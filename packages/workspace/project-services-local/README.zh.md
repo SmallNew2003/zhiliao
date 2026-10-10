@@ -29,6 +29,14 @@ kind: "package-reference"
 
 日志读取方各自拥有游标。`RetainedServiceLog` 保留 UTF-8 尾部，报告丢失字节，并将 JSON 元数据计入请求的字节上限。无法容纳元数据和一个字符的过小上限会被拒绝。提供方扫描过期或失败时保留最近观察到的行，标记 `stale: true` 并清空操作。每个保留行仍经过当前读取策略过滤，过期观察不能授权变更。
 
+在 macOS 上加载可选的 `@deepseek-ai/dsh-project-services-local/native` 提供方，即可观察 TCP 监听器并运行受管命令。外部记录按规范化工作目录关联，不提供生命周期操作或捕获输出。TCP 端口不能证明存在 HTTP 或 HTTPS URL。结构化 `lsof` 字段和有界的 `ps` 创建时间观察会排除扫描期间发生变化的进程；扫描失败时，运行时保留显式标记为陈旧的清单。并发读取方仅共享当前归 Host 所有的原始扫描，各自独立取消。完成的观察不被缓存；工作目录关联、受管状态和读取权限逐读取方组装。
+
+原生提供方配置使用显式 `shellPath`（`/bin/bash`）、`retainedOutputBytes`（1,048,576）、`terminationGraceMs`（5,000）、`scanTimeoutMs`（10,000）、`scanMaxBytes`（1,048,576）、`processInspectionMax`（200）、`captureIntervalMs`（25）和 `historyMaxInstances`（200）。数值字段均为正整数。历史上限淘汰最早停止的实例及其日志，同时保留所有活动范围；旧身份绝不指向替代实例。已淘汰实例的读取会报不可用。
+
+人类启动准备会解析配置的本地 shell 和命令可执行文件。Agent 调用方使用原生入口导出的 `createShellServiceExecution(initiatingContext, ctx.nativeProjectServices.lifetime, request)`，传入当前沙箱策略和临时环境。工厂要求声明 POSIX 命令语法，捕获实际 shell 已准备的隔离，并请求保留至范围退出的输出；提供方要求 subprocess realm 相同且 Host 生命周期信号完全一致，因此归 Session 所有的适配器会被拒绝。重启审批同时列明现有实例和预留的替代实例身份。停止前会预检启动与终止两个阶段；每次启动都有独立 id 和保留输出。发布后的发起方取消与发起作用域释放不会终止范围；提供方/Host 释放会中止待处理启动、回滚延迟取得的句柄、终止受管范围并等待完全停稳。
+
+原生生命周期状态依据所拥有的范围，而非直接 shell 的结果。直接退出码/信号事实独立可见。可选的提供方成员观察只在当前存在肯定所有权证据时去除重复的受管监听器记录；不支持观察时保留外部记录。macOS 成员关系和创建时间标签属于观察结果，受 subprocess 提供方记录的进程组限制约束；它们绝不授权向外部数字 PID 发信号。
+
 <a id="implementation"></a>
 ## 实现
 

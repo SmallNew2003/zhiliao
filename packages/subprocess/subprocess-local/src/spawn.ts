@@ -8,7 +8,7 @@
  * @module dsh-subprocess-local/spawn
  */
 
-import { type ChildProcess, type SpawnOptions, spawn, spawnSync } from 'node:child_process'
+import { type ChildProcess, type SpawnOptions, spawn, spawnSync, execFile } from 'node:child_process'
 import type { Readable } from 'node:stream'
 import { setTimeout as sleepMs } from 'node:timers/promises'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
@@ -204,6 +204,7 @@ function fallbackOwner(
   taskkill: (pid: number) => void,
   linuxGroupHasLiveMembers: (processGroupId: number) => boolean | undefined,
   direct: Promise<SubprocessOutcome>,
+  specObservationTimeout: number,
 ): BoundProcessOwner {
   let stopped = false
   let directSettled = false
@@ -231,6 +232,18 @@ function fallbackOwner(
   }
 
   return {
+    ownsProcess: async (candidate) => {
+      if (stopped || pid === undefined) return false
+      if (platform !== 'darwin') return undefined
+      return new Promise((resolve) => {
+        execFile('/bin/ps', ['-o', 'pgid=', '-p', String(candidate)], { timeout: specObservationTimeout, maxBuffer: 1024 }, (error, stdout) => {
+          if (stopped) { resolve(false); return }
+          if (error !== null) { resolve(undefined); return }
+          const group = Number(stdout.trim())
+          resolve(Number.isSafeInteger(group) && group > 0 ? group === pid : undefined)
+        })
+      })
+    },
     signal: (signal) => {
       if (!alive()) {
         stopped = true
@@ -301,11 +314,31 @@ export function bindManagedProcess(
   const stdoutClosed = observeOutputStream(outMode, stdout)
   const stderrClosed = observeOutputStream(errMode, stderr)
   const outputStreamsClosed = Promise.all([stdoutClosed, stderrClosed])
-  const stopCollectors = (): void => {
-    if (stdoutCollector !== undefined) stdout?.destroy()
-    if (stderrCollector !== undefined) stderr?.destroy()
-    stdoutCollector?.seal()
-    stderrCollector?.seal()
+  const stdoutThroughRange = isCollect(outMode) && outMode.untilRangeExit === true
+  const stderrThroughRange = isCollect(errMode) && errMode.untilRangeExit === true
+  const stopCollectors = (lifetime: 'all' | 'direct' | 'range' = 'all'): void => {
+    if (lifetime === 'all' || (lifetime === 'range') === stdoutThroughRange) {
+      if (stdoutCollector !== undefined) stdout?.destroy()
+      stdoutCollector?.seal()
+    }
+    if (lifetime === 'all' || (lifetime === 'range') === stderrThroughRange) {
+      if (stderrCollector !== undefined) stderr?.destroy()
+      stderrCollector?.seal()
+    }
+  }
+  const drainRangeOutput = async (): Promise<void> => {
+    if (!stdoutThroughRange && !stderrThroughRange) return
+    let drainTimer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        Promise.all([stdoutThroughRange ? stdoutClosed : undefined, stderrThroughRange ? stderrClosed : undefined]),
+        new Promise<void>((resolve) => { drainTimer = setTimeout(resolve, spec.graceMs) }),
+      ])
+    } finally {
+      if (drainTimer !== undefined) clearTimeout(drainTimer)
+      stopCollectors('range')
+      await Promise.all([stdoutThroughRange ? stdoutClosed : undefined, stderrThroughRange ? stderrClosed : undefined])
+    }
   }
 
   let graceTimer: ReturnType<typeof setTimeout> | undefined
@@ -335,6 +368,7 @@ export function bindManagedProcess(
       if (graceTimer !== undefined) clearTimeout(graceTimer)
       graceTimer = undefined
       spec.signal?.removeEventListener('abort', onAbort)
+      await drainRangeOutput()
       scheduleOwnerCleanup()
     })().catch((error: unknown) => {
       if (!settled || !scheduleOwnerCleanup()) rangeExitObservation = undefined
@@ -387,7 +421,7 @@ export function bindManagedProcess(
       settled = true
       // Only harness-collected pipes are force-closed at the drain boundary;
       // a 'pipe'-mode stream belongs to the caller and closes with the child.
-      stopCollectors()
+      stopCollectors('direct')
       cleanup()
       resolve(outcome)
     }
@@ -416,10 +450,10 @@ export function bindManagedProcess(
   })
 
   const waitForExit = async (signal?: AbortSignal): Promise<boolean> => {
-    if (rangeExitObserved) return true
     return waitWithAbort(observeRangeExit(), signal)
   }
 
+  const ownsProcess = launch.owner.ownsProcess?.bind(launch.owner)
   return {
     /* v8 ignore start -- pipe-mode streams exist on every conforming launch;
        the null-coalesces guard an internal adapter defect only. */
@@ -436,6 +470,9 @@ export function bindManagedProcess(
     terminate,
     terminateForHostExit,
     waitForExit,
+    ...ownsProcess === undefined ? {} : {
+      ownsProcess: async (pid: number): Promise<boolean | undefined> => rangeExitObserved ? false : ownsProcess(pid),
+    },
   }
 }
 
@@ -474,6 +511,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
     internals.taskkill ?? taskkillProcessTree,
     internals.linuxProcessGroupHasLiveMembers ?? linuxProcessGroupHasLiveMembers,
     direct,
+    spec.graceMs,
   )
   return bindManagedProcess(spec, {
     stdin: child.stdin,

@@ -70,6 +70,8 @@ if (result.timedOut) console.log('timed out after', result.timeoutMs)
 
 -----
 
+`prepare(spec)` 在不创建进程的情况下解析精确的后台启动。其 `PreparedShellLaunch.start(hostSignal)` 使用传入的发布生命周期，而非准备阶段取消；不支持准备的提供方会拒绝。即使 `done` 已结算，`ShellProcess.terminate()` 仍会等待整个所拥有范围终止，而 `waitForExit()` 独立观察范围完全停稳。`kill()` 和 `done` 保留直接命令语义。可选 `ownsProcess(pid)` 仅提供只读成员证据，绝不授予向外部 PID 发信号的权限。 `captureRangeOutput: true` 将收集保留到范围退出及有界的最终排空完成；默认收集仍在直接完成时结束。仅接受 POSIX argv 引用的提供方将 `supportsPosixCommandSyntax` 设为 true。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 

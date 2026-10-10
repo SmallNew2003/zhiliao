@@ -12,7 +12,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { SHELL_SETTINGS_NAMESPACE, ShellExecutor } from '@deepseek-ai/dsh-shell'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult, CollectedOutput } from '@deepseek-ai/dsh-shell'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult, CollectedOutput, PreparedShellLaunch } from '@deepseek-ai/dsh-shell'
 import type { SubprocessCollect, SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-settings'
 import { clampTimeout, deadline, MAX_TIMER_DELAY_MS, timeoutOf } from '@deepseek-ai/dsh-timeout'
@@ -138,6 +138,9 @@ export class LocalBashExecutor extends ShellExecutor {
     })
   }
 
+  /** @inheritdoc */
+  override get supportsPosixCommandSyntax(): boolean { return true }
+
   /**
    * Resolve a request into a fully-specified spec: fill `workdir` from
    * `config.cwd` (else `process.cwd()`), and `timeoutMs` from
@@ -156,6 +159,7 @@ export class LocalBashExecutor extends ShellExecutor {
     assertPositiveFinite('request.stdoutMaxBytes', stdoutMaxBytes)
     return {
       command: request.command,
+      ...request.captureRangeOutput === true ? { captureRangeOutput: true as const } : {},
       workdir: request.workdir ?? this.config.cwd ?? process.cwd(),
       timeoutMs,
       stdoutMaxBytes,
@@ -181,7 +185,9 @@ export class LocalBashExecutor extends ShellExecutor {
     signal: AbortSignal | undefined,
   ): SubprocessSpawnSpec {
     const collect = (maxBytes: number): SubprocessCollect =>
-      ({ maxBytes, spill: { maxBytes: this.config.maxSpillBytes } })
+      ({ maxBytes, spill: { maxBytes: this.config.maxSpillBytes },
+        ...spec.captureRangeOutput === true ? { untilRangeExit: true as const } : {},
+      })
     return {
       argv,
       cwd: spec.workdir,
@@ -268,6 +274,22 @@ export class LocalBashExecutor extends ShellExecutor {
     }
   }
 
+  /** @inheritdoc */
+  override async prepare(spec: ShellExecSpec): Promise<PreparedShellLaunch> {
+    spec.signal?.throwIfAborted()
+    const argv = ['bash', '-c', spec.command]
+    const program = await this.ctx.subprocess.resolveExecutable(argv[0] as string, spec.env, spec.signal)
+    spec.signal?.throwIfAborted()
+    const captured = {
+      ...spec, signal: undefined,
+      sandboxPolicy: spec.sandboxPolicy === undefined ? undefined : { ...spec.sandboxPolicy },
+      env: spec.env === undefined ? undefined : { ...spec.env },
+      dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
+    }
+    const resolved = [program, ...argv.slice(1)]
+    return { start: async signal => this.startArgv({ ...captured, signal }, resolved) }
+  }
+
   async start(spec: ShellExecSpec): Promise<ShellProcess> {
     return Promise.resolve(this.startArgv(spec, ['bash', '-c', spec.command]))
   }
@@ -285,6 +307,7 @@ export class LocalBashExecutor extends ShellExecutor {
     // Background runs ignore timeoutMs; callers stop them through kill() or spec.signal.
     spec.signal?.throwIfAborted()
     const running = this.ctx.subprocess.spawn(this.spawnSpec(spec, argv, this.config.maxOutputBytes, spec.signal))
+    const ownsProcess = running.ownsProcess?.bind(running)
     const collected = LocalBashExecutor.collected(running)
 
     // A provider rejection has no direct outcome to display; its stage is not
@@ -344,6 +367,9 @@ export class LocalBashExecutor extends ShellExecutor {
           ...err.spillPath !== undefined ? { stderrSpillPath: err.spillPath } : {},
         }
       },
+      terminate: async (): Promise<void> => { running.terminate(); await running.waitForExit() },
+      waitForExit: async (): Promise<void> => { await running.waitForExit() },
+      ...ownsProcess === undefined ? {} : { ownsProcess },
       kill: (): boolean => {
         if (proc.status !== 'running') return false
         proc.status = 'killed'

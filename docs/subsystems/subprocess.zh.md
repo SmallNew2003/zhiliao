@@ -57,6 +57,8 @@ type SubprocessStdinMode = 'ignore' | 'pipe' | { readonly data: string }
  * the complete stream recoverable up to its cap (the bash tool shape).
  */
 interface SubprocessCollect {
+  /** Keep this captured stream alive through owned-range exit and bounded final pipe drain. */
+  untilRangeExit?: true
   /** In-memory cap in bytes; overflow keeps the TAIL. */
   maxBytes: number
   /** Full-stream spill file; absent disables spilling entirely. */
@@ -164,6 +166,12 @@ interface SubprocessHandle {
    * gone, and also triggered by the spec's abort signal.
    */
   terminate(): void
+  /**
+   * Observe current membership in this still-owned range; never grants authority to signal a PID.
+   * @param pid - Currently observed local process id.
+   * @returns True for observed membership, false for confirmed absence, undefined when unverifiable.
+   */
+  ownsProcess?(pid: number): Promise<boolean | undefined>
   /**
    * Wait until the same managed range is empty — not just until the spawned
    * command reports its outcome, so surviving work remains observable.

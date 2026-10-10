@@ -40,6 +40,8 @@ class StubExecutor extends ShellExecutor {
       signal: null,
       done: Promise.resolve(),
       readOutput: (): ShellProcessRead => ({ delta: '', lossy: false }),
+      terminate: async () => {},
+      waitForExit: async () => {},
       kill: (): boolean => {
         if (proc.status !== 'running') return false
         proc.status = 'killed'
@@ -51,6 +53,12 @@ class StubExecutor extends ShellExecutor {
 }
 
 describe('ShellExecutor service seam', () => {
+  it('refuses preparation when the provider cannot preflight its launch', async () => {
+    const ctx = new Context(), fiber = await ctx.plugin(StubExecutor)
+    try { await expect(ctx.shell.prepare(ctx.shell.resolve({ command: 'command' }))).rejects.toThrow('does not support') }
+    finally { await fiber.dispose() }
+  })
+
   it('a concrete subclass registers as ctx.shell and serves the abstract API', async () => {
     const ctx = new Context()
     await ctx.plugin(StubExecutor)

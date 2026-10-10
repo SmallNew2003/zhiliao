@@ -3,7 +3,7 @@
  * @module
  */
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { SubprocessHandle, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessOutcome } from '@deepseek-ai/dsh-subprocess'
 
 /** Canonical repository identity within one execution world. */
 export type ServiceProjectId = Branded<'ServiceProjectId'>
@@ -119,6 +119,8 @@ export interface ResolvedServiceOperation {
   /** Nonempty exact instance set, including the reserved identity of a new launch. */
   targets: readonly { id: ServiceTargetId; revision: ServiceRevision }[]
   nativeLaunch?: {
+    /** Reserved identity of the range created by this launch. */
+    targetId?: ServiceTargetId
     command: ServiceCommand
     cwd: string
     executionIdentity: ServiceExecutionIdentity
@@ -135,15 +137,52 @@ export type ServiceReadable =
   | ServiceProject | ServiceCheckout | ServiceItem | ServiceGroup
   | ServiceDefinition | ServiceAssociation | ServiceOperation | ServiceProviderStatus
 
-/** Trusted native adapter applies sandbox policy before returning an owned process range. */
-export interface ServiceNativeExecution {
+/** Host lifetime and subprocess realm captured by the native provider. */
+export interface ServiceNativeLifetime {
+  subprocessRealm: symbol | undefined
+  signal: AbortSignal
+}
+
+/** Owned native range with one consuming output stream and independent exit facts. */
+export interface ServiceNativeProcess {
+  done: Promise<SubprocessOutcome>
+  /** Read newly captured output once, for retention by the native provider. */
+  readOutput(): { text: string; lossy: boolean }
+  /** Terminate the owned range and await quiescence; failures reject. */
+  terminate(): Promise<void>
+  /** Wait for range quiescence, independent of direct command outcome. */
+  waitForExit(): Promise<void>
   /**
-   * Launch an approved command with transient environment supplied only through this Host adapter.
-   * @param spec - Fully resolved native launch.
-   * @param signal - Launch cancellation owned by the operation.
-   * @returns Owned range. Its direct-child outcome does not imply range quiescence.
+   * Observe provider-owned membership without external signalling authority.
+   * @param pid - Currently observed process id.
+   * @returns Membership or undefined when unavailable.
    */
-  spawn(spec: SubprocessSpawnSpec, signal: AbortSignal): Promise<SubprocessHandle>
+  ownsProcess?(pid: number): Promise<boolean | undefined>
+}
+
+/** Exact launch facts and a capability that uses Host cancellation at publication. */
+export interface ServiceNativeLaunch {
+  command: ServiceCommand
+  cwd: string
+  /**
+   * Start the prepared native range.
+   * @param signal - Host-owned cancellation.
+   * @returns Owned process range.
+   */
+  start(signal: AbortSignal): Promise<ServiceNativeProcess>
+}
+
+/** Trusted shell adapter preflights confinement and shares the native provider's Host lifetime. */
+export interface ServiceNativeExecution {
+  lifetime: ServiceNativeLifetime
+  /**
+   * Resolve all launch prerequisites without creating a process.
+   * @param command - Authorized argv to execute through the sandboxed shell.
+   * @param cwd - Exact checkout directory.
+   * @param signal - Preparation cancellation.
+   * @returns Exact resolved launch capability.
+   */
+  resolve(command: ServiceCommand, cwd: string, signal: AbortSignal): Promise<ServiceNativeLaunch>
 }
 
 /** Trusted same-process authority. JSON requests cannot supply these callbacks. */

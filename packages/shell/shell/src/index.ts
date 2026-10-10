@@ -7,7 +7,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SandboxMode } from '@deepseek-ai/dsh-sandbox'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from './types.ts'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult, PreparedShellLaunch } from './types.ts'
 
 /**
  * Settings namespace of this capability, owned here rather than by either
@@ -25,6 +25,7 @@ export type {
   ShellExecRequest,
   ShellExecSpec,
   ShellProcess,
+  PreparedShellLaunch,
   ShellProcessRead,
   ShellProcessStatus,
   ShellRunResult,
@@ -76,6 +77,9 @@ export abstract class ShellExecutor extends Service {
     return undefined
   }
 
+  /** Whether command strings accept POSIX argv quoting; unknown providers report false. */
+  get supportsPosixCommandSyntax(): boolean { return false }
+
   /**
    * Apply implementation-owned defaults and caps to a request before execution.
    * @param request - the caller's request; omitted fields get this
@@ -99,6 +103,15 @@ export abstract class ShellExecutor extends Service {
    * @returns the live process handle after preparation; cancellation or setup failure rejects.
    */
   abstract start(spec: ShellExecSpec): Promise<ShellProcess>
+
+  /**
+   * Prepare every launch prerequisite without creating a process.
+   * @param _spec - Resolved command and preparation cancellation.
+   * @returns Exact launch capability; unsupported providers reject.
+   */
+  prepare(_spec: ShellExecSpec): Promise<PreparedShellLaunch> {
+    return Promise.reject(new Error('Shell provider does not support launch preparation'))
+  }
 }
 
 export default ShellExecutor

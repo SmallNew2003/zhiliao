@@ -10,7 +10,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
-import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@deepseek-ai/dsh-shell'
+import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult, PreparedShellLaunch } from '@deepseek-ai/dsh-shell'
 import { SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import type {
   ConfinedArgv,
@@ -124,32 +124,40 @@ export class SandboxBashExecutor extends LocalBashExecutor {
   }
 
   override async start(spec: ShellExecSpec): Promise<ShellProcess> {
+    if (spec.sandboxPolicy?.mode === 'danger-full-access') return super.start(spec)
+    const prepared = await this.prepare(spec)
+    return prepared.start(spec.signal ?? new AbortController().signal)
+  }
+
+  /** @inheritdoc */
+  override async prepare(spec: ShellExecSpec): Promise<PreparedShellLaunch> {
     const policy = spec.sandboxPolicy as SandboxExecutionPolicy
     const { mode } = policy
-    if (mode === 'danger-full-access') return super.start(spec)
+    if (mode === 'danger-full-access') return super.prepare(spec)
     const confined = await this.confine(spec.command, { ...policy, mode }, spec.signal)
     spec.signal?.throwIfAborted()
-    let proc: ShellProcess
-    try {
-      proc = this.startArgv(spec, confined.argv)
-    } catch (error) {
-      // LocalSubprocessRuntime reports ENOENT/EACCES with the failed executable path through async
-      // `done` rejection; this covers alternatives that throw the same error synchronously.
-      if (isRunnerSpawnFailure(error, confined.argv[0], spec.workdir)) {
-        throw new SandboxUnavailableError(mode, String(error))
-      }
-      throw error
+    const argv = [...confined.argv]
+    const captured = {
+      ...spec, signal: undefined,
+      sandboxPolicy: spec.sandboxPolicy === undefined ? undefined : { ...spec.sandboxPolicy },
+      env: spec.env === undefined ? undefined : { ...spec.env },
+      dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
     }
-    const { enforcement, denialSignatures, runnerFailureRules } = confined
-    this.processFacts.set(proc, {
-      mode,
-      enforcement,
-      denialSignatures,
-      runnerFailureRules,
-      runnerProgram: confined.argv[0],
-      workdir: spec.workdir,
-    })
-    return proc
+    return { start: async (signal) => {
+      signal.throwIfAborted()
+      const launchSpec = { ...captured, signal }
+      let proc: ShellProcess
+      try { proc = this.startArgv(launchSpec, argv) }
+      catch (error) {
+        if (isRunnerSpawnFailure(error, argv[0], captured.workdir)) throw new SandboxUnavailableError(mode, String(error))
+        throw error
+      }
+      this.processFacts.set(proc, {
+        mode, enforcement: confined.enforcement, denialSignatures: confined.denialSignatures,
+        runnerFailureRules: confined.runnerFailureRules, runnerProgram: argv[0], workdir: captured.workdir,
+      })
+      return proc
+    } }
   }
 
   /**

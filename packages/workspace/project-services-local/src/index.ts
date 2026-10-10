@@ -351,13 +351,20 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     }
     const targetIds = description.targets.map(item => item.id)
     if (targetIds.length === 0) throw new Error('Provider supplied no resolved service targets')
+    if (new Set(targetIds).size !== targetIds.length) throw new Error('Provider supplied duplicate service targets')
+    const launchTargetId = description.nativeLaunch?.targetId
+    if (launchTargetId !== undefined && (!targetIds.includes(launchTargetId)
+      || [...items, ...groups, ...context.definitions].some(item => item.id === launchTargetId))) {
+      throw new Error('Native launch target identity is already claimed or unreserved')
+    }
+    const existingTargetIds = targetIds.filter(id => id !== launchTargetId)
     const requestedIds = target !== undefined && 'targetIds' in target ? target.targetIds : target === undefined ? [] : [target.id]
     if (definition === undefined && target !== undefined
-      && JSON.stringify([...targetIds].sort()) !== JSON.stringify([...requestedIds].sort())) {
+      && JSON.stringify([...existingTargetIds].sort()) !== JSON.stringify([...requestedIds].sort())) {
       throw new Error('Provider resolved different service targets')
     }
     if (definition !== undefined && request.action !== 'start'
-      && targetIds.some(id => !items.some(item => item.id === id && item.definitionId === definition.id))) {
+      && existingTargetIds.some(id => !items.some(item => item.id === id && item.definitionId === definition.id))) {
       throw new Error('Definition operation resolved an unrelated instance')
     }
     const lockKeys: string[] = [...targetIds, ...requestedIds]
@@ -375,6 +382,9 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       if (fresh.project.id !== context.project.id) throw new Error('Project changed during operation')
       const scan = await this.inspect(provider, fresh, preparationSignal)
       if (scan.status.state !== 'ready') throw new Error('Service observation is stale')
+      if (launchTargetId !== undefined && [...scan.items, ...scan.groups, ...fresh.definitions].some(item => item.id === launchTargetId)) {
+        throw new Error('Native launch target identity was claimed during preparation')
+      }
       const currentCheckouts = this.knownCheckouts(fresh, [scan])
       const currentCheckout = currentCheckouts.find(item => item.id === checkout.id)
       if (currentCheckout === undefined || currentCheckout.path !== checkout.path

@@ -394,6 +394,54 @@ it('rejects a new launch without a resolved instance reservation', async () => {
   await expect(h.runtime.control(h.access, { requestId: brandString<ServiceTypes.ServiceRequestId>('no-target'), action: 'start', definition: { name: 'unresolved', checkoutId: h.item().checkoutId, command: { argv: ['node'] } } }, signal())).rejects.toThrow(/resolved.*target|target.*resolved/)
   expect(h.executionCount).toBe(0)
 })
+
+it('authorizes and reserves both the old range and the replacement launch identity', async () => {
+  const h = await fixture(), prepare = h.provider.prepare, release = deferred()
+  cleanup.push(async () => { release.resolve() })
+  const replacement = brandString<ServiceTypes.ServiceTargetId>('native:replacement')
+  let executing = false, overlap = false
+  h.provider.prepare = async (...args) => {
+    const prepared = await prepare(...args)
+    return { ...prepared, description: { ...prepared.description,
+      targets: [...prepared.description.targets, { id: replacement, revision: brandString<ServiceTypes.ServiceRevision>('reserved') }],
+      nativeLaunch: { targetId: replacement, command: { argv: ['node'] }, cwd: h.root, executionIdentity: h.access.executionIdentity },
+    }, execute: async (opSignal) => {
+      executing = true; h.started.resolve(); await release.promise
+      const result = await prepared.execute(opSignal); executing = false
+      return result
+    } }
+  }
+  h.access.authorize = async (operation) => { expect(operation.targets.map(target => target.id)).toEqual([h.item().id, replacement]) }
+  const restarted = h.runtime.control(h.access, h.request('replace-range', 'restart'), signal())
+  await h.started.promise
+  const locks = Reflect.get(h.runtime, 'locks') as ServiceTargetLocks
+  const contender = locks.run([replacement], async () => { overlap = executing })
+  await new Promise<void>(resolve => setImmediate(resolve))
+  release.resolve(); await Promise.all([restarted, contender])
+  expect(overlap).toBe(false)
+})
+
+it('rejects a replacement identity already claimed before asking for approval', async () => {
+  const h = await fixture(), prepare = h.provider.prepare
+  const claimed = brandString<ServiceTypes.ServiceTargetId>('native:claimed')
+  const inspect = h.provider.inspect
+  h.provider.inspect = async (...args) => {
+    const snapshot = await inspect(...args)
+    return { ...snapshot, items: [...snapshot.items, { ...h.item(), id: claimed }] }
+  }
+  h.provider.prepare = async (...args) => {
+    const prepared = await prepare(...args)
+    return { ...prepared, description: { ...prepared.description,
+      targets: [...prepared.description.targets, { id: claimed, revision: h.item().revision }],
+      nativeLaunch: { targetId: claimed, command: { argv: ['node'] }, cwd: h.root, executionIdentity: h.access.executionIdentity },
+    } }
+  }
+  let asked = false
+  h.access.authorize = async () => { asked = true }
+  await expect(h.runtime.control(h.access, h.request('claimed-replacement', 'restart'), signal())).rejects.toThrow('already claimed')
+  expect(asked).toBe(false)
+  expect(h.executionCount).toBe(0)
+})
 it('keeps prior identities when an unavailable observation has no replacement rows', async () => {
   const h = await fixture(), inspect = h.provider.inspect
   await h.runtime.list(h.access, {}, signal())

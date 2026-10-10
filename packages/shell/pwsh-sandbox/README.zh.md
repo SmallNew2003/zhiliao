@@ -65,6 +65,8 @@ kind: "package-reference"
 
 -----
 
+`prepare(spec)` 在创建任何进程前解析隔离。返回的启动能力捕获精确的隔离 argv 和结算分类器，`start(hostSignal)` 使用这些事实，不再次解析隔离。启动前取消会拒绝。调用方可在当前服务继续存活时预检替代实例；策略复核与授权仍由调用方负责。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 

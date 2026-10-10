@@ -1412,6 +1412,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'nativeProjectServices',
+    summary: 'Native contribution; Session disposal cannot dispose its Host-owned process ranges.',
+    description: 'Native contribution; Session disposal cannot dispose its Host-owned process ranges.',
+    methods: [
+      {
+        signature: 'readonly lifetime: ServiceNativeLifetime',
+        description: 'Host lifetime identity used to construct a sandboxed native execution adapter.',
+        parameters: [],
+      },
+      {
+        signature: 'async inspect(context: ServiceProviderContext, signal: AbortSignal): Promise<ServiceProviderSnapshot>',
+        description: 'Observe managed ranges and project-associated external TCP listeners.',
+        parameters: [{ name: 'context', description: 'Current project and checkout facts.' }, { name: 'signal', description: 'Scan cancellation.' }],
+        returns: 'Listener rows; external processes remain read-only.',
+      },
+      {
+        signature: 'async prepare( context: ServiceProviderContext, request: ServiceControlRequest, access: ServiceAccess, signal: AbortSignal, ): Promise<PreparedServiceOperation>',
+        description: 'Resolve both restart phases and reserve the exact managed identity before authorization.',
+        parameters: [{ name: 'context', description: 'Current project, captured checkouts and definitions.' }, { name: 'request', description: 'Requested action.' }, { name: 'access', description: 'Trusted human or agent authority.' }, { name: 'signal', description: 'Prepublication cancellation.' }],
+        returns: 'Side-effect-free operation.',
+      },
+      {
+        signature: 'async logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>',
+        description: 'Read independently retained output from a managed instance.',
+        parameters: [{ name: 'target', description: 'Read-authorized service row.' }, { name: 'request', description: 'Cursor and complete JSON byte limit.' }, { name: 'signal', description: 'Read cancellation.' }],
+        returns: 'Managed output or an explicit external-log limitation.',
+      },
+      {
+        signature: 'subscribe(changed: () => void): () => void',
+        description: 'Subscribe to committed lifecycle changes.',
+        parameters: [{ name: 'changed', description: 'Host consumer callback.' }],
+        returns: 'Effect-owned unsubscribe.',
+      },
+    ],
+  },
+  {
     key: 'officeToPdf',
     summary: 'A provider lifetime owns all converters, queued calls, and temporary files.',
     description: 'A provider lifetime owns all converters, queued calls, and temporary files.',
@@ -1584,6 +1620,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'readonly telemetryDisabledEnv: string | undefined',
         description: 'Launch-time DSH_TELEMETRY_DISABLED value; any non-empty value opts out.',
         parameters: [],
+      },
+    ],
+  },
+  {
+    key: 'projectServices',
+    summary: 'Shared Host service; providers and consumers use the same authorization and revisions.',
+    description: 'Shared Host service; providers and consumers use the same authorization and revisions.',
+    methods: [
+      {
+        signature: 'abstract list(access: ServiceAccess, request: ServiceListRequest, signal: AbortSignal): Promise<ServiceInventory>',
+        description: 'Return a fresh read-authorized project snapshot.',
+        parameters: [{ name: 'access', description: 'Trusted caller.' }, { name: 'request', description: 'Paging options.' }, { name: 'signal', description: 'Cancellation.' }],
+        returns: 'Read-filtered inventory.',
+      },
+      {
+        signature: 'abstract logs(access: ServiceAccess, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>',
+        description: 'Read retained output without consuming another reader’s position.',
+        parameters: [{ name: 'access', description: 'Trusted caller.' }, { name: 'request', description: 'Independent reader.' }, { name: 'signal', description: 'Cancellation.' }],
+        returns: 'Bounded authorized output.',
+      },
+      {
+        signature: 'abstract control(access: ServiceAccess, request: ServiceControlRequest, signal: AbortSignal): Promise<ServiceControlResult>',
+        description: 'Authorize and publish one idempotent operation.',
+        parameters: [{ name: 'access', description: 'Trusted caller.' }, { name: 'request', description: 'Idempotent operation.' }, { name: 'signal', description: 'Initiator cancellation before publication.' }],
+        returns: 'Read-filtered operation status.',
+      },
+      {
+        signature: 'abstract follow(access: ServiceAccess, request: ServiceListRequest, signal: AbortSignal): AsyncIterable<ServiceFeedFrame>',
+        description: 'Subscribe to fresh baselines and ordered inventory updates.',
+        parameters: [{ name: 'access', description: 'Trusted caller.' }, { name: 'request', description: 'Snapshot options.' }, { name: 'signal', description: 'Subscription cancellation.' }],
+        returns: 'Fresh baseline followed by ordered updates.',
+      },
+      {
+        signature: 'abstract registerProvider(provider: ProjectServiceProvider): () => void',
+        description: 'Register one provider until its owning effect is disposed.',
+        parameters: [{ name: 'provider', description: 'Host contribution.' }],
+        returns: 'Effect-owned removal.',
       },
     ],
   },
@@ -2363,6 +2436,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Prepare a background process asynchronously and publish its live handle.',
         parameters: [{ name: 'spec', description: 'a resolved spec from {@link resolve}, never a raw request.' }],
         returns: 'the live process handle after preparation; cancellation or setup failure rejects.',
+      },
+      {
+        signature: 'prepare(_spec: ShellExecSpec): Promise<PreparedShellLaunch>',
+        description: 'Prepare every launch prerequisite without creating a process.',
+        parameters: [{ name: '_spec', description: 'Resolved command and preparation cancellation.' }],
+        returns: 'Exact launch capability; unsupported providers reject.',
       },
     ],
   },
@@ -5345,6 +5424,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface PreparedReferencedMessage {\n    content: ContentBlock[];\n    additionalContext?: UserMessage;\n}',
   },
   {
+    name: 'PreparedServiceOperation',
+    declaration: 'export interface PreparedServiceOperation {\n    description: ResolvedServiceOperation;\n    validate(signal: AbortSignal): Promise<void>;\n    execute(signal: AbortSignal): Promise<ServiceExecutionResult>;\n}',
+  },
+  {
+    name: 'PreparedShellLaunch',
+    declaration: 'export interface PreparedShellLaunch {\n    start(signal: AbortSignal): Promise<ShellProcess>;\n}',
+  },
+  {
     name: 'PrepareSessionOptions',
     declaration: 'export type PrepareSessionOptions = (CreateSessionOptions & {\n    readonly eventState?: undefined;\n}) | RestoredSessionOptions;',
   },
@@ -5391,6 +5478,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ProjectionSnapshot',
     declaration: 'export interface ProjectionSnapshot {\n    asOfSeq: SessionSeqCursor;\n    values: Partial<SessionProjectionMap>;\n}',
+  },
+  {
+    name: 'ProjectServiceProvider',
+    declaration: 'export interface ProjectServiceProvider {\n    id: ServiceProviderId;\n    kind: \'native\' | \'docker\';\n    inspect(context: ServiceProviderContext, signal: AbortSignal): Promise<ServiceProviderSnapshot>;\n    prepare(context: ServiceProviderContext, request: ServiceControlRequest, access: ServiceAccess, signal: AbortSignal): Promise<PreparedServiceOperation>;\n    logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>;\n    subscribe?(changed: () => void): () => void;\n}',
   },
   {
     name: 'PromptAssembly',
@@ -5565,6 +5656,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ResolvedRetryPolicy = ResolvedNormalRetryPolicy | ResolvedAlwaysRetryPolicy;',
   },
   {
+    name: 'ResolvedServiceOperation',
+    declaration: 'export interface ResolvedServiceOperation {\n    action: ServiceAction;\n    project: ServiceProject;\n    checkout: ServiceCheckout;\n    targets: readonly {\n        id: ServiceTargetId;\n        revision: ServiceRevision;\n    }[];\n    nativeLaunch?: {\n        targetId?: ServiceTargetId;\n        command: ServiceCommand;\n        cwd: string;\n        executionIdentity: ServiceExecutionIdentity;\n    };\n    docker?: {\n        context: string;\n        daemonId: string;\n        containerIds: readonly string[];\n    };\n}',
+  },
+  {
     name: 'ResolvedSubagentStartRequest',
     declaration: 'export interface ResolvedSubagentStartRequest extends SubagentStartRequest {\n    readonly descriptor: SubagentDescriptorData;\n}',
   },
@@ -5667,6 +5762,158 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ServerResponse',
     declaration: 'export interface ServerResponse {\n    readonly type: \'server-response\';\n    readonly rpcId: RpcId;\n    readonly result: ConnectionRpcResult<unknown>;\n}',
+  },
+  {
+    name: 'ServiceAccess',
+    declaration: 'export interface ServiceAccess {\n    actorId: ServiceActorId;\n    kind: \'human\' | \'agent\';\n    cwd: string;\n    executionIdentity: ServiceExecutionIdentity;\n    authorize(operation: ResolvedServiceOperation, signal: AbortSignal): Promise<void>;\n    canRead(resource: ServiceReadable, signal: AbortSignal): Promise<boolean>;\n    revalidate(signal: AbortSignal): Promise<void>;\n    nativeExecution?: ServiceNativeExecution;\n}',
+  },
+  {
+    name: 'ServiceAction',
+    declaration: 'export type ServiceAction = \'start\' | \'stop\' | \'restart\';',
+  },
+  {
+    name: 'ServiceActorId',
+    declaration: 'export type ServiceActorId = Branded<\'ServiceActorId\'>;',
+  },
+  {
+    name: 'ServiceAssociation',
+    declaration: 'export interface ServiceAssociation {\n    id: ServiceTargetId;\n    projectId: ServiceProjectId;\n    checkoutId: ServiceCheckoutId;\n    providerId: ServiceProviderId;\n    revision: ServiceRevision;\n}',
+  },
+  {
+    name: 'ServiceCheckout',
+    declaration: 'export interface ServiceCheckout {\n    availability: \'present\' | \'missing\';\n    id: ServiceCheckoutId;\n    projectId: ServiceProjectId;\n    path: string;\n}',
+  },
+  {
+    name: 'ServiceCheckoutId',
+    declaration: 'export type ServiceCheckoutId = Branded<\'ServiceCheckoutId\'>;',
+  },
+  {
+    name: 'ServiceCommand',
+    declaration: 'export interface ServiceCommand {\n    argv: readonly string[];\n}',
+  },
+  {
+    name: 'ServiceControlRequest',
+    declaration: 'export type ServiceControlRequest = {\n    requestId: ServiceRequestId;\n} & ({\n    action: \'start\';\n    definition: {\n        name: string;\n        checkoutId: ServiceCheckoutId;\n        command: ServiceCommand;\n    };\n} | {\n    action: ServiceAction;\n    targetId: ServiceTargetId;\n    expectedRevision: ServiceRevision;\n});',
+  },
+  {
+    name: 'ServiceControlResult',
+    declaration: 'export interface ServiceControlResult {\n    operation?: ServiceOperation;\n    pending?: boolean;\n}',
+  },
+  {
+    name: 'ServiceCursor',
+    declaration: 'export type ServiceCursor = Branded<\'ServiceCursor\'>;',
+  },
+  {
+    name: 'ServiceDefinition',
+    declaration: 'export interface ServiceDefinition {\n    id: ServiceTargetId;\n    projectId: ServiceProjectId;\n    checkoutId: ServiceCheckoutId;\n    name: string;\n    command: ServiceCommand;\n    revision: ServiceRevision;\n}',
+  },
+  {
+    name: 'ServiceExecutionIdentity',
+    declaration: 'export type ServiceExecutionIdentity = Branded<\'ServiceExecutionIdentity\'>;',
+  },
+  {
+    name: 'ServiceExecutionResult',
+    declaration: 'export interface ServiceExecutionResult {\n    outcomes: readonly ServiceTargetOutcome[];\n    associations?: readonly ServiceAssociation[];\n}',
+  },
+  {
+    name: 'ServiceFeedFrame',
+    declaration: 'export type ServiceFeedFrame = {\n    kind: \'baseline\' | \'updated\';\n    snapshot: ServiceInventory;\n};',
+  },
+  {
+    name: 'ServiceGroup',
+    declaration: 'export interface ServiceGroup {\n    id: ServiceTargetId;\n    providerId: ServiceProviderId;\n    projectId: ServiceProjectId;\n    checkoutId: ServiceCheckoutId;\n    name: string;\n    revision: ServiceRevision;\n    targetIds: readonly ServiceTargetId[];\n    stale?: boolean;\n}',
+  },
+  {
+    name: 'ServiceInventory',
+    declaration: 'export interface ServiceInventory {\n    project: ServiceProject;\n    checkouts: readonly ServiceCheckout[];\n    items: readonly ServiceItem[];\n    definitions: readonly ServiceDefinition[];\n    groups: readonly ServiceGroup[];\n    providers: readonly ServiceProviderStatus[];\n    operations: readonly ServiceOperation[];\n    revision: ServiceRevision;\n    nextCursor?: ServiceCursor;\n}',
+  },
+  {
+    name: 'ServiceItem',
+    declaration: 'export interface ServiceItem {\n    id: ServiceTargetId;\n    providerId: ServiceProviderId;\n    projectId: ServiceProjectId;\n    checkoutId: ServiceCheckoutId;\n    revision: ServiceRevision;\n    name: string;\n    kind: \'native\' | \'docker\';\n    state: \'running\' | \'stopped\' | \'starting\' | \'unknown\';\n    ownership: \'managed\' | \'external\';\n    actions: readonly ServiceAction[];\n    ports?: readonly number[];\n    command?: ServiceCommand;\n    detail?: string;\n    definitionId?: ServiceTargetId;\n    stale?: boolean;\n}',
+  },
+  {
+    name: 'ServiceListRequest',
+    declaration: 'export interface ServiceListRequest {\n    cursor?: ServiceCursor;\n    limit?: number;\n}',
+  },
+  {
+    name: 'ServiceLogChunk',
+    declaration: 'export interface ServiceLogChunk {\n    targetId: ServiceTargetId;\n    stream: \'stdout\' | \'stderr\' | \'combined\';\n    text: string;\n}',
+  },
+  {
+    name: 'ServiceLogPage',
+    declaration: 'export interface ServiceLogPage {\n    chunks: readonly ServiceLogChunk[];\n    nextCursor?: ServiceCursor;\n    truncated: boolean;\n    gap: boolean;\n    unavailable?: string;\n}',
+  },
+  {
+    name: 'ServiceLogsRequest',
+    declaration: 'export interface ServiceLogsRequest {\n    targetId: ServiceTargetId;\n    cursor?: ServiceCursor;\n    maxBytes?: number;\n}',
+  },
+  {
+    name: 'ServiceNativeExecution',
+    declaration: 'export interface ServiceNativeExecution {\n    lifetime: ServiceNativeLifetime;\n    resolve(command: ServiceCommand, cwd: string, signal: AbortSignal): Promise<ServiceNativeLaunch>;\n}',
+  },
+  {
+    name: 'ServiceNativeLaunch',
+    declaration: 'export interface ServiceNativeLaunch {\n    command: ServiceCommand;\n    cwd: string;\n    start(signal: AbortSignal): Promise<ServiceNativeProcess>;\n}',
+  },
+  {
+    name: 'ServiceNativeLifetime',
+    declaration: 'export interface ServiceNativeLifetime {\n    subprocessRealm: symbol | undefined;\n    signal: AbortSignal;\n}',
+  },
+  {
+    name: 'ServiceNativeProcess',
+    declaration: 'export interface ServiceNativeProcess {\n    done: Promise<SubprocessOutcome>;\n    readOutput(): {\n        text: string;\n        lossy: boolean;\n    };\n    terminate(): Promise<void>;\n    waitForExit(): Promise<void>;\n    ownsProcess?(pid: number): Promise<boolean | undefined>;\n}',
+  },
+  {
+    name: 'ServiceOperation',
+    declaration: 'export interface ServiceOperation {\n    id: ServiceOperationId;\n    requestId: ServiceRequestId;\n    actorId: ServiceActorId;\n    projectId: ServiceProjectId;\n    checkoutId: ServiceCheckoutId;\n    action: ServiceAction;\n    targetIds: readonly ServiceTargetId[];\n    state: \'running\' | \'succeeded\' | \'failed\';\n    outcomes: readonly ServiceTargetOutcome[];\n}',
+  },
+  {
+    name: 'ServiceOperationId',
+    declaration: 'export type ServiceOperationId = Branded<\'ServiceOperationId\'>;',
+  },
+  {
+    name: 'ServiceProject',
+    declaration: 'export interface ServiceProject {\n    id: ServiceProjectId;\n    path: string;\n    executionIdentity: ServiceExecutionIdentity;\n    gitCommonDir?: string;\n}',
+  },
+  {
+    name: 'ServiceProjectId',
+    declaration: 'export type ServiceProjectId = Branded<\'ServiceProjectId\'>;',
+  },
+  {
+    name: 'ServiceProviderContext',
+    declaration: 'export interface ServiceProviderContext {\n    project: ServiceProject;\n    checkouts: readonly ServiceCheckout[];\n    definitions: readonly ServiceDefinition[];\n    associations: readonly ServiceAssociation[];\n    pendingDefinition?: ServiceDefinition;\n}',
+  },
+  {
+    name: 'ServiceProviderId',
+    declaration: 'export type ServiceProviderId = Branded<\'ServiceProviderId\'>;',
+  },
+  {
+    name: 'ServiceProviderSnapshot',
+    declaration: 'export interface ServiceProviderSnapshot {\n    capturedCheckouts?: readonly ServiceCheckout[];\n    items: readonly ServiceItem[];\n    groups: readonly ServiceGroup[];\n    status: ServiceProviderStatus;\n}',
+  },
+  {
+    name: 'ServiceProviderStatus',
+    declaration: 'export interface ServiceProviderStatus {\n    id: ServiceProviderId;\n    kind: \'native\' | \'docker\';\n    state: \'ready\' | \'stale\' | \'unavailable\';\n    observedAt: number;\n    reason?: string;\n}',
+  },
+  {
+    name: 'ServiceReadable',
+    declaration: 'export type ServiceReadable = ServiceProject | ServiceCheckout | ServiceItem | ServiceGroup | ServiceDefinition | ServiceAssociation | ServiceOperation | ServiceProviderStatus;',
+  },
+  {
+    name: 'ServiceRequestId',
+    declaration: 'export type ServiceRequestId = Branded<\'ServiceRequestId\'>;',
+  },
+  {
+    name: 'ServiceRevision',
+    declaration: 'export type ServiceRevision = Branded<\'ServiceRevision\'>;',
+  },
+  {
+    name: 'ServiceTargetId',
+    declaration: 'export type ServiceTargetId = Branded<\'ServiceTargetId\'>;',
+  },
+  {
+    name: 'ServiceTargetOutcome',
+    declaration: 'export interface ServiceTargetOutcome {\n    targetId: ServiceTargetId;\n    state: \'succeeded\' | \'failed\' | \'unattempted\';\n    message?: string;\n}',
   },
   {
     name: 'Session',
@@ -6214,15 +6461,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ShellExecRequest',
-    declaration: 'export interface ShellExecRequest {\n    command: string;\n    workdir?: string | undefined;\n    timeoutMs?: number | undefined;\n    stdoutMaxBytes?: number | undefined;\n    signal?: AbortSignal | undefined;\n    stdin?: string | undefined;\n    env?: Record<string, string> | undefined;\n    dshEnv?: DshEnvironment | undefined;\n    sandboxPolicy?: SandboxExecutionPolicy | undefined;\n}',
+    declaration: 'export interface ShellExecRequest {\n    command: string;\n    captureRangeOutput?: true;\n    workdir?: string | undefined;\n    timeoutMs?: number | undefined;\n    stdoutMaxBytes?: number | undefined;\n    signal?: AbortSignal | undefined;\n    stdin?: string | undefined;\n    env?: Record<string, string> | undefined;\n    dshEnv?: DshEnvironment | undefined;\n    sandboxPolicy?: SandboxExecutionPolicy | undefined;\n}',
   },
   {
     name: 'ShellExecSpec',
-    declaration: 'export interface ShellExecSpec {\n    command: string;\n    workdir: string;\n    timeoutMs: number;\n    stdoutMaxBytes: number;\n    signal?: AbortSignal | undefined;\n    stdin?: string | undefined;\n    env?: Record<string, string> | undefined;\n    dshEnv?: DshEnvironment | undefined;\n    sandboxPolicy: SandboxExecutionPolicy | undefined;\n}',
+    declaration: 'export interface ShellExecSpec {\n    command: string;\n    captureRangeOutput?: true;\n    workdir: string;\n    timeoutMs: number;\n    stdoutMaxBytes: number;\n    signal?: AbortSignal | undefined;\n    stdin?: string | undefined;\n    env?: Record<string, string> | undefined;\n    dshEnv?: DshEnvironment | undefined;\n    sandboxPolicy: SandboxExecutionPolicy | undefined;\n}',
   },
   {
     name: 'ShellProcess',
-    declaration: 'export interface ShellProcess {\n    status: ShellProcessStatus;\n    exitCode: number | null;\n    signal: NodeJS.Signals | null;\n    readonly done: Promise<void>;\n    sandbox?: ShellSandboxInfo;\n    readOutput(): ShellProcessRead;\n    kill(): boolean;\n}',
+    declaration: 'export interface ShellProcess {\n    status: ShellProcessStatus;\n    exitCode: number | null;\n    signal: NodeJS.Signals | null;\n    readonly done: Promise<void>;\n    sandbox?: ShellSandboxInfo;\n    readOutput(): ShellProcessRead;\n    kill(): boolean;\n    terminate(): Promise<void>;\n    waitForExit(): Promise<void>;\n    ownsProcess?(pid: number): Promise<boolean | undefined>;\n}',
   },
   {
     name: 'ShellProcessRead',
@@ -6434,7 +6681,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessCollect',
-    declaration: 'export interface SubprocessCollect {\n    maxBytes: number;\n    spill?: {\n        maxBytes: number;\n    };\n}',
+    declaration: 'export interface SubprocessCollect {\n    untilRangeExit?: true;\n    maxBytes: number;\n    spill?: {\n        maxBytes: number;\n    };\n}',
   },
   {
     name: 'SubprocessCollectedOutputs',
@@ -6442,7 +6689,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubprocessHandle',
-    declaration: 'export interface SubprocessHandle {\n    readonly stdin: Writable | undefined;\n    readonly stdout: Readable | undefined;\n    readonly stderr: Readable | undefined;\n    readonly control: Duplex | undefined;\n    readonly collected: SubprocessCollectedOutputs;\n    readonly done: Promise<SubprocessOutcome>;\n    terminate(): void;\n    waitForExit(signal?: AbortSignal): Promise<boolean>;\n}',
+    declaration: 'export interface SubprocessHandle {\n    readonly stdin: Writable | undefined;\n    readonly stdout: Readable | undefined;\n    readonly stderr: Readable | undefined;\n    readonly control: Duplex | undefined;\n    readonly collected: SubprocessCollectedOutputs;\n    readonly done: Promise<SubprocessOutcome>;\n    terminate(): void;\n    ownsProcess?(pid: number): Promise<boolean | undefined>;\n    waitForExit(signal?: AbortSignal): Promise<boolean>;\n}',
   },
   {
     name: 'SubprocessOutcome',

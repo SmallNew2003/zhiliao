@@ -31,6 +31,9 @@
     },
     {
       "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../shell/shell"
     }
   ]
 }

@@ -30,6 +30,7 @@
     "paths": {
       "@deepseek-ai/dsh-project-services": ["./packages/workspace/project-services/src"],
       "@deepseek-ai/dsh-project-services/types": ["./packages/workspace/project-services/src/types.ts"],
+      "@deepseek-ai/dsh-project-services-local/native": ["./packages/workspace/project-services-local/src/native.ts"],
       "@deepseek-ai/dsh-project-services-local": ["./packages/workspace/project-services-local/src"],
       "@deepseek-ai/dsh/profile-boot": ["./apps/cli/src/profile-boot.ts"],
       "@deepseek-ai/dsh-browser-use": ["./packages/browser-use/browser-use/src/index.ts"],
