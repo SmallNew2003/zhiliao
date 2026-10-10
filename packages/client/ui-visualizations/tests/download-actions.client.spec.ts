@@ -6,7 +6,7 @@ import { downloadBytes, createDownloadNames } from '../src/client/downloads.ts'
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 it('creates a local download and revokes its URL after the click even if the browser rejects it', () => {
   vi.useFakeTimers()
-  const create = vi.fn(() => 'blob:test'), revoke = vi.fn()
+  const create = vi.fn<(blob: Blob) => string>(() => 'blob:test'), revoke = vi.fn()
   vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke })
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
     expect(this.download).toBe('title_20261010.html')

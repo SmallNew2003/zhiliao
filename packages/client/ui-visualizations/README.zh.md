@@ -51,9 +51,11 @@ HTML 下载会嵌入 Bootstrap 及所有声明的库，并恢复原始源码。M
 
 [清单](src/runtime-manifest.ts) 将 `dsh-v1` 固定为 Bootstrap 5.3.8、ECharts 6.1.0 和 Mermaid 11.16.0。按类型划分的源码资源块按需加载，仅共享不可变的库字节。构建产物保留各库许可证、ECharts 声明及其 d3 许可证，以及 Popper 和 zrender 许可证。浏览器入口不包含这些库的实现。
 
-[文档构建器](src/client/runtime/document.ts) 在可信引导代码之前放置限制性 CSP。不透明的 `allow-scripts` 框架自行创建已打包脚本的 Blob URL，建立绑定生成代次的私有端口，然后执行作者内容。[通信桥](src/client/runtime/bridge.ts) 接受有界的就绪、高度和错误消息，以及仅用于退出放大的框架内 Escape 通知，仅接收已请求且 MIME 经过检查的导出，不提供 Host 调度器。释放时会结束端口、超时任务、观察器及等待中的读取者。
+[文档构建器](src/client/runtime/document.ts) 在可信引导代码之前放置限制性 CSP。不透明的 `allow-scripts` 框架自行创建已打包脚本的 Blob URL，建立绑定生成代次的私有端口，然后执行作者内容。[通信桥](src/client/runtime/bridge.ts) 接受有界的就绪、高度和错误消息，以及仅用于退出放大的框架内 Escape 通知，仅接收已请求且 MIME 经过检查的导出，不提供 Host 调度器。辅助函数调用后的有界图表清单更新 PNG 操作与图表选择器。释放时会结束端口、超时任务、观察器及等待中的读取者。
 
 [预览组件](src/client/Preview.tsx) 消费框架绑定的主题及数量限制快照。Bootstrap 接收公开颜色和字体设置；`dsh.chart` 应用视觉默认值，返回原生 ECharts 实例，并负责尺寸观察和释放。主题更新保留作者 HTML 与图表交互。Mermaid 在框架内以严格安全模式渲染，其 SVG 不会进入应用 DOM。
+
+HTML 构建会等待外层文档的原生 load，安装作者 DOM，再按源码顺序运行作者脚本。内联模块及可执行脚本资源完成后，触发一次会冒泡的作者 `DOMContentLoaded` 事件并报告就绪。该事件用于初始化普通监听器，`document.readyState` 仍为 `complete`；这是合成事件，并非新的导航。离线 HTML 使用相同初始化过程。脚本失败或文档释放会在就绪前停止初始化。
 
 不发布运行时 invariant companion，因为框架状态与数量限制标识均由单个 Client 注册拥有，不存在可供比较的独立 Host 观测。定向生命周期测试覆盖注册释放、旧生成代次失效和活跃数量限制；构建运行时 e2e 检查验证清单、按需资源块、许可证与独立经典脚本。
 

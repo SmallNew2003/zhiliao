@@ -126,3 +126,27 @@ it('accepts Escape only from the live ready generation and retires it after fail
     expect(received).not.toHaveBeenCalled()
   } finally { bridge.dispose() }
 })
+
+it('validates live chart catalogs and ignores catalogs before readiness, after failure, or from stale generations', () => {
+  const received = vi.fn()
+  const port = { postMessage() {}, close() {}, start() {}, onmessage: null } as unknown as MessagePort
+  const bridge = new PreviewBridge(port, 'g', Config({}), received)
+  try {
+    bridge.receive({ generation: 'g', type: 'charts', charts: ['1'] })
+    expect(received).not.toHaveBeenCalled()
+    bridge.receive({ generation: 'g', type: 'ready', title: '', charts: [] })
+    received.mockClear()
+    for (const message of [
+      { generation: 'old', charts: ['1'] }, { generation: 'g', charts: 1 },
+      { generation: 'g', charts: Array(65).fill('1') }, { generation: 'g', charts: ['x'.repeat(129)] },
+      { generation: 'g', charts: [1] },
+    ]) bridge.receive({ type: 'charts', ...message })
+    expect(received).not.toHaveBeenCalled()
+    bridge.receive({ generation: 'g', type: 'charts', charts: ['2', '3'] })
+    expect(received).toHaveBeenCalledWith({ type: 'charts', charts: ['2', '3'] })
+    bridge.receive({ generation: 'g', type: 'error', error: 'failed' })
+    received.mockClear()
+    bridge.receive({ generation: 'g', type: 'charts', charts: ['4'] })
+    expect(received).not.toHaveBeenCalled()
+  } finally { bridge.dispose() }
+})

@@ -63,9 +63,9 @@ it('preserves its active iframe through source switching, enlargement, and settl
   await waitFor(() => { expect(view.container.querySelector('iframe')).not.toBeNull() })
   const frame = view.container.querySelector('iframe')!
   expect(frame.getAttribute('sandbox')).toBe('allow-scripts')
-  fireEvent.click(view.getByRole('button', { name: 'Source', exact: true }))
+  fireEvent.click(view.getByRole('button', { name: 'Source' }))
   expect(view.container.querySelector('iframe')).toBe(frame)
-  fireEvent.click(view.getByRole('button', { name: 'Preview', exact: true }))
+  fireEvent.click(view.getByRole('button', { name: 'Preview' }))
   const enlarge = view.getByRole('button', { name: 'Enlarge' }); enlarge.focus()
   fireEvent.click(enlarge)
   expect(view.getByRole('dialog')).toBeTruthy()
@@ -179,6 +179,28 @@ it('dismisses enlargement on frame Escape while keeping an inline frame active',
   expect(view.container.querySelector('iframe')).toBe(frame)
 })
 
+it('shows late chart exports and retains or repairs the selected chart as the catalog changes', async () => {
+  const channel = browserChannel(), view = render(<Preview {...harness()} />)
+  await waitFor(() => { expect(view.container.querySelector('iframe')).not.toBeNull() })
+  const frame = view.container.querySelector('iframe')!, connection = await channel.connect(frame)
+  await connection.respond({ type: 'ready', title: '', charts: [] })
+  expect(view.queryByRole('button', { name: 'Download PNG' })).toBeNull()
+  await connection.respond({ type: 'charts', charts: ['2', '3'] })
+  expect(view.getByRole('button', { name: 'Download PNG' })).toBeTruthy()
+  const chooser = view.getByRole('combobox', { name: 'Chart' }) as HTMLSelectElement
+  expect(chooser.value).toBe('2')
+  fireEvent.change(chooser, { target: { value: '3' } })
+  await connection.respond({ type: 'charts', charts: ['2', '3', '4'] })
+  expect(chooser.value).toBe('3')
+  await connection.respond({ type: 'charts', charts: ['4', '5'] })
+  expect(chooser.value).toBe('4')
+  fireEvent.click(view.getByRole('button', { name: 'Download PNG' }))
+  expect(connection.port.postMessage.mock.calls.at(-1)?.[0]).toMatchObject({ format: 'png', chart: '4' })
+  await connection.respond({ type: 'charts', charts: [] })
+  expect(view.queryByRole('button', { name: 'Download PNG' })).toBeNull()
+  expect(view.container.querySelector('iframe')).toBe(frame)
+})
+
 it('downloads source, offline HTML and a chosen helper chart only from toolbar gestures', async () => {
   const channel = browserChannel(), download = vi.fn<Parameters<typeof Preview>[0]['download']>()
   const props = { ...harness(), download }
@@ -197,7 +219,7 @@ it('downloads source, offline HTML and a chosen helper chart only from toolbar g
   expect(html).toContain('const offline = true;'); expect(html).not.toContain('dsh-preview-init')
   fireEvent.change(view.getByRole('combobox', { name: 'Chart' }), { target: { value: '2' } })
   fireEvent.click(view.getByRole('button', { name: 'Download PNG' }))
-  const request = connection.port.postMessage.mock.calls.at(-1)?.[0]
+  const request = connection.port.postMessage.mock.calls.at(-1)![0]
   expect(request).toMatchObject({ format: 'png', chart: '2' })
   await connection.respond({ type: 'export', requestId: request.requestId, mime: 'image/png', data: 'data:image/png;base64,iVBORw0KGgo=' })
   expect(download.mock.calls[2]?.[0].length).toBe(8)
@@ -220,7 +242,7 @@ it('exports Mermaid SVG and retires pending exports when a frame is reloaded', a
   fireEvent.click(view.getByRole('button', { name: 'Download source' }))
   expect(download.mock.calls[0]?.[2]).toBe('Visualization.mmd')
   fireEvent.click(view.getByRole('button', { name: 'Download SVG' }))
-  const request = connection.port.postMessage.mock.calls.at(-1)?.[0]
+  const request = connection.port.postMessage.mock.calls.at(-1)![0]
   await connection.respond({ type: 'export', requestId: request.requestId, mime: 'image/svg+xml', data: '<svg/>' })
   expect(download.mock.calls[1]?.[1]).toBe('image/svg+xml')
   fireEvent.click(view.getByRole('button', { name: 'Download SVG' }))
@@ -297,7 +319,7 @@ it('does not download an export settled in the same tick as owner removal', asyn
   const frame = view.container.querySelector('iframe')!, connection = await channel.connect(frame)
   await connection.respond({ type: 'ready', title: '', charts: [] })
   fireEvent.click(view.getByRole('button', { name: 'Download SVG' }))
-  const request = connection.port.postMessage.mock.calls.at(-1)?.[0]
+  const request = connection.port.postMessage.mock.calls.at(-1)![0]
   await act(async () => {
     connection.port.onmessage?.({ data: { type: 'export', generation: request.generation, requestId: request.requestId, mime: 'image/svg+xml', data: '<svg/>' } } as MessageEvent)
     view.unmount()

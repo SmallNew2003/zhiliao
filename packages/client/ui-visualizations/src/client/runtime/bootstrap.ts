@@ -3,11 +3,16 @@ export const bootstrapSource = String.raw`
 (async () => {
   const payload = __DSH_PAYLOAD__;
   const offline = __DSH_OFFLINE__;
-  let port, svg, theme = payload.theme, disposed = false, scheduled = false;
+  let port, svg, theme = payload.theme, disposed = false, scheduled = false, ready = false, failed = false;
+  const loaded = document.readyState === 'complete' ? Promise.resolve()
+    : new Promise(resolve => addEventListener('load', resolve, { once: true }));
   const urls = new Set(), charts = [];
   const nativePost = MessagePort.prototype.postMessage;
   const send = message => { if (port && !disposed) nativePost.call(port, { generation: payload.generation, ...message }); };
-  const failure = error => send({ type: 'error', error: String(error && error.message || error).slice(0, 1024) });
+  const failure = error => {
+    failed = true;
+    send({ type: 'error', error: String(error && error.message || error).slice(0, 1024) });
+  };
   const dispose = () => {
     if (disposed) return;
     disposed = true;
@@ -54,6 +59,7 @@ export const bootstrapSource = String.raw`
       observer.observe(element);
       const id = String(charts.length + 1);
       charts.push({ id, chart, observer });
+      if (ready) send({ type: 'charts', charts: chartNames() });
       return chart;
     }
   }), configurable: false, writable: false });
@@ -70,13 +76,18 @@ export const bootstrapSource = String.raw`
     document.head.append(element);
   });
   const run = async () => {
+    await loaded;
+    if (disposed || failed) return;
     for (const css of payload.assets.css) {
       const style = document.createElement('style'); style.textContent = css; document.head.append(style);
     }
     const style = document.createElement('style');
     style.textContent = 'html{overflow:auto}body{margin:0;padding:12px;min-height:0}svg{max-width:100%;height:auto}';
     document.head.append(style);
-    for (const bytes of payload.assets.scripts) await script(bytes);
+    for (const bytes of payload.assets.scripts) {
+      await script(bytes);
+      if (disposed || failed) return;
+    }
     updateTheme(theme);
     if (payload.language === 'mermaid') {
       window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict',
@@ -86,11 +97,11 @@ export const bootstrapSource = String.raw`
       document.body.innerHTML = svg;
     } else {
       const parsed = new DOMParser().parseFromString(payload.source, 'text/html');
+      const scripts = [];
       const append = (node, target) => {
         if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') {
-          const element = document.createElement('script');
-          for (const attribute of node.attributes) element.setAttribute(attribute.name, attribute.value);
-          element.textContent = node.textContent; target.append(element);
+          const marker = document.createComment(''); target.append(marker);
+          scripts.push({ node, marker });
         } else if (node.nodeType === Node.ELEMENT_NODE) {
           if (node.tagName === 'BASE' || node.tagName === 'META') return;
           const element = document.importNode(node, false); target.append(element);
@@ -99,9 +110,33 @@ export const bootstrapSource = String.raw`
       };
       for (const node of parsed.head.childNodes) append(node, document.head);
       for (const node of parsed.body.childNodes) append(node, document.body);
+      for (const { node, marker } of scripts) {
+        const element = document.createElement('script');
+        for (const attribute of node.attributes) element.setAttribute(attribute.name, attribute.value);
+        element.textContent = node.textContent;
+        const type = element.type.trim().toLowerCase();
+        let moduleUrl;
+        if (type === 'module' && !element.hasAttribute('src')) {
+          moduleUrl = URL.createObjectURL(new Blob([element.textContent], { type: 'application/javascript' }));
+          urls.add(moduleUrl); element.textContent = ''; element.src = moduleUrl;
+        }
+        const pending = type === 'module' || (element.hasAttribute('src')
+          && (!type || /^(?:text|application)\/(?:javascript|ecmascript)$/.test(type)))
+          ? new Promise((resolve, reject) => {
+            element.addEventListener('load', resolve, { once: true });
+            element.addEventListener('error', () => reject(new Error('Authored script failed to load')), { once: true });
+          }) : undefined;
+        marker.replaceWith(element);
+        try { if (pending) await pending; }
+        finally { if (moduleUrl) { URL.revokeObjectURL(moduleUrl); urls.delete(moduleUrl); } }
+        if (disposed || failed) return;
+      }
+      document.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }));
     }
+    if (disposed || failed) return;
     observer.observe(document.body); observeHeight();
     const title = (document.title || document.querySelector('h1,h2,h3,caption')?.textContent || '').trim().slice(0, 128);
+    ready = true;
     send({ type: 'ready', title, charts: chartNames() });
   };
   const handle = async event => {

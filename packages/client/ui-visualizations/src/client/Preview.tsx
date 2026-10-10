@@ -57,7 +57,7 @@ export function Preview(props: PreviewProps): ReactNode {
   const [title, setTitle] = useState('')
   const [height, setHeight] = useState(config.minHeight)
   const [charts, setCharts] = useState<readonly string[]>([])
-  const [chart, setChart] = useState('1')
+  const [chart, setChart] = useState('')
   const [copyLabel, setCopyLabel] = useState(false)
   const [exporting, setExporting] = useState(false)
   const language = matched.kind === 'valid' ? matched.language : undefined
@@ -117,10 +117,15 @@ export function Preview(props: PreviewProps): ReactNode {
       setFrame(undefined); setStatus('failed'); setError(t('navigated')); return
     }
     const channel = new MessageChannel()
+    const updateCharts = (values: readonly string[]): void => {
+      setCharts(values)
+      setChart(current => values.includes(current) ? current : values[0] ?? '')
+    }
     bridge.current = new PreviewBridge(channel.port1, runtimeDocument.generation, config, (message) => {
       switch (message.type) {
         case 'height': setHeight(message.height); return
-        case 'ready': setStatus('ready'); setTitle(message.title); setCharts(message.charts); bridge.current?.theme(latestTheme.current); return
+        case 'ready': setStatus('ready'); setTitle(message.title); updateCharts(message.charts); bridge.current?.theme(latestTheme.current); return
+        case 'charts': updateCharts(message.charts); return
         case 'escape': if (latestEnlarged.current) close(); return
         case 'error':
           setStatus('failed'); setError(message.error === 'readinessTimeout' ? t('readinessTimeout') : `${t('failed')}: ${message.error}`)
@@ -139,7 +144,7 @@ export function Preview(props: PreviewProps): ReactNode {
     setExporting(true)
     try {
       if (kind === 'source') {
-        download(new TextEncoder().encode(block.code), 'text/plain', filename(title || t('title'), language === 'html' ? 'html' : 'mmd'))
+        download(new TextEncoder().encode(block.code), 'text/plain', filename(title || t('title'), block.language === 'html' ? 'html' : 'mmd'))
       } else if (kind === 'html') {
         const html = createStandaloneDocument({ source: block.code, language: 'html', assets: (frame as NonNullable<typeof frame>).assets, theme: latestTheme.current })
         download(new TextEncoder().encode(html), 'text/html', filename(title || t('title'), 'html'))

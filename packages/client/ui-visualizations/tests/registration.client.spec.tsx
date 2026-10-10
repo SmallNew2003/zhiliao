@@ -40,10 +40,11 @@ it('declines ordinary code, owns invalid marked metadata, and removes the provid
   await waitFor(() => { expect(view.getByRole('alert').textContent).toContain('runtime is unavailable') })
   const create = vi.fn(() => 'blob:source'), revoke = vi.fn()
   const OriginalURL = URL
-  vi.stubGlobal('URL', class extends OriginalURL { static createObjectURL = create; static revokeObjectURL = revoke })
+  vi.stubGlobal('URL', class extends OriginalURL { static override createObjectURL = create; static override revokeObjectURL = revoke })
   const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
   fireEvent.click(view.getByRole('button', { name: 'Download source' }))
   expect(click).toHaveBeenCalledOnce()
+  expect((click.mock.contexts[0] as HTMLAnchorElement).download).toMatch(/\.html$/u)
   await waitFor(() => { expect(revoke).toHaveBeenCalledWith('blob:source') })
   await act(async () => { setCurrent({ ...source, meta: 'preview runtime=dsh-v1' }) })
   await waitFor(() => { expect(view.container.querySelector('iframe')).not.toBeNull() })

@@ -4,6 +4,8 @@ import type { Config } from '../../config.ts'
 /** Messages that may update one live preview. */
 export type PreviewMessage =
   | { readonly type: 'ready'; readonly title: string; readonly charts: readonly string[] }
+  /** Live helper-owned chart identities; bounded like the initial ready catalog. */
+  | { readonly type: 'charts'; readonly charts: readonly string[] }
   | { readonly type: 'height'; readonly height: number }
   | { readonly type: 'error'; readonly error: string }
   /** Frame-local Escape may dismiss enlargement; it exposes no Host action. */
@@ -20,6 +22,11 @@ type PendingExport = {
   readonly resolve: (result: ExportResult) => void
   readonly reject: (error: Error) => void
   readonly timer: ReturnType<typeof setTimeout>
+}
+
+function validCharts(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length <= 64
+    && value.every(chart => typeof chart === 'string' && chart.length <= 128)
 }
 
 /**
@@ -83,11 +90,13 @@ export class PreviewBridge {
     switch (message.type) {
       case 'ready':
         if (this.ready || this.failed || typeof message.title !== 'string' || new TextEncoder().encode(message.title).length > 512
-          || !Array.isArray(message.charts) || message.charts.length > 64
-          || message.charts.some(chart => typeof chart !== 'string' || chart.length > 128)) return
+          || !validCharts(message.charts)) return
         this.ready = true
         clearTimeout(this.readiness)
-        this.onMessage({ type: 'ready', title: message.title, charts: message.charts as string[] })
+        this.onMessage({ type: 'ready', title: message.title, charts: message.charts })
+        return
+      case 'charts':
+        if (this.ready && !this.failed && validCharts(message.charts)) this.onMessage({ type: 'charts', charts: message.charts })
         return
       case 'height':
         if (this.failed || typeof message.height !== 'number' || !Number.isFinite(message.height)) return
