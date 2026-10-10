@@ -2,6 +2,7 @@ import { Fragment, memo, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownFileMentions, MarkdownPathImages } from '@deepseek-ai/dsh-client-ui-primitives'
+import { resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { AssistantBlock } from '../contract/snapshot.ts'
 import { markdownLabels } from '../markdown-labels.ts'
@@ -14,15 +15,22 @@ import css from './AssistantMarkdown.module.css'
  * @param protocol - `window.location.protocol` at render time.
  * @param origin - `window.location.origin` at render time.
  * @param value - The authored markdown destination, exactly as written.
+ * @param cwd - The Session workspace directory, when known.
  * @returns The API URL for an absolute POSIX path on an HTTP(S) page, or
  * undefined when the destination cannot be a Host-served local file
  * (non-HTTP transport such as Electron `file://`, protocol-relative or
- * relative destinations).
+ * relative destinations without a known cwd).
  */
-export function localPathMediaUrl(protocol: string, origin: string, value: string): string | undefined {
+export function localPathMediaUrl(protocol: string, origin: string, value: string, cwd?: string): string | undefined {
   if (protocol !== 'http:' && protocol !== 'https:') return undefined
-  if (value.length === 0 || !value.startsWith('/') || value.startsWith('//')) return undefined
-  return `${origin}/api/file?path=${encodeURIComponent(value)}`
+  if (value.length === 0 || value.startsWith('//')) return undefined
+  let targetPath = value
+  if (!targetPath.startsWith('/')) {
+    if (cwd === undefined || cwd === '' || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetPath)) return undefined
+    targetPath = resolveWorkspacePath(cwd, targetPath.replace(/^\.[/\\]/, ''))
+  }
+  if (!targetPath.startsWith('/') || targetPath.startsWith('//')) return undefined
+  return `${origin}/api/file?path=${encodeURIComponent(targetPath)}`
 }
 
 export interface AssistantMarkdownProps {
@@ -38,6 +46,8 @@ export interface AssistantMarkdownProps {
   revealProcess?: (() => void) | undefined
   /** Resolved prose file mentions for this Assistant's closing turn. */
   mentions?: MarkdownFileMentions | undefined
+  /** The current Session workspace directory, when known. */
+  cwd?: string | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
 }
@@ -45,7 +55,7 @@ export interface AssistantMarkdownProps {
 /** Reasoning block as the Think variant summary row (figma 39:28304). */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
   blocks, streaming, interrupted, renderMessageImages,
-  reasoningHidden = false, revealProcess, mentions, t,
+  reasoningHidden = false, revealProcess, mentions, cwd, t,
 }: AssistantMarkdownProps) {
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
@@ -55,8 +65,8 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   // stable per page load because MarkdownText memoizes on it.
   const pathImages = useMemo<MarkdownPathImages>(() => {
     const { protocol, origin } = window.location
-    return { resolve: value => localPathMediaUrl(protocol, origin, value) }
-  }, [])
+    return { resolve: value => localPathMediaUrl(protocol, origin, value, cwd) }
+  }, [cwd])
   const last = blocks.length - 1
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
