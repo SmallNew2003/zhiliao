@@ -128,10 +128,7 @@ export const InputBar = memo(function InputBar({
   // adjudicating and submitting render read-only so the draft stays visible.
   const disabled = removed || inert || !live || blocked !== undefined || parentOffline
   const locked = disabled
-  // The model seat is the ONE control a block leaves live: every block this
-  // contract has is cleared by choosing a model, so locking it too would leave
-  // the composer asking for the only thing it prevents. The other reasons to
-  // be disabled do lock it — there is no session to choose a model for.
+  // Recovery leaves model selection available while message input is blocked.
   const modelSeatLocked = removed || inert || !live
   const machineBusy = input?.phase === 'adjudicating' || input?.phase === 'submitting'
   // The no-workspace surface remains the resident DOM node but acts as the
@@ -281,34 +278,19 @@ export const InputBar = memo(function InputBar({
     }
   }
 
-  // An ordinary running session keeps Stop while the composer is empty or
-  // owner-blocked; an actionable draft gets the busy Send action, delivered
-  // through the same mode plain Enter resolves to. The label names that mode
-  // only when the click would deliver a plain message right now — an enabled
-  // button (no pending upload) over a non-empty draft that is neither a
-  // claimed command nor a `/` line headed for adjudication — so it never
-  // describes a delivery the click cannot or does not perform; every other
-  // state keeps plain Send. A continuable child keeps Send primary and
-  // exposes Stop independently.
-  const primaryStops = running && subagent === null && (empty || blocked !== undefined)
-  // Disabled native buttons may omit mouseleave; their tooltip must close from state.
-  const primaryDisabled = primaryStops ? stop === undefined : empty || disabled || machineBusy || uploadsPending
-  const interruptible = running && continuable
+  // Stop remains independent of the draft, including blocked input and pending uploads.
+  const primaryDisabled = empty || disabled || machineBusy || uploadsPending
+  const interruptible = running && steeringAvailable
   const primarySubmitMode = resolveSubmitMode(busyEnter, running, 'enter', steeringAvailable)
   const plainMessageDraft = !empty && input?.phase === 'plain' && !draft.trimStart().startsWith('/')
-  const primaryLabel = primaryStops
-    ? t('input.stop')
-    : running && steeringAvailable && !disabled && !uploadsPending && plainMessageDraft
-      ? t(primarySubmitMode === 'steer' ? 'input.send.steer' : 'input.send.queue')
-      : t('input.send')
+  const showDeliveryLabel = running && steeringAvailable && !disabled && !uploadsPending && plainMessageDraft
+  const primaryLabel = showDeliveryLabel
+    ? t(primarySubmitMode === 'steer' ? 'input.send.steer' : 'input.send.queue')
+    : t('input.send')
   const onPrimary = (): void => {
-    if (primaryStops) {
-      stop?.()
-      return
-    }
-    if (keyboard === undefined) return // absent machine: the button is disabled
-    /* v8 ignore next -- defensive: the primary button is disabled for empty, disabled, and pending-upload states. */
-    if (!empty && !disabled && !machineBusy && !uploadsPending) keyboard.submit(primarySubmitMode)
+    if (keyboard === undefined) return
+    /* v8 ignore next -- native disabled buttons reject pointer activation. */
+    if (!primaryDisabled) keyboard.submit(primarySubmitMode)
   }
 
   // Claim ghost hint: rendered by CSS as generated content after the last
@@ -351,6 +333,13 @@ export const InputBar = memo(function InputBar({
           anchor={cardRef.current}
           onDone={dismissToast}
         />
+      )}
+      {blocked !== undefined && (
+        <div className={css.recovery} role="status">
+          <IconWarningOutline16 />
+          <span className={css.recoveryReason}>{blocked.reason}</span>
+          {sessionId === undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+        </div>
       )}
       {notice?.level === 'info' && (
         <div className={css.notice} role="status">
@@ -441,12 +430,12 @@ export const InputBar = memo(function InputBar({
             {input === undefined || sessionId === undefined
               ? null
               : renderSlot('conversation.input.right', {})}
-            {sessionId === undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
+            {sessionId === undefined || blocked !== undefined ? null : renderSlot('conversation.input.model', { locked: modelSeatLocked })}
             {interruptible && (
               <Tooltip label={t('input.stop')} side="top" delayMs={500} disabled={stop === undefined}>
                 <button
                   type="button"
-                  className={css.primary}
+                  className={clsx(css.primary, css.stop)}
                   aria-label={t('input.stop')}
                   disabled={stop === undefined}
                   onMouseDown={keepFocus}
@@ -461,21 +450,16 @@ export const InputBar = memo(function InputBar({
             <Tooltip label={primaryLabel} side="top" delayMs={500} disabled={primaryDisabled}>
               <button
                 type="button"
-                className={css.primary}
+                className={clsx(css.primary, showDeliveryLabel && css.delivery)}
                 aria-label={primaryLabel}
                 disabled={primaryDisabled}
                 onMouseDown={keepFocus}
                 onClick={onPrimary}
               >
-                {primaryStops ? (
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                    <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                    <path d="M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z" fill="currentColor" />
-                  </svg>
-                )}
+                {showDeliveryLabel && <span>{primaryLabel}</span>}
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
+                  <path d="M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z" fill="currentColor" />
+                </svg>
               </button>
             </Tooltip>
           </div>

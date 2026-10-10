@@ -1,0 +1,10 @@
+- textbox "Message or run a task, / commands, @ files or sessions":
+  - paragraph: Queue item to edit
+- button "Add files or run commands":
+  - img
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Stop generating"
+- button "Queue message"

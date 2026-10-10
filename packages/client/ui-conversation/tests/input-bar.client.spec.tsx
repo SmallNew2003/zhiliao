@@ -216,26 +216,15 @@ function bench(over?: BenchOptions) {
   const view = render(<InputBar {...props} />)
   const textarea = view.container.querySelector<HTMLDivElement>('[data-composer-input]')!
   const sendableDraft = (over?.draft?.trim() ?? '') !== '' || (over?.attachments?.length ?? 0) > 0
-  const primaryStops = over?.running === true && over.subagent === undefined
-    && (!sendableDraft || over.blocked !== undefined)
-  // A running steer-capable composer (ordinary session or continuable child
-  // with its parent online) labels Send by the delivery mode it performs over
-  // a plain message draft; idle sessions, one-shot children, locked
-  // composers, a child's empty draft, drafts with a pending upload, and `/`
-  // command lines keep plain Send (an ordinary running session's empty draft
-  // is the Stop seat). The mirror models plain-phase drafts only: cases
-  // that claim a command or freeze the machine query the DOM directly.
   const steeringAvailable = over?.subagent === undefined || over.subagent.address.mode === 'continuable'
   const composerLocked = over?.disabled === true || over?.inert === true || over?.blocked !== undefined
     || (over?.subagent?.address.mode === 'continuable' && over.subagent.parentAvailable !== true)
   const uploadsPending = (over?.attachments ?? []).some(attachment =>
     attachment.kind === 'file' && over?.fileUploads?.[attachment.id]?.status !== 'ready')
   const plainMessageDraft = sendableDraft && !uploadsPending && !(over?.draft?.trimStart().startsWith('/') ?? false)
-  const primaryLabel = primaryStops
-    ? '停止生成'
-    : over?.running === true && steeringAvailable && !composerLocked && plainMessageDraft
-      ? (over.busyEnter === 'steer' ? '插话发送' : '排队发送')
-      : '发送消息'
+  const primaryLabel = over?.running === true && steeringAvailable && !composerLocked && plainMessageDraft
+    ? (over.busyEnter === 'steer' ? '插话发送' : '排队发送')
+    : '发送消息'
   const button = view.container.querySelector<HTMLButtonElement>(`button[aria-label="${primaryLabel}"]`)!
   const interruptButton = view.container.querySelector<HTMLButtonElement>('button[aria-label="停止生成"]')
   return {
@@ -799,41 +788,49 @@ describe('Enter semantics', () => {
 })
 
 describe('running and lock semantics', () => {
+  it('keeps an independent Stop action while editing and submitting a running draft', async () => {
+    const { view, shell, stop, sink } = bench({ running: true, draft: 'queued message' })
+    const interrupt = view.getByRole('button', { name: '停止生成' })
+    const send = view.getByRole('button', { name: '排队发送' })
+    expect(send.textContent).toContain('排队发送')
+    writeDraft(shell, '')
+    expect(view.getByRole('button', { name: '停止生成' })).toBe(interrupt)
+    writeDraft(shell, 'next message')
+    fireEvent.click(interrupt)
+    expect(stop).toHaveBeenCalledTimes(1)
+    expect(shell.snapshot.draft).toBe('next message')
+    fireEvent.click(view.getByRole('button', { name: '排队发送' }))
+    expect(sink).toHaveBeenCalledWith('next message', [], 'queue', expect.any(AbortSignal))
+    await vi.waitFor(() => { expect(shell.snapshot.draft).toBe('') })
+    expect(view.getByRole('button', { name: '停止生成' })).toBe(interrupt)
+  })
+
+  it('keeps the model recovery reason visible beside its action with a retained draft', () => {
+    const { view, textarea, slotCalls } = bench({
+      draft: '保留的草稿', blocked: { reason: '请选择可用模型' },
+      modelEntry: <button type="button">选择模型</button>,
+    })
+    expect(view.getByRole('status').textContent).toContain('请选择可用模型')
+    expect(view.getByRole('status').contains(view.getByRole('button', { name: '选择模型' }))).toBe(true)
+    expect(textarea.textContent).toBe('保留的草稿')
+    expect(slotCalls.find(call => call.key === 'conversation.input.model')?.owner).toEqual({ locked: false })
+  })
+
   it('dismisses the Stop tooltip when an empty composer becomes idle', () => {
     vi.useFakeTimers()
     try {
-      const { button, view, session } = bench({ running: true })
-      fireEvent.mouseEnter(button)
+      const { interruptButton: button, view, session } = bench({ running: true })
+      fireEvent.mouseEnter(button!)
       act(() => { vi.advanceTimersByTime(500) })
       expect(view.getByRole('tooltip').textContent).toBe('停止生成')
 
       // Disabling a hovered native button need not deliver mouseleave.
       act(() => { session.set(snapshotOf({ running: false })) })
-      expect(button.disabled).toBe(true)
-      expect(button.getAttribute('aria-label')).toBe('发送消息')
+      expect(view.queryByRole('button', { name: '停止生成' })).toBeNull()
       expect(view.queryByRole('tooltip')).toBeNull()
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('running switches the primary between Stop and Queue Send with the draft', async () => {
-    const { textarea, button, stop, sink, shell } = bench({ running: true })
-    expect(textarea.getAttribute('aria-disabled')).not.toBe('true')
-    expect(button.getAttribute('aria-label')).toBe('停止生成')
-    fireEvent.click(button)
-    expect(stop).toHaveBeenCalledTimes(1)
-
-    writeDraft(shell, '排队消息')
-    expect(button.getAttribute('aria-label')).toBe('排队发送')
-    writeDraft(shell, '   ')
-    expect(button.getAttribute('aria-label')).toBe('停止生成')
-    writeDraft(shell, '排队消息2')
-    expect(button.getAttribute('aria-label')).toBe('排队发送')
-    fireEvent.click(button)
-    expect(sink).toHaveBeenCalledWith('排队消息2', [], 'queue', expect.any(AbortSignal))
-    await vi.waitFor(() => { expect(button.getAttribute('aria-label')).toBe('停止生成') })
-    expect(stop).toHaveBeenCalledTimes(1)
   })
 
   it('running Send follows the busy-state Steer preference and labels the delivery', () => {
@@ -916,11 +913,11 @@ describe('running and lock semantics', () => {
     expect(button.getAttribute('aria-label')).toBe('排队发送')
     fireEvent.click(button)
     expect(sink).toHaveBeenCalledWith('', ['draft-1'], 'queue', expect.any(AbortSignal))
-    await vi.waitFor(() => { expect(button.getAttribute('aria-label')).toBe('停止生成') })
+    await vi.waitFor(() => { expect(button.disabled).toBe(true) })
   })
 
   it('running blocked composer keeps Stop with a retained draft', () => {
-    const { button, sink, stop, textarea } = bench({
+    const { interruptButton: button, sink, stop, textarea } = bench({
       running: true,
       draft: '保留的草稿',
       blocked: { reason: '请选择可用模型' },
@@ -928,9 +925,9 @@ describe('running and lock semantics', () => {
     })
     expect(textarea.getAttribute('aria-disabled')).toBe('true')
     expect(textarea.getAttribute('data-placeholder')).toBe('请选择可用模型')
-    expect(button.getAttribute('aria-label')).toBe('停止生成')
-    expect(button.disabled).toBe(false)
-    fireEvent.click(button)
+    expect(button!.getAttribute('aria-label')).toBe('停止生成')
+    expect(button!.disabled).toBe(false)
+    fireEvent.click(button!)
     expect(stop).toHaveBeenCalledTimes(1)
     expect(sink).not.toHaveBeenCalled()
   })
