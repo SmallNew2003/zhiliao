@@ -53,10 +53,10 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns 1 steps · {{throughput}} tok/s":
+- button "Session statistics · Model time {{duration}}":
   - img
-  - text: 1 turns 1 steps{{throughput}} tok/s
-- button "7.8K tok · Cache hit 99%":
+  - text: Model time {{duration}}
+- button "Token usage":
   - img
-  - text: 7.8K tokCache hit 99%
+  - text: Token usage
 - button "6% of context used": 6%

@@ -17,7 +17,9 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import { launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
+import {
+  captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './support.ts'
 
 /** Points the shipped shared Agent default at this scenario's own route. */
@@ -131,6 +133,8 @@ describe('web e2e: the composer model switch is the default for later sessions',
     const box = page.locator('[data-composer-input]').first()
     await expect.poll(async () => box.isEnabled(), { timeout: 10_000 }).toBe(true)
 
+    await box.fill('保留的草稿')
+
     // What removing the provider on the Models page leaves behind: the saved
     // default still names the route, and nothing serves it any more.
     // `replace`, not `update`: a merge patch of `{providers: {}}` leaves every
@@ -139,6 +143,13 @@ describe('web e2e: the composer model switch is the default for later sessions',
 
     await expect.poll(async () => box.isEnabled(), { timeout: 15_000 }).toBe(false)
     expect(await box.getAttribute('data-placeholder')).toBe('当前模型不可用，请先选择模型')
+    await page.getByRole('status').filter({ hasText: '当前模型不可用，请先选择模型' }).waitFor()
+    expect(await box.textContent()).toBe('保留的草稿')
+    await compareOrRefreshGolden(
+      fileURLToPath(new URL('./expected/conversation-clarity/model-recovery.expected.md', import.meta.url)),
+      await captureStableAria(page, '[role="status"]', scaffold.workspaceCwd),
+      webSnapshotMode(),
+    )
 
     // The block is an affordance; the refusal is the Host's. A client that
     // never disabled anything still cannot start a turn on a dead route.
@@ -154,9 +165,9 @@ describe('web e2e: the composer model switch is the default for later sessions',
     const seat = page.getByRole('button', { name: /^选择模型/ })
     expect(await seat.isEnabled()).toBe(true)
     await seat.click()
-    await page.getByRole('menuitem', { name: /模型/ }).click()
     await page.getByRole('menuitemradio').first().click()
     await expect.poll(async () => box.isEnabled(), { timeout: 15_000 }).toBe(true)
+    expect(await box.textContent()).toBe('保留的草稿')
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 })

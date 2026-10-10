@@ -330,8 +330,14 @@ describe('web e2e: lifecycle & chrome (workspace flow / reload / dark mode)', ()
     ).toBeGreaterThanOrEqual(1)
     await expect.poll(() => page.locator('[role="treeitem"][aria-selected="true"]').count(), { timeout: 10_000 }).toBe(1)
     await expect.poll(() => page.getByText('LIGHTHOUSE', { exact: true }).count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1)
-    // The usage pill's one label span concatenates the billed total and the cache-hit share.
-    await expect.poll(() => page.getByRole('button', { name: /Cache hit 99\.5%/ }).count(), { timeout: 15_000 }).toBe(1)
+    // The usage dialog's cache-hit row carries the whole-log billed share.
+    const usagePill = page.getByRole('button', { name: 'Token usage' })
+    await expect.poll(() => usagePill.count(), { timeout: 15_000 }).toBe(1)
+    await usagePill.click()
+    const usageDialog = page.getByRole('dialog', { name: 'Token usage' })
+    await expect.poll(() => usageDialog.getByText('Cache hit').count(), { timeout: 15_000 }).toBe(1)
+    await expect.poll(() => usageDialog.getByText('99.5%', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
+    await page.keyboard.press('Escape')
     // Host: the session's durable header cwd is the folder the workspace
     // flow created and adopted (<workspaceCwd>/workspace) — the proof the
     // send went through workspace materialization rather than a bare

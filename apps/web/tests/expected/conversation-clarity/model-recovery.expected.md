@@ -1,0 +1,6 @@
+- status:
+  - img
+  - text: 当前模型不可用，请先选择模型
+  - button "选择模型":
+    - text: 选择模型
+    - img

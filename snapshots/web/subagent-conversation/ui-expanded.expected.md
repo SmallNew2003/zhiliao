@@ -81,10 +81,10 @@
   - img
 - 'button "Access mode, current: Custom"': Custom
 - button "Send message" [disabled]
-- button "2 turns 2 steps · {{throughput}} tok/s":
+- button "Session statistics · Model time {{duration}}":
   - img
-  - text: 2 turns 2 steps{{throughput}} tok/s
-- button "15.7K tok · Cache hit 99%":
+  - text: Model time {{duration}}
+- button "Token usage":
   - img
-  - text: 15.7K tokCache hit 99%
+  - text: Token usage
 - button "6% of context used": 6%

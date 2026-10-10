@@ -176,7 +176,7 @@ describe('web e2e: queued image submission', () => {
       .getByRole('button', { name: 'Branch into a new conversation', exact: true })
       .waitFor({ timeout: 15_000 })
     await expect.poll(
-      () => page.getByRole('button', { name: /^3 turns 3 steps/ }).count(),
+      () => page.getByRole('button', { name: /^Session statistics/ }).count(),
       { timeout: 15_000 },
     ).toBe(1)
     const deliveredSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
