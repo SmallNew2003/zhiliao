@@ -120,7 +120,7 @@ export const bootstrapSource = String.raw`
           moduleUrl = URL.createObjectURL(new Blob([element.textContent], { type: 'application/javascript' }));
           urls.add(moduleUrl); element.textContent = ''; element.src = moduleUrl;
         }
-        const pending = type === 'module' || (element.hasAttribute('src')
+        const pending = type === 'module' || (element.hasAttribute('src') && !element.noModule
           && (!type || /^(?:text|application)\/(?:javascript|ecmascript)$/.test(type)))
           ? new Promise((resolve, reject) => {
             element.addEventListener('load', resolve, { once: true });

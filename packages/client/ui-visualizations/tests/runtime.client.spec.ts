@@ -13,8 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>`
 
 it.each([
-  { offline: false, fails: false }, { offline: true, fails: false }, { offline: false, fails: true },
-])('initializes listeners only after successful scripts, offline=$offline fails=$fails', async ({ offline, fails }) => {
+  { offline: false, fails: false, nomodule: false }, { offline: true, fails: false, nomodule: false },
+  { offline: false, fails: true, nomodule: false }, { offline: false, fails: false, nomodule: true },
+])('initializes listeners after supported scripts, offline=$offline fails=$fails nomodule=$nomodule', async ({ offline, fails, nomodule }) => {
   const channel = new MessageChannel()
   let ready = false
   let error: string | undefined
@@ -22,12 +23,18 @@ it.each([
     if (message.type === 'ready') ready = true
     if (message.type === 'error') error = message.error
   })
-  const input = { source: source + (fails ? '<script>throw new Error("authored initialization failed")</script>' : ''), language: 'html' as const, assets: { css: [], scripts: [] }, theme }
+  const authored = source + (fails ? '<script>throw new Error("authored initialization failed")</script>' : '')
+    + (nomodule ? '<script nomodule src="https://example.invalid/fallback.js"></script>' : '')
+  const input = { source: authored, language: 'html' as const, assets: { css: [], scripts: [] }, theme }
   const html = offline ? createStandaloneDocument(input) : createPreviewDocument({ ...input, generation: 'test' })
   const dom = new JSDOM(html, {
     runScripts: 'dangerously',
     virtualConsole: new VirtualConsole(),
     beforeParse(window) {
+      // JSDOM lacks module support; Chromium separately verifies skipped fallback execution.
+      Object.defineProperty(window.HTMLScriptElement.prototype, 'noModule', {
+        get(this: HTMLScriptElement) { return this.hasAttribute('nomodule') },
+      })
       Object.assign(window, {
         MessagePort,
         ResizeObserver: class { observe() {} disconnect() {} },
