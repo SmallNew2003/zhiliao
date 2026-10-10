@@ -1,4 +1,4 @@
-.preview { position: relative; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; margin: 12px 0; overflow: hidden; background: var(--dsw-alias-bg-base); }
+.preview { position: relative; width: 100%; max-width: none; padding: 0; color: inherit; box-sizing: border-box; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; margin: 12px 0; overflow: hidden; background: var(--dsw-alias-bg-base); }
 .toolbar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
 .toolbar button, .toolbar select { font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
 .toolbar button:hover, .toolbar button[aria-pressed='true'] { background: var(--dsw-alias-bg-layer-2); }
@@ -7,6 +7,7 @@
 .frame { display: block; border: 0; width: 100%; background: transparent; }
 .source { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; margin: 0; padding: 12px; max-height: 640px; font-family: monospace; }
 .status { padding: 12px; overflow-wrap: anywhere; }
-.enlarged { position: fixed; inset: 16px; margin: 0; z-index: 1000; display: flex; flex-direction: column; box-shadow: 0 0 0 100vmax rgb(0 0 0 / .45); }
+.enlarged { position: fixed; inset: 16px; margin: 0; z-index: 1000; display: flex; flex-direction: column; width: auto; max-height: none; }
 .enlarged .frame, .enlarged .source { flex: 1; max-height: none; min-height: 0; }
+.enlarged::backdrop { background: rgb(0 0 0 / .45); }
 @media (max-width: 640px) { .enlarged { inset: 4px; } .toolbar { gap: 2px; } .toolbar button { padding: 4px; } }

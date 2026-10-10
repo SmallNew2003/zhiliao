@@ -19,6 +19,9 @@ export const bootstrapSource = String.raw`
   addEventListener('pagehide', dispose, { once: true });
   addEventListener('error', event => failure(event.error || event.message));
   addEventListener('unhandledrejection', event => failure(event.reason));
+  addEventListener('keydown', event => {
+    if (event.isTrusted && event.key === 'Escape' && !event.repeat) send({ type: 'escape' });
+  }, { capture: true });
   const colors = () => theme.colorScheme === 'dark'
     ? [theme.accent, '#73c0de', '#91cc75', '#fac858', '#ee6666', '#9a60b4']
     : [theme.accent, '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'];
@@ -37,10 +40,7 @@ export const bootstrapSource = String.raw`
     style.colorScheme = theme.colorScheme;
     charts.forEach(entry => {
       if (entry.chart.isDisposed()) return;
-      const option = entry.option, values = defaults();
-      entry.chart.setOption({ color: option.color || values.color,
-        backgroundColor: option.backgroundColor === undefined ? values.backgroundColor : option.backgroundColor,
-        textStyle: { ...values.textStyle, ...option.textStyle } });
+      entry.chart.setTheme(defaults());
     });
   };
   const chartNames = () => charts.filter(entry => !entry.chart.isDisposed()).map(entry => entry.id);
@@ -48,13 +48,12 @@ export const bootstrapSource = String.raw`
     chart: (element, option) => {
       if (!window.echarts) throw new Error('Declare libs=echarts before calling dsh.chart');
       if (charts.length >= 64) throw new Error('The chart export catalog is full');
-      const chart = window.echarts.init(element);
-      const values = defaults();
-      chart.setOption({ ...values, ...option, textStyle: { ...values.textStyle, ...option.textStyle } });
+      const chart = window.echarts.init(element, defaults());
+      chart.setOption(option);
       const observer = new ResizeObserver(() => { if (!chart.isDisposed()) chart.resize(); });
       observer.observe(element);
       const id = String(charts.length + 1);
-      charts.push({ id, chart, option, observer });
+      charts.push({ id, chart, observer });
       return chart;
     }
   }), configurable: false, writable: false });

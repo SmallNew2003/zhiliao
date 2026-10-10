@@ -6,6 +6,8 @@ export type PreviewMessage =
   | { readonly type: 'ready'; readonly title: string; readonly charts: readonly string[] }
   | { readonly type: 'height'; readonly height: number }
   | { readonly type: 'error'; readonly error: string }
+  /** Frame-local Escape may dismiss enlargement; it exposes no Host action. */
+  | { readonly type: 'escape' }
 
 /** A validated download response; SVG remains bytes, never application markup. */
 export interface ExportResult {
@@ -40,7 +42,6 @@ export function exportBytes(result: ExportResult, limit: number): Uint8Array<Arr
     bytes = Uint8Array.from(atob(encoded), character => character.charCodeAt(0))
     if (![137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value)) throw new Error('invalidExport')
   }
-  if (bytes.byteLength > limit) throw new Error('exportTooLarge')
   return bytes
 }
 
@@ -92,6 +93,9 @@ export class PreviewBridge {
         if (this.failed || typeof message.height !== 'number' || !Number.isFinite(message.height)) return
         this.onMessage({ type: 'height', height: Math.max(this.config.minHeight, Math.min(this.config.maxHeight, message.height)) })
         return
+      case 'escape':
+        if (this.ready && !this.failed) this.onMessage({ type: 'escape' })
+        return
       case 'error':
         if (typeof message.error === 'string' && new TextEncoder().encode(message.error).length <= 4096) this.fail(message.error)
         return
@@ -104,7 +108,7 @@ export class PreviewBridge {
         try {
           exportBytes(message as unknown as ExportResult, this.config.maxExportBytes)
         } catch (error) {
-          this.rejectExport(error instanceof Error ? error.message : 'invalidExport'); return
+          this.rejectExport((error as Error).message); return
         }
         clearTimeout(pending.value.timer)
         this.pending = undefined

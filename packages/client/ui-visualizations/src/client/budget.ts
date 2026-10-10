@@ -1,12 +1,34 @@
 /** Registration-owned global activity store; only frame identities are retained. */
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+
+/** Global document identities and viewport ownership for one Client registration. */
+export interface PreviewBudget extends ObservableSnapshot<readonly string[]> {
+  /**
+   * Enroll a visible document; waiting documents do not evict active peers.
+   * @param id - Mounted preview identity.
+   */
+  enter(id: string): void
+  /**
+   * Retire an invisible or unmounted document and promote a waiting peer.
+   * @param id - Preview leaving the viewport.
+   */
+  leave(id: string): void
+  /**
+   * Activate a user-selected document, evicting the oldest active peer if needed.
+   * @param id - Explicitly selected preview.
+   */
+  activate(id: string): void
+  /** Release visible ownership and publish an empty activity snapshot. */
+  dispose(): void
+}
 
 /**
  * Allocate active slots without repeatedly cycling visible waiting previews.
  * @param limit - Validated maximum number of active documents.
  * @returns An observable snapshot and plain owner callbacks; no source or DOM is retained.
  */
-export function createPreviewBudget(limit: number) {
+export function createPreviewBudget(limit: number): PreviewBudget {
   const store = createSnapshotStore<readonly string[]>([])
   const visible = new Set<string>()
   const publish = (active: readonly string[]): void => {

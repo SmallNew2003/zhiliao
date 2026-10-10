@@ -27,6 +27,6 @@ export function loadRuntimeAssets(kind: 'html' | 'mermaid', libraries: readonly 
     return Object.freeze({ css: html.css, scripts: Object.freeze([...html.scripts, ...charts.scripts]) })
   })()
   cache.set(key, loading)
-  void loading.catch(() => { if (cache.get(key) === loading) cache.delete(key) })
+  void loading.catch(() => { cache.delete(key) })
   return loading
 }

@@ -1,6 +1,6 @@
 /** One assistant-owned preview; toolbar modes never relocate its iframe. */
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ReactNode, KeyboardEvent } from 'react'
+import type { ReactNode } from 'react'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
@@ -44,8 +44,7 @@ export function Preview(props: PreviewProps): ReactNode {
   const id = useId()
   const active = props.useBudget(values => values.includes(id))
   const theme = props.useTheme(value => value)
-  const root = useRef<HTMLDivElement>(null)
-  const iframe = useRef<HTMLIFrameElement>(null)
+  const root = useRef<HTMLDialogElement>(null)
   const bridge = useRef<PreviewBridge>()
   const opener = useRef<HTMLElement | null>(null)
   const lifecycle = useRef(0)
@@ -71,19 +70,20 @@ export function Preview(props: PreviewProps): ReactNode {
 
   useEffect(() => {
     if (!closed) return
-    const element = root.current
-    if (element === null) return
+    const element = (root.current as HTMLDialogElement)
     if (typeof IntersectionObserver === 'undefined') { enter(id); return () => { leave(id) } }
+    let retired = false
     const observer = new IntersectionObserver((entries) => {
+      if (retired) return
       if (entries.some(entry => entry.isIntersecting)) enter(id)
       else if (!latestEnlarged.current) leave(id)
     })
     observer.observe(element)
-    return () => { observer.disconnect(); leave(id) }
+    return () => { retired = true; observer.disconnect(); leave(id) }
   }, [id, closed, enter, leave])
 
   useEffect(() => {
-    const owner = ++lifecycle.current
+    ++lifecycle.current
     let retired = false
     bridge.current?.dispose(); bridge.current = undefined
     setFrame(undefined); setError(undefined); setCharts([]); setExporting(false); setStatus('loading')
@@ -96,7 +96,7 @@ export function Preview(props: PreviewProps): ReactNode {
     }, () => { if (!retired) { setStatus('failed'); setError(t('failed')) } })
     return () => {
       retired = true
-      if (owner === lifecycle.current) ++lifecycle.current
+      ++lifecycle.current
       bridge.current?.dispose(); bridge.current = undefined
     }
   }, [active, closed, language, libraries, block.code, reload, config])
@@ -104,39 +104,32 @@ export function Preview(props: PreviewProps): ReactNode {
   useEffect(() => { bridge.current?.theme(theme) }, [theme])
   useEffect(() => {
     if (!enlarged) return
-    root.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    const dialog = root.current as HTMLDialogElement
+    dialog.close()
+    dialog.showModal()
+    dialog.querySelector<HTMLButtonElement>('button')?.focus()
+    return () => { dialog.close(); dialog.open = true }
   }, [enlarged])
 
-  const onLoad = (): void => {
-    if (frame === undefined || iframe.current?.contentWindow === null || iframe.current?.contentWindow === undefined) return
+  const onLoad = (runtimeDocument: NonNullable<typeof frame>, target: Window): void => {
     if (bridge.current !== undefined) {
       bridge.current.dispose(); bridge.current = undefined
       setFrame(undefined); setStatus('failed'); setError(t('navigated')); return
     }
     const channel = new MessageChannel()
-    const owner = lifecycle.current
-    bridge.current = new PreviewBridge(channel.port1, frame.generation, config, (message) => {
-      if (owner !== lifecycle.current) return
+    bridge.current = new PreviewBridge(channel.port1, runtimeDocument.generation, config, (message) => {
       switch (message.type) {
         case 'height': setHeight(message.height); return
         case 'ready': setStatus('ready'); setTitle(message.title); setCharts(message.charts); bridge.current?.theme(latestTheme.current); return
+        case 'escape': if (latestEnlarged.current) close(); return
         case 'error':
           setStatus('failed'); setError(message.error === 'readinessTimeout' ? t('readinessTimeout') : `${t('failed')}: ${message.error}`)
           bridge.current?.dispose(); bridge.current = undefined; setFrame(undefined); return
       }
     })
-    iframe.current.contentWindow.postMessage({ type: 'dsh-preview-init', generation: frame.generation }, '*', [channel.port2])
+    target.postMessage({ type: 'dsh-preview-init', generation: runtimeDocument.generation }, '*', [channel.port2])
   }
   const close = (): void => { setEnlarged(false); opener.current?.focus() }
-  const keyDown = (event: KeyboardEvent): void => {
-    if (!enlarged) return
-    if (event.key === 'Escape') { event.preventDefault(); close(); return }
-    if (event.key !== 'Tab') return
-    const controls = [...(root.current?.querySelectorAll<HTMLElement>('button:not(:disabled),select,iframe:not([hidden])') ?? [])]
-    const first = controls[0], last = controls.at(-1)
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
-  }
   const copy = async (): Promise<void> => {
     try { await navigator.clipboard.writeText(block.code); setCopyLabel(true) }
     catch { setError(t('copyFailed')) }
@@ -147,11 +140,11 @@ export function Preview(props: PreviewProps): ReactNode {
     try {
       if (kind === 'source') {
         download(new TextEncoder().encode(block.code), 'text/plain', filename(title || t('title'), language === 'html' ? 'html' : 'mmd'))
-      } else if (kind === 'html' && frame !== undefined && language !== undefined) {
-        const html = createStandaloneDocument({ source: block.code, language, assets: frame.assets, theme: latestTheme.current })
+      } else if (kind === 'html') {
+        const html = createStandaloneDocument({ source: block.code, language: 'html', assets: (frame as NonNullable<typeof frame>).assets, theme: latestTheme.current })
         download(new TextEncoder().encode(html), 'text/html', filename(title || t('title'), 'html'))
-      } else if ((kind === 'svg' || kind === 'png') && bridge.current !== undefined) {
-        const response = await bridge.current.export(kind, kind === 'png' ? chart : undefined)
+      } else {
+        const response = await (bridge.current as PreviewBridge).export(kind, kind === 'png' ? chart : undefined)
         if (owner === lifecycle.current) download(exportBytes(response, config.maxExportBytes), response.mime, filename(title || t('title'), kind))
       }
     } catch (error) {
@@ -163,7 +156,7 @@ export function Preview(props: PreviewProps): ReactNode {
   }
   const diagnostic = matched.kind === 'error' ? t(matched.error) : undefined
   const showSource = mode === 'source' || diagnostic !== undefined || !closed || status === 'failed'
-  return <div ref={root} className={`${css.preview} ${enlarged ? css.enlarged : ''}`} data-visualization role={enlarged ? 'dialog' : undefined} aria-modal={enlarged || undefined} aria-label={title || t('title')} onKeyDown={keyDown}>
+  return <dialog open ref={root} className={`${css.preview} ${enlarged ? css.enlarged : ''}`} data-visualization role={enlarged ? 'dialog' : 'region'} aria-modal={enlarged || undefined} aria-label={title || t('title')} onCancel={(event) => { event.preventDefault(); close() }}>
     <div className={css.toolbar}>
       <button type="button" aria-pressed={mode === 'preview'} onClick={() => { setMode('preview') }}>{t('preview')}</button>
       <button type="button" aria-pressed={mode === 'source'} onClick={() => { setMode('source') }}>{t('source')}</button>
@@ -180,7 +173,7 @@ export function Preview(props: PreviewProps): ReactNode {
     {!closed && diagnostic === undefined && <div className={css.status} role="status">{t('waiting')}</div>}
     {closed && !active && <div className={css.status}><span>{t('inactive')}</span> <button type="button" onClick={() => { activate(id) }}>{t('activate')}</button></div>}
     {closed && active && status === 'loading' && <div className={css.status} role="status">{t('loading')}</div>}
-    {frame !== undefined && <iframe ref={iframe} className={css.frame} hidden={showSource} style={{ height, display: showSource ? 'none' : undefined }} title={title || t('title')} sandbox="allow-scripts" srcDoc={frame.html} onLoad={onLoad} />}
+    {frame !== undefined && <iframe className={css.frame} hidden={showSource} style={{ height, display: showSource ? 'none' : undefined }} title={title || t('title')} sandbox="allow-scripts" srcDoc={frame.html} onLoad={(event) => { onLoad(frame, event.currentTarget.contentWindow as Window) }} />}
     {showSource && <pre className={css.source}><code>{block.code}</code></pre>}
-  </div>
+  </dialog>
 }
