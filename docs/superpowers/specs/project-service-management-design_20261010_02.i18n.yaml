@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/superpowers/specs/project-service-management-design_20261010_02.md
-project-service-management-design_20261010_02.md: a23593918da7385d1390a096a5175a7cba7b8808
-project-service-management-design_20261010_02.zh.md: a607378991d977ce58e1cad28b6ddb12608e9344
+project-service-management-design_20261010_02.md: 383820221475e123374104a98e3e724ca73c068d
+project-service-management-design_20261010_02.zh.md: ad94dbd374109af572bd2fffbc33e7323d4e46df
