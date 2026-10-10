@@ -19,6 +19,12 @@ declare module '@deepseek-ai/dsh-system-prompt' {
   interface AssembleContext {
     /** Agent for this assembly; absent on diagnostics. When present, `scope` must identify the same agent. */
     agent?: Agent
+    /** Claimed input and proposed coordinates before `agent/pre-step`; absent on diagnostics. */
+    stepInput?: {
+      readonly messages: readonly UserMessage[]
+      readonly turn: number
+      readonly step: number
+    }
   }
 }
 

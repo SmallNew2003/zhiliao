@@ -9,7 +9,7 @@ import { BrowserMcpConfig, mountSessionMcp, validateBrowserMcpConfig } from '@de
 export const name = 'experimental-browser-use-playwright-mcp'
 
 /** Services required for scoped MCP startup and prompt readiness checks. */
-export const inject = ['browserUse', 'agents', 'tools', 'systemPrompt']
+export const inject = ['browserUse', 'agents', 'tools', 'systemPrompt', 'mcpDiscovery']
 
 /** Fixed Chromium launch or existing-browser attachment settings. */
 export type Config = BrowserMcpConfig

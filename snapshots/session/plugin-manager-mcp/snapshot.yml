@@ -2,10 +2,14 @@ version: 1
 scenario: plugin-manager-mcp
 profile: headless
 composition: plugin-manager-mcp
-recording: live
+recording: authored
 permission: danger-full-access
+environment:
+  DSH_EXAMPLE_MODE: lib
 header:
   class: plugin-manager-mcp
   pin: true
-  changes: 1
+  changes: 2
   promptChanges: 1
+replay:
+  override: true

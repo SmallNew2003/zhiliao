@@ -82,6 +82,8 @@ await handle.agent.whenIdle()
 
 ### 步骤准入
 
+`assembleContextFor(agent, signal?, stepInput?)` 将 Agent 与其作用域绑定用于提示词组装。在拟议步骤中，`AssembleContext.stepInput` 携带已领取的只读消息以及拟议的 `turn`/`step` 坐标，早于 `agent/pre-step` 对它们的改写或拒绝。诊断组装可以省略该字段；这些消息尚未获准进入模型历史。
+
 `PreStepDecision` 要么是 `{ kind: 'reject' }`，要么是 `{ kind: 'enter', messages, startsRequestSeries? }`。enter 分支包含完整、带标识且冻结的消息批次。接纳不等于提交：组装与 `step/start` 之后，`agent/request` 和 `prepareCall()` 先解析路由，循环随后才提交系统提示词与用户批次。在任一异步阶段取消都不会提交这两者。`startsRequestSeries: true` 声明一个独立的模型消息序列；包装下游 enter 的监听器会保留该声明与批次，除非有意替换其中一项。领取会从 inbox 移除候选消息，领取后插入的消息则等待后续边界。
 
 ### 持久 inbox

@@ -76,6 +76,14 @@ The `mode` config decides what the model sees: `native` (every visible schema), 
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tools) is the exhaustive source for every accepted field. Non-native modes require a composed `ctx.ptcRuntime` whose language has a registered SDK renderer; an agent preset selects its own presentation with [`dsh-agent-tool-presentation`](../agent-tool-presentation/README.md), and one agent can shadow the default with `presentAs(mode)`.
 
+`ctx.tools.modeFor(scope?)` reads the nearest scope presentation override or the deployment default without changing it.
+
+### Select model-visible definitions
+
+A definition may provide the pure synchronous `isPresented(scope?)` predicate, including through `defineTool()`. Omission or `true` includes it in model wire schemas and generated SDK text; `false` omits both. This does not change `get()`, `schemas()`, permission restrictions, or execution. Hidden names remain known for configured tool ordering; the `ptc` model-direct collapse still applies.
+
+`ctx.tools.renderSdk(names, scope?)` renders a proposed subset of scope-visible definitions regardless of `isPresented`, without changing presentation. It uses the actual SDK's runtime language, full instructions, and canonical name order, so its UTF-8 byte count measures the complete proposed SDK text. Unknown or restricted names throw; duplicate names render once; `run_code` contributes no SDK binding. Native mode returns empty text after validating names.
+
 ### Restrict tools per agent
 
 `ctx.tools.restrict(filter)` applies an allow or deny mask to the global tools one agent inherits; masks intersect, scoped registrations stay visible, and the restriction lifts when disposed. `ctx.tools.get(name, scope)` resolves a tool as one scope sees it. A Host-local presenter consumer passes the calling agent when it must match the definition that executed. `ctx.tools.schemas(scope)` returns the visible schemas without the `execute` functions.
@@ -100,7 +108,7 @@ This section explains how the package realizes the behavior above; the observabl
 
 ### Design concept
 
-The registry holds typed `ToolDefinition`s in scoped layers and projects them onto the model-facing `ToolSchema` set at request time — `output`, `execute`, `finalizeContent`, `timeoutMs`, and presentation callbacks never leak onto the wire. Every call runs a fixed pipeline: `tools/pre-execute` (extensible allow/deny/ask) → registered monotonic guards → `tools/execute` (around-dispatch wrappers) → `tools/post-execute` (inspect/replace, attach context) → definition-owned `finalizeContent` → the observe-only `tools/result` event. Only the `tools/execute` view may replace the required signal, and the registry re-fuses the caller signal before the body.
+The registry holds typed `ToolDefinition`s in scoped layers and projects them onto the model-facing `ToolSchema` set at request time — `output`, `execute`, `finalizeContent`, `timeoutMs`, `isPresented`, and presentation callbacks never leak onto the wire. Every call runs a fixed pipeline: `tools/pre-execute` (extensible allow/deny/ask) → registered monotonic guards → `tools/execute` (around-dispatch wrappers) → `tools/post-execute` (inspect/replace, attach context) → definition-owned `finalizeContent` → the observe-only `tools/result` event. Only the `tools/execute` view may replace the required signal, and the registry re-fuses the caller signal before the body.
 
 ### Source map
 
@@ -166,7 +174,7 @@ Fixed per-request cost proportional to the visible definitions. Restrictions tha
 
 #### KV Cache effect
 
-Prefix-stable while visible definitions and their order are unchanged. Registration, disposal, or scoped restriction may invalidate reuse from the first changed schema token.
+Prefix-stable while visible definitions and their order are unchanged. Registration, disposal, scoped restriction, or changed presentation eligibility may invalidate reuse from the first changed schema token.
 
 ### PTC mode schema and system prompt
 
@@ -199,7 +207,7 @@ Fixed per-request cost proportional to the visible definitions. PTC mode trades 
 
 #### KV Cache effect
 
-Prefix-stable while the PTC mode selection, generated SDK, transport schema, and visible tool set are unchanged. Mode or filter changes may invalidate reuse from the first changed prompt or schema token.
+Prefix-stable while the PTC mode selection, generated SDK, transport schema, and visible tool set are unchanged. Mode, filter, or presentation-eligibility changes may invalidate reuse from the first changed prompt or schema token.
 
 ### Tool-call history and results
 

@@ -3,8 +3,11 @@ scenario: browser-use-playwright-mcp
 profile: headless
 composition: browser-use-playwright-mcp
 recording: authored
+environment:
+  DSH_EXAMPLE_MODE: lib
 header:
   class: browser-use-playwright-mcp
   pin: true
+  changes: 1
 replay:
   override: true

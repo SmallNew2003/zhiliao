@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-mcp-discovery'
+import { readImageFile } from '../../packages/attachment/attachment-local/src/store.ts'
 import { releasedV0SessionFormatCodec } from '@deepseek-ai/dsh-session-format-v0-to-v1'
 import type { SessionFormatEvent, SessionFormatMigrationContext } from '@deepseek-ai/dsh-session-format'
 import { assertWorkspaceOutsideTemp, outsideTempWorkspaceParent } from '../../scripts/snapshot-workspace-parent.ts'
@@ -50,7 +52,7 @@ import {
   type SnapshotManifest,
   type WorkspaceSnapshotEntry,
 } from '@deepseek-ai/dsh-session-snapshot'
-import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, resolveExampleMode, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import { parseSessionLog, prepareSessionSnapshotFixtureForComparison } from '@deepseek-ai/dsh-llm-replay'
 
@@ -609,12 +611,104 @@ function verifyMcpResources(log: string, ptc: boolean): void {
   expect(log).not.toContain('bWNwLXJlc291cmNlLWJpbmFyeQ==')
   expect(normalizedSystemPrompts(log, contextOf([log])).join('\n'))
     .toContain('MCP_RESOURCE_INSTRUCTION: keep {{braces}} literal.')
-  expect(normalizedSystemPrompts(log, contextOf([log])).join('\n'))
-    .toContain('server argument: ["catalog"]')
+  const snapshots = events.flatMap(event => event.type === 'mcp/request-snapshot' ? [event.data] : [])
+  expect(snapshots[0]?.servers).toEqual([])
+  expect(snapshots[0]?.instructions).toBe('')
+  expect(snapshots.some(snapshot => snapshot.servers.some(server => server.server === 'catalog'))).toBe(true)
+  expect(events.flatMap(event => event.type === 'mcp/selection' ? [event.data.reason] : [])).toContain('load')
+  expect(normalizedSystemPrompts(log, contextOf([log]))[0]).not.toContain('MCP_RESOURCE_INSTRUCTION:')
+  expect(normalizedSystemPrompts(log, contextOf([log])).join('\n')).toContain('"server":"catalog"')
+}
+
+/** Require definition and instruction loading, request binding, and release through the real profile. */
+function verifyMcpDiscovery(log: string, ptc: boolean): void {
+  const events = parseSessionLog(log)
+  const snapshots = events.flatMap(event => event.type === 'mcp/request-snapshot' ? [event.data] : [])
+  expect(snapshots).toHaveLength(5)
+  const name = 'mcp__toolbox__lookup'
+  expect(snapshots.map(snapshot => snapshot.tools.map(tool => tool.name)))
+    .toEqual([[], [], [name], [name], []])
+  expect(snapshots.map(snapshot => snapshot.instructions.includes('MCP_TOOLBOX_INSTRUCTION:')))
+    .toEqual([false, false, true, true, false])
+  expect(snapshots[2]?.instructions).toContain('{{braces}}')
+  if (ptc) {
+    expect(snapshots.map(snapshot => snapshot.sdk.includes(`${name}:`)))
+      .toEqual([false, false, true, true, false])
+  } else {
+    expect(snapshots.map(snapshot => snapshot.schemas.some(schema => schema.name === name)))
+      .toEqual([false, false, true, true, false])
+  }
+  expect(events.flatMap(event => event.type === 'mcp/selection' ? [event.data.reason] : []))
+    .toEqual(['load', 'release'])
+  const results = ptc
+    ? events.flatMap(event => event.type === 'tool/ptc-dispatch' ? [event.data] : [])
+    : events.flatMap(event => event.type === 'tool/result'
+      ? event.data.message.content.filter(block => block.type === 'tool-result') : [])
+  expect(results.every(result => !result.isError)).toBe(true)
+  expect(results.flatMap(result => result.content.flatMap(block => block.type === 'text' ? [block.text] : [])).join('\n'))
+    .toContain('fixture-value')
+}
+
+/** Require discovery before screenshot execution and a readable persisted image. */
+async function verifyMcpScreenshot(log: string, cwd: string, scenario: string): Promise<void> {
+  const computer = scenario === 'computer-use-cua-driver-mcp'
+  const server = computer ? 'cua-driver-mcp'
+    : scenario === 'browser-use-chrome-devtools-mcp' ? 'chrome-devtools-mcp' : 'playwright-mcp'
+  const name = `mcp__${server}__${computer ? 'screenshot' : server === 'chrome-devtools-mcp'
+    ? 'take_screenshot' : 'browser_take_screenshot'}`
+  const events = parseSessionLog(log)
+  const calls = events.flatMap(event => event.type === 'tool/call' ? [event.data] : [])
+  expect(calls.map(call => ({ name: call.name, arguments: JSON.parse(call.arguments) }))).toEqual([
+    { name: 'discover_mcp_tools', arguments: { action: 'search', server, names: [name] } },
+    { name: 'discover_mcp_tools', arguments: { action: 'load', names: [name] } },
+    { name, arguments: computer ? { display: 0 } : server === 'chrome-devtools-mcp' ? { pageId: 0 } : { scale: 'css' } },
+  ])
+  const snapshots = events.flatMap(event => event.type === 'mcp/request-snapshot' ? [event.data] : [])
+  expect(snapshots.map(snapshot => snapshot.tools.map(tool => tool.name)))
+    .toEqual([[], [], [name], [name]])
+  expect(snapshots.map(snapshot => snapshot.schemas.map(schema => schema.name)))
+    .toEqual([
+      ['discover_mcp_tools'], ['discover_mcp_tools'],
+      ['discover_mcp_tools', name], ['discover_mcp_tools', name],
+    ])
+  const selections = events.flatMap(event => event.type === 'mcp/selection' ? [event.data] : [])
+  expect(selections).toHaveLength(1)
+  expect(selections[0]?.reason).toBe('load')
+  expect(selections[0]?.tools).toEqual(snapshots[2]?.tools)
+  expect(selections[0]?.servers).toEqual(snapshots[2]?.servers)
+  expect(snapshots[3]?.tools).toEqual(snapshots[2]?.tools)
+  const results = events.flatMap(event => event.type === 'tool/result'
+    ? event.data.message.content.filter(block => block.type === 'tool-result') : [])
+  expect(results).toHaveLength(3)
+  expect(results.every(result => !result.isError)).toBe(true)
+  const discovered = results[0]?.content[0]
+  expect(discovered?.type).toBe('text')
+  if (discovered?.type !== 'text') throw new Error(`${scenario}: discovery result has no text`)
+  expect(JSON.parse(discovered.text)).toMatchObject({ items: [{ name, server, connected: true }], nextOffset: null })
+  const loaded = results[1]?.content[0]
+  expect(loaded?.type).toBe('text')
+  if (loaded?.type !== 'text') throw new Error(`${scenario}: load result has no text`)
+  expect(JSON.parse(loaded.text)).toEqual({ ok: true, names: [name], servers: [server] })
+  const screenshot = results[2]
+  expect(screenshot?.toolCallId).toBe(computer ? 'computer-use-screenshot' : 'browser-screenshot')
+  expect(screenshot?.content).toHaveLength(2)
+  expect(screenshot?.content[0]).toEqual({ type: 'text', text: computer ? 'Display 0' : 'Chromium page' })
+  const image = screenshot?.content[1]
+  expect(image?.type).toBe('image')
+  if (image?.type !== 'image') throw new Error(`${scenario}: screenshot result has no image`)
+  expect(image.attachment).toEqual({
+    attachmentId: 'sha256:999f1d1527ee7e79266f16add5430fff76b1225d742464a5b1ff1f02971bb8ee',
+    mediaType: 'image/png', width: 1, height: 1, bytes: 90,
+  })
+  const stored = await readImageFile(join(cwd, '.dsh', 'attachments', 'v1'), image.attachment)
+  expect(Buffer.from(stored.data).toString('base64')).toBe(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADElEQVQImWNgZGIGAAAOAAeCcsnOAAAAAElFTkSuQmCC',
+  )
 }
 
 function verifyNoMcpServers(log: string, ptc: boolean): void {
   const events = parseSessionLog(log)
+  expect(events.filter(event => event.type.startsWith('mcp/'))).toEqual([])
   const headers = events.flatMap(event => event.type === 'request/header' ? [event.data.header] : [])
   const prompts = events.flatMap(event => event.type === 'system/message'
     ? event.data.message.content.filter(block => block.type === 'text').map(block => block.text) : [])
@@ -1048,6 +1142,8 @@ describe('headless recorded-session snapshots', () => {
       try {
         result = await runLoaderSmoke({
           label: `${scenario.name} headless snapshot`,
+          ...scenario.manifest.environment?.DSH_EXAMPLE_MODE === undefined ? {}
+            : { mode: resolveExampleMode(scenario.manifest.environment.DSH_EXAMPLE_MODE) },
           tempDirPrefix: 'dsh-log-snap-',
           ...(scenario.manifest.workspace?.parent === 'outside-temp' ? { tempDirParent: outsideTempWorkspaceParent() } : {}),
           binScript: dshBin,
@@ -1081,6 +1177,9 @@ describe('headless recorded-session snapshots', () => {
             ...scenario.manifest.environment,
             ...(scenario.name === 'mcp-resources' || scenario.name === 'mcp-resources-ptc' ? {
               DSH_MCP_RESOURCES_FIXTURE: join(repoRoot, 'packages/mcp/mcp-client/tests/fixtures/resources-server.ts'),
+            } : {}),
+            ...(scenario.name === 'mcp-discovery' || scenario.name === 'mcp-discovery-ptc' ? {
+              DSH_MCP_DISCOVERY_FIXTURE: join(repoRoot, 'packages/mcp/mcp-client/tests/fixtures/discovery-server.ts'),
             } : {}),
             NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
             DSH_TELEMETRY_DISABLED: '1',
@@ -1120,6 +1219,14 @@ describe('headless recorded-session snapshots', () => {
             }
             if (scenario.name === 'mcp-resources' || scenario.name === 'mcp-resources-ptc') {
               verifyMcpResources(actualLogs[0]!.content, scenario.name === 'mcp-resources-ptc')
+            }
+            if (scenario.name === 'mcp-discovery' || scenario.name === 'mcp-discovery-ptc') {
+              verifyMcpDiscovery(actualLogs[0]!.content, scenario.name === 'mcp-discovery-ptc')
+            }
+            if (scenario.name === 'browser-use-chrome-devtools-mcp'
+              || scenario.name === 'browser-use-playwright-mcp'
+              || scenario.name === 'computer-use-cua-driver-mcp') {
+              await verifyMcpScreenshot(actualLogs[0]!.content, cwd, scenario.name)
             }
             if (scenario.name === 'mcp-empty' || scenario.name === 'mcp-empty-ptc') {
               verifyNoMcpServers(actualLogs[0]!.content, scenario.name === 'mcp-empty-ptc')

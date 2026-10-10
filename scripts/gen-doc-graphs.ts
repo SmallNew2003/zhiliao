@@ -132,6 +132,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns browser authentication and shared HTTP request dispatch; API adapters register endpoints and streams.',
   },
   {
+    key: 'mcpDiscovery',
+    pkg: 'mcp-discovery',
+    title: 'Scoped MCP discovery and request admission',
+    mode: 'core',
+    consumers: ['mcp-client', 'mcp-resources'],
+    note: 'Owns bounded discovery, complete selected definitions and instructions, and durable request identities without changing tool permissions.',
+  },
+  {
     key: 'mcpResources',
     pkg: 'mcp-resources',
     title: 'Scoped MCP resource access',

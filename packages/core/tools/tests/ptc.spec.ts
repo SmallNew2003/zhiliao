@@ -122,6 +122,69 @@ async function runCode(
   })
 }
 
+describe('effective presentation mode', () => {
+  it('reports inherited presentation and restores it when the scope override unloads', async () => {
+    const { ctx, tools } = await setup({ mode: 'both' })
+    const { scope, agent } = await mintAgentScope(ctx)
+    expect(tools.modeFor()).toBe('both')
+    expect(tools.modeFor(agent)).toBe('both')
+    const restore = scope.ctx.tools.presentAs('native')
+    expect(tools.modeFor(agent)).toBe('native')
+    expect(tools.modeFor()).toBe('both')
+    restore()
+    expect(tools.modeFor(agent)).toBe('both')
+  })
+})
+
+describe('proposed SDK rendering', () => {
+  it.each([
+    { mode: 'ptc', language: 'typescript' },
+    { mode: 'both', language: 'typescript' },
+    { mode: 'ptc', language: 'python' },
+    { mode: 'both', language: 'python' },
+  ] as const)('renders hidden proposals with the actual $language SDK under $mode', async ({ mode, language }) => {
+    const { ctx, tools, systemPrompt } = await setup({ mode, runtime: { language } })
+    let presented = false
+    ctx.tools.register(defineTool({
+      name: 'z_deferred', description: '延迟工具', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      isPresented: () => presented,
+      execute: () => Promise.resolve('ran'),
+    }))
+    registerEcho(ctx, 'a_echo')
+    registerEcho(ctx, 'unused')
+    const before = await systemPrompt.assemble()
+    const deferredBinding = language === 'python' ? 'async def z_deferred(' : 'z_deferred:'
+    const echoBinding = language === 'python' ? 'async def a_echo(' : 'a_echo:'
+    const unusedBinding = language === 'python' ? 'async def unused(' : 'unused:'
+    expect(before.sections.find(s => s.name === 'tools:sdk')?.text).not.toContain(deferredBinding)
+    expect(before.tools.map(t => t.name)).toEqual(mode === 'ptc' ? ['run_code'] : ['a_echo', 'run_code', 'unused'])
+    const proposed = tools.renderSdk(['z_deferred', 'a_echo'])
+    expect(proposed).toContain('延迟工具')
+    expect(proposed).toContain(deferredBinding)
+    expect(proposed).not.toContain(unusedBinding)
+    expect(proposed.indexOf(echoBinding)).toBeLessThan(proposed.indexOf(deferredBinding))
+    expect(tools.renderSdk(['a_echo', 'z_deferred', 'a_echo'])).toBe(proposed)
+    expect((await systemPrompt.assemble()).sections).toEqual(before.sections)
+
+    presented = true
+    const { scope, agent } = await mintAgentScope(ctx)
+    scope.ctx.tools.restrict({ deny: ['unused'] })
+    const actual = (await systemPrompt.assemble({ scope: agent })).sections.find(s => s.name === 'tools:sdk')?.text
+    expect(actual).toBe(proposed)
+    expect(Buffer.byteLength(proposed, 'utf8')).toBe(Buffer.byteLength(actual!, 'utf8'))
+    expect(() => tools.renderSdk(['unused'], agent)).toThrow(/unknown.*unused/)
+    expect(() => tools.renderSdk(['missing'])).toThrow(/unknown.*missing/)
+  })
+
+  it('returns no proposed SDK for native mode', async () => {
+    const { ctx, tools } = await setup({ mode: 'native', runtime: false })
+    registerEcho(ctx)
+    expect(tools.renderSdk(['echo'])).toBe('')
+    expect(() => tools.renderSdk(['missing'])).toThrow(/unknown.*missing/)
+  })
+})
+
 describe('mode-aware wire contribution', () => {
   it.each([
     { mode: 'ptc', language: 'typescript' },

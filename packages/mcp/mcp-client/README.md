@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-mcp-client` lets the model use tools and resources from external Model Context Protocol (MCP) servers. Configure one server per entry; its tools use names such as `mcp__github__create_issue`. No server is enabled by default. Shipped profiles already provide [shared resource discovery and reading](../mcp-resources/README.md). An empty caller scope adds no MCP tools or prompt text. Server instructions join the logged system prompt as literal text; MCP prompt templates are unsupported. Slow or crashed servers can delay startup or fail calls until recovery.
+`dsh-mcp-client` lets the model use external Model Context Protocol (MCP) tools and resources. Configure one server per entry; tools use names such as `mcp__github__create_issue`. No server is enabled by default. Shipped profiles provide [on-demand tool loading](../mcp-discovery/README.md) and [shared resource access](../mcp-resources/README.md); complete definitions and literal server instructions enter model requests only after selection. With no visible server, MCP adds no tools or prompt text. Slow or crashed servers can delay startup or fail calls until recovery.
 
 ## Table of Contents
 
@@ -29,7 +29,7 @@ Add `dsh-mcp-client` when the model should call tools from an external MCP serve
 
 ### Minimal configuration
 
-Add one entry per server; nothing else is required. After the harness starts, the server's tools appear in the model's tool list.
+In shipped profiles, add one entry per server. After startup, the model can search the catalog and load needed tools through `discover_mcp_tools`.
 
 ```yaml
 - id: mcp-github
@@ -68,7 +68,7 @@ Add one entry per server; nothing else is required. After the harness starts, th
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-mcp-client) is the exhaustive source for every accepted field.
 
-After startup, the server's tools appear as `mcp__<serverName>__<tool>` — try a prompt that uses one. If the initial connection fails, the harness still starts but no tools from that server appear, and an error is logged. Setting `failOnStartupError: true` rejects plugin activation; [app-boot's startup policy](../../boot/app-boot/README.md) still permits an optional MCP entry to fail without aborting the harness.
+Discovered tools use public names `mcp__<serverName>__<tool>`, but their full schemas are deferred by default. Direct human input can request loading by full public tool name or narrow selection with `mcp:<serverName>`; markers grant no permission and do not load every server tool. If initial connection fails, the harness still starts, that server has no loadable tools, and an error is logged. Setting `failOnStartupError: true` rejects plugin activation; [app-boot startup policy](../../boot/app-boot/README.md) still allows an optional MCP entry to fail without aborting the harness.
 
 ### Tool naming and coexistence
 
@@ -88,9 +88,9 @@ Images are supported when the current model accepts image input and the harness 
 
 ### Startup, updates, and reconnection
 
-The server's tools appear before the harness starts its first turn. When the server changes its tool list, the model's tool set updates automatically; if the update fails, the previous tool set keeps working.
+Initial tool discovery completes before the first harness turn; full definitions remain deferred. Server tool-list changes update the catalog automatically; a failed update preserves the previous generation. When a selected definition or its instructions change, the caller must load it again and invoke it from a later request; discovery rejects stale definitions before network dispatch.
 
-When a server connection drops — for example a local server process crashes — the plugin reconnects automatically with delays that double from 500 ms up to 30 s and then refreshes the tool set; reconnect progress is visible in the logs. During an outage the last known tools stay listed but calls to them fail until the server recovers. After ten consecutive failed attempts the server's tools are removed and reconnection stops until you reload the configuration or restart the harness; a server that stays connected for a while resets that counter. Set `reconnect.enabled: false` to disable automatic reconnection — tools then stay listed but fail until you reload. Editing the configuration entry reloads the server connection in place, and unchanged names stay unchanged.
+After a connection drops, such as a local process crash, the plugin reconnects with delays doubling from 500 ms to 30 s and refreshes tools; progress appears in logs. Last-known definitions remain during an outage, but calls fail. After ten consecutive failures, the tools are unregistered and reconnection stops until configuration reload or restart; sustained uptime resets the counter. `reconnect.enabled: false` retains known definitions without automatic recovery. Reconnecting with identical content can reuse an existing selection; stable names alone do not imply unchanged definitions.
 
 -----
 
@@ -116,7 +116,7 @@ This section explains the design decisions behind the bridge and points at the c
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `serverName` reservation, activation await |
 | [`src/connection.ts`](src/connection.ts) | Connection supervisor: client generations, reconnect policy, attempt budget, disposal |
-| [`src/server-context.ts`](src/server-context.ts) | Resource-provider registration and literal server instructions |
+| [`src/server-context.ts`](src/server-context.ts) | Publish connection status and instructions to discovery, and register resource providers |
 | [`src/tools.ts`](src/tools.ts) | Tool bridge: discovery, naming, registration swap, execution, image projection |
 | [`src/transport.ts`](src/transport.ts) | Transport factory: stdio spawn with scrubbed env, Streamable HTTP |
 | — | No runtime invariant companion is published; MCP generations contribute through the tool registry, but the bridge exposes no independent server-to-tool snapshot after an asynchronous resync. |
@@ -124,6 +124,8 @@ This section explains the design decisions behind the bridge and points at the c
 The exported `createMcpToolDefinition(ctx, options)` adapts an upstream tool schema and raw-result callback to the same canonical values, errors, and durable image projection. Each callback receives the exact `ToolExecution`, including its Agent and cancellation signal; SDK spec-type validation checks its result before projection. Callers own registration, cancellation deadlines, and provider teardown. The native Cua Driver provider uses this adapter without opening an MCP transport.
 
 ### Lifecycle and sync
+
+The client requires `tools` and `mcpDiscovery`. Discovery wraps registered tools to control model presentation and check request identities; the original definition and registry retain execution, output projection, and permission checks. Server context supplies connection status and complete instructions to discovery without publishing its own prompt section. Custom compositions must mount [discovery](../mcp-discovery/README.md) and its dependencies.
 
 `apply` resolves the reconnect policy, reserves the `serverName` inside the current registration scope, starts the supervisor, and awaits the initial connection plus discovery. Independent Agent scopes may reuse the same namespace because their tools and transports are isolated; a duplicate inside one scope fails at load. The supervisor serializes every sync — initial, notification, and reconnect — through one queue so two syncs can never interleave their dispose-previous/register-next swap. Disposal cancels pending reconnects, closes the negotiating transport or attached client, waits for the in-flight attempt and queued syncs to quiesce, and unregisters the current generation.
 
@@ -161,15 +163,15 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-After discovery succeeds, SDK-admitted MCP tools appear as native tools named `mcp__<serverName>__<rawName>` (or their deterministic normalized form), with the server description and input schema. A re-sync replaces the generation; disposal or an exhausted reconnect budget removes it. A server without the tools capability connects with an empty tool set.
+After discovery succeeds, SDK-admitted tools enter the [bounded discovery catalog](../mcp-discovery/README.md#model-experience) under stable public names. Only selected tools contribute complete descriptions and input schemas to native requests or PTC declarations. Re-sync replaces the generation; disposal or an exhausted reconnect budget removes it. A server without tools capability connects with an empty tool set.
 
 #### Token effect
 
-The tool descriptions and input schemas enter every request while the tools are registered; re-syncs replace rather than accumulate schemas, and the server-qualified name adds tokens to every tool definition and call. A configured client also enables the [shared resource tools and server-name prompt](../mcp-resources/README.md#model-experience).
+Unselected definitions stay out of requests. Selected descriptions, schemas, and required instructions are subject to [discovery budgets](../mcp-discovery/README.md); server-qualified names still add tokens to definitions and calls. A configured client also enables [shared resource tools](../mcp-resources/README.md#model-experience).
 
 #### KV Cache effect
 
-The tool-definition prefix stays stable while the discovered set and schemas are unchanged. A re-sync that adds, removes, renames, or changes a tool replaces definitions and may invalidate reuse from the first changed schema token onward; a reconnect that recovers an unchanged list reproduces identical definitions and stays prefix-stable.
+The tool-definition prefix stays stable while selected tools and schemas are unchanged. Loading, release, or definition invalidation changes definitions in later requests; an identical-content reconnect can preserve their presentation. Catalog changes outside the selected set can still change discovery prompt text.
 
 ### Tool-call history and results
 
@@ -189,15 +191,15 @@ Append-only; newly visible content follows the reusable request prefix and does 
 
 #### What the model sees
 
-One server-labeled section contains the nonblank instructions returned by each successful connection. Absent or blank instructions add no prompt text. Braces remain literal. A replacement connection publishes its instructions only after discovery succeeds; disposal or exhausted recovery removes the section.
+Nonblank instructions from a successful connection remain complete literal, server-attributed text for [discovery](../mcp-discovery/README.md) to admit on demand. Loading a server tool or activating its resource server admits instructions into a later request. Absent or blank instructions add no instruction text; braces remain literal. A connection updates instructions only after discovery succeeds.
 
 #### Token effect
 
-Server instructions contribute text to model requests while their scoped section is active. Resource documents enter history only through explicit resource reads.
+Only selected servers contribute instruction text to model requests. The client size limit validates received instructions; discovery separately applies request budgets to complete selections without truncation. Resource documents enter history only through explicit reads.
 
 #### KV Cache effect
 
-Unchanged instructions retain identical prompt text. Updated or removed instructions change the next assembled system message and its reusable prefix.
+Unchanged, selected instructions retain identical prompt text. Selection, release, or changed instructions affect subsequent system messages; changed instructions also invalidate existing request identities.
 
 ## Known Limitations and Deferred Work
 

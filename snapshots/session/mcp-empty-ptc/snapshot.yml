@@ -3,6 +3,8 @@ scenario: mcp-empty-ptc
 profile: headless
 composition: mcp-empty-ptc
 recording: live
+environment:
+  DSH_EXAMPLE_MODE: lib
 header:
   class: mcp-empty-ptc
   pin: true

@@ -2,7 +2,13 @@ version: 1
 scenario: mcp-resources-ptc
 profile: headless
 composition: mcp-resources-ptc
-recording: live
+recording: authored
+environment:
+  DSH_EXAMPLE_MODE: lib
 header:
   class: mcp-resources-ptc
   pin: true
+  changes: 1
+  promptChanges: 1
+replay:
+  override: true

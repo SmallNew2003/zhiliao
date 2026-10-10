@@ -25,6 +25,14 @@ interface ToolOutputDefinition {
 ```ts type-equiv
 /** A registered tool: its schema plus the execution function. */
 interface ToolDefinition extends ToolSchema {
+  /**
+   * Pure synchronous model-presentation predicate. Omission or `true` includes
+   * the definition in wire schemas and SDK text; `false` omits it from both.
+   * Lookup, permission restrictions, schema inspection, and execution are unchanged.
+   * @param scope - the viewing scope; omitted for global assembly.
+   * @returns whether this scope's model should see the definition.
+   */
+  isPresented?(scope?: ScopeKey): boolean
   /** Mandatory canonical output declaration. */
   readonly output: ToolOutputDefinition
   /**
@@ -498,6 +506,14 @@ Tool registry and execution pipeline. Scoped registrations shadow globals; one v
 
 ```ts cordis-catalog
 /**
+ * The presentation one scope's agent sees: its own declaration, else the
+ * deployment default.
+ * @param scope - the calling agent, or undefined for the global view.
+ * @returns the resolved presentation mode.
+ */
+modeFor(scope?: ScopeKey): ToolPresentationMode
+
+/**
  * Present the calling scope's tools in `mode` instead of the deployment
  * default. Nearest scope on the chain wins, so a preset's standing
  * declaration covers every agent joined under it.
@@ -557,6 +573,17 @@ get(name: string, scope?: ScopeKey): ToolDefinition | undefined
  * @returns one deep-cloned schema per visible tool.
  */
 schemas(scope?: ScopeKey): ToolSchema[]
+
+/**
+ * Render a proposed scope-visible tool subset without changing presentation.
+ * Hidden definitions remain eligible; permissions and scoped shadows apply.
+ * Unknown or restricted names throw, including under native mode. Duplicate
+ * names render once; PTC transport is omitted from the SDK declarations.
+ * @param names - proposed names of definitions visible to this scope.
+ * @param scope - the viewing scope; omitted for the global view.
+ * @returns the complete canonical runtime-language SDK, or empty text in native mode.
+ */
+renderSdk(names: readonly string[], scope?: ScopeKey): string
 
 /**
  * Classify a pending call through the caller's visible tool definition. Only

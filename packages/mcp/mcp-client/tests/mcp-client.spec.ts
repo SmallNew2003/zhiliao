@@ -8,9 +8,10 @@ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { boundAgent, mountDiscovery } from './discovery-fixture.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
-import { publicToolName, syncTools, type ToolBridgeOptions } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
+import { publicToolName, syncTools as syncSourceTools, type ToolBridgeOptions } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
 import { createTransport } from '@deepseek-ai/dsh-mcp-client/src/transport.ts'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
 
@@ -56,7 +57,17 @@ async function mountRegistry(): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await mountDiscovery(ctx)
   return ctx
+}
+
+/** A synchronized mock server also owns the discovery source required by its definitions. */
+async function syncTools(...args: Parameters<typeof syncSourceTools>): ReturnType<typeof syncSourceTools> {
+  const [, ctx, options] = args
+  if (!ctx.mcpDiscovery.search(undefined, { server: options.serverName }).items.some(item => item.name === undefined)) {
+    ctx.mcpDiscovery.registerServer(options.serverName, { connected: () => true, instructions: () => '' })
+  }
+  return syncSourceTools(...args)
 }
 
 const IMAGE_LIMITS: ImageAttachmentLimits = {
@@ -117,14 +128,6 @@ async function mountRichRegistry(): Promise<{ ctx: Context; attachments: Recordi
   await ctx.plugin(LlmRuntime)
   ctx.llm.registerAdapter(['visual'], new ImageCatalogAdapter())
   return { ctx, attachments: ctx.attachments as RecordingAttachmentStore }
-}
-
-/** Calling-agent stand-in with no durable request header yet. */
-function agentOn(model: string | undefined = 'vision'): object {
-  return {
-    options: model === undefined ? {} : { provider: 'visual', model },
-    session: { requestHeader: () => undefined },
-  }
 }
 
 /** Require one text block and return its text for diagnostic assertions. */
@@ -438,7 +441,7 @@ describe('tool execution', () => {
       callId: ToolCallId('c1'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(result.content.map(block => block.type)).toEqual(['text', 'image', 'text', 'image', 'text'])
@@ -472,7 +475,7 @@ describe('tool execution', () => {
       callId: ToolCallId('no-store'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(result.content).toEqual([{
@@ -500,7 +503,7 @@ describe('tool execution', () => {
       callId: ToolCallId('bad-batch'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(rich.attachments.saved).toEqual([])
@@ -526,7 +529,7 @@ describe('tool execution', () => {
       callId: ToolCallId('strict-batch'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(rich.attachments.saved).toEqual([])
@@ -549,7 +552,7 @@ describe('tool execution', () => {
       callId: ToolCallId('text-route'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn('text') as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'text' }),
     })
 
     expect(rich.attachments.saved).toEqual([])
@@ -569,7 +572,7 @@ describe('tool execution', () => {
       callId: ToolCallId('no-provider'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: { options: { model: 'vision' }, session: { requestHeader: () => undefined } } as never,
+      agent: await boundAgent(rich.ctx, { model: 'vision' }),
     })
     expect(textAt(noProvider.content)).toContain('route could not be resolved')
 
@@ -578,7 +581,7 @@ describe('tool execution', () => {
       callId: ToolCallId('no-model'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: { options: { provider: 'visual' }, session: { requestHeader: () => undefined } } as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual' }),
     })
     expect(textAt(noModel.content)).toContain('route could not be resolved')
 
@@ -590,7 +593,7 @@ describe('tool execution', () => {
       callId: ToolCallId('no-llm'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(noLlmCtx, { provider: 'visual', model: 'vision' }),
     })
     expect(textAt(noLlm.content)).toContain('route could not be resolved')
 
@@ -600,7 +603,7 @@ describe('tool execution', () => {
       callId: ToolCallId('unverified'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
     expect(textAt(unverified.content)).toContain('route could not be verified')
 
@@ -612,7 +615,7 @@ describe('tool execution', () => {
       callId: ToolCallId('unknown-modalities'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
     expect(textAt(unknown.content)).toContain('does not declare image input')
 
@@ -626,7 +629,7 @@ describe('tool execution', () => {
       callId: ToolCallId('canceled'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
     expect(canceled.isError).toBe(true)
     expect(canceled.content[0]).toEqual({ type: 'text', text: 'Error: tool call aborted' })
@@ -647,7 +650,7 @@ describe('tool execution', () => {
       callId: ToolCallId('store-rejected'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(textAt(result.content)).toContain('durable image storage rejected the result')
@@ -669,7 +672,7 @@ describe('tool execution', () => {
       callId: ToolCallId('policy-rejected'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(textAt(result.content)).toContain('image admission rejected the result: too many images')
@@ -693,7 +696,7 @@ describe('tool execution', () => {
       callId: ToolCallId('replaced'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(rich.ctx, { provider: 'visual', model: 'vision' }),
     })
 
     expect(rich.attachments.saved).toHaveLength(1)
@@ -716,7 +719,7 @@ describe('tool execution', () => {
       callId: ToolCallId('value-replaced'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(valueRich.ctx, { provider: 'visual', model: 'vision' }),
     })
     expect(replaced.content).toEqual([{ type: 'text', text: 'value replacement' }])
 
@@ -735,7 +738,7 @@ describe('tool execution', () => {
       callId: ToolCallId('blocked'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: agentOn() as never,
+      agent: await boundAgent(blockedRich.ctx, { provider: 'visual', model: 'vision' }),
     })
     expect(blocked.isError).toBe(true)
     expect(blocked.content).toEqual([{ type: 'text', text: 'blocked by policy' }])
