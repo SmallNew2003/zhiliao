@@ -305,7 +305,11 @@ function makeHarness(
       case 'context':
         return <ContextMessageNodeView {...nodeProps<'context'>()} />
       case 'assistant-step':
-        return <AssistantNodeView {...nodeProps<'assistant-step'>()} />
+        return <AssistantNodeView {...nodeProps<'assistant-step'>()}
+          renderSlot={props.renderSlot}
+          renderSlotChain={((_key, _owner, options) => options?.fallback ?? null) as
+            React.ComponentProps<typeof AssistantNodeView>['renderSlotChain']}
+          SessionProvider={props.SessionProvider} />
       case 'command':
         return (
           <CommandNodeView

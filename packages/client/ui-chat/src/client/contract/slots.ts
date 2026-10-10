@@ -10,7 +10,7 @@ import type {
   SlotHookFactory, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { MarkdownCodeBlock, MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { createChatStore } from '../stores.ts'
 import type { ToolCallId } from './store.ts'
@@ -46,6 +46,12 @@ export interface TurnTailOwnerProps {
 /** Owner currency of finalized-assistant actions. */
 export interface AssistantActionOwnerProps {
   messageId: MessageId
+}
+
+/** Source and lifecycle data supplied by the assistant's top-level fence renderer. */
+export interface ChatCodeBlockOwnerProps {
+  /** Parser-confirmed fence data; nested code and reasoning never enter this slot. */
+  readonly block: MarkdownCodeBlock
 }
 
 /** Optional prose file-mention provider consumed by Chat. */
@@ -217,5 +223,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * that entry. With no entries, the standard action row remains unchanged.
      */
     'conversation.chat.assistant-actions': { kind: 'list'; scope: 'session'; owner: AssistantActionOwnerProps }
+    /**
+     * Assistant-only top-level fenced-code presentation. The first accepting
+     * selector renders; no provider or all-decline restores ordinary source.
+     * The assistant-step entry owns its declaration and effect lifetime.
+     */
+    'conversation.chat.codeBlock': { kind: 'chain'; scope: 'session'; owner: ChatCodeBlockOwnerProps }
   }
 }

@@ -222,6 +222,8 @@ export function apply(ctx: ClientContext): void {
 
 `target` and `buildViewNode(context)` declare one target-owned rendering contribution and must appear together. Preserve `context.key` as the React-facing identity, choose `anchorSeq` from durable ordering evidence, and return only renderer-ready data. Once a target Node has been published, keep returning the same key; use `visibility: 'hidden'` when it must temporarily leave the visible flow rather than withdrawing it with `null`.
 
+Chat's assistant-step renderer declares the session-scoped `conversation.chat.codeBlock` chain for top-level fences in Assistant text. Its `ChatCodeBlockOwnerProps` carries one `MarkdownCodeBlock` in `block`; source-offset identity and explicit closure come from the [Markdown primitive](../../packages/client/ui-primitives/README.md#rendering-agent-output). Providers register through the chain and decline unsupported inputs; ordinary code is the owner fallback. The [Chat package](../../packages/client/ui-chat/README.md#reference-previews) owns provider scope and presentation behavior.
+
 ## Predecessor reads
 
 Some Definitions need the latest earlier State of another business kind. `start` receives a `ConversationContextReader`; call `reader.previous<State>(kind)` there instead of accepting a Context collection or scanning events. The reader returns the nearest started Context before the current start `seq` as read-only data.

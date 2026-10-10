@@ -47,6 +47,8 @@ export interface PositionedBlock {
    * remounts when a block crosses the freeze boundary.
    */
   readonly key: number
+  /** Explicit delimiter closure for parser-confirmed top-level fences; absent on other blocks. */
+  readonly fence?: { readonly closed: boolean }
 }
 
 /** One {@link IncrementalMarkdownParser.update} result. */
@@ -70,6 +72,40 @@ export interface IncrementalBlocks {
 function blockKey(node: RootContent, base: number, index: number): number {
   const offset = node.position?.start.offset
   return offset === undefined ? -(index + 1) : base + offset
+}
+
+/** Return the start of the logical source line ending at or containing `offset`. */
+function sourceLineStart(text: string, offset: number): number {
+  let start = offset
+  while (start > 0 && text[start - 1] !== '\n' && text[start - 1] !== '\r') start -= 1
+  return start
+}
+
+/**
+ * Attach source identity and explicit fence closure to a parsed top-level block.
+ * Only the opening and final source lines are inspected; nested code is not visited.
+ * @param node - Top-level node from the grammar's current source slice.
+ * @param text - Full document source.
+ * @param base - Absolute offset of the grammar's source slice.
+ * @param index - Fallback key for a position-less node.
+ * @returns Positioned block with fence information when source positions confirm a delimiter.
+ */
+export function positionMarkdownBlock(node: RootContent, text: string, base: number, index: number): PositionedBlock {
+  const key = blockKey(node, base, index)
+  const block = { node, key }
+  if (node.type !== 'code' || node.position?.start.offset === undefined || node.position.end.offset === undefined) return block
+  const start = key
+  const end = base + node.position.end.offset
+  const lineStart = sourceLineStart(text, start)
+  if (!/^ {0,3}$/.test(text.slice(lineStart, start))) return block
+  const opening = /^(`{3,}|~{3,})/.exec(text.slice(start, lineTerminatorEnd(text, start) ?? end))
+  if (opening === null) return block
+  const run = opening[1] as string
+  const finalLineStart = sourceLineStart(text, end)
+  return {
+    ...block,
+    fence: { closed: finalLineStart > start && containsClosingFence(text.slice(finalLineStart, end), run[0] as '`' | '~', run.length) },
+  }
 }
 
 interface OpenFenceState {
@@ -344,15 +380,12 @@ export class IncrementalMarkdownParser {
         firstUnstable = 0
       } else {
         for (const node of blocks.slice(0, firstUnstable)) {
-          this.frozen.push({ node, key: blockKey(node, base, this.frozen.length) })
+          this.frozen.push(positionMarkdownBlock(node, text, base, this.frozen.length))
         }
         this.tailStart = base + cutEnd
       }
     }
-    const tail = blocks.slice(firstUnstable).map((node, index) => ({
-      node,
-      key: blockKey(node, base, index),
-    }))
+    const tail = blocks.slice(firstUnstable).map((node, index) => positionMarkdownBlock(node, text, base, index))
     this.cached = { frozen: [...this.frozen], tail, generation: this.generation }
     this.openFence = this.openFenceState(text, base, tail, this.cached.frozen)
     return this.cached
