@@ -1,0 +1,375 @@
+schema: comet.native.v4
+name: flatten-model-picker
+language: zh-CN
+phase: archive
+status: done
+state_version: 12
+brief: brief.md
+shape_confirmation_hash: 358c2ff223bbf80548ff204d70bcb30d208b71d5d400e9c2e3b6a00966598b4f
+spec_changes:
+  - capability: composer-model-picker
+    operation: create
+    source: specs/composer-model-picker/spec.md
+workspace:
+  isolation: worktree
+  change_branch: codex/flatten-model-picker
+  target_branch: master
+  finish: keep
+loop:
+  stage: done
+  goal_cycle: 2
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: In a session that permits model selection, one click opens
+      provider-grouped models and marks the current model without an
+      intermediate Model submenu.
+    result: passed
+    reason:
+      text: ModelSelect 直接渲染目录顺序的 provider group 与 menuitemradio，不存在中间 Model 子菜单；当前模型的
+        aria-checked 和勾选标记由共享目录 current 派生。组件测试、两份更新的 ARIA 快照及实际页面截图相符。
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: When the current model supports reasoning, the same panel shows exactly
+      its provider-declared efforts and current value. Models without reasoning
+      omit this section; arbitrary efforts are not introduced and provider
+      default semantics remain intact.
+    result: passed
+    reason:
+      text: 同一面板下方仅从当前模型 reasoning.efforts 构造选项；无 reasoning 元数据时省略等级区，未配置
+        defaultEffort 时保留 Default。组件测试覆盖有默认值、无默认值和缺失目录项；declared-reasoning
+        浏览器回归验证仅提供声明等级并持久化 high。
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: Successful model or effort selection updates the trigger from the
+      Host-confirmed result, closes the panel, and restores trigger focus.
+      Selecting the current value closes without another write. Existing
+      persistence scope and subsequent-request semantics remain unchanged.
+    result: passed
+    reason:
+      text: 模型与等级选择继续调用原 ModelDirectory/Host API，current
+        仍读取持久化投影而非乐观改写；成功后关闭并恢复触发器焦点，选中当前值直接关闭且不写入。组件测试覆盖上述关闭/焦点/无重复写入，default-model
+        浏览器回归保留后续会话默认值与已有日志会话的独立语义；实际 Session 记录模型/等级变更及后续请求配置。
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: Arrow keys move among actionable options; Enter, Space, or the existing
+      Tab gesture selects. Escape or Shift+Tab closes in one step and restores
+      trigger focus; outside clicks also close. A pending selection prevents
+      duplicate submissions.
+    result: passed
+    reason:
+      text: 方向键遍历并环绕未禁用选项，Tab 激活当前按钮，Escape 与 Shift+Tab 单步关闭并恢复焦点；Enter/Space 保留原生
+        button 激活语义。组件测试覆盖焦点遍历、Tab、两种关闭、真正外部点击及 selecting
+        禁用；浏览器回归验证跨模型/等级导航与关闭焦点。
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: Loading, retryable catalog errors, partial provider failures, empty lists,
+      and rejected selections have explicit feedback. Rejected selections retain
+      the original value and remain retryable.
+    result: passed
+    reason:
+      text: 加载、目录错误 Retry、部分 provider 失败和空列表直接在面板显示；选择失败使用既有 Toast，原目录 current
+        不因失败改写，selecting 结束后可重新选择。组件与 catalog 测试覆盖对应反馈、保留旧目录、失败重试及 writer-held
+        指引；未引入目录缺失即不可路由的判断。
+      truncated: false
+  - id: A6
+    source: brief.md
+    text: In Chinese and English, light and dark themes, desktop and 390px
+      viewports, the panel stays within the viewport; long names and many
+      options remain readable or scrollable, and the effort section is visually
+      distinct from the model list.
+    result: passed
+    reason:
+      text: Runtime 的 declared-reasoning 回归实际执行中/英 × 明/暗 × 1280/390px
+        八组长名称与17项模型布局，断言四边在视口内、无横向溢出且最末等级可滚动到达。独立目视检查中文明色、英文深色及390px深色截图，等级标题与分隔线清晰，模型名称受限宽度显示。
+      truncated: false
+  - id: A7
+    source: brief.md
+    text: Provide the current worktree’s real Web UI and a date-stamped interaction
+      GIF showing the list, model selection, and effort selection when
+      supported. Update and validate relevant component tests, browser
+      regressions, and owner-local snapshots, and complete independent read-only
+      acceptance.
+    result: passed
+    reason:
+      text: 核对当前 worktree、HEAD、TSX/CSS 与日期戳 GIF 的 SHA256
+        均匹配证据记录；目视检查模型列表、切换模型、切换等级及真实回复截图。隔离 Session 中存在 model/selection、实际
+        request/header（deepseek-flash/off）、目标 assistant/message 与 completed
+        回合。候选绑定 Runtime
+        回执证实3文件40组件/目录测试、7文件33浏览器测试、Host/Client类型检查、lint、3双语配对和空白检查通过；两份
+        owner-local ARIA 快照已更新。本报告完成独立只读逐项验收。
+      truncated: false
+builder_handoff:
+  candidate_id: c929c611-b1ad-4e52-bf59-18d6e952843e
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:e72dbd70-146b-4db0-9ac8-82ce5cc40d5f
+  iteration: 1
+  summary:
+    text: 完成单层模型与推理等级弹层，移除中间导航，保留 Host 选择与默认值语义；更新所有依赖旧菜单导航的 Web
+      测试，补充长列表、主题、语言和390px布局回归；提供真实服务/真实模型回复的交互GIF。
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+  checks:
+    - name:
+        text: pnpm run build
+        truncated: false
+      result: passed
+      note:
+        text: 完整构建通过；CSS长名称修补后重建模型选择包。
+        truncated: false
+    - name:
+        text: pnpm exec vitest run packages/client/ui-model-selection/tests
+        truncated: false
+      result: passed
+      note:
+        text: 3文件40测试通过。
+        truncated: false
+    - name:
+        text: Web affected regressions
+        truncated: false
+      result: passed
+      note:
+        text: 7文件32测试通过；随后增加8组布局矩阵，declared-reasoning 3测试replay通过；两个owner-local
+          ARIA快照已更新。
+        truncated: false
+    - name:
+        text: Host/client typecheck and lint
+        truncated: false
+      result: passed
+      note:
+        text: tsc -b tsconfig.host.json tsconfig.client.json通过；全仓lint:contracts-ready通过。
+        truncated: false
+    - name:
+        text: Scoped bilingual pairing
+        truncated: false
+      result: passed
+      note:
+        text: README、brief、spec三个双语对通过。
+        truncated: false
+    - name:
+        text: test:docs and doc-sync
+        truncated: false
+      result: failed
+      note:
+        text: 本次新增配对已补齐；剩余缺失链接与配对均来自HEAD已有comet-workflow-integration记录，详见验证记录。
+        truncated: false
+    - name:
+        text: Real browser demonstration
+        truncated: false
+      result: passed
+      note:
+        text: .playwright-mcp/model-picker-20261010/验证记录_20261010.json 与
+          GIF；真实模型回复“模型切换成功”。
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: 全仓文档检查仍被不属于本次变更的既有Comet链接/配对缺失阻断。
+      truncated: false
+    - text: GIF由同一真实页面的六张截图组成，停留时长用于阅读，不代表模型响应耗时；编码使用现有Pillow。
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-10T04:33:28.131Z
+blockers: []
+verification:
+  candidate_id: c929c611-b1ad-4e52-bf59-18d6e952843e
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:ea1d78e2-121b-42db-9451-70c70d0cc3e5
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: model-unit
+      name:
+        text: model-unit
+        truncated: false
+      argv_display:
+        - text: exec
+          truncated: false
+        - text: vitest
+          truncated: false
+        - text: run
+          truncated: false
+        - text: packages/client/ui-model-selection/tests
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 3263
+    - id: web-regressions
+      name:
+        text: web-regressions
+        truncated: false
+      argv_display:
+        - text: exec
+          truncated: false
+        - text: vitest
+          truncated: false
+        - text: run
+          truncated: false
+        - text: --config
+          truncated: false
+        - text: vitest.web.config.ts
+          truncated: false
+        - text: apps/web/tests/declared-reasoning.e2e.ts
+          truncated: false
+        - text: apps/web/tests/default-model.e2e.ts
+          truncated: false
+        - text: apps/web/tests/deepseek-messages-settings.e2e.ts
+          truncated: false
+        - text: apps/web/tests/deepseek-messages-chat.e2e.ts
+          truncated: false
+        - text: apps/web/tests/file-upload-round.e2e.ts
+          truncated: false
+        - text: apps/web/tests/feedback-release.e2e.ts
+          truncated: false
+        - text: apps/web/tests/onboarding-deepseek-config.e2e.ts
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 25170
+    - id: typecheck
+      name:
+        text: typecheck
+        truncated: false
+      argv_display:
+        - text: exec
+          truncated: false
+        - text: tsc
+          truncated: false
+        - text: -b
+          truncated: false
+        - text: tsconfig.host.json
+          truncated: false
+        - text: tsconfig.client.json
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 7167
+    - id: lint
+      name:
+        text: lint
+        truncated: false
+      argv_display:
+        - text: run
+          truncated: false
+        - text: lint:contracts-ready
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 26355
+    - id: bilingual-pairs
+      name:
+        text: bilingual-pairs
+        truncated: false
+      argv_display:
+        - text: run
+          truncated: false
+        - text: verify-translation-pairing
+          truncated: false
+        - text: packages/client/ui-model-selection/README.md
+          truncated: false
+        - text: docs/comet/changes/flatten-model-picker/brief.md
+          truncated: false
+        - text: docs/comet/changes/flatten-model-picker/specs/composer-model-picker/spec.md
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 1116
+    - id: whitespace
+      name:
+        text: whitespace
+        truncated: false
+      argv_display:
+        - text: diff
+          truncated: false
+        - text: --check
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 36
+  summary:
+    text: 独立只读验收通过，A1–A7 均满足。核对完整 brief/spec、实现差异、候选绑定 Runtime 回执、布局与交互截图及真实 Session
+      后，未发现本次单层模型选择范围内的阻断缺陷；无需补充 Runtime 检查。保留既有全仓文档失败和截图串联 GIF 的限制；最终用户接受、归档与任何
+      Git 交付仍由主流程处理。
+    truncated: false
+  risks:
+    - text: 全仓 test:docs/doc-sync 尚未全绿：已确认 HEAD 中既有 comet-workflow-integration 规格引用缺失
+        spec.zh.md；该规格与 2026-09-22 归档 verification 的双语配对缺失属于本次差异之外。本次
+        README、brief、spec 三对的 Runtime 检查通过，不能据此声称全仓文档检查通过。
+      truncated: false
+    - text: 日期戳 GIF 由同一真实页面的六张截图按状态串联，展示列表、模型/等级结果与真实回复，但不展示连续鼠标动作，也不能用于判断响应耗时；编码使用现有
+        Pillow，未使用 ffprobe。
+      truncated: false
+    - text: 独立验证复用了当前候选、同一 workspace/machine 的 Runtime
+        检查回执，没有重新运行全套测试或再次发送真实模型请求；已核对相关源码/测试修改时间早于回执，演示源码哈希一致，并读取隔离 Session
+        佐证真实请求。
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-10-10T04:44:29.401Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-10-10T04:31:56.224Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 独立只读验收通过，A1–A7 均满足。核对完整 brief/spec、实现差异、候选绑定 Runtime 回执、布局与交互截图及真实 Session
+        后，未发现本次单层模型选择范围内的阻断缺陷；无需补充 Runtime 检查。保留既有全仓文档失败和截图串联 GIF
+        的限制；最终用户接受、归档与任何 Git 交付仍由主流程处理。
+      truncated: false
+    completed_at: 2026-10-10T04:44:29.401Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-10T03:30:28.327Z
