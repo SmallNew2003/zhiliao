@@ -50,6 +50,10 @@ async function request(ctx: Context, owner: Agent, step = 1) {
   owner.session.append('system/message', {
     turn: 1, step, message: createSystemMessage(renderPrompt(assembly), 'lifecycle-fixture'),
   }, { surfaceOp: 'append' })
+  owner.session.append('request/header', {
+    header: { config: { provider: 'fixture', model: 'fixture' }, ...assembly.tools.length ? { tools: assembly.tools } : {} },
+    reason: owner.session.requestHeader() === undefined ? 'initial' : 'change',
+  })
   ctx.emit(scopeTarget(owner, owner), 'agent/assistant-stream', { agent: owner, frame: {
     type: 'start', attemptId: LlmAttemptId(`attempt-${step}`), revision: 1, turn: 1, step,
   } })
@@ -74,6 +78,24 @@ async function checkResources(ctx: Context, owner?: Agent) {
 }
 
 describe('MCP registration lifetime', () => {
+  it('rejects a tool whose server has not registered', async () => {
+    const ctx = await setup()
+    expect(() => ctx.mcpDiscovery.registerTool('missing', tool('mcp__missing__read'))).toThrow(/registered before its tools/)
+    expect(ctx.tools.get('mcp__missing__read')).toBeUndefined()
+    expect(ctx.mcpDiscovery.search().items).toEqual([])
+  })
+
+  it('keeps a server named discovery separate from the capability catalog', async () => {
+    const ctx = await setup()
+    server(ctx, 'discovery', 'Literal {{server}} instructions.')
+    const owner = agent(ctx)
+    expect(ctx.mcpDiscovery.load(owner, [], ['discovery']).ok).toBe(true)
+    const assembly = await request(ctx, owner)
+    const names = assembly.sections.map(section => section.name)
+    expect(new Set(names).size).toBe(names.length)
+    expect(assembly.sections.find(section => section.name === 'mcp:discovery')?.text).toBe('Literal {{server}} instructions.')
+    expect(renderPrompt(assembly)).toContain('Literal {{server}} instructions.')
+  })
   it('withdraws only the disposed server and removes discovery when the last owner unloads', async () => {
     const ctx = await setup()
     const first = await ctx.plugin({ inject: ['mcpDiscovery'], apply(inner: Context) {
@@ -250,6 +272,65 @@ describe('MCP request identities and scopes', () => {
     expect(await call(ctx, owner, 'mcp__repo__read')).toMatchObject({ isError: true })
     expect((await request(ctx, owner, 2)).tools.map(schema => schema.name)).not.toContain('mcp__repo__read')
     expect(selectionEvents(owner).at(-1)?.data).toMatchObject({ reason: 'invalidate', tools: [] })
+  })
+
+  it.each(['native', 'ptc'] as const)('continues %s assembly after all global tools are denied', async (mode) => {
+    const ctx = await setup({}, mode)
+    server(ctx, 'repo', 'Repo instructions')
+    ctx.mcpDiscovery.registerTool('repo', tool('mcp__repo__read'))
+    const owner = agent(ctx)
+    expect(ctx.mcpDiscovery.load(owner, ['mcp__repo__read']).ok).toBe(true)
+    await request(ctx, owner)
+    owner.ctx.get('tools')!.restrict({ allow: [] })
+    const assembly = await request(ctx, owner, 2)
+    expect(assembly.tools.map(schema => schema.name)).toEqual(mode === 'ptc' ? ['run_code'] : [])
+    expect(selectionEvents(owner).at(-1)?.data.tools).toEqual([])
+    expect(await call(ctx, owner, 'mcp__repo__read')).toMatchObject({ isError: true })
+  })
+
+  it('keeps an explicitly allowed MCP tool usable when discovery is denied', async () => {
+    const ctx = await setup()
+    server(ctx, 'repo', 'Repo instructions')
+    ctx.mcpDiscovery.registerTool('repo', tool('mcp__repo__read'))
+    const owner = agent(ctx)
+    owner.ctx.get('tools')!.restrict({ allow: ['mcp__repo__read'] })
+    expect(ctx.mcpDiscovery.load(owner, ['mcp__repo__read']).ok).toBe(true)
+    const assembly = await request(ctx, owner)
+    expect(assembly.tools.map(schema => schema.name)).toEqual(['mcp__repo__read'])
+    expect(await call(ctx, owner, 'mcp__repo__read')).toMatchObject({ isError: false })
+  })
+
+  it('keeps selected definitions out of diagnostic scopes without an Agent', async () => {
+    const ctx = await setup()
+    server(ctx, 'repo', 'Repo instructions')
+    ctx.mcpDiscovery.registerTool('repo', tool('mcp__repo__read'))
+    const owner = agent(ctx)
+    ctx.mcpDiscovery.load(owner, ['mcp__repo__read'])
+    const assembly = await ctx.systemPrompt.assemble({ scope: { name: 'diagnostic' } })
+    expect(assembly.tools.map(schema => schema.name)).toEqual(['discover_mcp_tools'])
+    expect(renderPrompt(assembly)).not.toContain('Repo instructions')
+  })
+
+  it('retains a valid selection when a resource activation names an unknown server', async () => {
+    const ctx = await setup()
+    server(ctx, 'repo')
+    ctx.mcpDiscovery.registerTool('repo', tool('mcp__repo__read'))
+    const owner = agent(ctx)
+    ctx.mcpDiscovery.load(owner, ['mcp__repo__read'])
+    const retained = ctx.sessionProjections.stateOf(owner.session, 'mcpDiscovery')?.selection
+    const refusal = ctx.mcpDiscovery.load(owner, [], ['missing'])
+    expect(refusal.ok).toBe(false)
+    if (!refusal.ok) expect(refusal.reason).toContain('missing')
+    expect(ctx.sessionProjections.stateOf(owner.session, 'mcpDiscovery')?.selection).toEqual(retained)
+  })
+
+  it('allows programmatic execution without a model request owner', async () => {
+    const ctx = await setup()
+    server(ctx, 'repo')
+    ctx.mcpDiscovery.registerTool('repo', tool('mcp__repo__read', 'Programmatic record'))
+    expect(await ctx.tools.execute({ name: 'mcp__repo__read', arguments: {},
+      callId: ToolCallId('programmatic'), signal: new AbortController().signal,
+    })).toMatchObject({ isError: false, value: 'Programmatic record' })
   })
 
   it('applies subset and server release only to subsequent requests', async () => {

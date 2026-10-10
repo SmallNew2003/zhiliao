@@ -108,7 +108,7 @@ export async function selectTools(ctx: Context, config: SelectorConfig, agent: A
     const decoded: unknown = JSON.parse(output)
     if (typeof decoded !== 'object' || decoded === null) throw new Error('Invalid MCP selector JSON')
     const value = decoded as Record<string, unknown>
-    if (!['selected', 'none', 'uncertain'].includes(String(value.status)) || !Array.isArray(value.names) || !Array.isArray(value.servers)
+    if (typeof value.status !== 'string' || !['selected', 'none', 'uncertain'].includes(value.status) || !Array.isArray(value.names) || !Array.isArray(value.servers)
       || !value.names.every(name => typeof name === 'string' && descriptors.some(item => item.name === name))
       || !value.servers.every(server => typeof server === 'string' && descriptors.some(item => item.server === server))) throw new Error('Invalid or unavailable MCP selector names')
     const result: SelectorResult = { status: value.status as SelectorResult['status'], names: value.names as string[], servers: value.servers as string[] }

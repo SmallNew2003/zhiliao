@@ -601,7 +601,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp`
 
-需要：`browserUse` · `agents` · `tools` · `systemPrompt`
+需要：`browserUse` · `agents` · `tools` · `systemPrompt` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Fixed Chromium launch or existing-browser attachment settings. */
@@ -616,7 +616,7 @@ Depends on: `BrowserMcpConfig` (`@deepseek-ai/dsh-experimental-browser-use-runti
 
 ## `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp`
 
-需要：`browserUse` · `agents` · `tools` · `systemPrompt`
+需要：`browserUse` · `agents` · `tools` · `systemPrompt` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Fixed Chromium launch or existing-browser attachment settings. */
@@ -673,7 +673,7 @@ Depends on: `ModelConfig` (`@browserbasehq/stagehand`)
 
 ## `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp`
 
-需要：`computerUse` · `tools`
+需要：`computerUse` · `tools` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Installed executable and MCP connection overrides. */
@@ -1769,7 +1769,7 @@ export interface SelectorConfig {
 }
 ```
 
-来源： [`packages/mcp/mcp-discovery/src/index.ts:35`](../packages/mcp/mcp-discovery/src/index.ts)
+来源： [`packages/mcp/mcp-discovery/src/index.ts:36`](../packages/mcp/mcp-discovery/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -2959,7 +2959,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
+来源：[`packages/core/system-prompt/src/index.ts:256`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 

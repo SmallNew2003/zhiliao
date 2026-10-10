@@ -52,6 +52,10 @@ async function assemble(ctx: Context, owner: Agent, turn = 1, step = 1, text?: s
 }
 function commit(ctx: Context, owner: Agent, assembly: PromptAssembly, turn = 1, step = 1) {
   owner.session.append('system/message', { turn, step, message: createSystemMessage(renderPrompt(assembly), 'prompt-fixture') }, { surfaceOp: 'append' })
+  owner.session.append('request/header', {
+    header: { config: { provider: 'fixture', model: 'fixture' }, ...assembly.tools.length ? { tools: assembly.tools } : {} },
+    reason: owner.session.requestHeader() === undefined ? 'initial' : 'change',
+  })
   ctx.emit(scopeTarget(owner, owner), 'agent/assistant-stream', { agent: owner, frame: {
     type: 'start', attemptId: LlmAttemptId(`attempt-${turn}-${step}`), revision: 1, turn, step,
   } })
@@ -65,7 +69,7 @@ function snapshots(owner: Agent) {
   return owner.session.snapshotEvents().filter(event => event.type === 'mcp/request-snapshot')
 }
 function discoveryText(assembly: PromptAssembly) {
-  return assembly.sections.find(section => section.name === 'mcp:discovery')?.text ?? ''
+  return assembly.sections.find(section => section.name === 'mcp-discovery')?.text ?? ''
 }
 
 async function minimumCatalogBytes() {

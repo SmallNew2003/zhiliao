@@ -180,7 +180,7 @@ describe('Session MCP Loader composition', () => {
     first.agent.followup(createUserMessage({ content: [{ type: 'text', text: `Use ${TOOL} to visit the fixture.` }], source: { kind: 'user' } }))
     await first.agent.whenIdle()
     expect(model.requests).toHaveLength(2)
-    expect(model.requests[0]?.tools?.map(tool => tool.name)).toEqual(['discover_mcp_tools', TOOL])
+    expect(model.requests[0]?.tools?.map(tool => tool.name)).toEqual([TOOL, 'discover_mcp_tools'])
     expect(model.requests[0]?.tools?.find(tool => tool.name === TOOL)).toMatchObject({ description: 'Visit the fixture page.', parameters: { required: ['label'], additionalProperties: false } })
     expect(JSON.stringify(first.agent.session.snapshotEvents())).toContain('Visit 1: fixture')
     expect((await execute(ctx, first.agent)).content).toEqual([{ type: 'text', text: 'Visit 2: direct' }])
@@ -226,13 +226,14 @@ describe('Session MCP Loader composition', () => {
     await Promise.all([second.agent.whenIdle(), child.agent.whenIdle()])
     expect(model.requests).toHaveLength(2)
     expect(model.requests.map(request => request.tools?.map(tool => tool.name)))
-      .toEqual(expect.arrayContaining([['unrelated'], ['unrelated', 'discover_mcp_tools']]))
+      .toEqual(expect.arrayContaining([['unrelated'], ['discover_mcp_tools', 'unrelated']]))
     for (const { agent } of [second, child]) {
       const expectedNames = agent === child.agent ? ['unrelated', 'discover_mcp_tools'] : ['unrelated']
+      const presentedNames = agent === child.agent ? ['discover_mcp_tools', 'unrelated'] : ['unrelated']
       expect(ctx.tools.schemas(agent).map(tool => tool.name)).toEqual(expectedNames)
       expect((await execute(ctx, agent)).isError).toBe(true)
       expect((await execute(ctx, agent, 'unrelated')).isError).toBe(false)
-      expect((await warm(ctx, agent)).tools.map(tool => tool.name)).toEqual(expectedNames)
+      expect((await warm(ctx, agent)).tools.map(tool => tool.name)).toEqual(presentedNames)
     }
     first.agent.ctx.tools.register({
       name: 'mcp__browser-fixture__late', description: 'A newly discovered browser operation.', parameters: { type: 'object' },
@@ -240,7 +241,7 @@ describe('Session MCP Loader composition', () => {
       execute: async () => true,
     })
     expect(ctx.tools.schemas(child.agent).filter(tool => tool.name.startsWith('mcp__browser-fixture__'))).toEqual([])
-    expect((await warm(ctx, child.agent)).tools.map(tool => tool.name)).toEqual(['unrelated', 'discover_mcp_tools'])
+    expect((await warm(ctx, child.agent)).tools.map(tool => tool.name)).toEqual(['discover_mcp_tools', 'unrelated'])
     expect((await execute(ctx, child.agent, 'mcp__browser-fixture__late')).isError).toBe(true)
     expect((await events(root)).filter(event => event.event === 'initialize')).toHaveLength(1)
     expect((await events(root)).filter(event => event.event === 'call')).toEqual([])
@@ -340,7 +341,7 @@ describe('Session MCP Loader composition', () => {
   it('denies inherited browser resources and instructions while keeping unrelated MCP servers usable', async () => {
     const { ctx, root } = await load(true)
     await ctx.plugin(McpResources)
-    ctx.mcpDiscovery.registerServer('docs', { connected: () => true, instructions: () => '' })
+    ctx.mcpDiscovery.registerServer('docs', { connected: () => true, instructions: () => 'DOC_FIXTURE_INSTRUCTION' })
     ctx.mcpResources.register('docs', { request: async () => ({ contents: [{ uri: 'docs://memo', text: 'Independent document.' }] }) })
     const parent = await ctx.agents.create({ sessionId: SessionId('resource-parent') })
     const child = await ctx.agents.create({
@@ -348,9 +349,16 @@ describe('Session MCP Loader composition', () => {
       setup: (_inner, agent) => { bindScopeParent(agent, parent.agent) },
     })
     expect(renderPrompt(await warm(ctx, parent.agent))).toContain('BROWSER_FIXTURE_INSTRUCTION')
+    const activation = await ctx.tools.execute({
+      agent: child.agent, name: 'discover_mcp_tools', arguments: { action: 'load', server: 'browser-fixture' },
+      callId: ToolCallId('activate-inherited-browser'), signal: new AbortController().signal,
+    })
+    expect(activation.isError).toBe(false)
+    expect(activation.value).toMatchObject({ ok: true })
     const blocked = await bindMcpRequest(ctx, child.agent, [], ['docs'])
     expect(blocked.tools.some(tool => tool.name === TOOL)).toBe(false)
     expect(renderPrompt(blocked)).not.toContain('BROWSER_FIXTURE_INSTRUCTION')
+    expect(renderPrompt(blocked)).toContain('DOC_FIXTURE_INSTRUCTION')
     expect(renderPrompt(blocked)).toContain('browser-fixture')
     for (const name of ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']) {
       expect((await resource(ctx, child.agent, name)).isError).toBe(true)

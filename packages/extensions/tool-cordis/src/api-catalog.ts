@@ -2761,7 +2761,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async assemble(context: AssembleContext = {}): Promise<PromptAssembly>',
-        description: 'Assemble global and scoped providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section.',
+        description: 'Await scoped preparation, assemble providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section.',
         parameters: [{ name: 'context', description: 'the optional scope and plugin-defined assembly fields.' }],
         returns: 'the post-waterfall assembly with any complete prompt enforced.',
       },
@@ -3925,6 +3925,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Emitted when any prompt provider changes.',
     description: 'Emitted when any prompt provider changes. This registry notification is unfiltered because a global change affects every scope.',
     parameters: [],
+  },
+  {
+    name: 'system-prompt/prepare',
+    mode: 'serial',
+    signature: '\'system-prompt/prepare\'(this: Scoped<SystemPrompt>, context: AssembleContext): void | Promise<void>',
+    summary: 'Await preparation before reading prompt and tool providers.',
+    description: 'Await preparation before reading prompt and tool providers. Scope-filtered dispatch: scoped listeners prepare only their scope\'s assemblies. Rejection or cancellation stops the assembly before provider evaluation.',
+    parameters: [{ name: 'context', description: 'the caller\'s scope, signal, and per-assembly inputs.' }],
   },
   {
     name: 'tools/change',

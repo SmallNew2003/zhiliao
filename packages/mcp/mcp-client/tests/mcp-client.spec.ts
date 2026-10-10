@@ -567,23 +567,13 @@ describe('tool execution', () => {
     )
     await syncTools(client as never, rich.ctx, defaultOpts, new Map())
 
-    const noProvider = await rich.ctx.tools.execute({
+    const noAgent = await rich.ctx.tools.execute({
       signal: testToolSignal,
-      callId: ToolCallId('no-provider'),
+      callId: ToolCallId('no-agent'),
       name: 'mcp__srv__img',
       arguments: {},
-      agent: await boundAgent(rich.ctx, { model: 'vision' }),
     })
-    expect(textAt(noProvider.content)).toContain('route could not be resolved')
-
-    const noModel = await rich.ctx.tools.execute({
-      signal: testToolSignal,
-      callId: ToolCallId('no-model'),
-      name: 'mcp__srv__img',
-      arguments: {},
-      agent: await boundAgent(rich.ctx, { provider: 'visual' }),
-    })
-    expect(textAt(noModel.content)).toContain('route could not be resolved')
+    expect(textAt(noAgent.content)).toContain('route could not be resolved')
 
     const noLlmCtx = await mountRegistry()
     await noLlmCtx.plugin(RecordingAttachmentStore)

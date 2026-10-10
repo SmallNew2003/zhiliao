@@ -48,6 +48,10 @@ async function assemble(ctx: Context, owner: Agent, text?: string, source: 'user
     })] },
   })
   owner.session.append('system/message', { turn: 1, step: 1, message: createSystemMessage(renderPrompt(assembled), 'fixture') }, { surfaceOp: 'append' })
+  owner.session.append('request/header', {
+    header: { config: { provider: 'fixture', model: 'fixture' }, ...assembled.tools.length ? { tools: assembled.tools } : {} },
+    reason: owner.session.requestHeader() === undefined ? 'initial' : 'change',
+  })
   return assembled
 }
 function bind(ctx: Context, owner: Agent) {

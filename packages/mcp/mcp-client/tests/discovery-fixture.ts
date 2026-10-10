@@ -1,6 +1,6 @@
 /** MCP unit compositions and durable request-snapshot owners. */
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, canonicalHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import McpDiscovery from '@deepseek-ai/dsh-mcp-discovery'
 import { createScope, scopeTarget } from '@deepseek-ai/dsh-scope'
@@ -18,7 +18,7 @@ export async function mountDiscovery(ctx: Context): Promise<void> {
 let nextOwner = 0
 
 /** Real Session owner for bridge unit tests that deliberately omit model services. */
-export async function boundAgent(ctx: Context, options: AgentOptions = { provider: 'visual', model: 'vision' }): Promise<Agent> {
+export async function boundAgent(ctx: Context, options: AgentOptions & { provider: string; model: string } = { provider: 'visual', model: 'vision' }): Promise<Agent> {
   const session = Session.create(SessionId(`mcp-unit-${++nextOwner}`))
   const agent = { id: session.id, session, options } as Agent
   const scoped = createScope(ctx, agent)
@@ -35,6 +35,10 @@ export async function boundAgent(ctx: Context, options: AgentOptions = { provide
   if (!loaded.ok) throw new Error(loaded.reason)
   const assembled = await ctx.systemPrompt.assemble({ scope: agent, agent, stepInput: { turn: 1, step: 1, messages: [] } })
   session.append('system/message', { turn: 1, step: 1, message: createSystemMessage(renderPrompt(assembled), 'fixture') }, { surfaceOp: 'append' })
+  session.append('request/header', {
+    header: canonicalHeader({ config: { provider: options.provider, model: options.model }, tools: assembled.tools }),
+    reason: 'initial',
+  })
   ctx.emit(scopeTarget(agent, agent), 'agent/assistant-stream', { agent, frame: {
     type: 'start', attemptId: LlmAttemptId(`mcp-unit-attempt-${nextOwner}`), revision: 1, turn: 1, step: 1,
   } })

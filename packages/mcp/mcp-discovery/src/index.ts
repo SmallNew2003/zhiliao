@@ -3,6 +3,7 @@
  * @module @deepseek-ai/dsh-mcp-discovery
  */
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { z as zod } from 'zod'
 import z from '@deepseek-ai/schemastery'
@@ -132,6 +133,7 @@ export class McpDiscovery extends Service {
     fullSdk: string
     sdkMatches: boolean
     instructions: Map<string, string>
+    definitions: Map<string, ToolSchema>
   }>()
   private readonly owners = new WeakMap<ScopeKey, Agent>()
   private readonly diagnostics = new WeakMap<Agent, string[]>()
@@ -176,9 +178,9 @@ export class McpDiscovery extends Service {
         }
       },
     })
-    ctx.systemPrompt.section({ name: 'mcp:discovery', order: ctx.systemPrompt.getSectionOrder('MCP_SERVERS'), interpolate: false, text: '' })
+    ctx.systemPrompt.section({ name: 'mcp-discovery', order: ctx.systemPrompt.getSectionOrder('MCP_SERVERS'), interpolate: false, text: '' })
+    ctx.on('system-prompt/prepare', context => this.prepare(context))
     ctx.on('system-prompt/assemble', async (assembly, context, next) => {
-      await this.prepare(context)
       const projected = this.project(assembly, context)
       Object.assign(assembly, projected)
       const result = await next()
@@ -208,11 +210,14 @@ export class McpDiscovery extends Service {
         })
         const sdkVisible = staged.sdkMatches && (!staged.fullSdk || actualSystem.includes(staged.fullSdk))
         const mode = this.selfCtx.tools.modeFor(agent)
+        const schemas = agent.session.requestHeader()?.tools?.filter(schema =>
+          schema.name.startsWith('mcp__') || schema.name === DISCOVERY_NAME) ?? []
         const tools = staged.snapshot.tools.filter(tool => servers.some(item => item.server === tool.server)
-          && (mode !== 'ptc' || sdkVisible))
+          && (mode === 'ptc' ? sdkVisible : schemas.some(schema =>
+            schema.name === tool.name && isDeepStrictEqual(schema, staged.definitions.get(tool.name)))))
         const instructions = servers.map(item => staged.instructions.get(item.server) as string).filter(text => text.trim()).join('\n\n')
         agent.session.append('mcp/request-snapshot', {
-          ...staged.snapshot, tools, servers, instructions, sdk: sdkVisible ? staged.snapshot.sdk : '',
+          ...staged.snapshot, tools, servers, schemas, instructions, sdk: sdkVisible ? staged.snapshot.sdk : '',
         })
       }
     })
@@ -427,10 +432,12 @@ export class McpDiscovery extends Service {
   }
   private admit(agent: Agent, selection: Selection): string | undefined {
     const tools = this.tools(agent)
+    const discovery = this.selfCtx.tools.get(DISCOVERY_NAME, agent)
     const schemas = [
-      schemaOf(this.discoveryTool()), ...selection.tools.map(tool => schemaOf(this.requiredTool(tools, tool.name).definition)),
+      ...discovery ? [schemaOf(discovery)] : [],
+      ...selection.tools.map(tool => schemaOf(this.requiredTool(tools, tool.name).definition)),
     ]
-    const sdk = this.selfCtx.tools.renderSdk([DISCOVERY_NAME, ...selection.tools.map(tool => tool.name)], agent)
+    const sdk = this.selfCtx.tools.renderSdk(schemas.map(schema => schema.name), agent)
     const totals = {
       nativeBytes: bytes(JSON.stringify(schemas)), sdkBytes: bytes(sdk),
       instructionBytes: bytes(this.instructions(agent, selection)),
@@ -533,22 +540,19 @@ export class McpDiscovery extends Service {
       }
       catalogText += CATALOG_CLOSE + PAGE_HINT
     }
-    const instructions = scope ? this.instructions(scope, selection) : ''
-    const mode = this.selfCtx.tools.modeFor(scope)
-    const visibleSchemas = this.selfCtx.tools.schemas(scope)
-      .filter(schema => this.selfCtx.tools.get(schema.name, scope)?.isPresented?.(scope) !== false)
-    const mcpSchemas = visibleSchemas.filter(schema => (schema.name.startsWith('mcp__') || schema.name === DISCOVERY_NAME) && mode !== 'ptc')
-    const schemas = [...assembly.tools.filter(schema => !schema.name.startsWith('mcp__') && schema.name !== DISCOVERY_NAME), ...mcpSchemas]
-    const sdk = this.selfCtx.tools.renderSdk(visibleSchemas.map(schema => schema.name), scope)
-    const sections = assembly.sections.map(section => section.name === 'mcp:discovery'
-      ? { ...section, text: [catalogText, instructions].filter(Boolean).join('\n\n') }
-      : section.name === 'tools:sdk' ? { ...section, text: sdk } : section)
-    return { ...assembly, tools: schemas, sections }
+    const servers = this.servers(scope)
+    const sections = assembly.sections.flatMap(section => section.name === 'mcp-discovery'
+      ? [{ ...section, text: catalogText }, ...selection.servers.map(item => ({
+        name: `mcp:${item.server}`, text: (servers.get(item.server) as ServerSource).instructions(), interpolate: false,
+      })).filter(section => section.text.trim())]
+      : [section])
+    return { ...assembly, sections }
   }
   private stage(assembly: PromptAssembly, context: AssembleContext): void {
     const agent = context.agent
     if (!agent || !context.stepInput) return
-    if (!this.catalog(agent).length) {
+    const selected = this.valid(agent)
+    if (!this.catalog(agent).length && !selected.tools.length && !selected.servers.length) {
       const previous = this.state(agent).request
       if (previous && (previous.schemas.length || previous.sdk || previous.instructions
         || previous.servers.length || previous.tools.length)) {
@@ -556,21 +560,21 @@ export class McpDiscovery extends Service {
           snapshot: {
             ...emptySelection(), turn: context.stepInput.turn, step: context.stepInput.step, schemas: [], sdk: '', instructions: '',
           },
-          fullSdk: '', sdkMatches: true, instructions: new Map(),
+          fullSdk: '', sdkMatches: true, instructions: new Map(), definitions: new Map(),
         })
       } else this.staged.delete(agent)
       return
     }
-    const selected = this.valid(agent)
-    const mode = this.selfCtx.tools.modeFor(agent)
     const schemas = assembly.tools.filter(schema => schema.name.startsWith('mcp__') || schema.name === DISCOVERY_NAME)
     const fullSdk = assembly.sections.find(section => section.name === 'tools:sdk')?.text ?? ''
     const presented = this.selfCtx.tools.schemas(agent)
       .filter(schema => this.selfCtx.tools.get(schema.name, agent)?.isPresented?.(agent) !== false)
     const expectedSdk = this.selfCtx.tools.renderSdk(presented.map(schema => schema.name), agent)
     const sdkMatches = fullSdk === expectedSdk
-    const tools = selected.tools.filter(tool => mode === 'ptc' ? sdkMatches : schemas.some(schema => schema.name === tool.name))
-    const sdk = this.selfCtx.tools.renderSdk([DISCOVERY_NAME, ...tools.map(tool => tool.name)], agent)
+    const tools = selected.tools
+    const sdk = this.selfCtx.tools.renderSdk([
+      ...this.selfCtx.tools.get(DISCOVERY_NAME, agent) ? [DISCOVERY_NAME] : [], ...tools.map(tool => tool.name),
+    ], agent)
     const instructions = this.instructions(agent, selected)
     const request: RequestSnapshot = structuredClone({
       ...selected, tools, turn: context.stepInput.turn, step: context.stepInput.step, schemas, sdk, instructions,
@@ -579,6 +583,9 @@ export class McpDiscovery extends Service {
       snapshot: request, fullSdk, sdkMatches,
       instructions: new Map(selected.servers.map(item => [
         item.server, (this.servers(agent).get(item.server) as ServerSource).instructions(),
+      ])),
+      definitions: new Map(selected.tools.map(item => [
+        item.name, structuredClone(schemaOf(this.requiredTool(this.tools(agent), item.name).definition)),
       ])),
     })
   }

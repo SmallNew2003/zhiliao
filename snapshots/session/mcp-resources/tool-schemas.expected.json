@@ -66,6 +66,41 @@
       }
     },
     {
+      "name": "discover_mcp_tools",
+      "description": "Search and load specific MCP tools, activate resource servers, or release loaded selections. Definitions and instructions enter the next request.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "search",
+              "load",
+              "release"
+            ]
+          },
+          "query": {
+            "type": "string"
+          },
+          "server": {
+            "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "offset": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    {
       "name": "edit",
       "description": "Edit an existing UTF-8 text file by replacing literal text.",
       "parameters": {
@@ -669,41 +704,6 @@
           "content"
         ]
       }
-    },
-    {
-      "name": "discover_mcp_tools",
-      "description": "Search and load specific MCP tools, activate resource servers, or release loaded selections. Definitions and instructions enter the next request.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "action": {
-            "type": "string",
-            "enum": [
-              "search",
-              "load",
-              "release"
-            ]
-          },
-          "query": {
-            "type": "string"
-          },
-          "server": {
-            "type": "string"
-          },
-          "names": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "offset": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "action"
-        ]
-      }
     }
   ],
   "changes": [
@@ -770,6 +770,41 @@
           },
           "required": [
             "objective"
+          ]
+        }
+      },
+      {
+        "name": "discover_mcp_tools",
+        "description": "Search and load specific MCP tools, activate resource servers, or release loaded selections. Definitions and instructions enter the next request.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "search",
+                "load",
+                "release"
+              ]
+            },
+            "query": {
+              "type": "string"
+            },
+            "server": {
+              "type": "string"
+            },
+            "names": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "offset": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "action"
           ]
         }
       },
@@ -1375,41 +1410,6 @@
           "required": [
             "file_path",
             "content"
-          ]
-        }
-      },
-      {
-        "name": "discover_mcp_tools",
-        "description": "Search and load specific MCP tools, activate resource servers, or release loaded selections. Definitions and instructions enter the next request.",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "enum": [
-                "search",
-                "load",
-                "release"
-              ]
-            },
-            "query": {
-              "type": "string"
-            },
-            "server": {
-              "type": "string"
-            },
-            "names": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "offset": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "action"
           ]
         }
       }

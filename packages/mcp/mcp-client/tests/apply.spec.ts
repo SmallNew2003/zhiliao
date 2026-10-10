@@ -220,6 +220,33 @@ describe('apply (plugin lifecycle)', () => {
     expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
   })
 
+  it('closes a pending connection when discovery server registration fails', async () => {
+    const connecting: PromiseWithResolvers<void> = Promise.withResolvers()
+    mockConnect.mockImplementation(() => connecting.promise)
+    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
+      this.onclose?.()
+      connecting.resolve()
+      return Promise.resolve()
+    })
+    ctx.mcpDiscovery.registerServer('srv', { connected: () => true, instructions: () => '' })
+    const fiber = ctx.plugin({ name: 'mcp-client-registration-conflict', inject, apply }, {
+      ...stdioConfig, reconnect: { enabled: false },
+    })
+    try {
+      await expect(Promise.resolve(fiber)).rejects.toThrow('already registered')
+      await fiber.dispose()
+      expect(mockConnect).toHaveBeenCalledTimes(1)
+      expect(mockClose).toHaveBeenCalledTimes(1)
+      expect(mockListTools).not.toHaveBeenCalled()
+      expect(ctx.mcpDiscovery.search().items).toEqual([
+        { server: 'srv', description: 'MCP server; activate for resource access.', connected: true },
+      ])
+    } finally {
+      connecting.resolve()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('closes the transport when its owner unloads during initial connection', async () => {
     const connecting: PromiseWithResolvers<void> = Promise.withResolvers()
     mockConnect.mockImplementation(() => connecting.promise)
