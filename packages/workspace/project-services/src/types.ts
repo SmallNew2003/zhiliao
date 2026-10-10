@@ -34,8 +34,10 @@ export interface ServiceProject {
   gitCommonDir?: string
 }
 
-/** A validated local checkout. Missing worktree paths are excluded. */
+/** Current local directory or captured checkout for a still-owned managed resource. */
 export interface ServiceCheckout {
+  /** Missing captured directories remain readable but cannot receive launches. */
+  availability: 'present' | 'missing'
   id: ServiceCheckoutId
   projectId: ServiceProjectId
   path: string
@@ -81,6 +83,8 @@ export interface ServiceItem {
   command?: ServiceCommand
   detail?: string
   definitionId?: ServiceTargetId
+  /** Retained observation whose provider could not refresh its facts. */
+  stale?: boolean
 }
 
 /** Exact provider grouping. Hidden members make the entire group unreadable. */
@@ -92,6 +96,7 @@ export interface ServiceGroup {
   name: string
   revision: ServiceRevision
   targetIds: readonly ServiceTargetId[]
+  stale?: boolean
 }
 
 /** Explicit scan health. Failed scans never masquerade as empty success. */
@@ -111,6 +116,7 @@ export interface ResolvedServiceOperation {
   action: ServiceAction
   project: ServiceProject
   checkout: ServiceCheckout
+  /** Nonempty exact instance set, including the reserved identity of a new launch. */
   targets: readonly { id: ServiceTargetId; revision: ServiceRevision }[]
   nativeLaunch?: {
     command: ServiceCommand
@@ -161,7 +167,8 @@ export interface ServiceAccess {
    */
   canRead(resource: ServiceReadable, signal: AbortSignal): Promise<boolean>
   /**
-   * Recheck authority after approval and before response emission.
+   * Recheck authority after approval and before response filtering.
+   * Reject changed authority for an approved operation; reads apply any refreshed scope to immutable candidate facts.
    * @param signal - Cancellation.
    * @returns Resolves when current sandbox and approval policies remain valid.
    */
@@ -215,10 +222,11 @@ export interface ServiceOperation {
   outcomes: readonly ServiceTargetOutcome[]
 }
 
-/** Response omits operation details when the current read policy denies them. */
+/** Response omits both operation and pending when the current read policy denies status access. */
 export interface ServiceControlResult {
   operation?: ServiceOperation
-  pending: boolean
+  /** Absent together with operation when status is unreadable. */
+  pending?: boolean
 }
 
 /** Read-authorized current project inventory. */
@@ -268,6 +276,11 @@ export interface ServiceProviderContext {
 
 /** A fresh provider observation. */
 export interface ServiceProviderSnapshot {
+  /**
+   * Previously verified project-bound checkout facts for resources this provider still owns.
+   * The runtime admits a missing checkout only alongside a matching managed item and permits read/stop only.
+   */
+  capturedCheckouts?: readonly ServiceCheckout[]
   items: readonly ServiceItem[]
   groups: readonly ServiceGroup[]
   status: ServiceProviderStatus

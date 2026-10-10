@@ -10,7 +10,7 @@ const targetId = z.string().min(1).transform(value => value as ServiceTargetId)
 const projectId = z.string().min(1).transform(value => value as ServiceProjectId)
 const checkoutId = z.string().min(1).transform(value => value as ServiceCheckoutId)
 const revision = z.string().min(1).transform(value => value as ServiceRevision)
-const command = z.object({ argv: z.array(z.string().min(1)).min(1) })
+const command = z.object({ argv: z.array(z.string()).min(1).refine(argv => argv[0] !== '', 'Executable must not be empty') })
 const definition = z.object({ id: targetId, projectId, checkoutId, name: z.string().min(1), command, revision })
 const association = z.object({
   id: targetId, projectId, checkoutId,

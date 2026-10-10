@@ -64,7 +64,7 @@ export class ProjectResolver {
       id: brandString<ServiceProjectId>(digest), path: common === undefined ? root : common,
       executionIdentity: access.executionIdentity, ...(common === undefined ? {} : { gitCommonDir: common }),
     }
-    return { project, checkouts: paths.map(path => ({ id: brandString<ServiceCheckoutId>(createHash('sha256').update(JSON.stringify([digest, path])).digest('hex')), projectId: project.id, path })) }
+    return { project, checkouts: paths.map(path => ({ id: brandString<ServiceCheckoutId>(createHash('sha256').update(JSON.stringify([digest, path])).digest('hex')), projectId: project.id, path, availability: 'present' as const })) }
   }
 
   private async commonDirectory(cwd: string, signal: AbortSignal): Promise<string> {

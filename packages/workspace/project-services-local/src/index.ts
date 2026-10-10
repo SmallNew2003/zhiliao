@@ -7,7 +7,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { ProjectServiceRuntime } from '@deepseek-ai/dsh-project-services'
-import type { ProjectServiceProvider, ServiceAccess, ServiceAssociation, ServiceControlRequest, ServiceControlResult, ServiceCheckoutId, ServiceDefinition, ServiceFeedFrame, ServiceInventory, ServiceListRequest, ServiceLogPage, ServiceLogsRequest, ServiceOperation, ServiceProviderContext, ServiceProviderId, ServiceProviderSnapshot, ServiceReadable, ServiceRevision, ServiceOperationId, ServiceTargetId } from '@deepseek-ai/dsh-project-services'
+import type { ProjectServiceProvider, ServiceAccess, ServiceAssociation, ServiceControlRequest, ServiceControlResult, ServiceCheckout, ServiceCheckoutId, ServiceDefinition, ServiceFeedFrame, ServiceInventory, ServiceListRequest, ServiceLogPage, ServiceLogsRequest, ServiceOperation, ServiceProviderContext, ServiceProviderId, ServiceProviderSnapshot, ServiceReadable, ServiceRevision, ServiceOperationId, ServiceTargetId } from '@deepseek-ai/dsh-project-services'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import { ProjectResolver } from './projects.ts'
 import { projectServicesDomain } from './storage.ts'
@@ -52,8 +52,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
   private readonly host = new AbortController()
   private domain!: Domain<typeof projectServicesDomain>
   private resolver!: ProjectResolver
-  private revision = 0
-  private inventoryFingerprint = ''
+  private readonly observations = new Map<ServiceProviderId, Map<string, ServiceProviderSnapshot>>()
   private readonly providerSubscriptions = new Map<ServiceProviderId, Set<() => void>>()
 
   constructor(ctx: Context, private readonly config: Config) { super(ctx) }
@@ -76,6 +75,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       this.changed()
       return () => {
         this.providers.delete(provider.id)
+        this.observations.delete(provider.id)
         for (const unsubscribe of this.providerSubscriptions.get(provider.id) ?? []) unsubscribe()
         this.providerSubscriptions.delete(provider.id)
         this.changed()
@@ -86,38 +86,49 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
   async list(access: ServiceAccess, request: ServiceListRequest, signal: AbortSignal): Promise<ServiceInventory> {
     const context = await this.resolve(access, signal)
     const scans = await Promise.all([...this.providers.values()].map(provider => this.inspect(provider, context, signal)))
-    const checkouts = await this.filter(context.checkouts, access, signal)
+    const facts = immutableFacts({
+      context, scans, checkouts: this.knownCheckouts(context, scans), operations: [...this.operations.values()],
+    })
+    await access.revalidate(signal)
+    if (!(await access.canRead(facts.context.project, signal))) throw new Error('Project read denied')
+    const checkouts = await this.filter(facts.checkouts, access, signal)
     const checkoutIds = new Set(checkouts.map(item => item.id))
+    const missing = new Set(checkouts.filter(item => item.availability === 'missing').map(item => item.id))
     const eligible = <T extends { projectId: string; checkoutId: ServiceCheckoutId }>(items: readonly T[]) =>
       items.filter(item => item.projectId === context.project.id && checkoutIds.has(item.checkoutId))
-    const items = await this.filter(eligible(scans.flatMap(scan => [...scan.items])), access, signal)
-    const definitions = await this.filter(eligible(context.definitions), access, signal)
+    const candidates = eligible(facts.scans.flatMap(scan => [...scan.items])).map(item =>
+      missing.has(item.checkoutId) ? { ...item, actions: item.actions.filter(action => action === 'stop') } : item)
+    const items = await this.filter(immutableFacts(candidates), access, signal)
+    const definitions = await this.filter(eligible(facts.context.definitions), access, signal)
     const readableIds = new Set([...items, ...definitions].map(item => item.id))
     const groups = await this.filter(
-      eligible(scans.flatMap(scan => [...scan.groups])).filter(group => group.targetIds.every(id => readableIds.has(id))),
+      eligible(facts.scans.flatMap(scan => [...scan.groups])).filter(group => group.targetIds.every(id => readableIds.has(id))),
       access, signal,
     )
     const operations = await this.filter(
-      eligible([...this.operations.values()]).filter(operation => operation.targetIds.every(id => readableIds.has(id))),
+      eligible(facts.operations).filter(operation => operation.targetIds.every(id => readableIds.has(id))),
       access, signal,
     )
-    const providers = await this.filter(scans.map(scan => scan.status), access, signal)
+    const providers = await this.filter(facts.scans.map(scan => scan.status), access, signal)
     const limit = request.limit ?? this.config.pageMaxItems
     if (!Number.isInteger(limit) || limit < 1 || limit > this.config.pageMaxItems) throw new Error('Invalid service page limit')
-    const fingerprint = createHash('sha256').update(JSON.stringify([context.project, checkouts, items, definitions, groups, operations, scans.map(scan => [scan.status.id, scan.status.state])])).digest('hex')
-    if (this.inventoryFingerprint !== fingerprint) { this.inventoryFingerprint = fingerprint; this.revision++ }
-    const revision = brandString<ServiceRevision>(String(this.revision))
+    const fingerprint = createHash('sha256').update(JSON.stringify([
+      access.actorId, access.kind, context.project, checkouts, items, definitions, groups, operations,
+      providers.map(({ observedAt: _observedAt, ...status }) => status),
+    ])).digest('hex')
+    const revision = brandString<ServiceRevision>(fingerprint)
     let offset = 0
     if (request.cursor !== undefined) {
-      const [cursorRevision, cursorOffset] = request.cursor.split(':')
-      if (cursorRevision !== revision || !/^\d+$/.test(cursorOffset ?? '')) throw new Error('Service cursor expired; request a fresh baseline')
+      const [cursorRevision, cursorOffset, extra] = request.cursor.split(':')
+      if (extra !== undefined || cursorRevision !== revision || !/^\d+$/.test(cursorOffset ?? '')) {
+        throw new Error('Service cursor expired; request a fresh baseline')
+      }
       offset = Number(cursorOffset)
+      if (!Number.isSafeInteger(offset)) throw new Error('Invalid service cursor offset')
     }
-    await access.revalidate(signal)
-    if (!(await access.canRead(context.project, signal))) throw new Error('Project read denied')
     signal.throwIfAborted()
     return immutableFacts({
-      project: context.project, checkouts, items: items.slice(offset, offset + limit), definitions, groups, operations,
+      project: facts.context.project, checkouts, items: items.slice(offset, offset + limit), definitions, groups, operations,
       providers, revision,
       ...(offset + limit < items.length ? { nextCursor: brandString(`${revision}:${offset + limit}`) } : {}),
     }) as ServiceInventory
@@ -128,7 +139,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     const scans = await Promise.all([...this.providers.values()].map(provider => this.inspect(provider, context, signal)))
     const target = scans.flatMap(scan => [...scan.items]).find(item =>
       item.id === request.targetId && item.projectId === context.project.id)
-    const checkout = context.checkouts.find(item => item.id === target?.checkoutId)
+    const checkout = this.knownCheckouts(context, scans).find(item => item.id === target?.checkoutId)
     if (target === undefined || checkout === undefined
       || !(await access.canRead(checkout, signal)) || !(await access.canRead(target, signal))) {
       throw new Error('Service unavailable for read')
@@ -137,7 +148,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     if (provider === undefined) throw new Error('Service provider unavailable')
     const maxBytes = request.maxBytes ?? this.config.agentLogMaxBytes
     if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > this.config.agentLogMaxBytes) throw new Error('Invalid service log limit')
-    const page = await provider.logs(target, { ...request, maxBytes }, signal)
+    const page = immutableFacts(await provider.logs(target, { ...request, maxBytes }, signal))
     await access.revalidate(signal)
     if (!(await access.canRead(context.project, signal)) || !(await access.canRead(checkout, signal))
       || !(await access.canRead(target, signal))) throw new Error('Service read denied')
@@ -158,6 +169,8 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       this.pruneRequests()
       if (this.requests.size >= this.config.operationMaxRecords) throw new Error('Project service operation capacity reached')
       const published = this.publish(access, context, request, signal)
+      this.active.add(published)
+      void published.then(() => this.active.delete(published), () => this.active.delete(published))
       entry = { fingerprint, published, settled: false }
       this.requests.set(key, entry)
       const current = entry
@@ -175,7 +188,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     const readSignal = this.host.signal
     const inventory = await this.list(access, {}, readSignal)
     const operation = inventory.operations.find(item => item.id === published.operation.id)
-    return { ...(operation === undefined ? {} : { operation }), pending: published.operation.state === 'running' }
+    return operation === undefined ? {} : { operation, pending: operation.state === 'running' }
   }
 
   async *follow(access: ServiceAccess, request: ServiceListRequest, signal: AbortSignal): AsyncIterable<ServiceFeedFrame> {
@@ -200,6 +213,8 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     })
     const interval = setInterval(changed, this.config.discoveryIntervalMs)
     const cleanup = () => {
+      signal.removeEventListener('abort', cleanup)
+      this.host.signal.removeEventListener('abort', cleanup)
       clearInterval(interval)
       this.listeners.delete(changed)
       for (const unsubscribe of unsubscribers) unsubscribe()
@@ -217,8 +232,6 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
         yield { kind: 'updated', snapshot: await this.list(access, request, signal) }
       }
     } finally {
-      signal.removeEventListener('abort', cleanup)
-      this.host.signal.removeEventListener('abort', cleanup)
       cleanup()
     }
   }
@@ -237,21 +250,58 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     }
   }
 
+  private knownCheckouts(context: ServiceProviderContext, scans: readonly ServiceProviderSnapshot[]): ServiceCheckout[] {
+    const known = new Map(context.checkouts.map(checkout => [checkout.id, { ...checkout, availability: 'present' as const }]))
+    const captured: ServiceCheckout[] = []
+    for (const scan of scans) {
+      for (const checkout of scan.capturedCheckouts ?? []) {
+        if (checkout.projectId !== context.project.id || known.has(checkout.id)) continue
+        const owned = scan.items.some(item => item.checkoutId === checkout.id && item.projectId === checkout.projectId
+          && item.providerId === scan.status.id && item.ownership === 'managed')
+        if (owned && !captured.some(item => item.id === checkout.id)) captured.push({ ...checkout, availability: 'missing' })
+      }
+    }
+    return [...known.values(), ...captured]
+  }
+
   private async inspect(
     provider: ProjectServiceProvider, context: ServiceProviderContext, signal: AbortSignal,
   ): Promise<ServiceProviderSnapshot> {
+    const previous = this.observations.get(provider.id)?.get(context.project.id)
     try {
       const scanSignal = AbortSignal.any([signal, this.host.signal, AbortSignal.timeout(this.config.scanTimeoutMs)])
-      const snapshot = await provider.inspect(context, scanSignal)
+      const observed = await provider.inspect(context, scanSignal)
+      const snapshot = immutableFacts({
+        ...observed, items: observed.items.map(item => item.stale === true ? { ...item, actions: [] } : item),
+      })
       scanSignal.throwIfAborted()
       signal.throwIfAborted()
-      if (Date.now() - snapshot.status.observedAt > this.config.freshnessMaxMs) return { items: [], groups: [], status: { ...snapshot.status, state: 'stale', reason: 'Provider observation expired' } }
+      if (snapshot.status.state !== 'ready' || Date.now() - snapshot.status.observedAt > this.config.freshnessMaxMs) {
+        const retained = snapshot.items.length === 0 && snapshot.groups.length === 0 ? previous ?? snapshot : snapshot
+        return this.staleObservation(retained, snapshot.status.reason ?? 'Provider observation expired')
+      }
+      const projects = this.observations.get(provider.id) ?? new Map<string, ServiceProviderSnapshot>()
+      projects.set(context.project.id, snapshot)
+      this.observations.set(provider.id, projects)
       return snapshot
     } catch (error) {
       signal.throwIfAborted()
+      this.host.signal.throwIfAborted()
       this.ctx.logger.warn(`Project service provider ${provider.id} inspection failed: ${String(error)}`)
-      return { items: [], groups: [], status: { id: provider.id, kind: provider.kind, state: 'stale', observedAt: Date.now(), reason: 'Provider inspection failed' } }
+      const snapshot = previous ?? { items: [], groups: [], status: {
+        id: provider.id, kind: provider.kind, state: 'stale', observedAt: Date.now(),
+      } }
+      return this.staleObservation(snapshot, 'Provider inspection failed')
     }
+  }
+
+  private staleObservation(snapshot: ServiceProviderSnapshot, reason: string): ServiceProviderSnapshot {
+    return immutableFacts({
+      ...snapshot,
+      items: snapshot.items.map(item => ({ ...item, actions: [], stale: true })),
+      groups: snapshot.groups.map(group => ({ ...group, stale: true })),
+      status: { ...snapshot.status, state: 'stale', reason },
+    })
   }
 
   private async filter<T extends ServiceReadable>(items: readonly T[], access: ServiceAccess, signal: AbortSignal): Promise<T[]> {
@@ -263,65 +313,119 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
   private async publish(
     access: ServiceAccess, context: ServiceProviderContext, request: ServiceControlRequest, signal: AbortSignal,
   ): Promise<Published> {
-    const scans = await Promise.all([...this.providers.values()].map(provider => this.inspect(provider, context, signal)))
-    const items = scans.flatMap(scan => [...scan.items])
-    const groups = scans.flatMap(scan => [...scan.groups])
-    const target = 'targetId' in request ? items.find(item => item.id === request.targetId) ?? groups.find(item => item.id === request.targetId) ?? context.definitions.find(item => item.id === request.targetId) : undefined
-    if ('targetId' in request && target === undefined) throw new Error('Service target unavailable')
-    const provider = target !== undefined && 'providerId' in target ? this.providers.get(target.providerId) : [...this.providers.values()].find(provider => provider.kind === 'native')
+    const preparationSignal = AbortSignal.any([signal, this.host.signal])
+    const scans = await Promise.all([...this.providers.values()].map(provider => this.inspect(provider, context, preparationSignal)))
+    const items = scans.flatMap(scan => [...scan.items]).filter(item => item.projectId === context.project.id)
+    const groups = scans.flatMap(scan => [...scan.groups]).filter(group => group.projectId === context.project.id)
+    const target = 'targetId' in request
+      ? [...items, ...groups, ...context.definitions].find(item => item.id === request.targetId)
+      : undefined
+    if ('targetId' in request && target?.revision !== request.expectedRevision) throw new Error('Service target revision changed')
+    if (target !== undefined && 'stale' in target && target.stale === true) throw new Error('Service observation is stale')
+    const definition = target !== undefined && !('providerId' in target) ? target : undefined
+    const provider = target !== undefined && 'providerId' in target
+      ? this.providers.get(target.providerId)
+      : [...this.providers.values()].find(provider => provider.kind === 'native')
     if (provider === undefined) throw new Error('Service provider unavailable')
+    if (scans.find(scan => scan.status.id === provider.id)?.status.state !== 'ready') throw new Error('Service observation is stale')
     const checkoutId = 'definition' in request ? request.definition.checkoutId : target?.checkoutId
-    const checkout = context.checkouts.find(checkout => checkout.id === checkoutId)
-    if (checkout === undefined || !(await access.canRead(checkout, signal))) throw new Error('Service checkout unavailable for read')
-    if (target !== undefined && !(await access.canRead(target, signal))) throw new Error('Service target unavailable for read')
-    const targetIds = target !== undefined && 'targetIds' in target ? target.targetIds : target === undefined ? [] : [target.id]
-    const lockKeys = targetIds.length === 0 ? [`definition:${context.project.id}:${checkoutId}:${'definition' in request ? request.definition.name : ''}`] : targetIds
+    const checkouts = this.knownCheckouts(context, scans)
+    const checkout = checkouts.find(item => item.id === checkoutId)
+    if (checkout === undefined || !(await access.canRead(checkout, preparationSignal))) {
+      throw new Error('Service checkout unavailable for read')
+    }
+    if (checkout.availability === 'missing' && request.action !== 'stop') throw new Error('Service checkout is missing')
+    if (target !== undefined && !(await access.canRead(target, preparationSignal))) throw new Error('Service target unavailable for read')
+    const pendingDefinition: ServiceDefinition | undefined = 'definition' in request
+      ? immutableFacts({ ...request.definition, id: brandString<ServiceTargetId>(`${provider.id}:definition:${randomUUID()}`),
+        projectId: context.project.id, revision: brandString<ServiceRevision>(randomUUID()) })
+      : undefined
+    const providerContext = immutableFacts({ ...context, checkouts,
+      ...(pendingDefinition === undefined ? {} : { pendingDefinition }),
+    })
+    const prepared = await provider.prepare(providerContext, request, access, preparationSignal)
+    const description = immutableFacts(prepared.description)
+    if (description.project.id !== context.project.id || description.checkout.id !== checkout.id
+      || description.checkout.path !== checkout.path || description.action !== request.action) {
+      throw new Error('Provider resolved a different service operation')
+    }
+    const targetIds = description.targets.map(item => item.id)
+    if (targetIds.length === 0) throw new Error('Provider supplied no resolved service targets')
+    const requestedIds = target !== undefined && 'targetIds' in target ? target.targetIds : target === undefined ? [] : [target.id]
+    if (definition === undefined && target !== undefined
+      && JSON.stringify([...targetIds].sort()) !== JSON.stringify([...requestedIds].sort())) {
+      throw new Error('Provider resolved different service targets')
+    }
+    if (definition !== undefined && request.action !== 'start'
+      && targetIds.some(id => !items.some(item => item.id === id && item.definitionId === definition.id))) {
+      throw new Error('Definition operation resolved an unrelated instance')
+    }
+    const lockKeys: string[] = [...targetIds, ...requestedIds]
+    for (const item of items) {
+      if (targetIds.includes(item.id) && item.definitionId !== undefined) lockKeys.push(item.definitionId)
+    }
+    if (pendingDefinition !== undefined) {
+      lockKeys.push(pendingDefinition.id, `definition:${context.project.id}:${checkout.id}:${pendingDefinition.name}`)
+    }
+    const observedIds = new Set(items.map(item => item.id))
+    const validateCurrent = async (): Promise<ServiceProviderContext> => {
+      preparationSignal.throwIfAborted()
+      if (this.providers.get(provider.id) !== provider) throw new Error('Service provider was removed during approval')
+      const fresh = await this.resolve(access, preparationSignal)
+      if (fresh.project.id !== context.project.id) throw new Error('Project changed during operation')
+      const scan = await this.inspect(provider, fresh, preparationSignal)
+      if (scan.status.state !== 'ready') throw new Error('Service observation is stale')
+      const currentCheckouts = this.knownCheckouts(fresh, [scan])
+      const currentCheckout = currentCheckouts.find(item => item.id === checkout.id)
+      if (currentCheckout === undefined || currentCheckout.path !== checkout.path
+        || (currentCheckout.availability === 'missing' && request.action !== 'stop')) {
+        throw new Error('Service checkout changed or is missing')
+      }
+      if (currentCheckout.availability === 'missing' && targetIds.some(id =>
+        !scan.items.some(item => item.id === id && item.ownership === 'managed' && item.checkoutId === checkout.id))) {
+        throw new Error('Missing checkout has no captured managed ownership')
+      }
+      if ('targetId' in request) {
+        const current = [...scan.items, ...scan.groups, ...fresh.definitions].find(item => item.id === request.targetId)
+        if (current?.revision !== request.expectedRevision) throw new Error('Service target revision changed')
+        if ('stale' in current && current.stale === true) throw new Error('Service observation is stale')
+        if ('targetIds' in current && JSON.stringify(current.targetIds) !== JSON.stringify(requestedIds)) {
+          throw new Error('Service group membership changed')
+        }
+      }
+      for (const approved of description.targets) {
+        const current = scan.items.find(item => item.id === approved.id)
+        if (current?.stale === true) throw new Error('Resolved service observation is stale')
+        if ((current !== undefined || observedIds.has(approved.id)) && current?.revision !== approved.revision) {
+          throw new Error('Resolved service target revision changed')
+        }
+        if (definition !== undefined && current !== undefined && current.definitionId !== definition.id) {
+          throw new Error('Service definition association changed')
+        }
+      }
+      return { ...fresh, checkouts: currentCheckouts }
+    }
     let publish!: (value: Published) => void
     let reject!: (reason: unknown) => void
     const result = new Promise<Published>((resolve, fail) => { publish = resolve; reject = fail })
     const work = this.locks.run(lockKeys, async () => {
-      const preparationSignal = AbortSignal.any([signal, this.host.signal])
-      preparationSignal.throwIfAborted()
-      const fresh = await this.resolve(access, preparationSignal)
-      if (fresh.project.id !== context.project.id || !fresh.checkouts.some(item => item.id === checkoutId)) throw new Error('Project checkout changed')
-      const freshScan = await this.inspect(provider, fresh, preparationSignal)
-      if ('targetId' in request) {
-        const current = [...freshScan.items, ...freshScan.groups, ...fresh.definitions].find(item => item.id === request.targetId)
-        if (current?.revision !== request.expectedRevision) throw new Error('Service target revision changed')
-        if ('targetIds' in current && JSON.stringify(current.targetIds) !== JSON.stringify(targetIds)) throw new Error('Service group membership changed')
-      }
-      const pendingDefinition: ServiceDefinition | undefined = 'definition' in request
-        ? { ...request.definition, id: brandString<ServiceTargetId>(`${provider.id}:definition:${randomUUID()}`),
-          projectId: context.project.id, revision: brandString<ServiceRevision>(randomUUID()) }
-        : undefined
-      const providerContext = pendingDefinition === undefined ? fresh : { ...fresh, pendingDefinition }
-      const prepared = await provider.prepare(providerContext, request, access, preparationSignal)
-      const description = immutableFacts(prepared.description)
-      if (description.project.id !== context.project.id || description.checkout.id !== checkoutId || description.action !== request.action) throw new Error('Provider resolved a different service operation')
-      if (targetIds.length > 0 && JSON.stringify(description.targets.map(item => item.id).sort()) !== JSON.stringify([...targetIds].sort())) throw new Error('Provider resolved different service targets')
+      await validateCurrent()
       await access.authorize(description, preparationSignal)
       preparationSignal.throwIfAborted()
       await access.revalidate(preparationSignal)
-      const approvedProject = await this.resolver.resolve(access, preparationSignal)
-      if (approvedProject.project.id !== description.project.id || !approvedProject.checkouts.some(item => item.id === description.checkout.id)) throw new Error('Project checkout changed during approval')
-      if (this.providers.get(provider.id) !== provider) throw new Error('Service provider was removed during approval')
       await prepared.validate(preparationSignal)
-      if (JSON.stringify(prepared.description) !== JSON.stringify(description)) throw new Error('Resolved service operation changed during approval')
-      if ('targetId' in request) {
-        const afterApproval = await this.inspect(provider, fresh, preparationSignal)
-        const currentTargets = [...afterApproval.items, ...fresh.definitions]
-        for (const approved of description.targets) {
-          if (currentTargets.find(item => item.id === approved.id)?.revision !== approved.revision) throw new Error('Service target revision changed during approval')
-        }
-        const group = afterApproval.groups.find(item => item.id === request.targetId)
-        if (target !== undefined && 'targetIds' in target && (group?.revision !== request.expectedRevision || JSON.stringify(group.targetIds) !== JSON.stringify(targetIds))) throw new Error('Service group revision changed during approval')
+      if (JSON.stringify(prepared.description) !== JSON.stringify(description)) {
+        throw new Error('Resolved service operation changed during approval')
       }
+      const currentContext = await validateCurrent()
       preparationSignal.throwIfAborted()
-      if (pendingDefinition !== undefined) {
-        await this.domain.table('definitions').put(pendingDefinition.id, pendingDefinition)
+      if (pendingDefinition !== undefined) await this.domain.table('definitions').put(pendingDefinition.id, pendingDefinition)
+      preparationSignal.throwIfAborted()
+      const operation: ServiceOperation = {
+        id: brandString<ServiceOperationId>(randomUUID()), requestId: request.requestId, actorId: access.actorId,
+        projectId: context.project.id, checkoutId: checkout.id, action: request.action,
+        targetIds, state: 'running', outcomes: [],
       }
-      preparationSignal.throwIfAborted()
-      const operation: ServiceOperation = { id: brandString<ServiceOperationId>(randomUUID()), requestId: request.requestId, actorId: access.actorId, projectId: context.project.id, checkoutId: checkout.id, action: request.action, targetIds: description.targets.map(item => item.id), state: 'running', outcomes: [] }
       const controller = new AbortController()
       const abort = () => controller.abort(this.host.signal.reason)
       this.host.signal.addEventListener('abort', abort, { once: true })
@@ -332,7 +436,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       publish({ operation, done })
       try {
         const output = await prepared.execute(controller.signal)
-        for (const association of output.associations ?? []) await this.saveAssociation(association, context)
+        for (const association of output.associations ?? []) await this.saveAssociation(association, currentContext)
         operation.outcomes = output.outcomes
         operation.targetIds = [...new Set([...operation.targetIds, ...output.outcomes.map(item => item.targetId)])]
         operation.state = output.outcomes.every(item => item.state === 'succeeded') ? 'succeeded' : 'failed'
@@ -367,7 +471,6 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
   }
 
   private changed(): void {
-    this.revision++
     for (const listener of this.listeners) {
       try { listener() }
       catch (error) { this.ctx.logger.warn(`Project service subscriber failed: ${String(error)}`) }
