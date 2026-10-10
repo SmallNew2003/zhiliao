@@ -48,6 +48,7 @@ function fakeSession(): SessionFace {
     getSnapshot: () => snapshot.getSnapshot(),
     subscribe: listener => snapshot.subscribe(listener),
     beginSubmission: () => ({ requestId: 'test-req' as never, abandon: () => {} }),
+    editMessage: () => Promise.reject(new Error('unused fake Session operation')),
     prompt: () => Promise.reject(new Error('unused fake Session operation')),
     readAttachment: () => Promise.reject(new Error('unused fake Session operation')),
     updateQueue: () => Promise.reject(new Error('unused fake Session operation')),

@@ -64,6 +64,8 @@ export function systemMessageDefinition(inspect: SystemPromptInspector): Convers
     kind: 'system-message',
     target: 'chat',
     match: event => event.type === 'system/message'
+      || event.type === 'user/message-edit'
+      || (event.type === 'user/message' && event.data.source.kind === 'user')
       || ('surfaceOp' in event && event.surfaceOp !== 'append')
       ? { id: String(event.seq), role: 'start' }
       : null,
@@ -108,7 +110,7 @@ export function requestPromptDefinition(inspect: RequestPromptInspector): Conver
       const inspection = inspect(previous?.prompt, match.event, system)
       const change = inspection.change?.kind
       // Appended prompts own their cards; a same-step header must not repeat them.
-      const systemEvent = systemContext?.matches[0]?.event
+      const systemEvent = systemContext?.state.lastSystemEvent ?? systemContext?.matches[0]?.event
       const shownByUpdate = system !== undefined
         && systemEvent?.type === 'system/message' && systemEvent.surfaceOp === 'append'
         && (system.update || previous === undefined)

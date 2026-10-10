@@ -15,7 +15,7 @@ import { ok, type RemoteMock } from '@deepseek-ai/dsh-remote-mock'
 import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
 import { JUMP_PAGE_MESSAGES, Session } from '../src/client/sessions/session.ts'
 import { SessionEventStream } from '../src/client/transport.ts'
-import type { SessionFollowRequest, SessionPage, SessionPageRequest } from '../src/types.ts'
+import type { SessionFollowRequest, SessionPage, SessionPageRequest, SessionRequestId } from '../src/types.ts'
 import { entries, ev, historyValue, plainTurn } from './event-script.client.ts'
 import { sessionBench } from './remote/bench.client.ts'
 import {
@@ -381,6 +381,15 @@ describe('paging', () => {
 
 describe('prompt and cancel errors', () => {
   const CHILD = { parentSessionId: PARENT, childSessionId: SID, mode: 'continuable' } as const
+
+  it('forwards latest-message edits with the caller-owned retry identity', async ({ mock, start }) => {
+    const session = await sessionBench(mock, start, SID)
+    mock.remote.session.editMessage.mockResolvedValue(ok({ accepted: true }))
+    const edit = { targetSeq: SessionSeq(3), text: 'edited', requestId: 'edit-retry' as SessionRequestId }
+    expect(await session.editMessage(edit)).toEqual({ ok: true, value: { accepted: true } })
+    expect(mock.log.requests('session/editMessage')).toEqual([{ sessionId: SID, ...edit }])
+    expect(mock.log.requests('session/prompt')).toEqual([])
+  })
 
   it('routes an addressed child through non-activating history, continuation prompt, and interrupt only', async ({ mock, start }) => {
     const session = await sessionBench(mock, start, SID, { address: CHILD, parentAvailable: true })

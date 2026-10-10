@@ -15,7 +15,7 @@ export {}
 export interface TurnOutlineEntry {
   /** Host-assigned turn number (the `turn/start` payload). */
   readonly turn: number
-  /** The turn's `turn/start` event seq — paging a window back through this seq loads the whole turn. */
+  /** Earliest seq needed to load the turn, including a preceding edit event. */
   readonly seq: SessionSeq
   /** Bounded first-human-prompt preview (one rail-card line); `''` until an eligible prompt lands. */
   readonly prompt: string
@@ -24,7 +24,8 @@ export interface TurnOutlineEntry {
 }
 
 /**
- * Fold state: the served entries plus the open turn's response draft. The
+ * Fold state: served entries, response draft, and one pre-latest-input snapshot.
+ * A pending edit supplies the next turn's prompt and paging anchor. The
  * draft buffers the newest text-bearing assistant message until `turn/end`
  * commits it, and the wire view projects only `turns` — draft-only applies
  * keep that array's identity, so the change feed stays quiet between turn
@@ -35,6 +36,10 @@ export interface TurnOutlineState {
   readonly turns: readonly TurnOutlineEntry[]
   /** Newest text-bearing assistant preview of the open turn; `''` outside one. */
   readonly draft: string
+  /** Effective outline immediately before the latest human input. */
+  readonly latestInput: { readonly seq: SessionSeq; readonly turns: readonly TurnOutlineEntry[]; readonly draft: string } | null
+  /** Edited input awaiting the next turn boundary. */
+  readonly pendingEdit: { readonly seq: SessionSeq; readonly prompt: string } | null
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {

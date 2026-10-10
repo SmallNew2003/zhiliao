@@ -6,7 +6,7 @@ import type {
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { LlmAttemptId, MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
+import type { SessionId, SessionSeq, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -193,6 +193,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     }
     'session/writer-held': { readonly sessionId: SessionId }
     'session/agent-busy': { readonly reason: string }
+    'session/edit-stale': { readonly sessionId: SessionId }
     'session/invalid-time-zone': { readonly value: string }
     'session/workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string }
     'agent-preset/conflict': {
@@ -322,6 +323,21 @@ export interface SessionPromptRequest {
 
 /** Receipt after one prompt enters the target Agent inbox. */
 export interface SessionPromptValue {
+  readonly accepted: true
+}
+
+/** Text-only replacement of the latest sent user input, retaining its durable attachments. */
+export interface SessionEditMessageRequest {
+  readonly sessionId: SessionId
+  /** Sequence of the latest user/message or user/message-edit event, including inherited input. */
+  readonly targetSeq: SessionSeq
+  readonly text: string
+  /** Stable identity reused after a lost acceptance response. */
+  readonly requestId: SessionRequestId
+}
+
+/** Acceptance after a durable edit, or an unchanged-text no-op. */
+export interface SessionEditMessageValue {
   readonly accepted: true
 }
 

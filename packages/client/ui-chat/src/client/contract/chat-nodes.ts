@@ -10,6 +10,8 @@ export interface ChatConversationViewNode extends ConversationViewNode {
   readonly anchorSeq: number
   readonly location: ConversationLocation
   readonly visibility: 'visible' | 'hidden'
+  /** Excluded from the effective transcript by a later input edit. */
+  readonly superseded?: boolean
 }
 
 /** Merge-extensible payload registry keyed by final Chat renderer kind. */

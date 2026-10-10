@@ -8,6 +8,8 @@ import { chatNode } from './common.ts'
 import { contextForm, contextProducer } from './event-projection.ts'
 
 interface ReferencedUserMessageNode extends UserMessageNode {
+  /** Original input sequence replaced by this edited input. */
+  readonly editTargetSeq?: number
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
   /** Skill names the same step's `skill-invocation` injections loaded. */
@@ -15,6 +17,8 @@ interface ReferencedUserMessageNode extends UserMessageNode {
 }
 
 interface ReferencedSteeringMessageNode extends SteeringMessageNode {
+  /** Original input sequence replaced by this edited input. */
+  readonly editTargetSeq?: number
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
   /** Skill names the same step's `skill-invocation` injections loaded. */
@@ -44,12 +48,17 @@ function isCompactionCheckpoint(event: Parameters<ConversationNodeDefinition['ma
 export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   kind: 'input-message',
   target: 'chat',
-  match: event => event.type === 'user/message'
-    && isAppendSurfaceEvent(event)
-    && !isCompactionCheckpoint(event)
-    ? { id: String(event.data.id), role: 'start' }
-    : null,
+  match: (event) => {
+    if (event.type === 'user/message-admit') return { id: String(event.data.message.id), role: 'update' }
+    if (event.type === 'user/message-edit') return { id: String(event.data.message.id), role: 'start' }
+    return event.type === 'user/message' && isAppendSurfaceEvent(event) && !isCompactionCheckpoint(event)
+      ? { id: String(event.data.id), role: 'start' } : null
+  },
   start: (_context, match, reader) => {
+    if (match.event.type === 'user/message-edit') {
+      const event = match.event
+      return { kind: 'user', seq: event.seq, time: event.time, content: event.data.message.content, source: event.data.message.source, editTargetSeq: event.data.targetSeq }
+    }
     if (match.event.type !== 'user/message') throw new Error('input-message start requires user/message')
     const event = match.event
     if (event.data.source.kind !== 'user') {
@@ -82,7 +91,8 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
         source: event.data.source,
       }
   },
-  update: context => context.state,
+  update: (context, match) => match.event.type !== 'user/message-admit'
+    ? context.state : { ...context.state, content: match.event.data.message.content },
   buildViewNode: (context) => {
     if (context.state === undefined) return null
     return chatNode(context, context.state.kind, context.state.seq, context.state)

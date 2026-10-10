@@ -32,6 +32,18 @@ function marked(session: Session): boolean[] {
 }
 
 describe('durable image selections', () => {
+  it('preserves offloaded images when edited text is prepared for a request', () => {
+    const session = createSession(SessionId('edit-admit-images'))
+    const source = input(session, [{ type: 'text', text: 'original' }, image])
+    const message = createUserMessage({ content: [{ type: 'text', text: 'edited' }, image], source: { kind: 'user' } })
+    const edit = session.append('user/message-edit', { targetSeq: source.seq, message })
+    session.append('image/offload', { targets: [{ seq: edit.seq, imageIndexes: [0] }] })
+    session.append('user/message-admit', { targetSeq: edit.seq, message: { ...message, content: [{ type: 'text', text: 'prepared' }, image] } })
+    expect(marked(session)).toEqual([true])
+    expect(session.deriveMessages()[0]?.content[0]).toEqual({ type: 'text', text: 'prepared' })
+    expect(marked(createSession(SessionId('admission-replay'), session.snapshotEvents()))).toEqual([true])
+  })
+
   it('preserves message identity, original data, and previously derived snapshots', () => {
     const session = createSession(SessionId('images'))
     const source = input(session, [

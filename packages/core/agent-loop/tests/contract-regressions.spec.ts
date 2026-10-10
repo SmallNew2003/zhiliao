@@ -83,6 +83,31 @@ describe('assistant replay provider and model fields', () => {
 })
 
 describe('abort during tool execution ends the turn', () => {
+  it('records cancellation after a transport attaches a stack to the abort reason', async () => {
+    const ctx = await harness(new MockAdapter([toolCallResponse('stack-abort', 'aborter', {})]))
+    try {
+      const agent = await ctx.agentLoop.create(SessionId('a-abort-stack'), { provider: 'mock', model: 'mock' })
+      const cause = { kind: 'user' } as const
+      ctx.tools.register(defineContentToolFixture({
+        name: 'aborter', description: '', parameters: {},
+        async execute() {
+          agent.cancel(cause)
+          // Node fetch attaches this non-enumerable field to the shared abort reason.
+          Error.captureStackTrace(cause)
+          return [{ type: 'text', text: 'stopped' }]
+        },
+      }))
+      const idle = waitForIdle(ctx, agent)
+      send(agent, 'go')
+      await idle
+      expect(Object.getOwnPropertyDescriptor(cause, 'stack')?.enumerable).toBe(false)
+      expect(agent.session.snapshotEvents().findLast(event => event.type === 'turn/end')?.data.reason)
+        .toEqual({ kind: 'aborted', reason: { kind: 'user' } })
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('parks context finalized after a tool-step abort until another wakeup', async () => {
     const adapter = new MockAdapter([
       toolCallResponse('c1', 'aborter', {}),

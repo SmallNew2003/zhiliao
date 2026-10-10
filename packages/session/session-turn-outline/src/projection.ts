@@ -4,13 +4,10 @@
  * outline the chat rail renders for turns outside a client's paged event
  * window.
  *
- * `turn/start` — not the prompt `user/message` — anchors each entry because
- * its seq is the load-through target for a jump: the loop logs `turn/start`
- * before the turn's prompt and steps, so a window paged back through that seq
- * contains the whole turn. Previews mirror the rail's loaded-turn previews
- * (space-joined text blocks, collapsed whitespace, an ellipsis when clipped)
- * with budgets sized to the rail card's clamps — one prompt line, up to three
- * response lines — so a turn shows the same words before and after its events
+ * Ordinary turns page through `turn/start`; edited turns page through the
+ * preceding `user/message-edit` so the loaded window includes their input.
+ * Previews mirror loaded-turn text normalization and card budgets: one prompt
+ * line and up to three response lines — so a turn shows the same words before and after its events
  * load. The response commits at `turn/end` from a draft of the newest
  * text-bearing assistant message; draft-only applies keep the `turns` array's
  * identity, so the identity-gated change feed pushes at most three times per
@@ -77,14 +74,23 @@ const turnOutlineEntriesSchema: ZodType<readonly TurnOutlineEntry[]> = z.array(z
 const turnOutlineStateSchema: ZodType<TurnOutlineState> = z.object({
   turns: turnOutlineEntriesSchema,
   draft: z.string().max(RESPONSE_PREVIEW_LIMIT),
+  latestInput: z.object({
+    seq: z.number().int().nonnegative().transform(SessionSeq),
+    turns: turnOutlineEntriesSchema,
+    draft: z.string().max(RESPONSE_PREVIEW_LIMIT),
+  }).strict().nullable(),
+  pendingEdit: z.object({
+    seq: z.number().int().nonnegative().transform(SessionSeq),
+    prompt: z.string().max(PROMPT_PREVIEW_LIMIT),
+  }).strict().nullable(),
 }).strict()
 
-const EMPTY_OUTLINE: TurnOutlineState = { turns: [], draft: '' }
+const EMPTY_OUTLINE: TurnOutlineState = { turns: [], draft: '', latestInput: null, pendingEdit: null }
 
 /** The `turnOutline` unit registered on `ctx.sessionProjections` (exported for the unit spec). */
 export const turnOutlineProjectionDefinition = {
   key: 'turnOutline',
-  stateVersion: 2,
+  stateVersion: 3,
   stateSchema: turnOutlineStateSchema,
   init: () => EMPTY_OUTLINE,
   apply: (state, event) => {
@@ -99,8 +105,30 @@ export const turnOutlineProjectionDefinition = {
         // standing entry.
         if (last !== undefined && event.data.turn <= last.turn) return state
         return {
-          turns: [...state.turns, { turn: event.data.turn, seq: event.seq, prompt: '', response: '' }],
+          ...state,
+          turns: [...state.turns, { turn: event.data.turn, seq: state.pendingEdit?.seq ?? event.seq, prompt: state.pendingEdit?.prompt ?? '', response: '' }],
           draft: '',
+          pendingEdit: null,
+        }
+      }
+      case 'user/message-admit': {
+        if (state.latestInput?.seq !== event.data.targetSeq) return state
+        const prompt = preview(event.data.message.content, PROMPT_PREVIEW_LIMIT)
+        if (state.pendingEdit?.seq === event.data.targetSeq) {
+          return { ...state, pendingEdit: { ...state.pendingEdit, prompt } }
+        }
+        const last = state.turns.at(-1)
+        if (last === undefined || state.latestInput.turns.at(-1)?.turn === last.turn || last.prompt === prompt) return state
+        return { ...state, turns: [...state.turns.slice(0, -1), { ...last, prompt }] }
+      }
+      case 'user/message-edit': {
+        const before = state.latestInput
+        if (before === null || before.seq !== event.data.targetSeq) throw new Error('turnOutline edit target is not the latest input')
+        return {
+          turns: before.draft === '' ? before.turns : before.turns.map((entry, index) => index === before.turns.length - 1 ? { ...entry, response: before.draft } : entry),
+          draft: '',
+          latestInput: { ...before, seq: event.seq },
+          pendingEdit: { seq: event.seq, prompt: preview(event.data.message.content, PROMPT_PREVIEW_LIMIT) },
         }
       }
       case 'user/message': {
@@ -109,22 +137,28 @@ export const turnOutlineProjectionDefinition = {
         // first preview.
         if (event.data.source.kind !== 'user') return state
         const last = state.turns.at(-1)
-        if (last === undefined || last.prompt !== '') return state
+        const latestInput = {
+          seq: event.seq,
+          turns: last !== undefined && (state.latestInput === null || state.latestInput.seq < last.seq)
+            ? state.turns.slice(0, -1) : state.turns,
+          draft: state.draft,
+        }
+        if (last === undefined || last.prompt !== '') return { ...state, latestInput }
         const prompt = preview(event.data.content, PROMPT_PREVIEW_LIMIT)
-        if (prompt === '') return state
-        return { turns: [...state.turns.slice(0, -1), { ...last, prompt }], draft: state.draft }
+        if (prompt === '') return { ...state, latestInput }
+        return { ...state, latestInput, turns: [...state.turns.slice(0, -1), { ...last, prompt }] }
       }
       case 'assistant/message': {
         // Newest text-bearing message wins; the buffer commits at turn/end.
         const draft = preview(event.data.message.content, RESPONSE_PREVIEW_LIMIT)
         if (draft === '' || draft === state.draft) return state
-        return { turns: state.turns, draft }
+        return { ...state, turns: state.turns, draft }
       }
       case 'turn/end': {
         if (state.draft === '') return state
         const last = state.turns.at(-1)
-        if (last === undefined || last.response === state.draft) return { turns: state.turns, draft: '' }
-        return { turns: [...state.turns.slice(0, -1), { ...last, response: state.draft }], draft: '' }
+        if (last === undefined || last.response === state.draft) return { ...state, turns: state.turns, draft: '' }
+        return { ...state, turns: [...state.turns.slice(0, -1), { ...last, response: state.draft }], draft: '' }
       }
       default:
         return state

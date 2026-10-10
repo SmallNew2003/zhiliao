@@ -1,0 +1,34 @@
+{"type":"session","version":3,"id":"{{session:1}}","createdAt":0,"cwd":"{{cwd}}","isSeeded":false,"delegationDepth":0,"agentPreset":"standard"}
+{"type":"permission/preset","data":{"preset":"workspace-write"}}
+{"type":"sandbox/mode","data":{"mode":"workspace-write"}}
+{"type":"approval/policy","data":{"policy":"ask"}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Earlier input A"}],"source":{"kind":"user","rpcId":"{{rpc:1}}","clientTimeZone":"{{clientTimeZone}}"},"role":"user","id":"{{message:1}}"}]}}
+{"type":"turn/start","data":{"turn":1}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
+{"type":"step/start","data":{"turn":1,"step":1}}
+{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"plugin","plugin":"@deepseek-ai/dsh-system-prompt"},"id":"{{message:2}}"}},"surfaceOp":"append"}
+{"type":"user/message","data":{"content":[{"type":"text","text":"Earlier input A"}],"source":{"kind":"user","rpcId":"{{rpc:1}}","clientTimeZone":"{{clientTimeZone}}"},"role":"user","id":"{{message:1}}"},"surfaceOp":"append"}
+{"type":"user/message","data":{"content":[{"type":"text","text":"Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: \"{{cwd}}\". Some platform temporary areas may also be writable.\n\nApproval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed."}],"source":{"kind":"plugin","plugin":"@deepseek-ai/dsh-system-prompt","form":"snapshot","sections":[{"name":"sandbox:policy","text":"Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: \"{{cwd}}\". Some platform temporary areas may also be writable."},{"name":"approval:policy","text":"Approval policy: ask. Operations that require approval may ask through the configured answerers; without an available answerer, the request fails closed."}]},"role":"user","id":"{{message:3}}"},"surfaceOp":"append"}
+{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"tools":"{{tools}}"},"reason":"initial"}}
+{"type":"request/context","data":{"provider":"deepseek-official","model":"deepseek-v4-flash","contextWindow":128000}}
+{"type":"session/title","data":{"title":"Earlier input A","messageSeqs":[8],"source":{"kind":"fallback"}}}
+{"type":"assistant/message","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"Earlier answer A"}],"source":{"kind":"model","provider":"deepseek-official","model":"deepseek-v4-flash"},"id":"{{message:4}}"},"stream":[{"type":"chunk","time":1791535997792,"chunk":{"type":"block-start","index":0,"blockType":"text"}},{"type":"text-chunks","time0":1791535997874,"index":0,"dt":[],"texts":["Earlier answer A"]},{"type":"chunk","time":1791535997954,"chunk":{"type":"block-end","index":0,"block":{"type":"text","text":"Earlier answer A"}}},{"type":"chunk","time":1791535998035,"chunk":{"type":"finish","reason":{"kind":"stop"}}}]},"surfaceOp":"append"}
+{"type":"step/end","data":{"turn":1,"step":1}}
+{"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Original input B"}],"source":{"kind":"user","rpcId":"{{rpc:2}}","clientTimeZone":"{{clientTimeZone}}"},"role":"user","id":"{{message:5}}"}]}}
+{"type":"turn/start","data":{"turn":2}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
+{"type":"step/start","data":{"turn":2,"step":1}}
+{"type":"user/message","data":{"content":[{"type":"text","text":"Original input B"}],"source":{"kind":"user","rpcId":"{{rpc:2}}","clientTimeZone":"{{clientTimeZone}}"},"role":"user","id":"{{message:5}}"},"surfaceOp":"append"}
+{"type":"assistant/message","data":{"turn":2,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"Original answer B"}],"source":{"kind":"model","provider":"deepseek-official","model":"deepseek-v4-flash"},"id":"{{message:6}}"},"stream":[{"type":"chunk","time":1791535998172,"chunk":{"type":"block-start","index":0,"blockType":"text"}},{"type":"text-chunks","time0":1791535998254,"index":0,"dt":[],"texts":["Original answer B"]},{"type":"chunk","time":1791535998334,"chunk":{"type":"block-end","index":0,"block":{"type":"text","text":"Original answer B"}}},{"type":"chunk","time":1791535998415,"chunk":{"type":"finish","reason":{"kind":"stop"}}}]},"surfaceOp":"append"}
+{"type":"step/end","data":{"turn":2,"step":1}}
+{"type":"turn/end","data":{"turn":2,"reason":{"kind":"completed"}}}
+{"type":"user/message-edit","data":{"targetSeq":20,"message":{"content":[{"type":"text","text":"Revised input B"}],"source":{"kind":"user","rpcId":"{{rpc:3}}","clientTimeZone":"{{clientTimeZone}}"},"role":"user","id":"{{message:7}}"}}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"inserted":[{"content":[{"type":"text","text":"Revised input B"}],"source":{"kind":"user","rpcId":"{{rpc:3}}","clientTimeZone":"{{clientTimeZone}}"},"role":"user","id":"{{message:7}}"}]}}
+{"type":"turn/start","data":{"turn":3}}
+{"type":"agent/inbox/spliced","data":{"target":"next-turn","start":0,"removedCount":1,"inserted":[]}}
+{"type":"step/start","data":{"turn":3,"step":1}}
+{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"tools":"{{tools}}"},"reason":"series"}}
+{"type":"assistant/message","data":{"turn":3,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"Revised answer B"}],"source":{"kind":"model","provider":"deepseek-official","model":"deepseek-v4-flash"},"id":"{{message:8}}"},"stream":[{"type":"chunk","time":1791535998621,"chunk":{"type":"block-start","index":0,"blockType":"text"}},{"type":"text-chunks","time0":1791535998702,"index":0,"dt":[],"texts":["Revised answer B"]},{"type":"chunk","time":1791535998784,"chunk":{"type":"block-end","index":0,"block":{"type":"text","text":"Revised answer B"}}},{"type":"chunk","time":1791535998864,"chunk":{"type":"finish","reason":{"kind":"stop"}}}]},"surfaceOp":"append"}
+{"type":"step/end","data":{"turn":3,"step":1}}
+{"type":"turn/end","data":{"turn":3,"reason":{"kind":"completed"}}}

@@ -70,6 +70,8 @@
 - text: {{clock}} Keep this later input in the original conversation. {{clock}}
 - button "Copy":
   - img
+- button "Edit message":
+  - img
 - paragraph: ORIGINAL ONLY
 - button "Copy":
   - img

@@ -9,6 +9,7 @@ import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import type { ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
+import { contextPressureProjectionDefinition } from '../src/usage-projection.ts'
 
 const ZERO: TokenUsageProjection = {
   uncachedInputTokens: 0,
@@ -352,6 +353,39 @@ function appendAssistant(
 }
 
 describe('contextPressure session projection', () => {
+  it('rejects prepared inputs or edits without the corresponding input checkpoint', async () => {
+    const { ctx, session } = await harness()
+    try {
+      const original = session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'original' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+      const message = createUserMessage({ content: [{ type: 'text', text: 'edited' }], source: { kind: 'user' } })
+      const edit = session.append('user/message-edit', { targetSeq: original.seq, message })
+      const admit = session.append('user/message-admit', { targetSeq: edit.seq, message })
+      const state = contextPressureProjectionDefinition.init()
+      expect(() => contextPressureProjectionDefinition.apply(state, edit)).toThrow(/edit target is not the latest user input/)
+      expect(() => contextPressureProjectionDefinition.apply(state, admit)).toThrow(/admitted input is not the latest input/)
+      expect(state).toEqual(contextPressureProjectionDefinition.init())
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('restores the pre-input pressure sample while retaining the current model capacity', async () => {
+    const { ctx, session } = await harness()
+    try {
+      session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'earlier' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+      startStep(session, 1, 1)
+      recordContext(session, 'small', 64_000)
+      finalUsage(session, { inputTokens: 123, outputTokens: 5 }, 1, 1)
+      const before = pressure(ctx, session)
+      const original = session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'original' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+      startStep(session, 2, 1)
+      recordContext(session, 'large', 128_000)
+      finalUsage(session, { inputTokens: 999, outputTokens: 7 }, 2, 1)
+      const edited = createUserMessage({ content: [{ type: 'text', text: 'edited' }], source: { kind: 'user' } })
+      session.append('user/message-edit', { targetSeq: original.seq, message: edited })
+      expect(pressure(ctx, session).pressureTokens).toBe(before.pressureTokens)
+      expect(pressure(ctx, session).contextWindow).toBe(128_000)
+      expect(projected(ctx, session).uncachedInputTokens).toBe(1122)
+    } finally { await ctx.fiber.dispose() }
+  })
   it('serves no pressure or capacity for an empty log', async () => {
     const { ctx, session } = await harness()
     expect(pressure(ctx, session)).toEqual({})
@@ -439,7 +473,7 @@ describe('contextPressure session projection', () => {
     const checkpoint = JSON.parse(JSON.stringify(
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
-    expect(checkpoint.contextPressure?.ver).toBe(5)
+    expect(checkpoint.contextPressure?.ver).toBe(6)
 
     await meterFiber.dispose()
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('contextPressure')

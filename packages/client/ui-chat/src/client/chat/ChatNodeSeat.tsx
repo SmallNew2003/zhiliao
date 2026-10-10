@@ -10,6 +10,7 @@ import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
+  readonly retainedDraftNode?: ChatNode | undefined
   readonly useChatNode: ChatViewSlotProps['useChatNode']
   readonly useChatNodeProcess: ChatViewSlotProps['useChatNodeProcess']
   readonly historyIncomplete: boolean
@@ -36,11 +37,13 @@ function turnOf(node: ChatNode | undefined): number | undefined {
 
 /** Subscribe, apply Turn-process visibility, and dispatch one stable Context key. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
-  cwd, openFile, openSkill, inspectCall, forkAt,
+  nodeKey, retainedDraftNode, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
+  latestInputSeq, running, editMessage, editDraftChanged, cwd, openFile, openSkill, inspectCall, forkAt,
   loadImage, renderMessageImages, fileMentions, useStore, actions, renderSlot, t,
 }: ChatNodeSeatProps) {
-  const node = useChatNode(nodeKey)
+  const currentNode = useChatNode(nodeKey)
+  const node = currentNode ?? retainedDraftNode
+  const editDraftDetached = retainedDraftNode !== undefined
   const routedNode = node as ChatNode | undefined
   const turn = turnOf(routedNode)
   const processPresentation = useChatNodeProcess(nodeKey)
@@ -103,6 +106,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const owner = useMemo<ChatNodeOwnerProps | null>(() => node === undefined
     ? null
     : {
+      latestInputSeq, running, editMessage, editDraftChanged, editDraftDetached,
       cwd,
       openFile,
       openSkill,
@@ -113,7 +117,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       fileMentions,
       turnProcess,
     }, [
-    node, cwd, openFile, openSkill, inspectCall, forkAt,
+    node, latestInputSeq, running, editMessage, editDraftChanged, editDraftDetached, cwd, openFile, openSkill, inspectCall, forkAt,
     loadImage, renderMessageImages, fileMentions, turnProcess,
   ])
   if (routedNode === undefined || owner === null) return null

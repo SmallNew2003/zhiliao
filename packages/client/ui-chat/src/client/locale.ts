@@ -5,6 +5,18 @@ export const NS = 'chat'
 
 /** Simplified Chinese dictionary and key-set source of truth. */
 export const zh = {
+  'message.edit': '编辑消息',
+  'message.edit.label': '消息文本',
+  'message.edit.cancel': '取消',
+  'message.edit.resend': '重新发送',
+  'message.edit.sending': '发送中…',
+  'message.edit.busy': '回复或停止清理结束后才能编辑。',
+  'message.edit.stale': '此消息已不是最新消息。你的草稿仍保留。',
+  'message.edit.attachments': '原附件保持不变。',
+  'message.edit.empty': '请输入文本，或保留原附件。',
+  'message.edit.attachmentError': '无法读取原附件。请恢复附件后重试。',
+  'message.edit.failed': '发送失败，草稿已保留。请重试。',
+
   'view.chat': '对话',
   'number.groupSeparator': ',',
   'duration.compactSeconds': '{seconds}秒',
@@ -116,6 +128,18 @@ export type ChatKey = keyof typeof zh
 
 /** English dictionary, checked against the Chinese key set. */
 export const en = {
+  'message.edit': 'Edit message',
+  'message.edit.label': 'Message text',
+  'message.edit.cancel': 'Cancel',
+  'message.edit.resend': 'Resend',
+  'message.edit.sending': 'Sending…',
+  'message.edit.busy': 'Editing is available after the response and stop cleanup finish.',
+  'message.edit.stale': 'This is no longer the latest message. Your draft is preserved.',
+  'message.edit.attachments': 'Original attachments remain unchanged.',
+  'message.edit.empty': 'Enter text or keep original attachments.',
+  'message.edit.attachmentError': 'An original attachment could not be read. Restore it and retry.',
+  'message.edit.failed': 'Sending failed. Your draft is preserved; please retry.',
+
   'view.chat': 'Chat',
   'number.groupSeparator': ',',
   'duration.compactSeconds': '{seconds}s',

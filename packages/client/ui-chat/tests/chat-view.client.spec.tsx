@@ -572,6 +572,63 @@ describe('Chat node rendering', () => {
 })
 
 describe('ChatView', () => {
+  it.each([['en', en, commonEn], ['zh', zh, commonZh]] as const)(
+    '%s keyboard resend returns focus to Chat after the original row disappears',
+    async (_locale, dictionary, common) => {
+      const h = makeHarness({ nodes: [user(1, 'original')] })
+      const t = makeTranslate(dictionary, common)
+      Object.assign(h.props, { t })
+      const accepted = Promise.withResolvers<{ ok: true; value: { accepted: true } }>()
+      const editMessage = vi.fn(() => accepted.promise)
+      const view = render(<ChatView {...h.props} editMessage={editMessage} />)
+      const trigger = screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit') })
+      trigger.focus()
+      fireEvent.click(trigger)
+      const editor = screen.getByRole<HTMLTextAreaElement>('textbox', { name: t('message.edit.label') })
+      expect(document.activeElement).toBe(editor)
+      fireEvent.change(editor, { target: { value: 'changed' } })
+      fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true })
+      expect(editMessage).toHaveBeenCalledTimes(1)
+      act(() => { h.set({ nodes: [user(5, 'changed')] }) })
+      expect(screen.queryByText('original')).toBeNull()
+      accepted.resolve({ ok: true, value: { accepted: true } })
+      await waitFor(() => { expect(screen.queryByRole('textbox')).toBeNull() })
+      const scroll = view.container.querySelector<HTMLElement>('[tabindex="-1"]')
+      expect(scroll).not.toBeNull()
+      expect(document.activeElement).toBe(scroll)
+    },
+  )
+
+  it('edits only the latest message and keeps original file attachments readonly', async () => {
+    const file = { ...user(2, 'text'), content: [{ type: 'text', text: 'text' }, { type: 'file', attachment: { attachmentId: 'file', name: 'original.txt', bytes: 3 } }] } as UserMessageNode
+    const h = makeHarness({ nodes: [user(1, 'earlier'), file] })
+    const editMessage = vi.fn().mockResolvedValue({ ok: true, value: { accepted: true } })
+    render(<ChatView {...h.props} editMessage={editMessage} />)
+    expect(screen.getAllByRole('button', { name: zh['message.edit'] })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: zh['message.edit'] }))
+    expect(screen.getByText('original.txt')).toBeTruthy()
+    expect(screen.getByText(zh['message.edit.attachments'])).toBeTruthy()
+    fireEvent.change(screen.getByRole<HTMLTextAreaElement>('textbox'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: zh['message.edit.resend'] }))
+    await waitFor(() =>{  expect(screen.queryByRole('textbox')).toBeNull() })
+    expect(editMessage.mock.calls[0]?.[0]).toMatchObject({ targetSeq: 2, text: '' })
+    expect(Object.keys(editMessage.mock.calls[0]?.[0] as object).sort()).toEqual(['requestId', 'targetSeq', 'text'])
+  })
+
+  it('keeps a draft when another client replaces its target and reconnect removes the old row', async () => {
+    const h = makeHarness({ nodes: [user(1, 'original')] })
+    const editMessage = vi.fn().mockResolvedValue({ ok: false, error: { code: 'session/edit-stale', message: 'stale' } })
+    render(<ChatView {...h.props} editMessage={editMessage} />)
+    fireEvent.click(screen.getByRole('button', { name: zh['message.edit'] }))
+    fireEvent.change(screen.getByRole<HTMLTextAreaElement>('textbox'), { target: { value: 'recoverable draft' } })
+    act(() =>{  h.set({ nodes: [user(5, 'other client')] }) })
+    expect((screen.getByRole<HTMLTextAreaElement>('textbox')).value).toBe('recoverable draft')
+    expect(screen.queryByText('original')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: zh['message.edit.resend'] }))
+    expect(screen.getByRole('alert').textContent).toBe(zh['message.edit.stale'])
+    expect(editMessage).not.toHaveBeenCalled()
+  })
+
   it('leaves the turn rail unrendered when an unrelated Chat update commits', () => {
     const snapshot = chatSnapshotFixture({
       nodes: [

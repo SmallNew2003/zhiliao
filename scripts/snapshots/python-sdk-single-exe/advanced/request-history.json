@@ -1,0 +1,50 @@
+[
+  {
+    "system": "{{system}}",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Serial agent creation completed."
+          },
+          {
+            "type": "text",
+            "text": "Run the advanced packaged-runtime snapshot scenario."
+          },
+          {
+            "type": "text",
+            "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+          },
+          {
+            "type": "text",
+            "text": "[image omitted because this model accepts text only; attachment sha256:b1ff9c8e]"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "system": "{{system}}",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Serial agent creation completed."
+          },
+          {
+            "type": "text",
+            "text": "Prepared replacement for the advanced snapshot input."
+          },
+          {
+            "type": "text",
+            "text": "Current runtime context. This snapshot supersedes earlier runtime-context snapshots.\n\nCurrent DSH file policy: danger-full-access. The DSH file sandbox does not restrict file modifications by available operations.\n\nApproval prompts are disabled in this session: actions that require approval are rejected automatically — do not request sandbox escalation (do not set `sandbox_permissions`)."
+          }
+        ]
+      }
+    ]
+  }
+]

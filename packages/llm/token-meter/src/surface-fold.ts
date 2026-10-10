@@ -73,8 +73,13 @@ function collectProjectedAttachments(
   return { imageTokens, fileTokens }
 }
 
-/** Build one priced node from a surface event's derived message. */
-function analyzeNode(seq: SessionSeq, message: Message | null): MeterSurfaceNode {
+/**
+ * Price one identified message and retain attachment occurrences for route pricing.
+ * @param seq - event position that owns the message.
+ * @param message - effective message, or null for an empty prompt.
+ * @returns detached heuristic and attachment prices.
+ */
+export function analyzeNode(seq: SessionSeq, message: Message | null): MeterSurfaceNode {
   if (message === null) {
     return {
       seq,

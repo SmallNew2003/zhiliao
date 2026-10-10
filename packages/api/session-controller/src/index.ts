@@ -33,6 +33,8 @@ import type {
   SessionControlFrame,
   SessionCreateRequest,
   SessionCreateValue,
+  SessionEditMessageRequest,
+  SessionEditMessageValue,
   SessionFollowFrame,
   SessionFollowRequest,
   SessionForkRequest,
@@ -122,6 +124,19 @@ export class SessionController extends TypertRemoteService {
     installModelSelectionProjection(ctx)
     this.agents = new ApiSessionAgentController(ctx)
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
+    ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => {
+      const decision = await next()
+      if (decision.kind !== 'enter' || signal.aborted || messages.length === 0) return decision
+      using observed = await ctx.sessionQuery.observeSession(agent.id, { projectionMode: 'none' })
+      const offered = new Set(messages.map(message => message.id))
+      const committed = new Map(decision.committedMessages?.map(receipt => [receipt.message.id, receipt]))
+      for (const event of observed.events) {
+        if (event.type === 'user/message-edit' && offered.has(event.data.message.id)) {
+          committed.set(event.data.message.id, { seq: event.seq, message: event.data.message })
+        }
+      }
+      return committed.size === 0 ? decision : { ...decision, committedMessages: [...committed.values()] }
+    })
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
       const result = await this.agents.resolveAgent(sessionId)
       if ('error' in result) throw result.error
@@ -165,7 +180,9 @@ export class SessionController extends TypertRemoteService {
           event.data.header.config.reasoningEffort,
         )
       }
-      if (event.type !== 'user/message' || event.data.source.kind !== 'user') return
+      const message = event.type === 'user/message' ? event.data
+        : event.type === 'user/message-edit' ? event.data.message : undefined
+      if (message?.source.kind !== 'user') return
       ctx.emit('api-session/activity', session.id, event.time)
     })
   }
@@ -347,6 +364,16 @@ export class SessionController extends TypertRemoteService {
   prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue> {
     signal.throwIfAborted()
     return this.commands.prompt(request)
+  }
+
+  /**
+   * Edit and resend the latest sent user input while retaining its original attachments.
+   * @param request - target event, replacement text, and stable retry identity.
+   * @returns acceptance after the edit is durable, or unchanged-text acceptance without a run.
+   */
+  @Remote('editMessage')
+  editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue> {
+    return this.commands.editMessage(request)
   }
 
   /**

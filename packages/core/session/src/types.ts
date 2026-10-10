@@ -268,6 +268,19 @@ export type RequestHeaderReason = 'initial' | 'resume' | 'change' | 'series'
  */
 export interface SessionEventMap {
   /**
+   * Replace the latest human-authored input and its subsequent model history.
+   * Replay restores the surface immediately before the original input, including
+   * nodes later shadowed by compaction, and adds the identified replacement.
+   * Repeated edits follow the target's earlier edit to the original input.
+   * Raw events and chronological turn/step numbering remain unchanged.
+   */
+  'user/message-edit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
+   * Update only text blocks of the current latest human input after pre-step preparation.
+   * Preserve its identity, metadata, attachments, and surface position.
+   */
+  'user/message-admit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
    * Opens turn `turn` before the loop claims queued input or runs pre-step.
    * Rejection, empty input, cancellation, or failure may close it with no
    * step; otherwise the following identified `user/message` event or batch

@@ -51,7 +51,7 @@ interface SessionSurfaceSnapshot {
   /** Highest raw-log seq included in the observation, or `null` for an empty log. */
   capturedThroughSeq: OptionalSessionSeq
   /** Cloned current surface events in model-history order. */
-  events: SurfaceEvent[]
+  events: (SurfaceEvent | SessionEvent<'user/message-edit'>)[]
 }
 ```
 

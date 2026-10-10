@@ -116,6 +116,8 @@ export type PreStepDecision =
     messages: UserMessage[]
     /** Start a distinct model-message series before this step's admitted messages. */
     startsRequestSeries?: true
+    /** Receipts for the latest human input; preparation preserves its identity and changes only text blocks. */
+    committedMessages?: readonly { seq: SessionSeq; message: UserMessage }[]
   }
 
 /** Action returned by a listener that owns model-request recovery. */

@@ -2805,6 +2805,9 @@ importers:
       '@deepseek-ai/dsh-session-turn-outline':
         specifier: workspace:^
         version: link:../../session/session-turn-outline
+      '@deepseek-ai/dsh-util-crypto':
+        specifier: workspace:^
+        version: link:../../util/util-crypto
       '@deepseek-ai/dsh-settings':
         specifier: workspace:^
         version: link:../../settings/settings

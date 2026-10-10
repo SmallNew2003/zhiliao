@@ -137,7 +137,10 @@ These limits define when cross-session references are a poor fit. They are curre
 - **No live link** — references are snapshots, not forks, resumes, subscriptions, or source-session mutations.
 - **Transcript search is line-based** — a literal phrase can straddle JSON-fragment lines or include escaped characters; decode and concatenate a message's fragments for exact text matching. Saved artifacts may expire under the backend's policy.
 
+Current-session references include edited inputs at their replacement sequences and use admitted text from the current-surface query. Text expansion before the edited request is logged by `user/message-admit`, so later references and model-history reconstruction read the same prepared content.
+
 <a id="dev-note"></a>
+
 ### Dev Note
 
 <details>

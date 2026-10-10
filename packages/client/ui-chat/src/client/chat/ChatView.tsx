@@ -9,6 +9,7 @@ import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
+import type { ChatNode } from '../contract/chat-nodes.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
@@ -202,12 +203,13 @@ function TurnStatus({ startTime, t }: {
 }
 
 type ChatNodeListProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey'> & {
+  readonly draftNode?: ChatNode | null
   readonly order: readonly string[]
 }
 
-const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNodeListProps) {
+const ChatNodeList = memo(function ChatNodeList({ order, draftNode, ...seatProps }: ChatNodeListProps) {
   return order.map(nodeKey => (
-    <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
+    <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} retainedDraftNode={draftNode?.key === nodeKey ? draftNode : undefined} {...seatProps} />
   ))
 })
 
@@ -217,11 +219,18 @@ const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNod
  */
 export function ChatView({
   useSession, useChat, useChatNode, useChatNodeProcess, useSessions, useStore, actions, renderSlot,
-  sessionId, openFile, openSkill, openExternalLink, loadOlder, loadThrough, loadImage, openView, chatScroll, forkAt, fileMentions,
-  useTranscriptView, useProjection, t,
+  sessionId, editMessage, openFile, openSkill, openExternalLink, loadOlder, loadThrough, loadImage, openView, chatScroll,
+  forkAt, fileMentions, useTranscriptView, useProjection, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
+  const [editDraft, setEditDraft] = useState<ChatNode | null>(null)
+  const detachedDraft = editDraft !== null && !order.includes(editDraft.key) ? editDraft : null
+  const renderedOrder = useMemo(() => detachedDraft === null ? order : [...order, detachedDraft.key], [order, detachedDraft])
   const nodeStore = useChat(s => s.nodes)
+  const latestInputSeq = useMemo(() => order.reduce<number | undefined>((latest, key) => {
+    const node = nodeStore.get(key) as ChatNode | undefined
+    return node?.kind === 'user' || node?.kind === 'steering' ? node.data.seq : latest
+  }, undefined), [order, nodeStore])
   // The rail's items are accumulated in the Chat snapshot, so this selector is
   // both the data and its change signal: the array identity moves only when a
   // Turn enters, leaves, or changes its preview.
@@ -303,6 +312,12 @@ export function ChatView({
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
 
   const listRef = useRef<HTMLDivElement | null>(null)
+  const effectiveOrderRef = useRef(order)
+  effectiveOrderRef.current = order
+  const editDraftChanged = useCallback((node: ChatNode, open: boolean) => {
+    setEditDraft(open ? node : null)
+    if (!open && !effectiveOrderRef.current.includes(node.key)) listRef.current?.focus()
+  }, [])
   const columnRef = useRef<HTMLDivElement | null>(null)
   // A saved position starts disarmed; the first layout effect synchronously
   // restores it and normalizes a floor-clamped position back to following.
@@ -760,7 +775,7 @@ export function ChatView({
 
   return (
     <div className={css.root}>
-      <div ref={listRef} className={css.scroll}>
+      <div ref={listRef} className={css.scroll} tabIndex={-1}>
         <TurnNavigator
           items={railItems}
           activeTurn={activeTurn}
@@ -784,7 +799,12 @@ export function ChatView({
           )}
           <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
             <ChatNodeList
-              order={order}
+              order={renderedOrder}
+              draftNode={detachedDraft}
+              editDraftChanged={editDraftChanged}
+              latestInputSeq={latestInputSeq}
+              running={running}
+              editMessage={editMessage}
               useChatNode={useChatNode}
               useChatNodeProcess={useChatNodeProcess}
               historyIncomplete={hasMore}

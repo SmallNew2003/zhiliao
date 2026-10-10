@@ -51,10 +51,15 @@ function projectSessionConversation(snapshot: SessionSurfaceSnapshot): Projected
         if (text !== '') conversation.push({ role: 'assistant', text, checkpoint: false, originalText: text, omittedBytes: 0 })
         break
       }
+      case 'user/message-edit': {
+        const text = textContent(event.data.message.content)
+        if (text !== '') conversation.push({ role: 'user', text, checkpoint: false, originalText: text, omittedBytes: 0 })
+        break
+      }
       case 'system/message':
       case 'tool/result':
         break
-      /* v8 ignore next 2 -- SurfaceEventType is closed and every variant is handled above. */
+      /* v8 ignore next 2 -- Current surface node events form a closed union handled above. */
       default:
         assertNever(event, 'session-reference surface event')
     }

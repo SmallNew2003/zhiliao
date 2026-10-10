@@ -729,6 +729,7 @@ const EMPTY_CONTRIBUTION: LegacyContribution = {
 
 function legacyContribution(raw: ChatConversationViewNode): LegacyContribution {
   const node = raw as ChatNode
+  if (raw.superseded === true) return EMPTY_CONTRIBUTION
   // Content-free settled Assistants remain in the finalized compatibility
   // stream so StatsPills preserves its pre-assembly step counts; hidden running
   // attempts have no final Node to contribute.
@@ -956,9 +957,66 @@ function partialContributionChanged(
       && previous?.anchorSeq !== next.anchorSeq)
 }
 
+/** Apply durable edit exclusions to resident and newly paged Chat nodes. */
+function effectiveChatNodes(
+  nodes: readonly ChatConversationViewNode[],
+  timeline: ConversationTimelineSnapshot,
+  resident: readonly ChatConversationViewNode[] = [],
+): readonly ChatConversationViewNode[] {
+  const edits = [...resident, ...nodes].flatMap((raw) => {
+    const node = raw as ChatNode
+    return (node.kind === 'user' || node.kind === 'steering') && node.data.editTargetSeq !== undefined
+      ? [{ seq: node.data.seq, target: node.data.editTargetSeq }] : []
+  })
+  if (edits.length === 0) return nodes
+  return nodes.map((node) => {
+    const superseded = edits.some(edit => node.anchorSeq >= edit.target && node.anchorSeq < edit.seq)
+    if (superseded) return node.superseded === true ? node : { ...node, visibility: 'hidden', superseded: true }
+    const input = node as ChatNode
+    if ((input.kind === 'user' || input.kind === 'steering') && input.data.editTargetSeq !== undefined) {
+      const turn = [...timeline.turns.values()].find(turn => turn.start !== undefined && turn.start.seq > input.data.seq)
+      if (turn === undefined) return node.location.kind === 'session' ? node : { ...node, location: { kind: 'session' } }
+      if (node.location.kind !== 'turn' || node.location.turn !== turn) return { ...node, location: { kind: 'turn', turn } }
+    }
+    return node
+  })
+}
+
+/** Omit discarded turn endpoints while preserving raw Conversation locations. */
+function effectiveChatTimeline(
+  timeline: ConversationTimelineSnapshot,
+  nodes: readonly ChatConversationViewNode[],
+  editedInputs: readonly ChatConversationViewNode[],
+): ConversationTimelineSnapshot {
+  if (editedInputs.length === 0) return timeline
+  const edits = editedInputs.flatMap((raw) => {
+    const node = raw as ChatNode
+    return (node.kind === 'user' || node.kind === 'steering') && node.data.editTargetSeq !== undefined
+      ? [{ seq: node.data.seq, target: node.data.editTargetSeq }] : []
+  })
+  const retainedTurns = new Set(nodes.filter(node => node.visibility === 'visible'
+    && node.kind !== 'system-prompt' && node.kind !== 'turn-process' && node.kind !== 'turn-tail')
+    .flatMap((node) => {
+      const turn = locationCoordinates(node.location).turn
+      return turn === undefined ? [] : [turn]
+    }))
+  const turns = new Map(timeline.turns)
+  for (const [number, turn] of turns) {
+    const endSeq = turn.end?.seq
+    if (endSeq === undefined || !edits.some(edit => endSeq >= edit.target && endSeq < edit.seq)) continue
+    if (!retainedTurns.has(number)) turns.delete(number)
+    else {
+      const { end: _discardedEnd, ...prefix } = turn
+      turns.set(number, { ...prefix, end: undefined })
+    }
+  }
+  return { turnOrder: timeline.turnOrder.filter(turn => turns.has(turn)), turns }
+}
+
 /** Incremental keyed Chat builder registered under the `chat` target. */
 export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversationViewNode, ChatSnapshot> {
   private readonly store = new MutableChatNodeStore()
+  private readonly editedInputs = new Map<string, ChatConversationViewNode>()
   private readonly locations = new MutableChatLocationIndex()
   private readonly navigation = new MutableTurnNavigationIndex()
   private readonly legacy = new LegacySliceBuilder()
@@ -967,6 +1025,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   private order: readonly string[] = EMPTY_KEYS
   /** Last published timeline: a Turn boundary can land without a new node. */
   private timeline: ConversationTimelineSnapshot | null = null
+  private effectiveTimeline: ConversationTimelineSnapshot | null = null
   readonly empty: ChatSnapshot
 
   constructor() {
@@ -977,14 +1036,18 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly nodes: readonly ChatConversationViewNode[]
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
-    const nodes = this.skillNames.replace(this.referenceLabels.replace(input.nodes))
+    this.editedInputs.clear()
+    for (const node of input.nodes) this.indexEdit(node)
+    const nodes = this.skillNames.replace(this.referenceLabels.replace(effectiveChatNodes(input.nodes, input.timeline)))
     this.store.replace(nodes)
     this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
     this.store.replaceProcesses(this.order, this.locations)
-    this.navigation.rebuild(input.timeline, this.locations, this.store)
+    const timeline = effectiveChatTimeline(input.timeline, nodes, [...this.editedInputs.values()])
+    this.effectiveTimeline = timeline
+    this.navigation.rebuild(timeline, this.locations, this.store)
     this.timeline = input.timeline
-    const snapshot = this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
+    const snapshot = this.snapshot(timeline, this.legacy.replace(nodes, timeline))
     this.store.publish()
     return snapshot
   }
@@ -993,7 +1056,17 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly upserts: readonly ChatConversationViewNode[]
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
-    const upserts = this.skillNames.apply(this.referenceLabels.apply(input.upserts, this.store), this.store)
+    const editChanged = input.upserts.some((raw) => {
+      const node = raw as ChatNode
+      return (node.kind === 'user' || node.kind === 'steering') && node.data.editTargetSeq !== undefined
+    })
+    for (const node of input.upserts) this.indexEdit(node)
+    const editsPresent = this.editedInputs.size > 0
+    const candidates = editChanged || (editsPresent && input.timeline !== this.timeline)
+      ? [...new Map([...this.store.values(), ...input.upserts].map(node => [node.key, node])).values()]
+      : input.upserts
+    const projected = effectiveChatNodes(candidates, input.timeline, [...this.editedInputs.values()])
+    const upserts = this.skillNames.apply(this.referenceLabels.apply(projected, this.store), this.store)
     const processTurns = new Set<number>()
     let structural = false
     const contentOnly: ChatConversationViewNode[] = []
@@ -1021,15 +1094,27 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     }
     this.locations.touch(contentOnly)
     this.store.updateProcesses(processTurns, this.locations)
+    const timeline = !editsPresent ? input.timeline
+      : editChanged || input.timeline !== this.timeline
+        ? effectiveChatTimeline(input.timeline, this.store.values(), [...this.editedInputs.values()])
+        : this.effectiveTimeline ?? input.timeline
+    this.effectiveTimeline = timeline
     if (structural || input.timeline !== this.timeline) {
-      this.navigation.rebuild(input.timeline, this.locations, this.store)
+      this.navigation.rebuild(timeline, this.locations, this.store)
     } else {
       this.navigation.touch(turnsOf(contentOnly), this.locations, this.store)
     }
     this.timeline = input.timeline
-    const snapshot = this.snapshot(input.timeline, this.legacy.apply(upserts, input.timeline))
+    const snapshot = this.snapshot(timeline, this.legacy.apply(upserts, timeline))
     this.store.publish()
     return snapshot
+  }
+
+  private indexEdit(raw: ChatConversationViewNode): void {
+    const node = raw as ChatNode
+    if ((node.kind === 'user' || node.kind === 'steering') && node.data.editTargetSeq !== undefined) {
+      this.editedInputs.set(node.key, node)
+    }
   }
 
   private snapshot(

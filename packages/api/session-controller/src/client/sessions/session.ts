@@ -13,6 +13,7 @@ import type {
   PromptContentPart,
   QueueAction,
   SessionAddress,
+  SessionEditMessageRequest,
   SessionAssistantStreamBaseline,
   SessionProjectionBaseline,
   SessionRequestId,
@@ -297,6 +298,15 @@ export class Session implements SessionFace {
       this.notifier.markDirty()
     }
     return result
+  }
+
+  /**
+   * Edit and resend the latest sent input with a caller-owned retry identity.
+   * @param request - target event, replacement text, and stable retry identity.
+   * @returns durable acceptance or the admission error without modifying the local draft.
+   */
+  editMessage(request: Omit<SessionEditMessageRequest, 'sessionId'>): Promise<RemoteResult<{ accepted: true }>> {
+    return this.remote.session.editMessage({ sessionId: this.sessionId, ...request })
   }
 
   /**
