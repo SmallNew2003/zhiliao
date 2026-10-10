@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/superpowers/plans/inline-visualizations-plan_20261010.md
-inline-visualizations-plan_20261010.md: 4441ac18f03cc07d9ea139b802fab1e2a7eecab0
-inline-visualizations-plan_20261010.zh.md: 59341ab77dc67088309da9db1101e92e4aa90e66
+inline-visualizations-plan_20261010.md: 40589b9a1874469d41df4f898747e52f1ab2a808
+inline-visualizations-plan_20261010.zh.md: 2d8c942e7fd3e29ffce40706eee1de5f403404b9
