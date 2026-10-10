@@ -473,7 +473,7 @@ Source: [`packages/client/ui-sidebar-documentpreview/src/config.ts:5`](../packag
 
 ## `@deepseek-ai/dsh-client-ui-visualizations`
 
-Requires: `webserver`
+Requires: `webServer` · `systemPrompt` · `skills` · `tools`
 
 ```ts config-catalog
 /** Resolved limits shared by Host index injection and browser rendering. */
@@ -2939,7 +2939,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:249`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 

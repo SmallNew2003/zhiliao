@@ -158,7 +158,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-primitives': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-dockkit': ['lib/**/*.css'],
   '@deepseek-ai/dsh-client-ui-sidebar-documentpreview': ['lib/client.*.js'],
-  '@deepseek-ai/dsh-client-ui-visualizations': ['lib/runtime-manifest.js', 'lib/client.*.js', 'lib/licenses/*'],
+  '@deepseek-ai/dsh-client-ui-visualizations': ['lib/runtime-manifest.js', 'lib/client.*.js', 'lib/licenses/*', 'assets'],
   '@deepseek-ai/dsh-client-ui-sidebar-terminal': ['lib/client.*.js'],
   '@deepseek-ai/dsh-client-web': ['lib/**/*.css', 'lib/apply-injections.js'],
   '@deepseek-ai/dsh-client-ui-theme': ['lib/styles'],

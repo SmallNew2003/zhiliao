@@ -65,6 +65,8 @@ When you launch `dsh --profile web` over SSH, the URL line still prints but the 
 
 Each browser session composes its own agent from the shipped presets (the `standard` preset by default), instead of sharing one process-wide tool set. You can change the default preset or add your own presets under `$DSH_HOME/.agent-presets`.
 
+The Web roster includes [inline visualizations](../../client/ui-visualizations/README.md) for interactive HTML panels, ECharts charts and Mermaid diagrams. Its authoring guidance follows each agent’s visible skill loader; presets without that tool receive no loader instructions. Preview inputs remain local and transient.
+
 -----
 
 <a id="understand-the-implementation"></a>

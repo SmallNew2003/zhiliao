@@ -25,7 +25,7 @@ View explicitly marked HTML panels, ECharts charts and Mermaid diagrams inside a
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount this package with the Web Host, assistant Chat renderer, locale and theme providers. The Host injects validated limits into the browser index; the Client requires that injection before registering its assistant-only chain selector.
+The shipped Web bundle mounts this package. Custom compositions require the Web Host (`webServer`), system prompt, skill and tool registries, assistant Chat renderer, locale and theme providers. The Host resolves and injects validated limits into the browser index; the Client requires that injection before registering its assistant-only chain selector.
 
 Only top-level closed assistant fences execute: `html preview runtime=dsh-v1`, `html preview runtime=dsh-v1 libs=echarts`, or `mermaid preview runtime=dsh-v1`. Unknown or duplicate metadata produces a local diagnostic with readable source. Open fences show generation status and never load runtime assets.
 
@@ -75,19 +75,25 @@ No runtime invariant companion is published because frame state and budget ident
 <a id="model-experience"></a>
 ## Model Experience
 
-### Assistant source
+### Authoring guidance and assistant source
 
 #### What the model sees
 
-The viewer adds no prompt, tool schema or Session event. The existing assistant message contains complete source, inline data, runtime identifier `dsh-v1` and declared libraries; rendering reads that text.
+Agents with a visible scoped `skill` tool receive the short `ui:visualizations` section below. The [authoring provider](src/authoring.ts) registers `visualize-html`, `visualize-charts` and `visualize-diagrams`, resolving their runtime and library identifiers from the executable manifest. The existing loader publishes catalog summaries and loads full API instructions on request. Agents without a loader receive no visualization guidance. Existing system messages, skill-catalog messages and skill tool results record instructions; assistant messages record authored source and inline data. The package adds no tool schema or Session event, and local input changes never reach the model.
+
+##### System guidance
+
+```markdown
+Use an inline visualization when interaction, a chart or a diagram helps explain the answer. Load the matching skill first: visualize-html for interactive panels, visualize-charts for data charts, or visualize-diagrams for Mermaid diagrams. Use only top-level assistant fences marked html preview runtime=dsh-v1 (add libs=echarts for charts) or mermaid preview runtime=dsh-v1; explicitly close each fence. Ordinary code stays source. Include data inline and use the packaged libraries. Inputs are transient; previews cannot access files, the Host or the network. Offer a file artifact when the user needs durable data or an unsupported export.
+```
 
 #### Token effect
 
-Preview controls and interaction state consume no model tokens. Authored source remains part of the ordinary assistant reply.
+The short system section and three catalog summaries add bounded instructions for agents with the loader; full skill bodies consume tokens only when loaded. Preview controls and interaction state consume no model tokens. Authored source remains part of the ordinary assistant reply.
 
 #### KV Cache effect
 
-Rendering and downloads do not alter recorded messages or model requests. Existing assistant text retains its ordinary history and cache behavior.
+Guidance and catalog summaries stay stable for the same runtime and visible capabilities. Loading a skill adds its body to recorded history; removing the plugin retracts the prompt and catalog candidates, and the existing loader publishes a replacement catalog on the next step. Rendering and downloads do not alter model requests.
 
 ## Known Limitations and Deferred Work
 

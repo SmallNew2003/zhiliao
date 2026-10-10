@@ -45,7 +45,8 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@deepseek-ai/cordis": "workspace:^"
+    "@deepseek-ai/cordis": "workspace:^",
+    "@deepseek-ai/dsh-skill": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
@@ -67,7 +68,12 @@
     "echarts": "6.1.0",
     "mermaid": "11.16.0",
     "jsdom": "29.1.1",
-    "@types/jsdom": "^28.0.3"
+    "@types/jsdom": "^28.0.3",
+    "@deepseek-ai/dsh-skill": "workspace:^",
+    "@deepseek-ai/dsh-system-prompt": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-scope": "workspace:^",
+    "@deepseek-ai/dsh-util-crypto": "workspace:^"
   },
   "files": [
     "lib/index.js",
@@ -75,10 +81,11 @@
     "lib/runtime-manifest.js",
     "lib/client.*.js",
     "lib/licenses/*",
+    "assets",
     "lib/types/**/*.d.ts"
   ],
   "dependencies": {
-    "@deepseek-ai/dsh-util-crypto": "workspace:^",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "yaml": "^2.4.2"
   }
 }

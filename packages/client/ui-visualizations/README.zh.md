@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-将本包与 Web Host、助手 Chat 渲染器、语言及主题提供方一起挂载。Host 将经过验证的限制注入浏览器首页；Client 只有收到该注入后才注册仅用于助手内容的链选择器。
+内置 Web 组合包会挂载此包。自定义组合需要 Web Host（`webServer`）、系统提示词、技能与工具注册表、助手 Chat 渲染器、语言及主题提供方。Host 解析并将经过验证的限制注入浏览器首页；Client 只有收到该注入后才注册仅用于助手内容的链选择器。
 
 仅执行助手内容中显式闭合的顶层围栏：`html preview runtime=dsh-v1`、`html preview runtime=dsh-v1 libs=echarts` 或 `mermaid preview runtime=dsh-v1`。未知或重复元数据会显示局部诊断并保留可读源码。未闭合围栏显示生成状态，且不会加载运行时资源。
 
@@ -75,19 +75,25 @@ HTML 构建会等待外层文档的原生 load，安装作者 DOM，再按源码
 <a id="model-experience"></a>
 ## 模型体验
 
-### 助手源码
+### 创作指导与助手源码
 
 #### 模型看到什么
 
-查看器不新增提示词、工具定义或 Session 事件。现有助手消息包含完整源码、内联数据、运行时标识 `dsh-v1` 及声明的库；渲染会读取该文本。
+作用域内可见 `skill` 工具的代理会收到下方简短的 `ui:visualizations` 段落。[创作指导提供方](src/authoring.ts) 注册 `visualize-html`、`visualize-charts` 和 `visualize-diagrams`，从可执行资源清单解析其运行时及库标识。现有加载器发布目录摘要，并按请求加载完整 API 指令。没有加载器的代理不会收到可视化指导。现有系统消息、技能目录消息与技能工具结果记录指令；助手消息记录作者源码与内联数据。此包不新增工具定义或 Session 事件，本地输入变化不会传给模型。
+
+##### 系统指导
+
+```markdown
+Use an inline visualization when interaction, a chart or a diagram helps explain the answer. Load the matching skill first: visualize-html for interactive panels, visualize-charts for data charts, or visualize-diagrams for Mermaid diagrams. Use only top-level assistant fences marked html preview runtime=dsh-v1 (add libs=echarts for charts) or mermaid preview runtime=dsh-v1; explicitly close each fence. Ordinary code stays source. Include data inline and use the packaged libraries. Inputs are transient; previews cannot access files, the Host or the network. Offer a file artifact when the user needs durable data or an unsupported export.
+```
 
 #### Token 影响
 
-预览控件与交互状态不消耗模型 token。作者源码仍属于普通助手回复的一部分。
+简短系统段落与三个目录摘要为拥有加载器的代理增加有界指令；完整技能正文仅在加载时消耗 token。预览控件与交互状态不消耗模型 token。作者源码仍属于普通助手回复的一部分。
 
 #### KV Cache 影响
 
-渲染与下载不会改变已记录消息或模型请求。现有助手文本保持通常的历史与缓存行为。
+运行时及可见能力相同时，指导和目录摘要保持稳定。加载技能会将正文加入已记录历史；移除此插件会撤回提示词与目录候选，现有加载器在下一步发布替换目录。渲染与下载不会改变模型请求。
 
 ## 已知限制与延期工作
 

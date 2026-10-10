@@ -55,4 +55,10 @@ test('keeps library source bytes out of startup and publishes its declared artif
   const manifest = JSON.parse(await read('package.json')) as { files: string[]; exports: Record<string, { default: string }> }
   assert.ok(manifest.files.includes('lib/client.*.js')); assert.ok(manifest.files.includes('lib/licenses/*'))
   assert.equal(manifest.exports['./runtime-manifest']?.default, './lib/runtime-manifest.js')
+  assert.ok(manifest.files.includes('assets'))
+  for (const name of ['visualize-html', 'visualize-charts', 'visualize-diagrams']) {
+    const template = await read(`assets/${name}/SKILL.md`)
+    assert.match(template, new RegExp(`name: ${name}`, 'u'))
+    assert.ok(template.includes('runtime={{runtime}}'))
+  }
 })
