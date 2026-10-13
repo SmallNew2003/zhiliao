@@ -47,3 +47,15 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 native/system/test/bin/
+# >>> Comet managed project state >>>
+!/.comet/
+/.comet/*
+!/.comet/config.yaml
+!/.comet/dsh-hooks-codex.patch.yml
+# <<< Comet managed project state <<<
+
+# Agent tool working state. Like the Comet block above, these hold per-session
+# notes and commit references that are not repository content; verify-repository-references
+# scans nonignored new files, so leaving them unscanned keeps the gate red.
+.workbuddy/
+.codex/
