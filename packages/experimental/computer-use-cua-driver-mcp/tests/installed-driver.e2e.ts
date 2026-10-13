@@ -5,6 +5,9 @@ import ComputerUse from '@deepseek-ai/dsh-computer-use'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import SessionStore from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import McpDiscovery from '@deepseek-ai/dsh-mcp-discovery'
 import { expect, it } from 'vitest'
 import * as Provider from '../src/index.ts'
 
@@ -32,6 +35,9 @@ it.skipIf(executable === undefined || executable === '')(
       await ctx.plugin(ComputerUse)
       await ctx.plugin(SystemPrompt)
       await ctx.plugin(ToolRuntime)
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(SessionProjectionRegistry)
+      await ctx.plugin(McpDiscovery)
       const provider = await ctx.plugin(Provider, {
         command: executable,
         args: driverArguments(),

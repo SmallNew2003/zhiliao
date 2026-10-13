@@ -1374,6 +1374,48 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'mcpDiscovery',
+    summary: 'Deferred MCP definitions share permission filtering and execution with ordinary tools.',
+    description: 'Deferred MCP definitions share permission filtering and execution with ordinary tools.',
+    methods: [
+      {
+        signature: 'registerServer(server: string, source: ServerSource): () => void',
+        description: 'Register a configured server in the caller\'s scope.',
+        parameters: [{ name: 'server', description: 'namespace.' }, { name: 'source', description: 'connection facts.' }],
+        returns: 'effect disposer.',
+      },
+      {
+        signature: 'registerTool(server: string, definition: ToolDefinition): () => void',
+        description: 'Register one deferred MCP definition without changing authorization.',
+        parameters: [{ name: 'server', description: 'owning namespace.' }, { name: 'definition', description: 'original tool.' }],
+        returns: 'effect disposer.',
+      },
+      {
+        signature: 'search(scope?: ScopeKey, request: SearchRequest = {}): DiscoveryPage',
+        description: 'Search the permission-filtered catalog without loading schemas.',
+        parameters: [{ name: 'scope', description: 'caller identity.' }, { name: 'request', description: 'bounded filters and pagination.' }],
+        returns: 'complete byte-limited page.',
+      },
+      {
+        signature: 'load(agent: Agent, names: readonly string[], servers: readonly string[] = [], signal?: AbortSignal): LoadResult',
+        description: 'Atomically add tool definitions and complete server instructions.',
+        parameters: [{ name: 'agent', description: 'durable owner.' }, { name: 'names', description: 'exact public tool names.' }, { name: 'servers', description: 'resource-only activation targets.' }, { name: 'signal', description: 'cancellation before commit.' }],
+        returns: 'admission or refusal.',
+      },
+      {
+        signature: 'release(agent: Agent, names?: readonly string[], servers: readonly string[] = []): LoadResult',
+        description: 'Release selections for future requests; started snapshots stay fixed.',
+        parameters: [{ name: 'agent', description: 'owner.' }, { name: 'names', description: 'names, or omission to release all.' }, { name: 'servers', description: 'activated server names to release.' }],
+        returns: 'remaining selection.',
+      },
+      {
+        signature: 'assertServer(server: string, exec: ToolExecution): void',
+        description: 'Guard model resource calls before network access. Programmatic calls without an Agent bypass activation only.',
+        parameters: [{ name: 'server', description: 'resource namespace.' }, { name: 'exec', description: 'execution owner.' }],
+      },
+    ],
+  },
+  {
     key: 'mcpResources',
     summary: 'Scoped resource access plus three tools shared by configured MCP servers.',
     description: 'Scoped resource access plus three tools shared by configured MCP servers.',
@@ -2719,7 +2761,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async assemble(context: AssembleContext = {}): Promise<PromptAssembly>',
-        description: 'Assemble global and scoped providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section.',
+        description: 'Await scoped preparation, assemble providers, detach tool parameters, apply canonical ordering, then run the assembly waterfall. Scoped sections and variables shadow globals. The returned waterfall value is authoritative except that an effective complete section is restored afterwards as the sole prompt section.',
         parameters: [{ name: 'context', description: 'the optional scope and plugin-defined assembly fields.' }],
         returns: 'the post-waterfall assembly with any complete prompt enforced.',
       },
@@ -2945,6 +2987,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Tool registry and execution pipeline. Scoped registrations shadow globals; one visibility resolver feeds presentation, lookup, and dispatch.',
     methods: [
       {
+        signature: 'modeFor(scope?: ScopeKey): ToolPresentationMode',
+        description: 'The presentation one scope\'s agent sees: its own declaration, else the deployment default.',
+        parameters: [{ name: 'scope', description: 'the calling agent, or undefined for the global view.' }],
+        returns: 'the resolved presentation mode.',
+      },
+      {
         signature: 'presentAs(mode: ToolPresentationMode): () => void',
         description: 'Present the calling scope\'s tools in `mode` instead of the deployment default. Nearest scope on the chain wins, so a preset\'s standing declaration covers every agent joined under it.\n\nScoped only, and one declaration per scope: this is how an agent preset composes PTC mode agents beside native ones in the same process, and a process-global override would be the `mode` config field instead.',
         parameters: [{ name: 'mode', description: 'the presentation the covered agents\' models see.' }],
@@ -2979,6 +3027,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Project visible definitions onto the allowlisted model-facing schema fields, excluding execution and presentation callbacks.',
         parameters: [{ name: 'scope', description: 'the viewing scope (the agent); omitted = the global view.' }],
         returns: 'one deep-cloned schema per visible tool.',
+      },
+      {
+        signature: 'renderSdk(names: readonly string[], scope?: ScopeKey): string',
+        description: 'Render a proposed scope-visible tool subset without changing presentation. Hidden definitions remain eligible; permissions and scoped shadows apply. Unknown or restricted names throw, including under native mode. Duplicate names render once; PTC transport is omitted from the SDK declarations.',
+        parameters: [{ name: 'names', description: 'proposed names of definitions visible to this scope.' }, { name: 'scope', description: 'the viewing scope; omitted for the global view.' }],
+        returns: 'the complete canonical runtime-language SDK, or empty text in native mode.',
       },
       {
         signature: 'executionMode(exec: ToolExecutionInput): ToolExecutionMode',
@@ -3873,6 +3927,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [],
   },
   {
+    name: 'system-prompt/prepare',
+    mode: 'serial',
+    signature: '\'system-prompt/prepare\'(this: Scoped<SystemPrompt>, context: AssembleContext): void | Promise<void>',
+    summary: 'Await preparation before reading prompt and tool providers.',
+    description: 'Await preparation before reading prompt and tool providers. Scope-filtered dispatch: scoped listeners prepare only their scope\'s assemblies. Rejection or cancellation stops the assembly before provider evaluation.',
+    parameters: [{ name: 'context', description: 'the caller\'s scope, signal, and per-assembly inputs.' }],
+  },
+  {
     name: 'tools/change',
     mode: 'emit',
     signature: '\'tools/change\'(): void',
@@ -4534,7 +4596,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeepSeekLlmApiExtensionRequest',
-    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly purpose?: \'compaction\' | \'session-title\';\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly purpose?: \'compaction\' | \'session-title\' | \'mcp-selector\';\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'DeepSeekLlmApiJson',
@@ -4575,6 +4637,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DirectoryRegistrationHandle',
     declaration: 'export interface DirectoryRegistrationHandle {\n    (): void;\n    replace(entries: readonly LlmConfigurableProvider[]): void;\n}',
+  },
+  {
+    name: 'DiscoveryItem',
+    declaration: 'export interface DiscoveryItem {\n    server: string;\n    name?: string;\n    description: string;\n    connected: boolean;\n}',
+  },
+  {
+    name: 'DiscoveryPage',
+    declaration: 'export interface DiscoveryPage {\n    items: DiscoveryItem[];\n    nextOffset: number | null;\n    hint: string;\n}',
   },
   {
     name: 'Domain',
@@ -4754,7 +4824,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'mcp-selector\';\n}',
   },
   {
     name: 'GenericCallView',
@@ -5039,6 +5109,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LlmRuntime',
     declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined;\n    fileRequestText(ref: FileAttachmentRef): string;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions) /* …truncated — full shape in source */',
+  },
+  {
+    name: 'LoadResult',
+    declaration: 'export type LoadResult = {\n    ok: true;\n    names: string[];\n    servers: string[];\n} | {\n    ok: false;\n    reason: string;\n};',
   },
   {
     name: 'LspHover',
@@ -5653,6 +5727,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SearchPathsResultView {\n    card: \'search\';\n    shape: \'paths\';\n    title?: string;\n    paths: string[];\n    truncated: boolean;\n    total: number;\n}',
   },
   {
+    name: 'SearchRequest',
+    declaration: 'export interface SearchRequest {\n    query?: string;\n    server?: string;\n    names?: readonly string[];\n    offset?: number;\n}',
+  },
+  {
     name: 'SearchResultView',
     declaration: 'export type SearchResultView = SearchMatchesResultView | SearchPathsResultView;',
   },
@@ -5667,6 +5745,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ServerResponse',
     declaration: 'export interface ServerResponse {\n    readonly type: \'server-response\';\n    readonly rpcId: RpcId;\n    readonly result: ConnectionRpcResult<unknown>;\n}',
+  },
+  {
+    name: 'ServerSource',
+    declaration: 'export interface ServerSource {\n    instructions(): string;\n    connected(): boolean;\n}',
   },
   {
     name: 'Session',
@@ -6706,7 +6788,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolDefinition',
-    declaration: 'export interface ToolDefinition extends ToolSchema {\n    readonly output: ToolOutputDefinition;\n    execute(args: unknown, exec: ToolRunContext): Promise<unknown>;\n    finalizeContent?(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>): ContentBlock[] | undefined;\n    timeoutMs?: number;\n    isConcurrencySafe?(args: unknown): boolean;\n    presentCall?(args: unknown): ToolCallView | undefined;\n    presentResult?(args: unknown, result: ToolResult): ToolResultView | undefined;\n}',
+    declaration: 'export interface ToolDefinition extends ToolSchema {\n    isPresented?(scope?: ScopeKey): boolean;\n    readonly output: ToolOutputDefinition;\n    execute(args: unknown, exec: ToolRunContext): Promise<unknown>;\n    finalizeContent?(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>): ContentBlock[] | undefined;\n    timeoutMs?: number;\n    isConcurrencySafe?(args: unknown): boolean;\n    presentCall?(args: unknown): ToolCallView | undefined;\n    presentResult?(args: unknown, result: ToolResult): ToolResultView | undefined;\n}',
   },
   {
     name: 'ToolDispatchExecution',
@@ -6794,7 +6876,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolRuntime',
-    declaration: 'export class ToolRuntime extends Service {\n    static inject;\n    static Config: z<Config>;\n    readonly [TOOL_RUNTIME_SCHEDULER]: ToolRuntimeScheduler;\n    constructor(ctx: Context, config: Config = {});\n    presentAs(mode: ToolPresentationMode): () => void;\n    register(definition: ToolDefinition): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    guard(guard: ToolGuard): () => void;\n    get(name: string, scope?: ScopeKey): ToolDefinition | undefined;\n    schemas(scope?: ScopeKey): ToolSchema[];\n    executionMode(exec: ToolExecutionInput): ToolExecutionMode;\n    async execute(exec: ToolExecutionInput): Promise<ToolExecutionResult>;\n}',
+    declaration: 'export class ToolRuntime extends Service {\n    static inject;\n    static Config: z<Config>;\n    readonly [TOOL_RUNTIME_SCHEDULER]: ToolRuntimeScheduler;\n    constructor(ctx: Context, config: Config = {});\n    modeFor(scope?: ScopeKey): ToolPresentationMode;\n    presentAs(mode: ToolPresentationMode): () => void;\n    register(definition: ToolDefinition): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    guard(guard: ToolGuard): () => void;\n    get(name: string, scope?: ScopeKey): ToolDefinition | undefined;\n    schemas(scope?: ScopeKey): ToolSchema[];\n    renderSdk(names: readonly string[], scope?: ScopeKey): string;\n    executionMode(exec: ToolExecutionInput): ToolExecutionMode;\n    async execute(exec: ToolExecutionInput): Promise<ToolExecutionResult>;\n}',
   },
   {
     name: 'ToolRuntimeScheduler',

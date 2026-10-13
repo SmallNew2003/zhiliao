@@ -6080,6 +6080,634 @@
       }
     },
     {
+      "key": "event:mcp/diagnostic",
+      "kind": "event",
+      "event": "mcp/diagnostic",
+      "surface": false,
+      "digest": "fd799362bcd5609155c506e902eded2d8eb7a225b27e29633453d888b2cb996d",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/diagnostic"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:mcp/request-snapshot",
+      "kind": "event",
+      "event": "mcp/request-snapshot",
+      "surface": false,
+      "digest": "54a21b94ddd4a57fa7a4c8ccc04601d1104bbd00e178b43cbf953a47e185f0d1",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "instructions",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "schemas",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "sdk",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "step",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "tools",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "turn",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 4
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "description",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "parameters",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [],
+            "indices": [
+              {
+                "key": 2,
+                "value": 6
+              }
+            ]
+          },
+          {
+            "kind": "opaque",
+            "reason": "unknown"
+          },
+          {
+            "kind": "array",
+            "element": 8
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 11
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/request-snapshot"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:mcp/selection",
+      "kind": "event",
+      "event": "mcp/selection",
+      "surface": false,
+      "digest": "1771168491be719a2635410d0307d1d96c838c47d1f088345f0999c801bce309",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 14,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "tools",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5,
+              6
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "replace"
+          },
+          {
+            "kind": "literal",
+            "value": "invalidate"
+          },
+          {
+            "kind": "literal",
+            "value": "load"
+          },
+          {
+            "kind": "literal",
+            "value": "release"
+          },
+          {
+            "kind": "array",
+            "element": 8
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 11
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/selection"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:mcp/selector-request",
+      "kind": "event",
+      "event": "mcp/selector-request",
+      "surface": false,
+      "digest": "155628d1a76c7cf23e9abaf44a8636623e1f613c1b070aac4d079f6b87d8ea2f",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "input",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "maxTokens",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "model",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "phase",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "system",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "servers"
+          },
+          {
+            "kind": "literal",
+            "value": "tools"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/selector-request"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:mcp/selector-result",
+      "kind": "event",
+      "event": "mcp/selector-result",
+      "surface": false,
+      "digest": "5944401746ca522fc3073ddbbc85ec0951073da07be0d5a3b9616c3f301d4cfe",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "detail",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "names",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "failed"
+          },
+          {
+            "kind": "literal",
+            "value": "none"
+          },
+          {
+            "kind": "literal",
+            "value": "selected"
+          },
+          {
+            "kind": "literal",
+            "value": "uncertain"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/selector-result"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:model/selection",
       "kind": "event",
       "event": "model/selection",
@@ -14820,7 +15448,7 @@
         ]
       },
       "names": [
-        "event:request/header.data.header.tools[0].parameters"
+        "event:mcp/request-snapshot.data.schemas[0].parameters"
       ],
       "sources": []
     },
@@ -16399,6 +17027,153 @@
       ],
       "sources": [
         "packages/attachment/attachment/src/types.ts:28"
+      ]
+    },
+    {
+      "digest": "1086e67db666219407bee128990fecfded4702ba3f74b61bc151b9041eb07f46",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "instructions",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "schemas",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "sdk",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "step",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "tools",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "turn",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "description",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "parameters",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [],
+            "indices": [
+              {
+                "key": 1,
+                "value": 5
+              }
+            ]
+          },
+          {
+            "kind": "opaque",
+            "reason": "unknown"
+          },
+          {
+            "kind": "array",
+            "element": 7
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 10
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          }
+        ]
+      },
+      "names": [
+        "packages/mcp/mcp-discovery/src/types.ts#RequestSnapshot"
+      ],
+      "sources": [
+        "packages/mcp/mcp-discovery/src/types.ts:17"
       ]
     },
     {
@@ -18017,6 +18792,116 @@
       "sources": []
     },
     {
+      "digest": "155628d1a76c7cf23e9abaf44a8636623e1f613c1b070aac4d079f6b87d8ea2f",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "input",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "maxTokens",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "model",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "phase",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "system",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "servers"
+          },
+          {
+            "kind": "literal",
+            "value": "tools"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/selector-request"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selector-request"
+      ],
+      "sources": []
+    },
+    {
       "digest": "1571525adc95a24e5d25b5a6440df401cd7cdd881b745178e85f5a333435cd1b",
       "schema": {
         "root": 0,
@@ -18042,6 +18927,229 @@
         ]
       },
       "names": [],
+      "sources": []
+    },
+    {
+      "digest": "170c650ebfb8dc36df27941fe62a6d4379956b7f52af6e8eb88e6fe7790ac81f",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "detail",
+                "type": 1,
+                "optional": true
+              },
+              {
+                "name": "names",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 1
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "failed"
+          },
+          {
+            "kind": "literal",
+            "value": "none"
+          },
+          {
+            "kind": "literal",
+            "value": "selected"
+          },
+          {
+            "kind": "literal",
+            "value": "uncertain"
+          }
+        ]
+      },
+      "names": [
+        "packages/mcp/mcp-discovery/src/types.ts#SelectorResult"
+      ],
+      "sources": [
+        "packages/mcp/mcp-discovery/src/types.ts:27"
+      ]
+    },
+    {
+      "digest": "1771168491be719a2635410d0307d1d96c838c47d1f088345f0999c801bce309",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 14,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "tools",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4,
+              5,
+              6
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "replace"
+          },
+          {
+            "kind": "literal",
+            "value": "invalidate"
+          },
+          {
+            "kind": "literal",
+            "value": "load"
+          },
+          {
+            "kind": "literal",
+            "value": "release"
+          },
+          {
+            "kind": "array",
+            "element": 8
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 11
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/selection"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selection"
+      ],
       "sources": []
     },
     {
@@ -27086,6 +28194,20 @@
       ]
     },
     {
+      "digest": "33f74f022c28c94befbea5f9eec6cb377d95fcd19789d9ce418154eb56a01669",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "selected"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "34d1ab5c5df378186d6054b1a1beea9a41e41965d6f336f0bc0025c441a82e66",
       "schema": {
         "root": 0,
@@ -27177,6 +28299,20 @@
       "names": [
         "event:model/selection"
       ],
+      "sources": []
+    },
+    {
+      "digest": "3543b1d01fd32bffde973898e458a27bcb307e62a505f85605bf0a19fbeac385",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "mcp/request-snapshot"
+          }
+        ]
+      },
+      "names": [],
       "sources": []
     },
     {
@@ -28841,7 +29977,7 @@
         "packages/core/tools/src/index.ts#ToolRestriction"
       ],
       "sources": [
-        "packages/core/tools/src/index.ts:682"
+        "packages/core/tools/src/index.ts:690"
       ]
     },
     {
@@ -29045,6 +30181,33 @@
       ]
     },
     {
+      "digest": "3e84536d13f1398db4a4b0df93058809d5cbe6974f9b9659005aaf93b15de4f8",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "servers"
+          },
+          {
+            "kind": "literal",
+            "value": "tools"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selector-request.data.phase"
+      ],
+      "sources": []
+    },
+    {
       "digest": "3ee93b06f3a125850337602bcdf155d2538c43a5c944ec55b1b3c365152d6796",
       "schema": {
         "root": 0,
@@ -29131,6 +30294,43 @@
         ]
       },
       "names": [],
+      "sources": []
+    },
+    {
+      "digest": "3fd39cdbc47e741ef07e378faaf3c2e50f6ebb3f62bdbf22c4daecc9f9a9a04a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2,
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "invalidate"
+          },
+          {
+            "kind": "literal",
+            "value": "load"
+          },
+          {
+            "kind": "literal",
+            "value": "release"
+          },
+          {
+            "kind": "literal",
+            "value": "replace"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selection.data.reason"
+      ],
       "sources": []
     },
     {
@@ -29625,6 +30825,40 @@
       "sources": []
     },
     {
+      "digest": "4476aa11b200de7ad2f93b2201a49d40fcee2f158eaa9d6bbe2320650cc615db",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "packages/mcp/mcp-discovery/src/types.ts#SelectedServer"
+      ],
+      "sources": [
+        "packages/mcp/mcp-discovery/src/types.ts:13"
+      ]
+    },
+    {
       "digest": "44818000e56acb97afdb5045ce235eb55e3fb1ccabc9fc7d0750bb38f36a7f8e",
       "schema": {
         "root": 0,
@@ -29766,6 +31000,20 @@
       "sources": [
         "packages/interaction/user-approval/src/types.ts:44"
       ]
+    },
+    {
+      "digest": "471581d8cce4fb2263106aa3eb0390056e110cbedb3b57fe15a5fa27d39305d6",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "release"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
     },
     {
       "digest": "477614bca595a9e7adb5a1870be446b9a8684f3ba8950259d6289f2d3b74f028",
@@ -32104,6 +33352,7 @@
         "packages/llm/llm/src/brand.ts#ProviderRequestId",
         "packages/llm/llm/src/brand.ts#ReasoningEffortId",
         "packages/llm/llm/src/brand.ts#ToolCallId",
+        "packages/mcp/mcp-discovery/src/types.ts#McpDefinitionId",
         "packages/schedule/schedule/src/types.ts#ScheduleId",
         "packages/session/session-title/src/index.ts#SessionTitleProviderId",
         "packages/session/session-title/src/types.ts#SessionTitleProviderId",
@@ -32129,6 +33378,7 @@
         "packages/llm/llm/src/brand.ts:31",
         "packages/llm/llm/src/brand.ts:43",
         "packages/llm/llm/src/brand.ts:67",
+        "packages/mcp/mcp-discovery/src/types.ts:9",
         "packages/schedule/schedule/src/types.ts:10",
         "packages/session/session-title/src/index.ts:42",
         "packages/session/session-title/src/types.ts:17",
@@ -34145,6 +35395,190 @@
       ]
     },
     {
+      "digest": "54a21b94ddd4a57fa7a4c8ccc04601d1104bbd00e178b43cbf953a47e185f0d1",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 12,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "instructions",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "schemas",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "sdk",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "step",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "tools",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "turn",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 4
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "description",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "parameters",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [],
+            "indices": [
+              {
+                "key": 2,
+                "value": 6
+              }
+            ]
+          },
+          {
+            "kind": "opaque",
+            "reason": "unknown"
+          },
+          {
+            "kind": "array",
+            "element": 8
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 11
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/request-snapshot"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/request-snapshot"
+      ],
+      "sources": []
+    },
+    {
       "digest": "557e148d30b79ee48645850832b30c717d7c3b64641deb5d6133b8b4e91ee0b8",
       "schema": {
         "root": 0,
@@ -34559,6 +35993,120 @@
         ]
       },
       "names": [],
+      "sources": []
+    },
+    {
+      "digest": "5944401746ca522fc3073ddbbc85ec0951073da07be0d5a3b9616c3f301d4cfe",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "detail",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "names",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "union",
+            "types": [
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "failed"
+          },
+          {
+            "kind": "literal",
+            "value": "none"
+          },
+          {
+            "kind": "literal",
+            "value": "selected"
+          },
+          {
+            "kind": "literal",
+            "value": "uncertain"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/selector-result"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selector-result"
+      ],
       "sources": []
     },
     {
@@ -35076,9 +36624,9 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[39].sourceEventSeqs",
-        "SessionEventEnvelope[52].sourceEventSeqs",
-        "SessionEventEnvelope[55].sourceEventSeqs",
+        "SessionEventEnvelope[44].sourceEventSeqs",
+        "SessionEventEnvelope[57].sourceEventSeqs",
+        "SessionEventEnvelope[60].sourceEventSeqs",
         "event:assistant/attempt.data.stream[0][0].dt",
         "event:assistant/attempt.data.stream[0][1].dt",
         "event:assistant/attempt.data.stream[0][2].dt",
@@ -35532,6 +37080,48 @@
         ]
       },
       "names": [],
+      "sources": []
+    },
+    {
+      "digest": "6207847ecee7edcb63b97c4188982e672ae6e21553eb08ce577fa6bb90de56b5",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "array",
+            "element": 1
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/request-snapshot.data.tools",
+        "event:mcp/selection.data.tools"
+      ],
       "sources": []
     },
     {
@@ -38309,6 +39899,7 @@
         ]
       },
       "names": [
+        "event:mcp/request-snapshot.data.schemas",
         "event:request/header.data.header.tools"
       ],
       "sources": []
@@ -43596,6 +45187,45 @@
       "sources": []
     },
     {
+      "digest": "8f5c0d1a1986b662b4ff2ab87288e2a2dff707ef4cc22df1fdeb60032006a21f",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "packages/mcp/mcp-discovery/src/types.ts#SelectedTool"
+      ],
+      "sources": [
+        "packages/mcp/mcp-discovery/src/types.ts:11"
+      ]
+    },
+    {
       "digest": "8f6d609794bf5afc01d7ccf3e03811d32f4b8047f58a2c9a98db0154c2ad7cb9",
       "schema": {
         "root": 0,
@@ -44224,6 +45854,8 @@
         "event:assistant/attempt.data.stream[0][0].texts",
         "event:assistant/attempt.data.stream[0][1].texts",
         "event:assistant/attempt.data.stream[0][2].args",
+        "event:mcp/selector-result.data.names",
+        "event:mcp/selector-result.data.servers",
         "event:request/header.data.header.config.stop",
         "event:subagent/descriptor.data[1].toolFilter.allow",
         "event:subagent/descriptor.data[1].toolFilter.deny",
@@ -44379,6 +46011,35 @@
       },
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "96dc47546c405ab96c1b5a8696830cfd780e0375f0d5c17ecb5d7e333d9ebc49",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "reason",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/diagnostic.data"
+      ],
+      "sources": [
+        "packages/mcp/mcp-discovery/src/types.ts:36"
+      ]
     },
     {
       "digest": "96f4a9c81fc0f940ef71528a8cc66731ae4cf1f40d79680c5fe3c39f96d7723c",
@@ -44559,9 +46220,9 @@
         ]
       },
       "names": [
-        "SessionEventEnvelope[39]",
-        "SessionEventEnvelope[52]",
-        "SessionEventEnvelope[55]"
+        "SessionEventEnvelope[44]",
+        "SessionEventEnvelope[57]",
+        "SessionEventEnvelope[60]"
       ],
       "sources": []
     },
@@ -44885,6 +46546,57 @@
       "sources": [
         "packages/webhook/webhook/src/types.ts:74"
       ]
+    },
+    {
+      "digest": "9f3bc8cde7db1974d897382b1cb60bf7b7dddbfe2184872a9f9ea1a04934d7b5",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "mcp/selection"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "9fd09e54ca86df401a5a7fb73455184f94cd141ea3928882e5e965fb9f79f5ef",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "union",
+            "types": [
+              1,
+              2,
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "failed"
+          },
+          {
+            "kind": "literal",
+            "value": "none"
+          },
+          {
+            "kind": "literal",
+            "value": "selected"
+          },
+          {
+            "kind": "literal",
+            "value": "uncertain"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selector-result.data.status"
+      ],
+      "sources": []
     },
     {
       "digest": "9fe0e77a7816b7fdb4b953ec0e2f0cd7bbd22c5de5c3567e612d1b20eb0992e6",
@@ -46909,6 +48621,20 @@
       ]
     },
     {
+      "digest": "a42d04a8d2e024f02eaec433e68752d8d7fe579371091e1df18b686f457083c7",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "uncertain"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a5a8c15f08af1b0f26f40906e0797b6b0920fd01069e660becce35ab7fc48d77",
       "schema": {
         "root": 0,
@@ -48511,6 +50237,20 @@
       "names": [
         "event:plan/mode"
       ],
+      "sources": []
+    },
+    {
+      "digest": "a7f81d425b672ca0e90396f7138bd1b2ee3f9756cd6dce203efef19dc038b009",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "load"
+          }
+        ]
+      },
+      "names": [],
       "sources": []
     },
     {
@@ -52142,7 +53882,7 @@
         "event:agent/inbox/spliced.data.inserted[0].source[8].replayState",
         "event:assistant/attempt.data.stream[0][3].chunk[6].replayState.blocks[0]",
         "event:assistant/attempt.data.stream[0][3].chunk[6].replayState.response",
-        "event:request/header.data.header.tools[0].parameters.[value]",
+        "event:mcp/request-snapshot.data.schemas[0].parameters.[value]",
         "event:tool/ptc-dispatch-start.data.arguments",
         "event:tool/ptc-dispatch.data.arguments"
       ],
@@ -52206,6 +53946,20 @@
       "sources": []
     },
     {
+      "digest": "be7479886f132424873f06043a0ca9f7a946409b3b1e3ee0110e097741911717",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "servers"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "bf16d2e98a7f13894ded2cffe5ce857bf473954a0e3c0ed9bc7739e2e1c7b78a",
       "schema": {
         "root": 0,
@@ -52213,6 +53967,20 @@
           {
             "kind": "literal",
             "value": "subagent-settled"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "c0818f4c89ae337e05b10952460b5f8a52d22bf25be6c3e75b65735a55e48b3b",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "mcp/selector-result"
           }
         ]
       },
@@ -55509,6 +57277,43 @@
       ]
     },
     {
+      "digest": "d073bc80f3aadf7d8e988e241fd27501e90a84c5471b3bd2713b3aeb5c5e7e25",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "array",
+            "element": 1
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/request-snapshot.data.servers",
+        "event:mcp/selection.data.servers"
+      ],
+      "sources": []
+    },
+    {
       "digest": "d0fbb0ca1bbba059830826f33f801da1aced35a2504376d61e020bdfec8d50c0",
       "schema": {
         "root": 0,
@@ -55516,6 +57321,20 @@
           {
             "kind": "literal",
             "value": "delete"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "d251926aa290480fcbcb7aa104e0f6e75f57fef487cc53564cf8fa0518741c51",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "invalidate"
           }
         ]
       },
@@ -56372,6 +58191,79 @@
       "sources": []
     },
     {
+      "digest": "d866ca23d8c5261e92842e9088a35888b44e20a5403f9ad2b84a8ff345bb1f22",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "input",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "maxTokens",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "model",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "phase",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "system",
+                "type": 1,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "servers"
+          },
+          {
+            "kind": "literal",
+            "value": "tools"
+          }
+        ]
+      },
+      "names": [
+        "packages/mcp/mcp-discovery/src/types.ts#SelectorRequest"
+      ],
+      "sources": [
+        "packages/mcp/mcp-discovery/src/types.ts:25"
+      ]
+    },
+    {
       "digest": "d8f868c6b3e7189de6c1ffe2ea04794ea2aa31315b6347d12536e46020afac87",
       "schema": {
         "root": 0,
@@ -56552,6 +58444,20 @@
       "sources": [
         "packages/llm/llm/src/message.ts:29"
       ]
+    },
+    {
+      "digest": "da2d19e1ee4eb30c3f92cef1f96cb9e6cb4a227ad80ad0e8ee7795c4ada3de92",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "none"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
     },
     {
       "digest": "dacf3d5f3e4ff619c1320e64a48dec5e7ecd7870bece65fbd449a0e63adfa521",
@@ -58587,12 +60493,12 @@
         "SessionEventEnvelope[36]",
         "SessionEventEnvelope[37]",
         "SessionEventEnvelope[38]",
+        "SessionEventEnvelope[39]",
         "SessionEventEnvelope[3]",
         "SessionEventEnvelope[40]",
         "SessionEventEnvelope[41]",
         "SessionEventEnvelope[42]",
         "SessionEventEnvelope[43]",
-        "SessionEventEnvelope[44]",
         "SessionEventEnvelope[45]",
         "SessionEventEnvelope[46]",
         "SessionEventEnvelope[47]",
@@ -58601,11 +60507,16 @@
         "SessionEventEnvelope[4]",
         "SessionEventEnvelope[50]",
         "SessionEventEnvelope[51]",
+        "SessionEventEnvelope[52]",
         "SessionEventEnvelope[53]",
         "SessionEventEnvelope[54]",
+        "SessionEventEnvelope[55]",
         "SessionEventEnvelope[56]",
-        "SessionEventEnvelope[57]",
+        "SessionEventEnvelope[58]",
+        "SessionEventEnvelope[59]",
         "SessionEventEnvelope[5]",
+        "SessionEventEnvelope[61]",
+        "SessionEventEnvelope[62]",
         "SessionEventEnvelope[7]",
         "SessionEventEnvelope[8]",
         "SessionEventEnvelope[9]"
@@ -59187,6 +61098,20 @@
       "sources": []
     },
     {
+      "digest": "e704da6218847dab56255c1a19baf53ed1bb1ee88df9f829c84c1884076348d4",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "tools"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "e72269f931559e901e5e8fe1cfcbd0669fb795f43cc038ff39fba62f60403c33",
       "schema": {
         "root": 0,
@@ -59522,6 +61447,20 @@
       ]
     },
     {
+      "digest": "eae7e8964051d87e1c69257b168f7284dbc87212003cff93142b7972af305af3",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "mcp/selector-request"
+          }
+        ]
+      },
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "ebb768d85ec87fb68e42fc14fd7d8535b5ac11791b14d04c6770180f0a719bf8",
       "schema": {
         "root": 0,
@@ -59627,6 +61566,20 @@
       "names": [
         "event:tool/ptc-dispatch-start"
       ],
+      "sources": []
+    },
+    {
+      "digest": "edd505c76bf3c5e52b8eda8c2b3fbc993b3f3ac19ae01e063f660ec8fe8ad04c",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "literal",
+            "value": "mcp/diagnostic"
+          }
+        ]
+      },
+      "names": [],
       "sources": []
     },
     {
@@ -60764,6 +62717,113 @@
       "sources": []
     },
     {
+      "digest": "fb3e5f3f45c46615d1c54af427326eee9a4cd7db8dcd117c0886f3002e00be54",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "reason",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "servers",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "tools",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "invalidate"
+          },
+          {
+            "kind": "literal",
+            "value": "load"
+          },
+          {
+            "kind": "literal",
+            "value": "release"
+          },
+          {
+            "kind": "literal",
+            "value": "replace"
+          },
+          {
+            "kind": "array",
+            "element": 7
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 10
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "identity",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "server",
+                "type": 8,
+                "optional": false
+              }
+            ],
+            "indices": []
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/selection.data"
+      ],
+      "sources": []
+    },
+    {
       "digest": "fb5e0517050d2c6d40e5b8145db1f7c5ca7044d5d50fada6ff80e0b22c6ca973",
       "schema": {
         "root": 0,
@@ -60910,6 +62970,76 @@
       },
       "names": [
         "event:todo/write.data.todos[0].status"
+      ],
+      "sources": []
+    },
+    {
+      "digest": "fd799362bcd5609155c506e902eded2d8eb7a225b27e29633453d888b2cb996d",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "reason",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "mcp/diagnostic"
+          }
+        ]
+      },
+      "names": [
+        "event:mcp/diagnostic"
       ],
       "sources": []
     },

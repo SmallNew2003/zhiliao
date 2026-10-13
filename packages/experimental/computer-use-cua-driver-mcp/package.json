@@ -32,9 +32,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
-    "@deepseek-ai/dsh-computer-use": "workspace:^"
+    "@deepseek-ai/dsh-computer-use": "workspace:^",
+    "@deepseek-ai/dsh-mcp-discovery": "workspace:^"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-mcp-discovery": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",
     "@deepseek-ai/cordis-plugin-include": "workspace:^",

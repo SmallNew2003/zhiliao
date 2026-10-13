@@ -58,6 +58,40 @@ async function run(ctx: Context, name: string, agent?: Agent): Promise<string> {
   return first?.type === 'text' ? first.text : JSON.stringify(result.content)
 }
 
+describe('model presentation eligibility', () => {
+  it('omits hidden definitions from the wire while retaining lookup, schemas, and execution', async () => {
+    const ctx = await mount()
+    const { scope, key } = await mintAgentScope(ctx, 'a')
+    const other = { id: 'other' as SessionId } as Agent
+    ctx.tools.register({ ...tool('deferred'), isPresented: viewing => viewing === key })
+    ctx.tools.register(tool('ordinary'))
+    ctx.tools.register({ ...tool('explicit'), isPresented: () => true })
+
+    expect((await ctx.systemPrompt.assemble({ scope: key })).tools.map(t => t.name))
+      .toEqual(['deferred', 'explicit', 'ordinary'])
+    expect((await ctx.systemPrompt.assemble({ scope: other })).tools.map(t => t.name))
+      .toEqual(['explicit', 'ordinary'])
+    expect((await ctx.systemPrompt.assemble()).tools.map(t => t.name))
+      .toEqual(['explicit', 'ordinary'])
+    expect(ctx.tools.get('deferred', other)?.name).toBe('deferred')
+    expect(ctx.tools.schemas(other).map(t => t.name)).toContain('deferred')
+    expect(await run(ctx, 'deferred', other)).toBe('ran:deferred')
+
+    scope.ctx.tools.restrict({ deny: ['deferred'] })
+    expect(ctx.tools.get('deferred', key)).toBeUndefined()
+    expect(await run(ctx, 'deferred', key)).toBe('Error: unknown tool "deferred"')
+  })
+
+  it('validates configured order against hidden known tool names', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt, { toolOrder: ['deferred', '<unlisted-tools>'] })
+    await ctx.plugin(ToolRuntime)
+    ctx.tools.register({ ...tool('deferred'), isPresented: () => false })
+    ctx.tools.register(tool('ordinary'))
+    expect((await ctx.systemPrompt.assemble()).tools.map(t => t.name)).toEqual(['ordinary'])
+  })
+})
+
 describe('scoped tool registration', () => {
   it('keeps final-result observers synchronous', () => {
     type ToolResultListener = Events['tools/result']

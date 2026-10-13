@@ -162,7 +162,7 @@ tools(provider: (context: AssembleContext) => ToolProviderResult): () => void
 variable(name: string, provider: (context: AssembleContext) => string | undefined): () => void
 
 /**
- * Assemble global and scoped providers, detach tool parameters, apply
+ * Await scoped preparation, assemble providers, detach tool parameters, apply
  * canonical ordering, then run the assembly waterfall. Scoped sections and
  * variables shadow globals. The returned waterfall value is authoritative
  * except that an effective complete section is restored afterwards as the
@@ -219,6 +219,27 @@ Emitted when any prompt provider changes. This registry notification is unfilter
  */
 'system-prompt/change'(): void
 ```
+
+Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
+
+<a id="system-promptprepare--serial"></a>
+
+#### `system-prompt/prepare` — serial
+
+Await preparation before reading prompt and tool providers. Scope-filtered dispatch: scoped listeners prepare only their scope's assemblies. Rejection or cancellation stops the assembly before provider evaluation.
+
+```ts cordis-catalog
+/**
+ * Await preparation before reading prompt and tool providers.
+ * Scope-filtered dispatch: scoped listeners prepare only their scope's assemblies.
+ * Rejection or cancellation stops the assembly before provider evaluation.
+ * @param context - the caller's scope, signal, and per-assembly inputs.
+ * @mode serial
+ */
+'system-prompt/prepare'(this: Scoped<SystemPrompt>, context: AssembleContext): void | Promise<void>
+```
+
+Types: [Scoped](scope.zh.md)
 
 Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts)
 <!-- END GENERATED cordis-surface -->

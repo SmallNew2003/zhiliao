@@ -77,6 +77,8 @@ ctx.systemPrompt.variable('cwd', ({ agent }) => agent?.session.header.cwd)
 
 工具 schema 提供方在每次组装时求值，并贡献模型可见的 `ToolSchema` 集合；`ToolRuntime` 会自动注册自身，因此大多数工具在此无需手动接线。提供方返回限制后的可见集合，外加 `toolOrder` 使用的限制前名称全集。
 
+异步准备工作通过 `system-prompt/prepare` 完成。`assemble()` 按作用域筛选并串行等待这些监听器，再对变量、段、运行时上下文或工具提供方求值。监听器收到组装上下文及其可选的取消信号。准备失败或被取消时，不会执行任何提供方。
+
 ### 抑制运行时上下文
 
 `suppressRuntimeContext()` 移除调用作用域的所有动态运行时上下文贡献，但不禁用拥有底层事实的服务；多个抑制器独立组合，当不再存在抑制器时该 effect 会恢复上下文。

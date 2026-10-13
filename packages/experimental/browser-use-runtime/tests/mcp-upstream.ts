@@ -19,6 +19,8 @@ import Sessions, { SessionId } from '@deepseek-ai/dsh-session'
 import Agents from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import Projections from '@deepseek-ai/dsh-session-projection'
+import McpDiscovery from '@deepseek-ai/dsh-mcp-discovery'
+import { bindMcpRequest } from './mcp-request.ts'
 import { expect, vi } from 'vitest'
 import type { BrowserMcpConfig } from '../src/mcp.ts'
 
@@ -57,7 +59,7 @@ export async function verifyMcpBrowser(
     }
     const modules = new Map<string, unknown>([
       ['browserUse', BrowserUse], ['prompt', SystemPrompt], ['tools', Tools], ['llm', Llm],
-      ['sessions', Sessions], ['agents', Agents], ['loop', AgentLoop], ['projections', Projections], ['browser', provider],
+      ['sessions', Sessions], ['agents', Agents], ['loop', AgentLoop], ['projections', Projections], ['discovery', McpDiscovery], ['browser', provider],
     ])
     const configPath = join(root, 'cordis.yml')
     await writeFile(configPath, JSON.stringify([...modules.keys()].map(name => ({ id: name, name, config: name === 'loop' ? { agents: [] } : name === 'browser' ? browserConfig : {} }))))
@@ -75,11 +77,12 @@ export async function verifyMcpBrowser(
     await ctx.loader.await()
     const owner = await ctx.agents.create({ sessionId: SessionId('browser-upstream'), meta: { cwd: root } })
     await owner.agent.whenIdle()
-    await ctx.systemPrompt.assemble({ agent: owner.agent, scope: owner.agent, signal: new AbortController().signal })
-    const schemas = ctx.tools.schemas(owner.agent)
+    const name = `mcp__${namespace}__${navigate.name}`
+    await bindMcpRequest(ctx, owner.agent, [name])
+    const schemas = ctx.tools.schemas(owner.agent).filter(tool => tool.name !== 'discover_mcp_tools')
     expect(schemas.length).toBeGreaterThan(5)
     expect(schemas.every(tool => tool.name.startsWith(`mcp__${namespace}__`))).toBe(true)
-    const result = await ctx.tools.execute({ agent: owner.agent, name: `mcp__${namespace}__${navigate.name}`, arguments: navigate.arguments(url), callId: ToolCallId('navigate'), signal: new AbortController().signal })
+    const result = await ctx.tools.execute({ agent: owner.agent, name, arguments: navigate.arguments(url), callId: ToolCallId('navigate'), signal: new AbortController().signal })
     expect(result.isError, JSON.stringify(result.content)).toBe(false)
     expect(observed.has(`/${namespace}-${mode}`)).toBe(true)
     expect(result.content.length).toBeGreaterThan(0)

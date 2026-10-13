@@ -21,6 +21,7 @@ import { z } from 'zod'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { boundAgent, mountDiscovery } from './discovery-fixture.ts'
 import { ToolCallId, LlmAdapter, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { apply } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
@@ -41,6 +42,7 @@ async function mountRegistry(): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await mountDiscovery(ctx)
   return ctx
 }
 
@@ -61,14 +63,6 @@ async function mountImageRegistry(dshHome: string): Promise<Context> {
   await ctx.plugin(LlmRuntime)
   ctx.llm.registerAdapter(['visual'], new ImageAdapter())
   return ctx
-}
-
-/** Calling-agent stand-in pinned to the keyless image-capable route. */
-function imageAgent(): object {
-  return {
-    options: { provider: 'visual', model: 'vision' },
-    session: { requestHeader: () => undefined },
-  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -174,7 +168,7 @@ describe('fixture server — controlled scenarios', () => {
 
   it('executes image() → ordered durable image content', async () => {
     const result = await ctx.tools.execute({
-      signal: testToolSignal, agent: imageAgent() as never,
+      signal: testToolSignal, agent: await boundAgent(ctx),
       callId: nextCallId(), name: 'mcp__fixture__image', arguments: {},
     })
     expect(result.isError).toBe(false)
@@ -292,7 +286,7 @@ describe('fixture server — crash recovery', () => {
   it('plugin unload during an outage stops reconnection and unregisters tools', async () => {
     const ctx = await mountRegistry()
     const fiber = ctx.plugin(
-      { name: 'mcp-client', inject: ['tools'], apply },
+      { name: 'mcp-client', inject: ['tools', 'mcpDiscovery'], apply },
       crashConfig('ephemeral', { initialDelayMs: 8_000, maxDelayMs: 8_000, maxAttempts: 5 }),
     )
     // Cordis awaits async apply() as startup work; wait for it.

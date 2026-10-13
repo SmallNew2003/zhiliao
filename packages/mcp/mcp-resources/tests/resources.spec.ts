@@ -1,9 +1,12 @@
 import { setImmediate as nextEventLoopTurn } from 'node:timers/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime, { defineTool, type Config as ToolConfig } from '@deepseek-ai/dsh-tools'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
+import { defineTool, type Config as ToolConfig } from '@deepseek-ai/dsh-tools'
+import { ToolCallId, LlmAdapter, createUserMessage, type GenerateOptions, type StreamChunk } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
+import McpDiscovery from '@deepseek-ai/dsh-mcp-discovery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { bindScopeParent, createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import { PtcRuntime, type PtcRunRequest, type PtcRunResult, type PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
@@ -35,16 +38,54 @@ afterEach(async () => {
 async function setup(mode: ToolConfig['mode'] = 'native') {
   const ctx = new Context()
   roots.push(ctx)
-  await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime, { mode })
+  await mountAgentLoopTestDependencies(ctx, { tools: { mode } })
   if (mode !== 'native') await ctx.plugin(BindingProbe)
+  await ctx.plugin(McpDiscovery)
   await ctx.plugin(McpResources)
+  await mountAgentLoopTestHarness(ctx)
+  ctx.llm.registerAdapter(['resource-fixture'], new ResourceAdapter())
   return ctx
+}
+
+class ResourceAdapter extends LlmAdapter {
+  async *stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
+    yield { type: 'finish', reason: { kind: 'stop' } }
+  }
+}
+
+let agentSeq = 0
+async function mintAgent(ctx: Context, parentAgent?: Agent): Promise<Agent> {
+  const handle = await ctx.agents.create({
+    sessionId: SessionId(`resource-agent-${++agentSeq}`),
+    agentOptions: { provider: 'resource-fixture', model: 'fixture' },
+    ...parentAgent === undefined ? {} : { parentAgent },
+  })
+  return handle.agent
+}
+
+/** Match standalone provider ownership to the connection-owned discovery registration. */
+function registerProvider(ctx: Context, server: string, provider: McpResourceProvider): () => void {
+  const removeResource = ctx.mcpResources.register(server, provider)
+  let removeServer: () => void
+  try {
+    removeServer = ctx.mcpDiscovery.registerServer(server, { connected: () => true, instructions: () => '' })
+  } catch (error) {
+    removeResource()
+    throw error
+  }
+  return () => { removeServer(); removeResource() }
+}
+
+async function activate(ctx: Context, agent: Agent, server: string): Promise<void> {
+  const loaded = ctx.mcpDiscovery.load(agent, [], [server])
+  if (!loaded.ok) throw new Error(loaded.reason)
+  agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Inspect resource availability.' }], source: { kind: 'user' } }))
+  await agent.whenIdle()
 }
 
 async function resourceScope(ctx: Context, owner: Agent): Promise<Scope> {
   let scoped!: Scope
-  await ctx.plugin({ inject: ['mcpResources', 'tools'], apply(inner: Context) {
+  await ctx.plugin({ inject: ['mcpResources', 'mcpDiscovery', 'tools'], apply(inner: Context) {
     scoped = createScope(inner, owner)
   } })
   return scoped
@@ -83,11 +124,11 @@ describe('MCP resource tools', () => {
   it('keeps shared tools until the last provider unloads and accepts a replacement', async () => {
     const ctx = await setup()
     const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [] })
-    const first = await ctx.plugin({ inject: ['mcpResources'], apply(inner: Context) {
-      inner.mcpResources.register('first', { request })
+    const first = await ctx.plugin({ inject: ['mcpResources', 'mcpDiscovery'], apply(inner: Context) {
+      registerProvider(inner, 'first', { request })
     } })
-    const second = await ctx.plugin({ inject: ['mcpResources'], apply(inner: Context) {
-      inner.mcpResources.register('second', { request })
+    const second = await ctx.plugin({ inject: ['mcpResources', 'mcpDiscovery'], apply(inner: Context) {
+      registerProvider(inner, 'second', { request })
     } })
     expect(visibleResourceTools(ctx)).toEqual([...resourceToolNames].sort())
     await first.dispose()
@@ -95,15 +136,15 @@ describe('MCP resource tools', () => {
     expect((await call(ctx, 'list_mcp_resources', { server: 'second' })).isError).toBe(false)
     await second.dispose()
     expect(visibleResourceTools(ctx)).toEqual([])
-    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP resource servers')
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP capabilities')
 
-    const remove = ctx.mcpResources.register('second', { request })
+    const remove = registerProvider(ctx, 'second', { request })
     expect(visibleResourceTools(ctx)).toEqual([...resourceToolNames].sort())
     remove()
     expect(visibleResourceTools(ctx)).toEqual([])
     remove()
     expect(visibleResourceTools(ctx)).toEqual([])
-    const replace = ctx.mcpResources.register('second', { request })
+    const replace = registerProvider(ctx, 'second', { request })
     expect(visibleResourceTools(ctx)).toEqual([...resourceToolNames].sort())
     replace()
     expect(visibleResourceTools(ctx)).toEqual([])
@@ -111,17 +152,18 @@ describe('MCP resource tools', () => {
 
   it.each([false, true])('shares scoped tools across independent provider owners (reverse disposal: %s)', async (reverse) => {
     const ctx = await setup()
-    const owner = {} as Agent
+    const owner = await mintAgent(ctx)
     const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [] })
     const providers = await Promise.all(['first', 'second'].map(async server => ({
       server,
-      fiber: await ctx.plugin({ inject: ['mcpResources'], apply(inner: Context) {
-        createScope(inner, owner).ctx.mcpResources.register(server, { request })
+      fiber: await ctx.plugin({ inject: ['mcpResources', 'mcpDiscovery'], apply(inner: Context) {
+        registerProvider(createScope(inner, owner).ctx, server, { request })
       } }),
     })))
     if (reverse) providers.reverse()
     await providers[0]!.fiber.dispose()
     expect(visibleResourceTools(ctx, owner)).toEqual([...resourceToolNames].sort())
+    await activate(ctx, owner, providers[1]!.server)
     expect((await call(ctx, 'list_mcp_resources', { server: providers[1]!.server }, owner)).isError).toBe(false)
     await providers[1]!.fiber.dispose()
     expect(visibleResourceTools(ctx, owner)).toEqual([])
@@ -129,7 +171,7 @@ describe('MCP resource tools', () => {
 
   it('awaits scoped tool teardown before its provider owner finishes unloading', async () => {
     const ctx = await setup()
-    const owner = {} as Agent
+    const owner = await mintAgent(ctx)
     const scoped = await resourceScope(ctx, owner)
     const cleanupStarted = Promise.withResolvers<undefined>()
     const cleanupGate = Promise.withResolvers<undefined>()
@@ -161,35 +203,37 @@ describe('MCP resource tools', () => {
 
   it('exposes a scoped server only to its owner and descendants and falls back to inherited providers', async () => {
     const ctx = await setup()
-    const owner = {} as Agent
-    const child = {} as Agent
-    const sibling = {} as Agent
+    const owner = await mintAgent(ctx)
+    const child = await mintAgent(ctx, owner)
     bindScopeParent(child, owner)
+    const sibling = await mintAgent(ctx)
     const scoped = await resourceScope(ctx, owner)
     const localRequest = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [] })
     const globalRequest = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [] })
-    const removeLocal = scoped.ctx.mcpResources.register('docs', { request: localRequest })
+    const removeLocal = registerProvider(scoped.ctx, 'docs', { request: localRequest })
     for (const agent of [owner, child]) {
+      await activate(ctx, agent, 'docs')
       expect(visibleResourceTools(ctx, agent)).toEqual([...resourceToolNames].sort())
       expect((await call(ctx, 'list_mcp_resources', { server: 'docs' }, agent)).isError).toBe(false)
     }
     for (const agent of [undefined, sibling]) {
       expect(visibleResourceTools(ctx, agent)).toEqual([])
       expect(renderPrompt(await ctx.systemPrompt.assemble(agent === undefined ? {} : { scope: agent })))
-        .not.toContain('MCP resource servers')
+        .not.toContain('MCP capabilities')
       expect(await call(ctx, 'list_mcp_resources', { server: 'docs' }, agent))
         .toMatchObject({ isError: true, error: { info: { code: 'UNKNOWN_TOOL' } } })
     }
-    const removeGlobal = ctx.mcpResources.register('docs', { request: globalRequest })
+    const removeGlobal = registerProvider(ctx, 'docs', { request: globalRequest })
     removeLocal()
     expect(visibleResourceTools(ctx, child)).toEqual([...resourceToolNames].sort())
+    await activate(ctx, child, 'docs')
     await call(ctx, 'list_mcp_resources', { server: 'docs' }, child)
     expect(localRequest).toHaveBeenCalledTimes(2)
     expect(globalRequest).toHaveBeenCalledOnce()
     removeGlobal()
     expect(visibleResourceTools(ctx, owner)).toEqual([])
     expect(visibleResourceTools(ctx, child)).toEqual([])
-    scoped.ctx.mcpResources.register('docs', { request: localRequest })
+    registerProvider(scoped.ctx, 'docs', { request: localRequest })
     expect(visibleResourceTools(ctx, owner)).toEqual([...resourceToolNames].sort())
     await scoped.dispose()
     expect(visibleResourceTools(ctx, owner)).toEqual([])
@@ -198,7 +242,7 @@ describe('MCP resource tools', () => {
   it('removes PTC declarations and bindings and rejects a previously materialized call after disposal', async () => {
     const ctx = await setup('ptc')
     const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [] })
-    const remove = ctx.mcpResources.register('docs', { request })
+    const remove = registerProvider(ctx, 'docs', { request })
     expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('list_mcp_resources:')
     const runtime = ctx.ptcRuntime as BindingProbe
     runtime.behavior = async (spec) => {
@@ -220,84 +264,84 @@ describe('MCP resource tools', () => {
   it('retains tools for a configured provider while its requests fail', async () => {
     const ctx = await setup()
     const request = vi.fn<McpResourceProvider['request']>().mockRejectedValue(new Error('MCP server disconnected'))
-    ctx.mcpResources.register('docs', { request })
+    registerProvider(ctx, 'docs', { request })
     expect((await call(ctx, 'list_mcp_resources', { server: 'docs' })).isError).toBe(true)
     expect(visibleResourceTools(ctx)).toEqual([...resourceToolNames].sort())
-    expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('server argument: ["docs"]')
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('"server":"docs"')
   })
 
   it.each([false, true])('rolls back a partial shared-tool registration (scoped: %s)', async (scoped) => {
     const ctx = await setup()
-    const owner = {} as Agent
+    const owner = await mintAgent(ctx)
     const registrationCtx = scoped ? (await resourceScope(ctx, owner)).ctx : ctx
     const removeConflict = registrationCtx.tools.register(defineTool({
       name: 'list_mcp_resource_templates', description: 'Conflicting tool.', parameters: {},
       output: { schema: { type: 'null' }, render: () => [] },
       execute: async () => null,
     }))
-    expect(() => registrationCtx.mcpResources.register('docs', { request: async () => ({ resources: [] }) }))
+    expect(() => registerProvider(registrationCtx, 'docs', { request: async () => ({ resources: [] }) }))
       .toThrow('already registered')
     expect(ctx.tools.get('list_mcp_resources', scoped ? owner : undefined)).toBeUndefined()
     expect(renderPrompt(await ctx.systemPrompt.assemble(scoped ? { scope: owner } : {})))
-      .not.toContain('MCP resource servers')
+      .not.toContain('MCP capabilities')
     removeConflict()
-    registrationCtx.mcpResources.register('docs', { request: async () => ({ resources: [] }) })
+    registerProvider(registrationCtx, 'docs', { request: async () => ({ resources: [] }) })
     expect(visibleResourceTools(ctx, scoped ? owner : undefined)).toEqual([...resourceToolNames].sort())
   })
 
   it('publishes explicit server names without requiring server tools or instructions', async () => {
     const ctx = await setup()
-    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP resource servers')
-    ctx.mcpResources.register('docs{{literal}}', { request: async () => ({ resources: [] }) })
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP capabilities')
+    registerProvider(ctx, 'docs{{literal}}', { request: async () => ({ resources: [] }) })
 
     const prompt = renderPrompt(await ctx.systemPrompt.assemble())
-    expect(prompt).toContain('MCP resource servers')
-    expect(prompt).toContain('server argument: ["docs{{literal}}"]')
+    expect(prompt).toContain('MCP capabilities')
+    expect(prompt).toContain('"server":"docs{{literal}}"')
   })
 
   it('lists only caller-visible names and withdraws disposed providers from the prompt', async () => {
     const ctx = await setup()
-    const owner = {} as Agent
-    const other = {} as Agent
+    const owner = await mintAgent(ctx)
+    const other = await mintAgent(ctx)
     const provider = { request: async () => ({ resources: [] }) }
-    const disposeGlobal = ctx.mcpResources.register('docs', provider)
-    const fiber = await ctx.plugin({ inject: ['mcpResources'], apply(inner: Context) {
+    const disposeGlobal = registerProvider(ctx, 'docs', provider)
+    const fiber = await ctx.plugin({ inject: ['mcpResources', 'mcpDiscovery'], apply(inner: Context) {
       const scope = createScope(inner, owner)
-      scope.ctx.mcpResources.register('docs', provider)
-      scope.ctx.mcpResources.register('private', provider)
+      registerProvider(scope.ctx, 'docs', provider)
+      registerProvider(scope.ctx, 'private', provider)
     } })
 
     expect(renderPrompt(await ctx.systemPrompt.assemble({ scope: owner })))
-      .toContain('server argument: ["docs","private"]')
+      .toContain('"server":"private"')
     expect(renderPrompt(await ctx.systemPrompt.assemble({ scope: other })))
-      .toContain('server argument: ["docs"]')
+      .toContain('"server":"docs"')
     await fiber.dispose()
     expect(renderPrompt(await ctx.systemPrompt.assemble({ scope: owner })))
-      .toContain('server argument: ["docs"]')
+      .toContain('"server":"docs"')
     disposeGlobal()
-    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP resource servers')
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP capabilities')
   })
 
-  it('withdraws all shared tools and server-name context when its plugin unloads', async () => {
+  it('withdraws all shared tools while standalone discovery ownership remains when its plugin unloads', async () => {
     const ctx = new Context()
     roots.push(ctx)
-    await ctx.plugin(SystemPrompt)
-    await ctx.plugin(ToolRuntime)
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(McpDiscovery)
     const fiber = await ctx.plugin(McpResources)
-    ctx.mcpResources.register('docs', { request: async () => ({ resources: [] }) })
-    expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('MCP resource servers')
+    registerProvider(ctx, 'docs', { request: async () => ({ resources: [] }) })
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('MCP capabilities')
 
     await fiber.dispose()
     for (const name of ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']) {
       expect(ctx.tools.get(name)).toBeUndefined()
     }
-    expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP resource servers')
+    expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('MCP capabilities')
   })
 
   it('routes all three operations with the explicit server and opaque parameters', async () => {
     const ctx = await setup()
     const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [], nextCursor: 'next-page' })
-    ctx.mcpResources.register('docs', { request })
+    registerProvider(ctx, 'docs', { request })
 
     expect((await call(ctx, 'list_mcp_resources', { server: 'docs', cursor: 'page-2' })).isError).toBe(false)
     expect(request.mock.calls[0]?.[0]).toEqual({ method: 'resources/list', cursor: 'page-2' })
@@ -317,7 +361,7 @@ describe('MCP resource tools', () => {
       { uri: 'docs://text', mimeType: 'text/plain', text: 'Read this guide.' },
       { uri: 'docs://binary', mimeType: 'application/octet-stream', blob: 'AQIDBA==' },
     ] }
-    ctx.mcpResources.register('docs', { request: async () => value })
+    registerProvider(ctx, 'docs', { request: async () => value })
     const result = await call(ctx, 'read_mcp_resource', { server: 'docs', uri: 'docs://text' })
     expect(result.isError).toBe(false)
     expect('value' in result && result.value).toEqual(value)
@@ -330,7 +374,7 @@ describe('MCP resource tools', () => {
 
   it('rejects missing parameters and unavailable servers before dispatch', async () => {
     const ctx = await setup()
-    ctx.mcpResources.register('docs', { request: async () => ({ resources: [] }) })
+    registerProvider(ctx, 'docs', { request: async () => ({ resources: [] }) })
     expect((await call(ctx, 'read_mcp_resource', { uri: 'docs://text' })).isError).toBe(true)
     const result = await call(ctx, 'read_mcp_resource', { server: 'missing', uri: 'docs://text' })
     expect(result.isError).toBe(true)
@@ -341,20 +385,23 @@ describe('MCP resource tools', () => {
     const ctx = await setup()
     const globalRequest = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ contents: [] })
     const localRequest = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ contents: [] })
-    const other = {} as Agent
-    const owner = {} as Agent
-    ctx.mcpResources.register('docs', { request: globalRequest })
+    const other = await mintAgent(ctx)
+    const owner = await mintAgent(ctx)
+    registerProvider(ctx, 'docs', { request: globalRequest })
     let dispose = () => {}
-    await ctx.plugin({ inject: ['mcpResources'], apply(inner: Context) {
+    await ctx.plugin({ inject: ['mcpResources', 'mcpDiscovery'], apply(inner: Context) {
       const scope = createScope(inner, owner)
-      dispose = scope.ctx.mcpResources.register('docs', { request: localRequest })
-      expect(() => scope.ctx.mcpResources.register('docs', { request: localRequest })).toThrow('already registered')
+      dispose = registerProvider(scope.ctx, 'docs', { request: localRequest })
+      expect(() => registerProvider(scope.ctx, 'docs', { request: localRequest })).toThrow('already registered')
     } })
+    await activate(ctx, owner, 'docs')
     await call(ctx, 'list_mcp_resources', { server: 'docs' }, owner)
     expect(localRequest).toHaveBeenCalledOnce()
+    await activate(ctx, other, 'docs')
     await call(ctx, 'list_mcp_resources', { server: 'docs' }, other)
     expect(globalRequest).toHaveBeenCalledOnce()
     dispose()
+    await activate(ctx, owner, 'docs')
     await call(ctx, 'list_mcp_resources', { server: 'docs' }, owner)
     expect(globalRequest).toHaveBeenCalledTimes(2)
   })

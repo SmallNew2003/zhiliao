@@ -169,8 +169,13 @@ export function emitAgentEvent<K extends AgentSubjectEvent>(
  * agent-scoped prompt and tool contributions cannot be silently omitted.
  * @param agent - the agent the assembly is for.
  * @param signal - the current turn's explicit control signal, when assembly belongs to a turn.
+ * @param stepInput - claimed messages and proposed coordinates before pre-step admission.
  * @returns the context to pass to `assemble()`.
  */
-export function assembleContextFor(agent: Agent, signal?: AbortSignal): AssembleContext {
-  return { agent, scope: agent, ...signal === undefined ? {} : { signal } }
+export function assembleContextFor(
+  agent: Agent,
+  signal?: AbortSignal,
+  stepInput?: AssembleContext['stepInput'],
+): AssembleContext {
+  return { agent, scope: agent, ...signal === undefined ? {} : { signal }, ...stepInput === undefined ? {} : { stepInput } }
 }

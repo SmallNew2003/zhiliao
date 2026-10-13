@@ -68,6 +68,7 @@ import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
+import McpDiscovery from '@deepseek-ai/dsh-mcp-discovery'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import { registerListSubagentModels } from '../packages/subagent/tool-subagent/src/list-models.ts'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
@@ -216,12 +217,26 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
   },
   {
+    pkg: '@deepseek-ai/dsh-mcp-discovery',
+    dir: 'mcp-discovery',
+    source: 'packages/mcp/mcp-discovery/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.sessionProjections', 'ctx.mcpDiscovery'],
+    writes: ['tool/call', 'tool/result', 'mcp/selection'],
+    async mount(ctx) {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(McpDiscovery)
+      ctx.mcpDiscovery.registerServer('catalog', { instructions: () => '', connected: () => true })
+    },
+  },
+  {
     pkg: '@deepseek-ai/dsh-mcp-resources',
     dir: 'mcp-resources',
     source: 'packages/mcp/mcp-resources/src/tools.ts',
     requires: ['ctx.tools', 'ctx.mcpResources'],
     writes: ['tool/call', 'tool/result'],
     async mount(ctx) {
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(McpDiscovery)
       await ctx.plugin(McpResources)
       ctx.mcpResources.register('catalog', {
         request: () => Promise.reject(new Error('gen-tool-catalog: MCP requests are unreachable during schema harvest')),

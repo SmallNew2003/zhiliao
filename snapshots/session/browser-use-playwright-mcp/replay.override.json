@@ -12,6 +12,72 @@
         "index": 0,
         "block": {
           "type": "tool-call",
+          "id": "playwright-mcp-search",
+          "name": "discover_mcp_tools",
+          "arguments": "{\"action\":\"search\",\"server\":\"playwright-mcp\",\"names\":[\"mcp__playwright-mcp__browser_take_screenshot\"]}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "playwright-mcp-load",
+          "name": "discover_mcp_tools",
+          "arguments": "{\"action\":\"load\",\"names\":[\"mcp__playwright-mcp__browser_take_screenshot\"]}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
           "id": "browser-screenshot",
           "name": "mcp__playwright-mcp__browser_take_screenshot",
           "arguments": "{\"scale\":\"css\"}"

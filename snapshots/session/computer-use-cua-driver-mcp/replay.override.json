@@ -12,6 +12,72 @@
         "index": 0,
         "block": {
           "type": "tool-call",
+          "id": "cua-driver-mcp-search",
+          "name": "discover_mcp_tools",
+          "arguments": "{\"action\":\"search\",\"server\":\"cua-driver-mcp\",\"names\":[\"mcp__cua-driver-mcp__screenshot\"]}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "cua-driver-mcp-load",
+          "name": "discover_mcp_tools",
+          "arguments": "{\"action\":\"load\",\"names\":[\"mcp__cua-driver-mcp__screenshot\"]}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
           "id": "computer-use-screenshot",
           "name": "mcp__cua-driver-mcp__screenshot",
           "arguments": "{\"display\":0}"

@@ -76,6 +76,14 @@ ctx.tools.register(defineTool({
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tools)是每个受支持字段的穷尽式真源。非原生模式要求已组合的 `ctx.ptcRuntime` 且其语言有已注册的 SDK 渲染器；agent preset 通过 [`dsh-agent-tool-presentation`](../agent-tool-presentation/README.zh.md) 自行选择呈现方式，单个 agent 可用 `presentAs(mode)` 遮蔽默认值。
 
+`ctx.tools.modeFor(scope?)` 读取最近作用域的呈现覆盖值或部署默认值，不改变该值。
+
+### 选择模型可见的定义
+
+工具定义可以提供纯同步的 `isPresented(scope?)` 谓词，也可通过 `defineTool()` 声明。省略或返回 `true` 时，定义会进入模型 wire schema 与生成的 SDK 文本；返回 `false` 时，两者都会省略它。这不会改变 `get()`、`schemas()`、权限限制或执行。隐藏名称仍属于配置工具顺序的已知名称集合；`ptc` 的模型直接调用收缩仍然适用。
+
+`ctx.tools.renderSdk(names, scope?)` 按给定作用域可见的定义渲染拟选子集，不受 `isPresented` 限制，也不改变呈现状态。它使用实际 SDK 的运行时语言、完整指令和规范名称顺序，因此 UTF-8 字节数衡量完整的拟选 SDK 文本。未知或被限制的名称会抛出错误；重复名称只渲染一次；`run_code` 不贡献 SDK 绑定。原生模式验证名称后返回空文本。
+
 ### 按 agent 限制工具
 
 `ctx.tools.restrict(filter)` 对单个 agent 继承的全局工具应用允许或拒绝掩码；掩码取交集，作用域注册保持可见，限制在 dispose（资源释放）时解除。`ctx.tools.get(name, scope)` 按一个作用域的视角解析工具。使用 Host 本地展示转换器的消费方如需匹配实际执行的定义，会传入发起调用的 agent。`ctx.tools.schemas(scope)` 返回可见 schema（不含 `execute` 函数）。
@@ -100,7 +108,7 @@ ctx.tools.register(defineTool({
 
 ### 设计理念
 
-注册表在作用域层中持有类型化 `ToolDefinition`，并在请求时把它们投影为面向模型的 `ToolSchema` 集合——`output`、`execute`、`finalizeContent`、`timeoutMs` 与呈现回调绝不会泄漏到协议上。每次调用都运行一条固定流水线：`tools/pre-execute`（可扩展的允许／拒绝／询问）→ 已注册单调守卫 → `tools/execute`（环绕分发包装层）→ `tools/post-execute`（检查／替换、附加上下文）→ 由定义持有的 `finalizeContent` → 仅观测的 `tools/result` 事件。只有 `tools/execute` 视图可以替换必填信号，注册表会在调用主体前重新融合调用方信号。
+注册表在作用域层中持有类型化 `ToolDefinition`，并在请求时把它们投影为面向模型的 `ToolSchema` 集合——`output`、`execute`、`finalizeContent`、`timeoutMs`、`isPresented` 与呈现回调绝不会泄漏到协议上。每次调用都运行一条固定流水线：`tools/pre-execute`（可扩展的允许／拒绝／询问）→ 已注册单调守卫 → `tools/execute`（环绕分发包装层）→ `tools/post-execute`（检查／替换、附加上下文）→ 由定义持有的 `finalizeContent` → 仅观测的 `tools/result` 事件。只有 `tools/execute` 视图可以替换必填信号，注册表会在调用主体前重新融合调用方信号。
 
 ### 源码地图
 
@@ -166,7 +174,7 @@ ctx.tools.register(defineTool({
 
 #### KV Cache 影响
 
-只要可见定义及其顺序不变，前缀就保持稳定。注册、dispose 或作用域限制可能从第一个改变的 schema token 起使复用失效。
+只要可见定义及其顺序不变，前缀就保持稳定。注册、dispose、作用域限制或呈现资格变更可能从第一个改变的 schema token 起使复用失效。
 
 ### PTC mode schema 与系统提示词
 
@@ -199,7 +207,7 @@ Program-only SDK bindings:
 
 #### KV Cache 影响
 
-只要 PTC mode 选择、生成的 SDK、传输 schema 与可见工具集合不变，前缀就保持稳定。模式或筛选器变更可能从第一个改变的提示词或 schema token 起使复用失效。
+只要 PTC mode 选择、生成的 SDK、传输 schema 与可见工具集合不变，前缀就保持稳定。模式、筛选器或呈现资格变更可能从第一个改变的提示词或 schema token 起使复用失效。
 
 ### 工具调用历史与结果
 
