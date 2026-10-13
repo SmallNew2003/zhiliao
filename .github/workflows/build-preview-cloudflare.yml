@@ -1,9 +1,9 @@
 name: Build PR preview
 
 # Every push to a pull request publishes that pull request's preview to
-# Cloudflare Pages under its own branch alias, behind Cloudflare Access. The
-# upload carries build products only: the workflow never grants the deployment
-# platform access to this repository's sources.
+# Cloudflare Pages under its own branch alias. The upload carries build
+# products only: the workflow never grants the deployment platform access to
+# this repository's sources.
 
 on:
   pull_request:
@@ -22,10 +22,10 @@ permissions:
 
 env:
   PRIMARY_NODE_VERSION: '24'
-  # Cloudflare Pages project receiving the upload. Its preview deployments are
-  # the surface the Access application protects; the project's production branch
-  # is deliberately a name no deployment uses, so no unprotected URL exists.
-  CF_PROJECT: dsh-build-preview
+  # Cloudflare Pages project receiving the upload. The production branch is
+  # deliberately a name no deployment uses, so the apex URL stays empty and
+  # every reachable URL is a per-pull-request alias.
+  CF_PROJECT: zhiliao-jjml
   # CI runs must never report to the production telemetry endpoint baked into
   # apps/cli/cordis.yml (AppCLIEntry disables the row when set).
   DSH_TELEMETRY_DISABLED: '1'
@@ -92,17 +92,33 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # The pipe to tee would otherwise hide a wrangler failure behind tee's
+          # own exit status.
+          set -euo pipefail
           npx --yes wrangler@4 pages deploy apps/web/dist \
             --project-name "$CF_PROJECT" \
             --branch "pr-${{ github.event.pull_request.number }}" \
-            --commit-dirty=true
+            --commit-dirty=true | tee wrangler.log
+          # The project name is not the served subdomain: Cloudflare appends a
+          # suffix when the plain name is already taken account-wide or
+          # globally, and renaming the project afterwards does not restore the
+          # plain name. The alias is therefore read from the deploy output
+          # rather than assembled from $CF_PROJECT, which would guess a host
+          # that answers 404 or does not resolve at all.
+          alias=$(sed -n 's/.*Deployment alias URL: \(https:\/\/[^ ]*\).*/\1/p' wrangler.log | tail -1)
+          if [ -z "$alias" ]; then
+            echo "wrangler reported no deployment alias URL"
+            cat wrangler.log
+            exit 1
+          fi
+          echo "PREVIEW_URL=$alias" >> "$GITHUB_ENV"
 
       # The image is what a worker boot fails on first and least visibly, so the
-      # run only passes once the protected URL serves it as gzip bytes. Three
+      # run only passes once the deployed URL serves it as gzip bytes. Three
       # facts are asserted, each with its own failure meaning:
-      #   200                     Access admitted the request; a 302 means the
-      #                           Access policy is missing its Service Auth rule
-      #                           for this token
+      #   200                     the alias resolves and the upload landed; the
+      #                           retry loop covers the moment after an upload
+      #                           when the alias is not yet routable
       #   no content-encoding     the platform did not claim transport
       #                           compression, which would make the browser
       #                           decode the body and leave the worker's
@@ -111,26 +127,20 @@ jobs:
       #                           packer wrote
       # Accept-Encoding is sent because a browser sends it; the assertion is
       # about what the platform does with a body that is already compressed.
-      - name: Verify the protected deployment serves the image
-        env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      - name: Verify the deployment serves the image
         run: |
-          url="https://pr-${{ github.event.pull_request.number }}.${CF_PROJECT}.pages.dev"
-          image="$url/preview/vfs-image.tar.gz"
+          image="$PREVIEW_URL/preview/vfs-image.tar.gz"
           code=000
           for attempt in 1 2 3 4 5; do
             code=$(curl -sS -o image.bin -D headers.txt -w '%{http_code}' \
               -H 'Accept-Encoding: gzip' \
-              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
               "$image" || echo 000)
             echo "attempt $attempt: HTTP $code"
             if [ "$code" = "200" ]; then break; fi
             sleep 10
           done
           if [ "$code" != "200" ]; then
-            echo "the protected image URL answered $code, not 200"
+            echo "the image URL answered $code, not 200"
             head -20 headers.txt
             exit 1
           fi
@@ -146,8 +156,8 @@ jobs:
           fi
           echo "image served as $(wc -c < image.bin) gzip bytes"
 
-      # The alias URL follows from the pull request number, so it is stable
-      # across redeploys and worth stating once. The marker makes the comment
+      # The alias URL is whatever the deploy produced, so it is stable across
+      # redeploys and worth stating once. The marker makes the comment
       # idempotent: a pull request opened before this workflow existed never
       # sees an `opened` event, and every later push must not restate the URL.
       - name: Comment the preview URL
@@ -166,5 +176,5 @@ jobs:
           # line that opens with a raw HTML comment.
           printf '%s\n\n%s\n' \
             "$marker" \
-            "[Preview for #$PR](https://pr-$PR.${CF_PROJECT}.pages.dev) (requires Cloudflare Access sign-in)" \
+            "[Preview for #$PR]($PREVIEW_URL)" \
             | gh pr comment "$PR" --body-file -
