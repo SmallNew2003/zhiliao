@@ -66,7 +66,7 @@ Seeding reads `git log` through an injectable executable with a scrubbed environ
 <a id="dev-note"></a>
 ## Dev Note
 
-This package publishes no `./invariant` companion: it owns no cross-cutting observation that could drift from another package's. Its lifecycle wiring is covered by emitting real agent events, and its seeding by an injected executable standing in for `git log`.
+No invariant companion is published because this package owns no cross-cutting observation that could drift from another package's: its lifecycle wiring is covered by emitting real agent events, and its seeding by an injected executable standing in for `git log`.
 
 <a id="model-experience"></a>
 ## Model Experience

@@ -66,7 +66,7 @@ kind: "package-reference"
 <a id="dev-note"></a>
 ## 开发备注
 
-本包不发布 `./invariant` 伴随包：它没有任何可能与其他包产生偏离的横切观测。其生命周期接线由发射真实 agent 事件覆盖，seeding 由注入的可执行文件替代 `git log` 覆盖。
+本包不发布 invariant 伴随包，因为它没有任何可能与其他包产生偏离的横切观测：其生命周期接线由发射真实 agent 事件覆盖，seeding 由注入的可执行文件替代 `git log` 覆盖。
 
 <a id="model-experience"></a>
 ## 模型体验
