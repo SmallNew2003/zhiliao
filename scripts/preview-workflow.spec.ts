@@ -38,26 +38,37 @@ describe('PR preview workflow', () => {
     })
   })
 
-  it('retains per-PR deployment, protected image verification, and idempotent URL comments', () => {
+  it('retains per-PR deployment, image verification, and idempotent URL comments', () => {
     expect(workflow.concurrency).toEqual({
       group: 'build-preview-cloudflare-${{ github.event.pull_request.number }}',
       'cancel-in-progress': true,
     })
-    expect(workflow.env.CF_PROJECT).toBe('dsh-build-preview')
+    expect(workflow.env.CF_PROJECT).toBe('zhiliao-jjml')
     const shape = preview.steps.find(step => step.name === 'Shape the upload')!
     expect(shape.run).toContain("find apps/web/dist -name '*.map' -delete")
     expect(shape.run).toContain('cp apps/web/dist/preview.html apps/web/dist/index.html')
     const deploy = preview.steps.find(step => step.name === 'Upload to Cloudflare Pages')!
     expect(deploy.run).toContain('npx --yes wrangler@4 pages deploy apps/web/dist')
     expect(deploy.run).toContain('--branch "pr-${{ github.event.pull_request.number }}"')
-    const verify = preview.steps.find(step => step.name === 'Verify the protected deployment serves the image')!
-    expect(verify.run).toContain('/preview/vfs-image.tar.gz')
+    // The Pages project name is not the served subdomain, so the alias must be
+    // read from the deploy output and published for the later steps.
+    expect(deploy.run).toContain('Deployment alias URL:')
+    expect(deploy.run).toContain('echo "PREVIEW_URL=$alias" >> "$GITHUB_ENV"')
+    // tee would otherwise report success when the deploy itself failed.
+    expect(deploy.run).toContain('set -euo pipefail')
+    const verify = preview.steps.find(step => step.name === 'Verify the deployment serves the image')!
+    expect(verify.run).toContain('"$PREVIEW_URL/preview/vfs-image.tar.gz"')
     expect(verify.run).toContain('"$code" != "200"')
     expect(verify.run).toContain('content-encoding:')
     expect(verify.run).toContain('"$magic" != "1f8b"')
-    expect(verify.env?.CF_ACCESS_CLIENT_SECRET).toBe('${{ secrets.CF_ACCESS_CLIENT_SECRET }}')
+    expect(verify.env).toBeUndefined()
+    // Neither consumer may reassemble the host from $CF_PROJECT: a project
+    // renamed after Cloudflare assigned its suffix serves on the old subdomain.
+    expect(verify.run).not.toContain('pages.dev')
     const comment = preview.steps.find(step => step.name === 'Comment the preview URL')!
     expect(comment.run).toContain('<!-- dsh-preview-url -->')
     expect(comment.run).toContain('gh pr comment "$PR" --body-file -')
+    expect(comment.run).toContain('[Preview for #$PR]($PREVIEW_URL)')
+    expect(comment.run).not.toContain('pages.dev')
   })
 })
