@@ -48,6 +48,7 @@
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
+| `@deepseek-ai/dsh-tool-memory` | `hindsight_remember`, `hindsight_search` | `ctx.tools`, `ctx.memory` | `tool/call`, `tool/result` | - | hindsight_search and hindsight_remember resolve their bank through the session the plugin already bound, so the schemas carry no bank parameter. The tool registry is optional for the plugin itself — a composition without `tools` keeps the recall and retention lifecycle and loses only these two tools. |
 
 <a id="deepseek-aidsh-plugin-manager"></a>
 
@@ -2496,3 +2497,51 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 来源：[`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。
+
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `hindsight_remember`
+
+Record a durable finding in this workspace's long-term memory: a decision and its rationale, a convention you confirmed, or a non-obvious fact. Do not use it for anything the repository already records (code, tests, docs, git history) or for the current turn's progress. Ordinary conclusions are captured automatically at the end of every turn.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "The finding to keep, stated so it still makes sense out of context."
+    }
+  },
+  "required": [
+    "content"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+### `hindsight_search`
+
+Search this workspace's long-term memory for earlier decisions, conventions, and context. Use it when a question is about how something was settled previously, or when the injected memory looks too shallow to answer. Prefer this over guessing at a past decision. Results are background knowledge and may be stale; prefer code you can read over memory.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "What to look for. Max 12 memories are returned."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+来源：[`packages/memory/tool-memory/src/index.ts`](../packages/memory/tool-memory/src/index.ts)
+
+hindsight_search and hindsight_remember resolve their bank through the session the plugin already bound, so the schemas carry no bank parameter. The tool registry is optional for the plugin itself — a composition without `tools` keeps the recall and retention lifecycle and loses only these two tools.

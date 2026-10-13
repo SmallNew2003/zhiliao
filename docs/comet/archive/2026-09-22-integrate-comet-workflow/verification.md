@@ -4,6 +4,8 @@ generated_from_state_version: 26
 
 # 验证
 
+English | [中文](verification.zh.md)
+
 ## 当前结果
 
 - 结果: **已归档**

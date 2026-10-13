@@ -1018,6 +1018,8 @@ export interface Config {
   model?: string
   /** Default per-hook timeout in ms when a hook sets none (Codex default: 600000). */
   defaultTimeoutMs?: number
+  /** Whether hook payloads include original tool arguments beside the Codex command field. */
+  exposeToolArguments?: boolean
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
 }
@@ -1054,6 +1056,30 @@ export interface Config {
 ```
 
 Source: [`packages/host/frontend-static/src/index.ts:30`](../packages/host/frontend-static/src/index.ts)
+
+<a id="deepseek-aidsh-host-memory-controller"></a>
+
+## `@deepseek-ai/dsh-host-memory-controller`
+
+Requires: `memory`
+
+```ts config-catalog
+/**
+ * The read-only browse surface's transport settings. Every field is
+ * deployment-varying and therefore configurable rather than a constant.
+ */
+export interface Config {
+  /** Base URL of the memory daemon, without a trailing slash. */
+  readonly baseUrl?: string
+  /**
+   * Timeout for one browse request. These are metadata reads, so the budget is
+   * the provider's cheap-metadata budget rather than its inference budget.
+   */
+  readonly timeoutMs?: number
+}
+```
+
+Source: [`packages/host/memory-controller/src/index.ts:54`](../packages/host/memory-controller/src/index.ts)
 
 <a id="deepseek-aidsh-host-open-in-app"></a>
 
@@ -1724,6 +1750,55 @@ export interface ReconnectConfig {
 ```
 
 Source: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
+
+<a id="deepseek-aidsh-memory"></a>
+
+## `@deepseek-ai/dsh-memory`
+
+```ts config-catalog
+/**
+ * Config for the memory seam. `provider` pins which registered provider wins; it is
+ * optional because a single registered usable provider auto-selects. Deployment-varying
+ * choices live here (or in cordis.yml against these fields) rather than in constants.
+ */
+export interface MemoryRuntimeConfig {
+  /** Explicit provider id. Omitted = auto-select when exactly one usable provider exists. */
+  readonly provider?: string
+}
+```
+
+Source: [`packages/memory/memory/src/index.ts:56`](../packages/memory/memory/src/index.ts)
+
+<a id="deepseek-aidsh-memory-hindsight-http"></a>
+
+## `@deepseek-ai/dsh-memory-hindsight-http`
+
+Requires: `memory`
+
+```ts config-catalog
+/**
+ * Plugin config. Every field is deployment-varying and therefore configurable rather than
+ * a constant: which daemon to talk to, and how long each class of request may take.
+ */
+export interface Config {
+  /** Base URL of the hindsight daemon, without a trailing slash. */
+  baseUrl?: string
+  /** Bank id suffix used when a workspace has no resolvable project name. */
+  defaultBankSuffix?: string
+  /** Timeout for cheap metadata endpoints such as health and bank listing. */
+  metadataTimeoutMs?: number
+  /** How long a health-probe answer is reused before memory re-checks the daemon. */
+  probeTtlMs?: number
+  /** Timeout for recall and search, which run inference server-side. */
+  recallTimeoutMs?: number
+  /** Timeout for retaining a transcript. */
+  retainTimeoutMs?: number
+  /** Maximum transcript characters sent in one retention request. */
+  maxRetainChars?: number
+}
+```
+
+Source: [`packages/memory/hindsight-http/src/index.ts:40`](../packages/memory/hindsight-http/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -3177,6 +3252,32 @@ export interface Config {
 
 Source: [`packages/lsp/tool-lsp/src/index.ts:57`](../packages/lsp/tool-lsp/src/index.ts)
 
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+Requires: `memory`
+
+```ts config-catalog
+/** Plugin config: recall budget, injection shape, retention, and cold-bank seeding. */
+export interface Config {
+  /** Inject recalled memories ahead of the first request of a session. */
+  injectRecall?: boolean
+  /** Retain each finished turn's transcript into the session's bank. */
+  retainTranscripts?: boolean
+  /** Maximum memories injected in one session opening. */
+  recallLimit?: number
+  /** Seed a cold bank with recent commits and a read-only survey. */
+  seedColdBanks?: boolean
+  /** How many recent commits seed a cold bank from. */
+  seedCommitCount?: number
+  /** Wall-clock budget for seeding one workspace; exceeded work is abandoned. */
+  seedBudgetMs?: number
+}
+```
+
+Source: [`packages/memory/tool-memory/src/index.ts:43`](../packages/memory/tool-memory/src/index.ts)
+
 <a id="deepseek-aidsh-tool-present"></a>
 
 ## `@deepseek-ai/dsh-tool-present`
@@ -3795,6 +3896,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-input-trigger` ([`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-jobs` ([`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-memory-browser` ([`packages/client/ui-memory-browser/src/index.ts`](../packages/client/ui-memory-browser/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-open-in-app` ([`packages/client/ui-open-in-app/src/index.ts`](../packages/client/ui-open-in-app/src/index.ts))
