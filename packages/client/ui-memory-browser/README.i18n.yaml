@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-memory-browser/README.md
 README.md: 07ecfc7b7466feee839298423078e5bced84ed38
-README.zh.md: d65d9af2111e8088c457838375a8d954d2b72e8c
+README.zh.md: ef7b282fec0f84dc7f0d5a92383e6e0fcbeda317

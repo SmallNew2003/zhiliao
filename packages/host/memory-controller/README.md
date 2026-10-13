@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Clients call five methods on the `memoryController` namespace to display what a deployment's long-term memory holds: `list` for the memory banks with their fact counts and last write, `stats` for one bank's node, link, and document totals plus its fact-type and link-type distributions, `pages` for a bank's knowledge pages, `search` for the knowledge index, and `page` for one page's body. Every method answers a structured status instead of throwing, so a browser can say *which* condition it hit — memory switched off, the deployment misconfigured, the daemon unreachable, or the request failed — rather than showing a generic transport error. The surface is read-only: it cannot retain, edit, or delete a memory.
+Clients call five read-only methods on the `memoryController` namespace to display what a deployment's long-term memory holds: `list` for the memory banks with their fact counts and last write, `stats` for one bank's totals and distributions, `pages` for a bank's knowledge pages, `search` for the knowledge index, and `page` for one page's body. Every method answers a structured status instead of throwing, so a browser can say *which* condition it hit — memory switched off, the deployment misconfigured, the daemon unreachable, or the request failed — rather than showing a generic transport error.
 
 ## Table of Contents
 

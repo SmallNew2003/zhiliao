@@ -9,15 +9,15 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-tool-memory` connects a workspace's long-term memory to the agent loop. It does two jobs. Automatically, it recalls memories relevant to a session's opening prompt, retains each finished turn, and seeds a cold bank from recent commits — so a session starts informed and ends having contributed. Deliberately, it exposes `hindsight_search` and `hindsight_remember` for a targeted lookup or an explicit decision worth keeping. Memory is bound per workspace and shared with any other harness pointed at the same backend, so a decision recorded in one toolchain is visible in this one. Every lifecycle listener degrades to a warning: a slow or absent backend costs an unserved turn, never a failed turn.
+`dsh-tool-memory` connects a workspace's long-term memory to the agent loop. Automatically, it recalls memories relevant to a session's opening prompt, retains each finished turn, and seeds a cold bank from recent commits. Deliberately, it exposes `hindsight_search` and `hindsight_remember` for a targeted lookup or an explicit decision worth keeping. Memory is bound per workspace and shared with any other harness pointed at the same backend, so a decision recorded in one toolchain is visible in this one. Every lifecycle listener degrades to a warning: a slow or absent backend costs an unserved turn, never a failed turn.
 
 ## Table of Contents
 
 - [Use this package](#use-this-package)
 - [Understand the implementation](#understand-the-implementation)
+- [Dev Note](#dev-note)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
 
 -----
 
@@ -63,6 +63,11 @@ Every listener follows the compaction package's discipline: call `next()` first,
 
 Seeding reads `git log` through an injectable executable with a scrubbed environment (`--no-optional-locks`, no terminal prompt, `LC_ALL=C`) so the read cannot take the repository's index lock or depend on the caller's locale. It reads commit subjects only — file contents and codebase surveys are hindsight's ingestion engine's job, not this package's.
 
+<a id="dev-note"></a>
+## Dev Note
+
+This package publishes no `./invariant` companion: it owns no cross-cutting observation that could drift from another package's. Its lifecycle wiring is covered by emitting real agent events, and its seeding by an injected executable standing in for `git log`.
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -70,7 +75,9 @@ Seeding reads `git log` through an injectable executable with a scrubbed environ
 
 #### What the model sees
 
-When a session opens, recalled memories are appended to the request history as a user-role message attributed to this plugin. The block reads:
+When a session opens, recalled memories are appended to the request history as a user-role message attributed to this plugin. The framing is deliberate: recalled text is third-party content — it can contain anything the workspace previously decided or was asked — so it is labelled background rather than instruction and explicitly subordinated to the request and the code.
+
+##### Recalled-memory preamble
 
 ```markdown
 Long-term memory for this workspace, recalled automatically.
@@ -80,8 +87,6 @@ Cite it when you rely on it, and use hindsight_search to look up anything not co
 
 1. we chose Cordis for the plugin lifecycle
 ```
-
-The framing is deliberate. Recalled text is third-party content — it can contain anything the workspace previously decided or was asked — so it is labelled background rather than instruction and explicitly subordinated to the request and the code.
 
 #### Token effect
 
@@ -93,17 +98,22 @@ The injection happens at `agent/pre-step`, before system-prompt assembly, so it 
 
 ### Tools
 
-`hindsight_search` takes a free-text query and returns matching memories as a numbered list, framed as possibly stale. `hindsight_remember` takes one statement and reports whether the backend accepted it. Both return an empty or refused result rather than an error when the session has no bank, so the model is never blocked by memory being unavailable.
+#### What the model sees
+
+`hindsight_search` takes one required `query` string and returns matching memories as a numbered list, framed as possibly stale. `hindsight_remember` takes one required `content` string and reports whether the backend accepted it. Both return an empty or refused result rather than an error when the session has no bank, so the model is never blocked by memory being unavailable.
+
+#### Token effect
+
+Both schemas are fixed for a given configuration. A search result is bounded by the backend's own limit, and a remember result is one short status line.
+
+#### KV Cache effect
+
+Prefix-stable while the definitions and their visibility are unchanged. Plugin lifecycle or scoped restrictions may invalidate reuse from these schemas.
+
+## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-## Known Limitations and Deferred Work
 
 - **Recall latency is the backend's** — hindsight answers recall by running inference, which can exceed a minute. `recallTimeoutMs` on the provider bounds it; a timeout degrades to no injection plus a warning.
 - **Retention is per session, not per turn** — the whole transcript is resent each turn so an interrupted turn is not lost; the backend deduplicates server-side, but this is wasteful for long sessions.
 - **No cross-session fact editing** — a wrong memory stays wrong until something newer supersedes it. There is no UI or tool to correct or delete a specific memory yet.
-- **No tool-catalog regeneration entry** — this package's tools are registered through the optional tool injection rather than a static manifest, so `gen-tool-catalog` does not enumerate them yet.
-
-<a id="dev-note"></a>
-## Dev Note
-
-This package publishes no `./invariant` companion: it owns no cross-cutting observation that could drift from another package's. Its lifecycle wiring is covered by emitting real agent events, and its seeding by an injected executable standing in for `git log`.

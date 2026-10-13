@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The `memory/` packages give an agent a durable memory of a workspace: what was decided earlier, what conventions hold, and what the repository is about. Recall runs when a session opens, retention runs when a turn closes, and a cold bank is seeded from recent commits so the first session is not amnesiac. The family splits the same way the web family does — a provider-neutral seam, a concrete provider, and a model-facing consumer — so deployments can swap the backing store without touching lifecycle wiring.
+The `memory/` packages give an agent a durable memory of a workspace: what was decided earlier, what conventions hold, and what the repository is about. Recall runs when a session opens, retention runs when a turn closes, and a cold bank is seeded from recent commits. A provider-neutral seam, a concrete provider, and a model-facing consumer keep the backing store swappable.
 
 Recall is served by a hindsight daemon that runs inference to answer a query. A slow or absent daemon therefore costs a warning and an unserved turn, never a failed turn: every lifecycle listener degrades rather than propagating.
 
