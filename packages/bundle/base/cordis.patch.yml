@@ -475,6 +475,20 @@
         fetch: true
         searchTimeoutMs: 60000
 
+    # Long-term memory: the capability seam and its hindsight provider stay in the host
+    # composition so every session resolves banks against one backend. Recall answers by
+    # running inference in the daemon, so its timeout is generous on purpose.
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+
+    - id: memory-hindsight-http
+      name: '@deepseek-ai/dsh-memory-hindsight-http'
+      config:
+        baseUrl: !!js process.env.HINDSIGHT_API_URL ?? 'http://127.0.0.1:9077'
+
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'
 

@@ -45,6 +45,9 @@
       "path": "../../host/plugin-inventory"
     },
     {
+      "path": "../../host/memory-controller"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {
