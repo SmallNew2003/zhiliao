@@ -1,7 +1,18 @@
 - menu "模型与推理等级":
-  - menuitemradio "Default" [checked]:
-    - text: Default
-    - img
-  - menuitemradio "Off"
-  - menuitemradio "High"
-  - menuitemradio "Max"
+  - group "DeepSeek":
+    - text: DeepSeek
+    - menuitemradio "DeepSeek-V4-Flash"
+    - menuitemradio "DeepSeek-V4-Flash-Vision-Exp"
+  - group "Acme Gateway":
+    - text: Acme Gateway
+    - menuitemradio "Acme Think" [checked]:
+      - text: Acme Think
+      - img
+  - group "推理等级":
+    - text: 推理等级
+    - menuitemradio "Default" [checked]:
+      - text: Default
+      - img
+    - menuitemradio "Off"
+    - menuitemradio "High"
+    - menuitemradio "Max"
