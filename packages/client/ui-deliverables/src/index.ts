@@ -16,7 +16,8 @@ export const inject = ['systemPrompt', 'connection', 'sessionQuery', 'sessionCon
 /** Static Web guidance for primary outputs and existing-file references. */
 const FILE_REFERENCE_PROMPT = 'When you successfully create or modify files, mention the primary outputs in your final response. '
   + 'Outside commands, configuration expressions, and code blocks, link every mention of an existing file, including repeats and tables, to its full path relative to the working directory or absolute; append #L24 or #L24-L30 to the target for known lines. '
-  + 'Use the filename or a clear alias as the label, adding only enough parent directories to distinguish files; keep full paths out of labels. Default to the name alone; when precise locations matter, append :24 or :24–30, with no # or L in the line suffix.'
+  + 'Use the filename or a clear alias as the label, adding only enough parent directories to distinguish files; keep full paths out of labels. Default to the name alone; when precise locations matter, append :24 or :24–30, with no # or L in the line suffix. '
+  + 'When referencing or displaying images, embed them directly using markdown image syntax ![alt](path) with an absolute path or path relative to the working directory.'
 
 /**
  * Register Web file-reference guidance and native opens for declared files.

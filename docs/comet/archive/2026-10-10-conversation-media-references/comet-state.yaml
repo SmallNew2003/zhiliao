@@ -1,0 +1,179 @@
+schema: comet.native.v4
+name: conversation-media-references
+language: zh-CN
+phase: archive
+status: done
+state_version: 10
+brief: brief.md
+shape_confirmation_hash: 26607d1353ef982e6c7d9365711ebcde4580844e8dabcb2de49f140f5c3d4fea
+spec_changes:
+  - capability: conversation-media-references
+    operation: create
+    source: specs/conversation-media-references/spec.md
+workspace:
+  isolation: worktree
+  change_branch: comet/conversation-media-references
+  target_branch: master
+  finish: pull-request
+loop:
+  stage: done
+  goal_cycle: 1
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: "Scenario: 前端根据 cwd 渲染工作区相对路径图片 - **WHEN** Agent 在回复中输出包含相对路径的图片（如
+      `![图表](charts/figure.png)` 或 `./figure.png`），且提供了有效的会话 `cwd` - **THEN**
+      前端将其解析为指向 `/api/file?path=...` 的绝对路径并在界面中渲染图片"
+    result: passed
+    reason:
+      text: 已通过测试用例验证：在提供 cwd 时，相对路径图片正确解析为指向 /api/file?path=... 的绝对路径并在
+        AssistantMarkdown 中渲染
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: "Scenario: 缺失 cwd 时保持非绝对路径静态回退 - **WHEN** 未提供 `cwd` 且图片目标为相对路径 - **THEN**
+      前端不构造 `/api/file` 请求，保持安全降级"
+    result: passed
+    reason:
+      text: 已通过测试用例验证：在缺失 cwd 时，相对路径图片保持静态回退，不构造 /api/file 请求
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: "Scenario: 系统提示词注入完整的文件与图片引用指引 - **WHEN** 挂载 `ui-deliverables` 插件并装配系统提示词
+      - **THEN** 生成的系统提示词中包含文件 Markdown 链接与图片 Markdown 嵌入语法的指导说明"
+    result: passed
+    reason:
+      text: 已通过单元测试验证：ui-deliverables 的 FILE_REFERENCE_PROMPT 注入包含文件链接与图片嵌入说明
+      truncated: false
+  - id: A4
+    source: specs/conversation-media-references/spec.md
+    text: 解析并渲染相对路径图片 - **WHEN** Agent 输出 `![图表](charts/figure.png)` 且提供有效 `cwd` -
+      **THEN** 前端构造指向 `/api/file?path=...` 的请求地址并在界面中渲染图片
+    result: passed
+    reason:
+      text: Spec 验收通过：Agent 输出 ![图表](charts/figure.png) 且提供有效 cwd 时前端正确构造
+        /api/file?path=... 请求
+      truncated: false
+  - id: A5
+    source: specs/conversation-media-references/spec.md
+    text: 提示词包含图片嵌入指引 - **WHEN** 挂载 `ui-deliverables` 插件并装配提示词 - **THEN**
+      提示词文本明确指示使用 `![alt](path)` 嵌入图片
+    result: passed
+    reason:
+      text: Spec 验收通过：挂载 ui-deliverables 插件时提示词明确指示使用 ![alt](path) 嵌入图片
+      truncated: false
+builder_handoff:
+  candidate_id: d4205671-c093-49be-9e6f-9cae44b8dde2
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:506420a1-77ae-4adb-87a3-e50052c9f35e
+  iteration: 1
+  summary:
+    text: 实现会话图片与文件引用支持：前端解析工作区相对路径并注入系统提示词指引
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+  checks:
+    - name:
+        text: pnpm vitest run
+          packages/client/ui-chat/tests/assistant-markdown-path-images.client.spec.tsx
+        truncated: false
+      result: passed
+      note:
+        text: 8 tests passed
+        truncated: false
+    - name:
+        text: pnpm vitest run packages/client/ui-deliverables/tests/prompt.host.spec.ts
+        truncated: false
+      result: passed
+      note:
+        text: 1 test passed, snapshots aligned
+        truncated: false
+  checks_truncated: false
+  known_limits: []
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-10-10T08:25:35.541Z
+blockers: []
+verification:
+  candidate_id: d4205671-c093-49be-9e6f-9cae44b8dde2
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:ccb441a5-6c88-4f4b-8cc3-505271771035
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks:
+    - id: check-ui-chat
+      name:
+        text: vitest ui-chat path images
+        truncated: false
+      argv_display:
+        - text: vitest
+          truncated: false
+        - text: run
+          truncated: false
+        - text: packages/client/ui-chat/tests/assistant-markdown-path-images.client.spec.tsx
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 5212
+    - id: check-ui-deliverables
+      name:
+        text: vitest ui-deliverables prompt
+        truncated: false
+      argv_display:
+        - text: vitest
+          truncated: false
+        - text: run
+          truncated: false
+        - text: packages/client/ui-deliverables/tests/prompt.host.spec.ts
+          truncated: false
+      argv_truncated: false
+      cwd_ref: .
+      status: passed
+      exit_code: 0
+      duration_ms: 3357
+  summary:
+    text: 所有 5 项验收条件（A1-A5）均已通过测试验证，前端工作区相对路径图片解析和系统提示词嵌入指导运行正常
+    truncated: false
+  risks: []
+  risks_truncated: false
+  completed_at: 2026-10-10T08:32:08.972Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: 所有 5 项验收条件（A1-A5）均已通过测试验证，前端工作区相对路径图片解析和系统提示词嵌入指导运行正常
+      truncated: false
+    completed_at: 2026-10-10T08:32:08.972Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-10-10T08:05:58.951Z
