@@ -398,3 +398,44 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+.recovery {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--dsh-composer-card-max-width);
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.recoveryReason {
+  flex: 1;
+  min-width: 160px;
+}
+
+.primary.stop {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.primary.delivery {
+  display: inline-flex;
+  gap: 6px;
+  width: auto;
+  padding: 0 12px;
+  border-radius: 17px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.primary.stop:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}

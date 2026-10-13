@@ -572,6 +572,22 @@ describe('Chat node rendering', () => {
 })
 
 describe('ChatView', () => {
+  it('groups adjacent session context disclosures without folding the conversation', () => {
+    const h = makeHarness({ nodes: [context(1, 'policy'), context(2, 'catalog'), user(3, 'question')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const group = view.container.querySelector<HTMLDetailsElement>('[data-context-group]')
+    expect(group).not.toBeNull()
+    expect(group!.open).toBe(false)
+    expect(group!.querySelector('summary')?.textContent).toContain('2')
+    expect(group!.querySelectorAll('[data-chat-flow-kind="context"]')).toHaveLength(2)
+    expect(group!.contains(view.getByText('question'))).toBe(false)
+    fireEvent.click(group!.querySelector('summary')!)
+    expect(group!.open).toBe(true)
+    act(() => { h.set({ nodes: [context(1, 'policy'), context(2, 'catalog'), user(3, 'question'), assistant(4, 'answer')] }) })
+    expect(view.container.querySelector('[data-context-group]')).toBe(group)
+    expect(group!.open).toBe(true)
+  })
+
   it('leaves the turn rail unrendered when an unrelated Chat update commits', () => {
     const snapshot = chatSnapshotFixture({
       nodes: [
@@ -2702,6 +2718,49 @@ describe('ChatView', () => {
       fireEvent.click(view.getByLabelText('回到底部'))
       expect(host.scrollTop).toBe(2000)
     } finally {
+      host.remove()
+    }
+  })
+
+  it('saves a collapsed context summary and restores an expanded child to that summary', () => {
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-scroll', '')
+    Object.defineProperties(host, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 500, configurable: true },
+      scrollTop: { value: 0, writable: true, configurable: true },
+    })
+    document.body.appendChild(host)
+    let summaryTop = 60
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.hasAttribute('data-context-group')) return { top: summaryTop, bottom: summaryTop + 30 } as DOMRect
+      if (this.dataset.chatFlowKind === 'context') return { top: 0, bottom: 0 } as DOMRect
+      return { top: 0, bottom: 500 } as DOMRect
+    })
+    try {
+      const h = makeHarness({ nodes: [context(1, 'policy'), context(2, 'catalog'), user(3, 'q')] })
+      const view = render(<h.ChatView {...h.props} />, { container: host })
+      readerScroll(host, 100)
+      expect(h.chatScroll.read()).toEqual({ anchorKey: 'context-group:fixture:context:1', anchorTop: 60, scrollTop: 100 })
+      view.rerender(<div />)
+      h.chatScroll.save({ anchorKey: 'fixture:context:2', anchorTop: 20, scrollTop: 100 })
+      host.scrollTop = 0
+      view.rerender(<h.ChatView {...h.props} />)
+      expect(host.scrollTop).toBe(140)
+      act(() => { h.setSession({ hasMore: true }) })
+      fireEvent.click(view.getByRole('button', { name: '加载更早' }))
+      summaryTop = 100
+      act(() => { h.set({
+        nodes: [context(0, 'earlier'), context(1, 'policy'), context(2, 'catalog'), user(3, 'q')],
+        loadingOlder: true,
+      }) })
+      expect(host.scrollTop).toBe(180)
+      view.rerender(<div />)
+      host.scrollTop = 0
+      view.rerender(<h.ChatView {...h.props} />)
+      expect(host.scrollTop).toBe(180)
+    } finally {
+      rect.mockRestore()
       host.remove()
     }
   })

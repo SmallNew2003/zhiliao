@@ -39,8 +39,16 @@ interface PagingAnchor {
 
 /** Find an already-rendered row without interpolating a selector. */
 function anchorElement(list: HTMLElement, key: string): HTMLElement | null {
+  const groupPrefix = 'context-group:'
+  const memberKey = key.startsWith(groupPrefix) ? key.slice(groupPrefix.length) : null
   for (const row of list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]:not([hidden])')) {
-    if (row.dataset.chatAnchorKey === key) return row
+    if (row.dataset.chatAnchorKey === key) {
+      return row.closest<HTMLElement>('details[data-context-group]:not([open])') ?? row
+    }
+    // A prepended context can change the group's first member and summary key.
+    if (row.dataset.chatAnchorKey === memberKey) {
+      return row.closest<HTMLElement>('details[data-context-group]') ?? row
+    }
   }
   return null
 }
@@ -203,12 +211,30 @@ function TurnStatus({ startTime, t }: {
 
 type ChatNodeListProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey'> & {
   readonly order: readonly string[]
+  readonly nodes: ChatSnapshot['nodes']
 }
 
-const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNodeListProps) {
-  return order.map(nodeKey => (
-    <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
-  ))
+const ChatNodeList = memo(function ChatNodeList({ order, nodes, ...seatProps }: ChatNodeListProps) {
+  const rows: { key: string; members: string[] | null }[] = []
+  for (const nodeKey of order) {
+    const node = nodes.get(nodeKey)
+    const sessionContext = (node?.kind === 'context' || node?.kind === 'system-prompt')
+      && node.location.kind === 'session'
+    const previous = rows.at(-1)
+    if (sessionContext && previous?.members !== null && previous !== undefined) {
+      previous.members.push(nodeKey)
+    } else {
+      rows.push({ key: nodeKey, members: sessionContext ? [nodeKey] : null })
+    }
+  }
+  return rows.map(row => row.members === null || row.members.length === 1
+    ? <ChatNodeSeat key={row.key} nodeKey={row.key} {...seatProps} />
+    : (
+      <details key={row.key} className={css.contextGroup} data-context-group data-chat-flow-key={row.key} data-chat-anchor-key={`context-group:${row.key}`}>
+        <summary>{seatProps.t('message.contextGroup', { count: row.members.length })}</summary>
+        {row.members.map(nodeKey => <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />)}
+      </details>
+    ))
 })
 
 /**
@@ -785,6 +811,7 @@ export function ChatView({
           <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
             <ChatNodeList
               order={order}
+              nodes={nodeStore}
               useChatNode={useChatNode}
               useChatNodeProcess={useChatNodeProcess}
               historyIncomplete={hasMore}

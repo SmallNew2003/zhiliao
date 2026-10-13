@@ -1,0 +1,274 @@
+schema: comet.native.v4
+name: integrate-comet-workflow
+language: zh-CN
+phase: archive
+status: done
+state_version: 26
+brief: brief.md
+shape_confirmation_hash: 6230e0bb8c281a6442f8669d5ebf1bf62216d1c31eebd0591aec5869fcdf3425
+spec_changes:
+  - capability: comet-workflow-integration
+    operation: create
+    source: specs/comet-workflow-integration/spec.md
+workspace:
+  isolation: current
+  change_branch: master
+  target_branch: master
+  finish: null
+loop:
+  stage: done
+  goal_cycle: 5
+  iteration: 1
+  attempt: 1
+  retry_epoch: 0
+  failed_iteration_count: 0
+  no_progress_count: 0
+  execution_failure_count: 0
+  previous_unresolved_ids: []
+  next_action: null
+acceptance:
+  - id: A1
+    source: brief.md
+    text: 在干净检出中执行 `comet workflow resolve . --activate --json` 时，返回本仓库保存的工作流选择及有效的
+      Comet 配置。
+    result: passed
+    reason:
+      text: Project workflow resolves.
+      truncated: false
+  - id: A2
+    source: brief.md
+    text: 已纳入范围的客户端写入钩子调用仓库内的 Comet 路由器，不引用开发者机器上的绝对路径。
+    result: passed
+    reason:
+      text: Selected hooks are portable.
+      truncated: false
+  - id: A3
+    source: brief.md
+    text: DSH 通过项目 overlay 加载 `dsh-hooks-codex` 后，bridge 将原始工具参数提供给 Comet
+      路由器；非写入调用继续执行，Native Build 阶段允许实现写入，Shape 阶段拒绝实现写入，Verify 阶段写入使候选失效并返回
+      Build。
+    result: passed
+    reason:
+      text: Overlay and phase policy match specification.
+      truncated: false
+  - id: A4
+    source: brief.md
+    text: 未启用工具参数传递的 DSH bridge 继续仅向 Codex hook 提供 `tool_input.command`。
+    result: passed
+    reason:
+      text: Default payload remains command-only.
+      truncated: false
+  - id: A5
+    source: brief.md
+    text: Git 仅跟踪项目级 Comet 配置、适配层、DSH overlay 和正式文档工件，忽略本机运行时状态。
+    result: passed
+    reason:
+      text: Runtime state is ignored.
+      truncated: false
+  - id: A6
+    source: specs/comet-workflow-integration/spec.md
+    text: 解析已提交的项目工作流 - **WHEN** 开发者在仓库根目录执行 Comet 工作流解析命令 - **THEN** 命令返回项目保存的有效配置
+      - **AND** 返回的可用工作流包含 Native 和 Classic
+    result: passed
+    reason:
+      text: Native and Classic are configured.
+      truncated: false
+  - id: A7
+    source: specs/comet-workflow-integration/spec.md
+    text: 客户端调用可移植路由器 - **WHEN** Codex 或 WorkBuddy 在仓库检出中调用已提交的写入钩子 - **THEN**
+      钩子调用仓库内可解析的 Comet 路由器 - **AND** 该调用不包含特定开发者的绝对项目路径
+    result: passed
+    reason:
+      text: Only selected adapters are present.
+      truncated: false
+  - id: A8
+    source: specs/comet-workflow-integration/spec.md
+    text: DSH 复用 Comet 写入约束 - **WHEN** DSH 使用项目的 Comet overlay 运行工具调用 - **THEN**
+      `dsh-hooks-codex` 在 `PreToolUse` 时调用 Comet 路由器 - **AND** bridge
+      将工具参数传递给路由器以识别文件操作目标 - **AND** 非写入调用继续执行 - **AND** Native Build
+      阶段的实现写入继续执行 - **AND** Native Shape 阶段的实现写入被拒绝 - **AND** Native Verify
+      阶段的实现写入使候选失效并返回 Build
+    result: passed
+    reason:
+      text: DSH routing policy matches the corrected specification.
+      truncated: false
+  - id: A9
+    source: specs/comet-workflow-integration/spec.md
+    text: 未启用参数传递时保留现有 payload - **WHEN** `dsh-hooks-codex` 未启用工具参数传递 - **THEN** 每个
+      Codex tool payload 的 `tool_input` 仅包含字符串 `command`
+    result: passed
+    reason:
+      text: Default payload regression test passed.
+      truncated: false
+  - id: A10
+    source: specs/comet-workflow-integration/spec.md
+    text: Comet overlay 启用参数传递 - **WHEN** DSH 使用 Comet overlay 调用带文件路径的工具 - **THEN**
+      Codex hook payload 保留该文件路径 - **AND** `tool_input.command` 仍为字符串
+    result: passed
+    reason:
+      text: Opt-in payload regression test passed.
+      truncated: false
+  - id: A11
+    source: specs/comet-workflow-integration/spec.md
+    text: 干净检出不含本机状态 - **WHEN** 开发者在另一台机器检出该仓库 - **THEN** 所有已跟踪的 Comet 配置和适配文件可用 -
+      **AND** 本机运行时状态不在 Git 跟踪中
+    result: passed
+    reason:
+      text: Clean-clone state policy is correct.
+      truncated: false
+builder_handoff:
+  candidate_id: 48cf1d02-0c67-446b-8f05-5da36a6a6cf0
+  identity_provider: skill-coordinated
+  builder_execution_ref: skill-coordinated:builder:9c951acb-89a3-4d63-a007-41b65ea15c92
+  iteration: 1
+  summary:
+    text: Completed Comet configuration, portable client hooks, DSH overlay, opt-in
+      tool-argument payload support, paired documentation, and generated
+      configuration catalog.
+    truncated: false
+  addressed_acceptance_ids:
+    - A1
+    - A2
+    - A3
+    - A4
+    - A5
+    - A6
+    - A7
+    - A8
+    - A9
+    - A10
+    - A11
+  checks:
+    - name:
+        text: hooks-codex tests
+        truncated: false
+      result: passed
+      note:
+        text: 76 tests passed
+        truncated: false
+    - name:
+        text: Comet integration tests
+        truncated: false
+      result: passed
+      note:
+        text: 14 focused tests passed
+        truncated: false
+    - name:
+        text: documentation quick gate
+        truncated: false
+      result: passed
+      note:
+        text: pnpm run test:docs
+        truncated: false
+    - name:
+        text: Host build
+        truncated: false
+      result: passed
+      note:
+        text: pnpm run build:lib:host
+        truncated: false
+  checks_truncated: false
+  known_limits:
+    - text: The existing headless task driver cannot complete a real model task after
+        Loader activation.
+      truncated: false
+  known_limits_truncated: false
+  review: null
+  submitted_at: 2026-09-22T11:25:12.661Z
+blockers: []
+verification:
+  candidate_id: 48cf1d02-0c67-446b-8f05-5da36a6a6cf0
+  identity_provider: skill-coordinated
+  verifier_execution_ref: skill-coordinated:verifier:5bcf0590-0ee8-454c-9da0-c0854e44389a
+  iteration: 1
+  attempt: 1
+  assurance: skill-coordinated
+  verdict: pass
+  checks: []
+  summary:
+    text: Independent read-only verification passed every acceptance item.
+    truncated: false
+  risks:
+    - text: The existing headless task driver cannot complete a real model task after
+        Loader activation.
+      truncated: false
+  risks_truncated: false
+  completed_at: 2026-09-22T11:29:00.549Z
+history:
+  - goal_cycle: 1
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-09-21T06:37:32.798Z
+  - goal_cycle: 2
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Observed implementation write before temporary-verifier-target.txt
+      truncated: false
+    completed_at: 2026-09-21T06:45:30.203Z
+  - goal_cycle: 2
+    iteration: 2
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-09-21T07:09:51.437Z
+  - goal_cycle: 3
+    iteration: 1
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Observed implementation write before draft.md
+      truncated: false
+    completed_at: 2026-09-22T02:49:17.990Z
+  - goal_cycle: 3
+    iteration: 2
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native confirmed acceptance criteria changed
+      truncated: false
+    completed_at: 2026-09-22T02:58:51.761Z
+  - goal_cycle: 4
+    iteration: 1
+    attempt: 0
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: Native Shape artifacts changed
+      truncated: false
+    completed_at: 2026-09-22T03:21:23.446Z
+  - goal_cycle: 5
+    iteration: 1
+    attempt: 1
+    outcome: pass
+    unresolved_ids: []
+    summary:
+      text: Independent read-only verification passed every acceptance item.
+      truncated: false
+    completed_at: 2026-09-22T11:29:00.549Z
+history_overflow:
+  dropped_entries: 0
+  first_dropped_at: null
+  last_dropped_at: null
+  outcome_counts:
+    pass: 0
+    fail: 0
+    blocked: 0
+    execution-error: 0
+    recovery: 0
+verification_result: pass
+verification_report: verification.md
+archived: true
+created_at: 2026-09-21T04:03:53.242Z
