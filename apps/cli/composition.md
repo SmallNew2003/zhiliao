@@ -174,6 +174,12 @@ flowchart LR
   cfg --> plugin_dsh_base_web_fetch_http
   plugin_dsh_base_tool_web["tool-web<br/>@deepseek-ai/dsh-tool-web"]
   cfg --> plugin_dsh_base_tool_web
+  plugin_dsh_base_memory["memory<br/>@deepseek-ai/dsh-memory"]
+  cfg --> plugin_dsh_base_memory
+  plugin_dsh_base_memory_hindsight_http["memory-hindsight-http<br/>@deepseek-ai/dsh-memory-hindsight-http"]
+  cfg --> plugin_dsh_base_memory_hindsight_http
+  plugin_dsh_base_tool_memory["tool-memory<br/>@deepseek-ai/dsh-tool-memory"]
+  cfg --> plugin_dsh_base_tool_memory
   plugin_dsh_base_mcp_resources["mcp-resources<br/>@deepseek-ai/dsh-mcp-resources"]
   cfg --> plugin_dsh_base_mcp_resources
   plugin_dsh_base_tools["tools<br/>@deepseek-ai/dsh-tools"]
@@ -273,6 +279,9 @@ flowchart LR
 | `web-search-deepseek` | `@deepseek-ai/dsh-web-search-deepseek` |
 | `web-fetch-http` | `@deepseek-ai/dsh-web-fetch-http` |
 | `tool-web` | `@deepseek-ai/dsh-tool-web` |
+| `memory` | `@deepseek-ai/dsh-memory` |
+| `memory-hindsight-http` | `@deepseek-ai/dsh-memory-hindsight-http` |
+| `tool-memory` | `@deepseek-ai/dsh-tool-memory` |
 | `mcp-resources` | `@deepseek-ai/dsh-mcp-resources` |
 | `tools` | `@deepseek-ai/dsh-tools` |
 | `system-prompt` | `@deepseek-ai/dsh-system-prompt` |
