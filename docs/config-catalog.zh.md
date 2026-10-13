@@ -1020,8 +1020,6 @@ export interface Config {
   model?: string
   /** Default per-hook timeout in ms when a hook sets none (Codex default: 600000). */
   defaultTimeoutMs?: number
-  /** Whether hook payloads include original tool arguments beside the Codex command field. */
-  exposeToolArguments?: boolean
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
 }
