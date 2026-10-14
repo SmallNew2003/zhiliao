@@ -184,6 +184,10 @@ export function apply(ctx: Context, config: Config): void {
       const text = renderRecall(recalled)
       if (text === undefined) return decision
       logger.debug(`memory: injected ${recalled.length} memories into ${agent.session.header.id} (turn ${turn})`)
+      /* jscpd:ignore-start — independent owners: time-context appends the wall-clock
+         snapshot and this plugin appends recalled memories. Both build a
+         plugin-attributed user message for their own text; the wording and trigger
+         condition differ, so only the four-line construction is shared. */
       return {
         ...decision,
         messages: [
@@ -194,6 +198,7 @@ export function apply(ctx: Context, config: Config): void {
           }),
         ],
       }
+      /* jscpd:ignore-end */
     }, { prepend: true })
   }
 
