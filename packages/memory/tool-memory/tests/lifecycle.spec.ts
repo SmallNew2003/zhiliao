@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { agentEvents } from '@deepseek-ai/dsh-agent'
 import MemoryRuntime, { memoryBankId, MemoryError } from '@deepseek-ai/dsh-memory'
@@ -8,6 +12,28 @@ import type { Config } from '../src/index.ts'
 
 const bank = memoryBankId('coding-agent::demo')
 const signal = new AbortController().signal
+
+/**
+ * Create a Git repository holding one commit per subject and return its root.
+ *
+ * The seeder shells out to real `git log`, so a workspace that behaves like a live
+ * repository has to exist on disk. Identity is passed inline because the seeder reads
+ * history under a scrubbed environment that has no `HOME` to resolve a global config.
+ */
+async function gitWorkspace(subjects: readonly string[]): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-git-ws-'))
+  execFileSync('git', ['init', '--quiet'], { cwd: root })
+  for (const [index, subject] of subjects.entries()) {
+    await writeFile(join(root, `file-${index}.txt`), `${subject}\n`)
+    execFileSync('git', ['add', '--all'], { cwd: root })
+    execFileSync(
+      'git',
+      ['-c', 'user.name=dsh', '-c', 'user.email=dsh@invalid', 'commit', '--quiet', '-m', subject],
+      { cwd: root },
+    )
+  }
+  return root
+}
 
 /** One prompt as the agent loop would hand it to a pre-step listener. */
 function userMessage(text: string): { role: string; content: unknown } {
@@ -76,7 +102,7 @@ function makeProvider(overrides: Partial<MemoryProvider> = {}): StubProvider {
 const memoryPlugin = {
   name: toolMemory.name,
   inject: toolMemory.inject,
-  apply: (ctx: Context, config: Config) => toolMemory.apply(ctx, config),
+  apply: (ctx: Context, config: Config) => { toolMemory.apply(ctx, config) },
 }
 
 /**
@@ -88,7 +114,7 @@ async function mount(config: Partial<Config> = {}, provider: StubProvider = make
   await ctx.plugin(MemoryRuntime, {})
   ctx.memory.registerProvider(provider)
   // schemastery defaults are applied by the loader; tests pass explicit values instead.
-  await ctx.plugin(memoryPlugin, { ...resolvedConfig(), ...config } as never)
+  await ctx.plugin(memoryPlugin, { ...resolvedConfig(), ...config })
   return { ctx, provider }
 }
 
@@ -150,7 +176,7 @@ describe('tool-memory lifecycle wiring', () => {
 
     await expect(ctx.plugin({
       inject: ['memory', 'agents', 'tools'],
-      apply: (child: Context, cfg: Config) => toolMemory.apply(child, cfg),
+      apply: (child: Context, cfg: Config) => { toolMemory.apply(child, cfg) },
     } as never, { ...resolvedConfig() } as never)).resolves.toBeDefined()
   })
 
@@ -189,7 +215,7 @@ describe('tool-memory lifecycle wiring', () => {
   it('renders a non-Error bank-resolution rejection in the log line', async () => {
     const warn = vi.fn()
     const provider = makeProvider({
-      // A backend that rejects with a bare value rather than an Error.
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- a non-Error rejection is the scenario under test.
       resolveBank: () => Promise.reject('a bare string, not an Error'),
     })
     const ctx = new Context()
@@ -197,14 +223,14 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = () => undefined
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({ sessionId: 's-bind-nonerror' })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
 
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('a bare string, not an Error'),
-    ))
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('a bare string, not an Error'))
+    })
   })
 
   it('logs a bank-binding failure that escapes the normal path', async () => {
@@ -218,12 +244,12 @@ describe('tool-memory lifecycle wiring', () => {
     await ctx.plugin(MemoryRuntime, {})
     Object.defineProperty(ctx.memory, 'isAvailable', { value: () => { throw new Error('probe exploded') } })
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({ sessionId: 's-bind-throw' })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
 
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('bank binding failed')))
+    await vi.waitFor(() => { expect(warn).toHaveBeenCalledWith(expect.stringContaining('bank binding failed')) })
   })
 
   it('warns instead of throwing when bank resolution fails', async () => {
@@ -235,7 +261,7 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.warn = warn
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({ sessionId: 's-fail' })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
@@ -249,7 +275,7 @@ describe('tool-memory lifecycle wiring', () => {
     const ctx = new Context()
     ctx.logger.warn = warn
     await ctx.plugin(MemoryRuntime, {})
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({ sessionId: 's-off' })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
@@ -284,7 +310,7 @@ describe('tool-memory lifecycle wiring', () => {
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 10))
 
-    await agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
+    agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
 
     expect(provider.retained).toHaveLength(1)
     expect(provider.retained[0]?.turns[0]).toMatchObject({ prompt: 'why Cordis?', response: 'plugin lifecycle.' })
@@ -296,7 +322,7 @@ describe('tool-memory lifecycle wiring', () => {
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 10))
 
-    await agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
+    agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
 
     expect(provider.retained).toHaveLength(0)
   })
@@ -309,7 +335,7 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = () => undefined
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({
       sessionId: 's-plainerror',
       messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }],
@@ -319,7 +345,7 @@ describe('tool-memory lifecycle wiring', () => {
 
     agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
 
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('socket closed')))
+    await vi.waitFor(() => { expect(warn).toHaveBeenCalledWith(expect.stringContaining('socket closed')) })
     // A plain Error carries no seam code, so the message is logged unadorned.
     expect(warn.mock.calls[0]?.[0]).not.toContain('MEMORY_')
   })
@@ -335,7 +361,7 @@ describe('tool-memory lifecycle wiring', () => {
     const controller = new AbortController()
     controller.abort()
 
-    await agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal: controller.signal })
+    agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal: controller.signal })
 
     expect(provider.retained).toHaveLength(0)
   })
@@ -347,7 +373,7 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.warn = warn
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({
       sessionId: 's-retain-fail',
       messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }],
@@ -355,9 +381,9 @@ describe('tool-memory lifecycle wiring', () => {
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 10))
 
-    expect(() => agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })).not.toThrow()
+    expect(() => { agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal }) }).not.toThrow()
     // The listener is async; `emit` does not await it, so let it settle.
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('retaining')))
+    await vi.waitFor(() => { expect(warn).toHaveBeenCalledWith(expect.stringContaining('retaining')) })
   })
 
   it('injects recalled memory ahead of the opening request, once per session', async () => {
@@ -527,12 +553,13 @@ describe('tool-memory lifecycle wiring', () => {
       seedColdBanks: true,
       seedCommitCount: 2,
       seedBudgetMs: 30_000,
-    } as never)
-    const { agent } = makeAgent({ sessionId: 's-seed-nosignal', cwd: '/Users/jelvin/000_source_code/zhiliao' })
+    })
+    const workspace = await gitWorkspace(['first commit', 'second commit'])
+    const { agent } = makeAgent({ sessionId: 's-seed-nosignal', cwd: workspace })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup' })
 
-    await vi.waitFor(() => expect(debug).toHaveBeenCalledWith(expect.stringContaining('seeded bank')), { timeout: 5000 })
+    await vi.waitFor(() => { expect(debug).toHaveBeenCalledWith(expect.stringContaining('seeded bank')) }, { timeout: 5000 })
   })
 
   it('starts session work without a lifecycle signal', async () => {
@@ -560,14 +587,15 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = debug
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(makeProvider())
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true, seedBudgetMs: 30_000 } as never)
-    const { agent } = makeAgent({ sessionId: 's-seed-twice-a', cwd: '/Users/jelvin/000_source_code/zhiliao' })
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true, seedBudgetMs: 30_000 })
+    const workspace = await gitWorkspace(['first commit', 'second commit'])
+    const { agent } = makeAgent({ sessionId: 's-seed-twice-a', cwd: workspace })
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
-    await vi.waitFor(() => expect(debug).toHaveBeenCalled(), { timeout: 5000 })
+    await vi.waitFor(() => { expect(debug).toHaveBeenCalled() }, { timeout: 5000 })
     debug.mockClear()
 
     // The same bank a second time: the seeder declines, so nothing is logged.
-    const { agent: again } = makeAgent({ sessionId: 's-seed-twice-b', cwd: '/Users/jelvin/000_source_code/zhiliao' })
+    const { agent: again } = makeAgent({ sessionId: 's-seed-twice-b', cwd: workspace })
     agentEvents(ctx, again).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 50))
 
@@ -581,13 +609,14 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = debug
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(makeProvider())
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true, seedBudgetMs: 30_000 } as never)
-    const { agent } = makeAgent({ sessionId: 's-seed-skip', cwd: '/tmp' })
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true, seedBudgetMs: 30_000 })
+    const outside = await mkdtemp(join(tmpdir(), 'dsh-no-git-'))
+    const { agent } = makeAgent({ sessionId: 's-seed-skip', cwd: outside })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
 
-    // /tmp is not a repository, so the seeder reports a skip rather than a harvest.
-    await vi.waitFor(() => expect(debug).toHaveBeenCalledWith(expect.stringContaining('left bank')), { timeout: 5000 })
+    // A directory outside any repository is normal, so the seeder reports a skip.
+    await vi.waitFor(() => { expect(debug).toHaveBeenCalledWith(expect.stringContaining('left bank')) }, { timeout: 5000 })
   })
 
   it('passes the decision through untouched when recall returns nothing', async () => {
@@ -609,7 +638,7 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.warn = warn
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({ sessionId: 's-recall-fail' })
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 10))
@@ -653,7 +682,7 @@ describe('tool-memory lifecycle wiring', () => {
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 10))
 
-    await agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
+    agentEvents(ctx, agent).emit('agent/turn-stopping', { turn: 1, signal })
 
     expect(provider.retained).toHaveLength(0)
   })
@@ -672,13 +701,14 @@ describe('tool-memory lifecycle wiring', () => {
       seedColdBanks: true,
       seedCommitCount: 3,
       seedBudgetMs: 30_000,
-    } as never)
-    const { agent } = makeAgent({ sessionId: 's-seed', cwd: '/Users/jelvin/000_source_code/zhiliao' })
+    })
+    const workspace = await gitWorkspace(['first commit', 'second commit', 'third commit'])
+    const { agent } = makeAgent({ sessionId: 's-seed', cwd: workspace })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
 
     // Seeding runs detached, so wait for the retain it should perform.
-    await vi.waitFor(() => expect(provider.retained.length).toBeGreaterThan(0), { timeout: 5000 })
+    await vi.waitFor(() => { expect(provider.retained.length).toBeGreaterThan(0) }, { timeout: 5000 })
     expect(warn).not.toHaveBeenCalled()
   })
 
@@ -692,12 +722,13 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = () => undefined
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true } as never)
-    const { agent } = makeAgent({ sessionId: 's-seed-fail', cwd: '/Users/jelvin/000_source_code/zhiliao' })
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true })
+    const workspace = await gitWorkspace(['only commit'])
+    const { agent } = makeAgent({ sessionId: 's-seed-fail', cwd: workspace })
 
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
 
-    await vi.waitFor(() => expect(warn).toHaveBeenCalled(), { timeout: 5000 })
+    await vi.waitFor(() => { expect(warn).toHaveBeenCalled() }, { timeout: 5000 })
   })
 
   it('registers the model-facing tools once a tool registry appears', async () => {
@@ -706,7 +737,7 @@ describe('tool-memory lifecycle wiring', () => {
     // The plugin injects the tool registry optionally, so tools appear only when one does.
     ctx.provide('tools', { register: (tool: { name: string }) => { registered.push(tool.name) } })
 
-    await vi.waitFor(() => expect(registered.sort()).toEqual(['hindsight_remember', 'hindsight_search']))
+    await vi.waitFor(() => { expect(registered.sort()).toEqual(['hindsight_remember', 'hindsight_search']) })
   })
 
   it('keeps working when no tool registry ever appears', async () => {
@@ -717,7 +748,7 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = () => undefined
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
     const { agent } = makeAgent({
       sessionId: 's-notools',
       messages: [{ role: 'user', content: [{ type: 'text', text: 'q' }] }],
@@ -733,7 +764,7 @@ describe('tool-memory lifecycle wiring', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
-  it('logs a seeding failure raised outside the seeder handling', async () => {
+  it('renders a zero-commit-count seed without warning', async () => {
     const warn = vi.fn()
     const provider = makeProvider()
     const ctx = new Context()
@@ -741,11 +772,12 @@ describe('tool-memory lifecycle wiring', () => {
     ctx.logger.debug = () => undefined
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(provider)
-    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true, seedCommitCount: 0 } as never)
-    const { agent } = makeAgent({ sessionId: 's-seed-throw', cwd: '/Users/jelvin/000_source_code/zhiliao' })
+    await ctx.plugin(memoryPlugin, { ...resolvedConfig(), seedColdBanks: true, seedCommitCount: 0 })
+    const workspace = await gitWorkspace(['only commit'])
+    const { agent } = makeAgent({ sessionId: 's-seed-throw', cwd: workspace })
 
-    // A zero commit count makes the seeder hand back a negative-count outcome, which the
-    // listener still renders through the shared describe path without throwing.
+    // A zero commit count reads no history, so the listener renders the empty harvest
+    // through the shared describe path without warning.
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 50))
 
@@ -758,7 +790,7 @@ describe('tool-memory lifecycle wiring', () => {
     const { ctx } = await mount({}, provider)
     const registered: { name: string; execute: (args: Record<string, string>, exec?: unknown) => Promise<unknown> }[] = []
     ctx.provide('tools', { register: (tool: { name: string; execute: (args: Record<string, string>, exec?: unknown) => Promise<unknown> }) => { registered.push(tool) } })
-    await vi.waitFor(() => expect(registered).toHaveLength(2))
+    await vi.waitFor(() => { expect(registered).toHaveLength(2) })
     const { agent } = makeAgent({ sessionId: 's-toolbank' })
     agentEvents(ctx, agent).emit('agent/created', { source: 'startup', signal })
     await new Promise(resolve => setTimeout(resolve, 10))
@@ -774,7 +806,7 @@ describe('tool-memory lifecycle wiring', () => {
     const ctx = new Context()
     await ctx.plugin(MemoryRuntime, {})
     ctx.memory.registerProvider(makeProvider())
-    const fiber = await ctx.plugin(memoryPlugin, { ...resolvedConfig() } as never)
+    const fiber = await ctx.plugin(memoryPlugin, { ...resolvedConfig() })
 
     await fiber.dispose()
     await new Promise(resolve => setTimeout(resolve, 10))
