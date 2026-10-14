@@ -103,6 +103,28 @@ async function scriptedGit(lines: readonly string[]): Promise<string> {
   return file
 }
 
+/**
+ * Create a Git repository holding one commit per subject and return its root.
+ *
+ * The seeder shells out to real `git log`, so a workspace that behaves like a live
+ * repository has to exist on disk. Identity is passed inline because the seeder reads
+ * history under a scrubbed environment that has no `HOME` to resolve a global config.
+ */
+async function gitWorkspace(subjects: readonly string[]): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-git-ws-'))
+  execFileSync('git', ['init', '--quiet'], { cwd: root })
+  for (const [index, subject] of subjects.entries()) {
+    await writeFile(join(root, `file-${index}.txt`), `${subject}\n`)
+    execFileSync('git', ['add', '--all'], { cwd: root })
+    execFileSync(
+      'git',
+      ['-c', 'user.name=dsh', '-c', 'user.email=dsh@invalid', 'commit', '--quiet', '-m', subject],
+      { cwd: root },
+    )
+  }
+  return root
+}
+
 describe('createSeeder', () => {
   /** A memory seam stub that records what it was asked to retain. */
   function memoryStub(retain: (request: { turns: { prompt: string }[] }) => Promise<unknown> = () => Promise.resolve({ retained: true })): {
@@ -124,21 +146,23 @@ describe('createSeeder', () => {
   it('retains recent commit subjects from a Git workspace', async () => {
     const seeder = createSeeder({ commitCount: 5, budgetMs: 20_000 })
     const { memory, calls } = memoryStub()
+    const workspace = await gitWorkspace(['first commit', 'second commit', 'third commit'])
 
-    const outcome = await seeder.seed(memory, bank, '/Users/jelvin/000_source_code/zhiliao', new AbortController().signal, logger)
+    const outcome = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
 
     expect(outcome?.seeded).toBe(true)
-    expect(outcome?.commits).toBeGreaterThan(0)
+    expect(outcome?.commits).toBe(3)
     expect(calls[0]?.turns[0]?.prompt).toContain('Recent commits in')
-    expect(calls[0]?.turns[0]?.prompt).toContain('/Users/jelvin/000_source_code/zhiliao')
+    expect(calls[0]?.turns[0]?.prompt).toContain(workspace)
   })
 
   it('attempts a given bank only once per process', async () => {
     const seeder = createSeeder({ commitCount: 1, budgetMs: 20_000 })
     const { memory, calls } = memoryStub()
+    const workspace = await gitWorkspace(['only commit'])
 
-    const first = await seeder.seed(memory, bank, '/Users/jelvin/000_source_code/zhiliao', new AbortController().signal, logger)
-    const second = await seeder.seed(memory, bank, '/Users/jelvin/000_source_code/zhiliao', new AbortController().signal, logger)
+    const first = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
+    const second = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
 
     expect(first?.seeded).toBe(true)
     expect(second).toBeUndefined()
@@ -158,8 +182,9 @@ describe('createSeeder', () => {
   it('reports no history for a workspace outside any Git repository', async () => {
     const seeder = createSeeder({ commitCount: 3, budgetMs: 20_000 })
     const { memory, calls } = memoryStub()
+    const outside = await mkdtemp(join(tmpdir(), 'dsh-no-git-'))
 
-    const outcome = await seeder.seed(memory, bank, '/tmp', new AbortController().signal, logger)
+    const outcome = await seeder.seed(memory, bank, outside, new AbortController().signal, logger)
 
     expect(outcome).toMatchObject({ seeded: false, commits: 0, reason: 'no git history' })
     expect(calls).toHaveLength(0)
@@ -179,28 +204,28 @@ describe('createSeeder', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('reports no commits when git answers with an empty history', async () => {
+  it('names the workspace root in the harvest prompt', async () => {
     const seeder = createSeeder({ commitCount: 3, budgetMs: 20_000 })
     const { memory, calls } = memoryStub()
+    const workspace = await gitWorkspace(['only commit'])
 
-    // A reachable repository whose log succeeds but yields nothing usable: every line
-    // lacks the separator, so nothing is harvested.
-    const outcome = await seeder.seed(memory, bank, '/Users/jelvin/000_source_code/zhiliao', new AbortController().signal, logger)
+    const outcome = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
 
-    // The real repository has history, so seeding runs; assert the harvest is shaped.
-    expect(calls[0]?.turns[0]?.prompt).toContain('Recent commits in')
-    expect(outcome?.commits).toBeGreaterThan(0)
+    expect(calls[0]?.turns[0]?.prompt).toContain(`Recent commits in ${workspace}, newest first:`)
+    expect(outcome?.commits).toBe(1)
   })
 
   it('renders a non-Error retain rejection without losing the bank id', async () => {
     const seeder = createSeeder({ commitCount: 3, budgetMs: 20_000 })
     const warn = vi.fn()
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- a non-Error rejection is the scenario under test.
     const { memory } = memoryStub(() => Promise.reject('plain string failure'))
+    const workspace = await gitWorkspace(['only commit'])
 
     const outcome = await seeder.seed(
       memory,
       bank,
-      '/Users/jelvin/000_source_code/zhiliao',
+      workspace,
       new AbortController().signal,
       { warn, debug: () => undefined } as never,
     )
@@ -209,13 +234,12 @@ describe('createSeeder', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('plain string failure'))
   })
 
-  it('skips malformed git log lines instead of failing the whole harvest', async () => {
+  it('renders each harvested commit as a short sha plus its subject', async () => {
     const seeder = createSeeder({ commitCount: 5, budgetMs: 20_000 })
     const { memory, calls } = memoryStub()
+    const workspace = await gitWorkspace(['a commit whose subject is well formed'])
 
-    // The real repository's log is well-formed; this asserts the shape the parser keeps
-    // (short sha plus subject per line), which is what guards the malformed-line skips.
-    const outcome = await seeder.seed(memory, bank, '/Users/jelvin/000_source_code/zhiliao', new AbortController().signal, logger)
+    const outcome = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
 
     expect(outcome?.seeded).toBe(true)
     const prompt = calls[0]?.turns[0]?.prompt ?? ''
@@ -281,8 +305,9 @@ describe('createSeeder', () => {
   it('reports a failed retain without throwing', async () => {
     const seeder = createSeeder({ commitCount: 3, budgetMs: 20_000 })
     const { memory } = memoryStub(() => Promise.reject(new MemoryError('down', 'MEMORY_BACKEND_ERROR')))
+    const workspace = await gitWorkspace(['only commit'])
 
-    const outcome = await seeder.seed(memory, bank, '/Users/jelvin/000_source_code/zhiliao', new AbortController().signal, logger)
+    const outcome = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
 
     expect(outcome).toMatchObject({ seeded: false, commits: 0, reason: 'retain failed' })
   })
