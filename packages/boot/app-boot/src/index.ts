@@ -12,7 +12,7 @@ import { parseEnv } from 'node:util'
 import { basename, dirname, isAbsolute, resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 import { Context, type FiberState } from '@deepseek-ai/cordis'
-import Loader, { type Entry, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
+import Loader, { type Entry, type EntryOptions, type ModuleLoader } from '@deepseek-ai/cordis-plugin-loader'
 import Include, { applyEntryPatches, entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import Group from '@deepseek-ai/cordis-plugin-group'
 import { dshHomePath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
@@ -553,6 +553,52 @@ export async function mountRootInclude(
 }
 
 /**
+ * Whether a bare plugin specifier projects, through the ambient module
+ * pipeline, to a workspace or vendored `src` entry rather than an installed
+ * copy under `node_modules`.
+ *
+ * A source launch projects workspace and vendored imports to `src` through
+ * tsconfig `paths`, while Node's internal ESM loader resolves the same package
+ * through its published `exports` to `lib`; the two produce distinct module
+ * instances whose `unique symbol` service keys do not match across the plugin
+ * boundary. Only specifiers whose ambient resolution escapes `node_modules`
+ * redirect to the ambient pipeline, so the check is inert where no `paths`
+ * projection applies.
+ * @param specifier - plugin module specifier to classify.
+ * @returns true when the specifier must load through the ambient pipeline.
+ */
+function resolvesToWorkspaceSource(specifier: string): boolean {
+  if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('#') || specifier.includes(':')) return false
+  try {
+    return !import.meta.resolve(specifier).includes('/node_modules/')
+  } catch {
+    // The ambient pipeline cannot project this specifier; the internal loader owns it.
+    return false
+  }
+}
+
+/**
+ * During a source launch, load workspace and vendored plugin entries through
+ * the ambient module pipeline so each package keeps one module instance shared
+ * with the rest of the graph. Bare specifiers the ambient pipeline cannot
+ * project, and every relative or builtin specifier, stay on Node's internal ESM
+ * loader. Packaged runtimes pass a `bareModuleBaseUrl` and keep the internal
+ * loader for every bare specifier.
+ * @param ctx - context carrying an installed Loader service.
+ */
+function installSourcePlanePluginLoader(ctx: Context): void {
+  const loader = ctx.get('loader')
+  const internal = loader?.internal
+  if (loader === undefined || internal === undefined) return
+  const sourcePlane = Object.create(internal) as ModuleLoader
+  sourcePlane.import = async (specifier: string, parentURL: string, importAttributes: ImportAttributes): Promise<unknown> =>
+    resolvesToWorkspaceSource(specifier)
+      ? import(specifier)
+      : internal.import(specifier, parentURL, importAttributes)
+  loader.internal = sourcePlane
+}
+
+/**
  * The slice of `process` {@link installFailLoud} needs — injectable so tests
  * exercise the handler without registering on (or exiting) the real process.
  */
@@ -889,7 +935,9 @@ export async function auditStartupEntries(
  * bare package names resolve there by default or against an explicit
  * `bareModuleBaseUrl` for closed packaged runtimes. The bootstrap include
  * is statically imported and mounted as the `cordis:include` builtin, loading
- * through the ambient module pipeline (vite/tsx/plain ESM). The package build
+ * through the ambient module pipeline (vite/tsx/plain ESM); a source launch
+ * (no `bareModuleBaseUrl`) also routes workspace and vendored plugin entries
+ * through that pipeline so each package keeps one module instance. The package build
  * embeds Include while leaving Loader external, so the built include tree and
  * host share one Loader peer. Loader settlement drains entry work without
  * rejecting the whole tree. The final {@link auditStartupEntries} call rejects
@@ -944,6 +992,7 @@ export async function boot(
       void Promise.resolve(next()).catch((error: unknown) => { ctx.logger.error(error) })
     }, { global: true, prepend: true })
     await ctx.plugin(Loader)
+    if (bareModuleBaseUrl === undefined) installSourcePlanePluginLoader(ctx)
     await prepare?.(ctx)
     stage = 'plugin tree failed to load'
     await mountRootInclude(ctx, absoluteConfigPath, patches, bareModuleBaseUrl)
