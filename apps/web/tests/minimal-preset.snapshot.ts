@@ -124,6 +124,8 @@ describe('minimal agent preset', () => {
         "prompt": "You are a helpful software engineer assistant.",
         "tools": [
           "bash",
+          "hindsight_remember",
+          "hindsight_search",
         ],
       }
     `)
