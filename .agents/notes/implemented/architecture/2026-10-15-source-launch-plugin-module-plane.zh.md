@@ -10,7 +10,9 @@ Status: implemented
 
 ## 决策
 
-源码启动——即 [`boot()`](../../../../packages/boot/app-boot/src/index.ts) 未收到 `bareModuleBaseUrl` 的情况——让工作区与 vendored 插件入口改走环境模块管道，也就是图内其余部分已在使用的 tsconfig `paths` 投影，而不再用 Node 的内部 ESM 加载器。`packages/boot/app-boot/src/index.ts` 在 `loader.internal` 上安装了一个源码平面包装器：裸插件标识符若其环境解析落到 `node_modules` 之外，就通过普通动态 `import()` 加载，从而与图内其余部分共享同一模块实例；已安装与树外插件、`node_modules` 依赖，以及相对或内建标识符仍走内部加载器。打包运行会传入 `bareModuleBaseUrl`，对所有裸标识符继续使用内部加载器，其解析不变。
+源码启动——即 [`boot()`](../../../../packages/boot/app-boot/src/index.ts) 未收到 `bareModuleBaseUrl` 的情况——让工作区与 vendored 插件入口改走环境模块管道，也就是图内其余部分已在使用的 tsconfig `paths` 投影，而不再用 Node 的内部 ESM 加载器。[`source-plane.ts`](../../../../packages/boot/app-boot/src/source-plane.ts) 在 `loader.internal` 上安装了一个源码平面包装器：只有当插件入口自己的位置把该裸标识符解析到 `node_modules` 之外时，它才改走普通动态 `import()`。环境管道无法投影的标识符、被入口自己的位置解析进 `node_modules` 的标识符，以及相对或内建标识符，仍走内部加载器。打包运行会传入 `bareModuleBaseUrl`，对所有裸标识符继续使用内部加载器，其解析不变。判据单独成模块而不是挨着 `boot()`，是为了让逐文件覆盖率门禁能直接度量它。
+
+「入口自己的位置」这个条件是包装器不接管配置自有解析的关键。tsx 会把裸标识符无条件投影到工作区的 `src` 入口，与导入方无关，因此单看投影无法区分「工作区包」和「组合用自己 `node_modules` 里的副本遮蔽了 harness 包名」这两种情况。从 profile 基准 URL 解析该标识符——启动时即 profile 解析路由器给出的答案——才能分开它们：工作区包解析进检出目录，而遮蔽包解析进组合自己的 `node_modules`，于是保留组合自己的副本。
 
 这扩展了[通过 tsx ESM hook 的源码启动](2026-07-29-dsh-source-launch-tsx-esm.zh.md)决策：那份笔记让 CLI 图走 tsx `paths`，这一份让加载器挂载的插件入口也走同一投影，使同一个包不会在一次启动里同时解析到两个平面。
 
@@ -22,6 +24,12 @@ Status: implemented
 
 **修改 vendored 加载器的 `tree.import`，让其优先走环境管道。** 否决：源码与产物之分是 dsh 运行时关注点，不是加载器的关注点；把改动留在 `packages/boot/app-boot` 可避免每次 vendor 同步都要重新应用的 vendored 修改。
 
+**只看环境投影就重定向，不参考入口自己的位置。** 否决：即使组合用自己 `node_modules` 里的副本遮蔽了该包名，也会加载工作区包，使组合丢掉自己拥有的覆盖。`app-boot` 套件有用例钉住这一点，在该判据下会失败。
+
 ## 影响
 
-源码启动从 `src` 加载工作区与 vendored 插件，每个包只保留一个模块实例，`unique symbol` 服务键可跨插件边界解析；就地修改插件源码无需重新构建即可生效，与既定的零构建回路一致。打包与已安装运行不受影响，因为在 tsconfig `paths` 不会把标识符投影到 `node_modules` 之外的地方，该包装器不起作用。此修复还暴露出一处被崩溃掩盖的既有快照期望值漂移：memory 特性注册了 `hindsight_remember` 与 `hindsight_search` 并注入 memory 系统提示，但记录的 headless 工具目录早于它们，因为在运行崩溃时无法完成刷新。这些期望值属于 memory 改动，不属于本次改动。
+源码启动从 `src` 加载工作区与 vendored 插件，每个包只保留一个模块实例，`unique symbol` 服务键可跨插件边界解析；就地修改插件源码无需重新构建即可生效，与既定的零构建回路一致。组合仍可用自己 `node_modules` 里的副本遮蔽 harness 包名，安装在 profile 里的树外插件也继续从那里解析。打包与已安装运行不受影响，因为在 tsconfig `paths` 不会把标识符投影到 `node_modules` 之外的地方，该包装器不起作用。此修复还暴露出一处被崩溃掩盖的既有快照期望值漂移：memory 特性注册了 `hindsight_remember` 与 `hindsight_search` 并注入 memory 系统提示，但记录的 headless 工具目录早于它们，因为在运行崩溃时无法完成刷新。这些期望值属于 memory 改动，不属于本次改动。
+
+## 测试
+
+`packages/boot/app-boot/tests/app-boot.spec.ts` 覆盖了判据的两半：源码启动下工作区插件经由同一模块实例解析；组合用自己 `node_modules` 里的副本遮蔽 `@deepseek-ai/dsh-system-prompt` 时保留该副本。`packages/boot/app-boot/tests/source-plane.spec.ts` 直接钉住判据的每个分支：相对、绝对、import-map 与内建标识符，环境管道无法投影的标识符，`node_modules` 下的依赖，仓库内外的插件入口位置，以及遮蔽场景。`snapshots/session`、`snapshots/sdk`、`snapshots/acp` 的无密钥录制会话复放跑的是真实子进程启动向量；拆掉包装器会在那里重新出现 `prepare` 崩溃。
