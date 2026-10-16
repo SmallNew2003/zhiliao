@@ -94,13 +94,16 @@ async function deepseekDefaultsServer(options: { waitForTitleRequest?: boolean; 
       requests.push(JSON.parse(body) as JsonObject)
       paths.push(request.url ?? '')
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      let keepAlives = 3
+      // The DeepSeek defaults fixture pins streamIdleTimeoutMs at 150: comments
+      // every 25ms keep the stream inside it while the response lands past it,
+      // so the comments stay load-bearing rather than incidental.
+      let keepAlives = 12
       const write = (): void => {
         // One-shot teardown may cancel background title work after the main response.
         if (keepAlives-- > 0
           || (options.waitForTitleRequest === true && !requests.some(request => request.max_tokens === 64))) {
           response.write(': keep-alive\n\n')
-          timer = setTimeout(write, 60)
+          timer = setTimeout(write, 25)
           return
         }
         if (options.protocol === 'messages') {
@@ -121,7 +124,7 @@ async function deepseekDefaultsServer(options: { waitForTitleRequest?: boolean; 
           '',
         ].join('\n\n'))
       }
-      let timer = setTimeout(write, 60)
+      let timer = setTimeout(write, 25)
       response.once('close', () => { clearTimeout(timer) })
     })
   })
