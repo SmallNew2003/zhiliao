@@ -1566,15 +1566,7 @@ export async function captureExpandedTurnProcessAria(
   }
   try {
     if (options.scrollToBottom === true) {
-      const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
-      const scroll = page.locator('[data-conversation-scroll]')
-      await expect.poll(async () => {
-        const distanceFromBottom = await scroll.evaluate((host) => {
-          host.scrollTop = host.scrollHeight
-          return host.scrollHeight - host.clientHeight - host.scrollTop
-        })
-        return Math.abs(distanceFromBottom) <= 1 && await backToBottom.count() === 0
-      }, { timeout: 10_000 }).toBe(true)
+      await scrollConversationToBottom(page)
     }
     return await captureStableAria(page, selector, workspaceCwd)
   } finally {
@@ -1583,6 +1575,24 @@ export async function captureExpandedTurnProcessAria(
       if (await control.getAttribute('aria-expanded') === 'true') await control.click()
     }
   }
+}
+
+/**
+ * Scroll the conversation to its bottom and wait for the scroll affordance to
+ * disappear, so a capture does not depend on where earlier interactions left the
+ * viewport or on how tall the host's font metrics make the transcript.
+ * @param page - the page under test.
+ */
+export async function scrollConversationToBottom(page: Page): Promise<void> {
+  const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
+  const scroll = page.locator('[data-conversation-scroll]')
+  await expect.poll(async () => {
+    const distanceFromBottom = await scroll.evaluate((host) => {
+      host.scrollTop = host.scrollHeight
+      return host.scrollHeight - host.clientHeight - host.scrollTop
+    })
+    return Math.abs(distanceFromBottom) <= 1 && await backToBottom.count() === 0
+  }, { timeout: 10_000 }).toBe(true)
 }
 
 /**

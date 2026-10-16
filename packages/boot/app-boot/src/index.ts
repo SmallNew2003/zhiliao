@@ -19,6 +19,7 @@ import { dshHomePath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { createLaunchEnvironmentSnapshot, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 export { readProfilePatches, resolveTelemetryPatch, type ProfileContext, type ProfilePnpmInvocation } from './profile-context.ts'
 export { sanitizeProfile } from './profile-sanitize.ts'
+import { installSourcePlanePluginLoader } from './source-plane.ts'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 
 export {
@@ -889,7 +890,9 @@ export async function auditStartupEntries(
  * bare package names resolve there by default or against an explicit
  * `bareModuleBaseUrl` for closed packaged runtimes. The bootstrap include
  * is statically imported and mounted as the `cordis:include` builtin, loading
- * through the ambient module pipeline (vite/tsx/plain ESM). The package build
+ * through the ambient module pipeline (vite/tsx/plain ESM); a source launch
+ * (no `bareModuleBaseUrl`) also routes workspace and vendored plugin entries
+ * through that pipeline so each package keeps one module instance. The package build
  * embeds Include while leaving Loader external, so the built include tree and
  * host share one Loader peer. Loader settlement drains entry work without
  * rejecting the whole tree. The final {@link auditStartupEntries} call rejects
@@ -944,6 +947,7 @@ export async function boot(
       void Promise.resolve(next()).catch((error: unknown) => { ctx.logger.error(error) })
     }, { global: true, prepend: true })
     await ctx.plugin(Loader)
+    if (bareModuleBaseUrl === undefined) installSourcePlanePluginLoader(ctx.loader)
     await prepare?.(ctx)
     stage = 'plugin tree failed to load'
     await mountRootInclude(ctx, absoluteConfigPath, patches, bareModuleBaseUrl)

@@ -112,6 +112,16 @@ interface ToolArgsMap {
     /** One glob filter for which files to search (e.g. "*.ts", "*.{js,jsx}"). Not a list; negation is not supported. */
     include?: string;
   } & Record<string, JsonValue>;
+  /** Record a durable finding in this workspace's long-term memory: a decision and its rationale, a convention you confirmed, or a non-obvious fact. Do not use it for anything the repository already records (code, tests, docs, git history) or for the current turn's progress. Ordinary conclusions are captured automatically at the end of every turn. */
+  hindsight_remember: {
+    /** The finding to keep, stated so it still makes sense out of context. */
+    content: string;
+  } & Record<string, JsonValue>;
+  /** Search this workspace's long-term memory for earlier decisions, conventions, and context. Use it when a question is about how something was settled previously, or when the injected memory looks too shallow to answer. Prefer this over guessing at a past decision. Results are background knowledge and may be stale; prefer code you can read over memory. */
+  hindsight_search: {
+    /** What to look for. Max 12 memories are returned. */
+    query: string;
+  } & Record<string, JsonValue>;
   /** Request cancellation of a background agent's current turn by its agent id. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op. */
   interrupt_agent: {
     /** The agent id of the running agent to interrupt. */
@@ -337,6 +347,17 @@ interface ToolOutputMap {
       lineNumber: number;
       line: string;
     }[];
+  };
+  hindsight_remember: {
+    remembered: boolean;
+    detail: string;
+  };
+  hindsight_search: {
+    memories: {
+      id: string;
+      text: string;
+    }[];
+    truncated: boolean;
   };
   interrupt_agent: {
     accepted: boolean;

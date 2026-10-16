@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { renderRecall, describeSeeding } from '../src/render.ts'
 import { workspaceRootOf, isPrimarySession } from '../src/workspace.ts'
-import { createSeeder } from '../src/seed.ts'
+import { createSeeder, parseCommitLines } from '../src/seed.ts'
 import type { MemoryBankId, MemoryRuntime } from '@deepseek-ai/dsh-memory'
 import { memoryBankId, MemoryError } from '@deepseek-ai/dsh-memory'
 
@@ -248,7 +248,11 @@ describe('createSeeder', () => {
     }
   })
 
-  it('skips malformed lines and keeps the well-formed ones', async () => {
+  // The scripted executable is a `#!/bin/sh` script, which Windows cannot spawn:
+  // `execFile` refuses a `.cmd` or `.bat` stand-in without a shell, so the seeder
+  // would report a missing git instead of the scripted output. The parsing this
+  // case pins is covered directly by `parseCommitLines` below.
+  it.skipIf(process.platform === 'win32')('skips malformed lines and keeps the well-formed ones', async () => {
     const { memory, calls } = memoryStub()
     const workspace = await mkdtemp(join(tmpdir(), 'dsh-ws-'))
     const seeder = createSeeder({
@@ -272,19 +276,43 @@ describe('createSeeder', () => {
     expect(prompt).not.toContain('no-separator-on-this-line')
   })
 
-  it('reports no commits when git succeeds but the history is empty', async () => {
+  it('reports no commits when git succeeds but the log window is empty', async () => {
     const { memory, calls } = memoryStub()
-    const workspace = await mkdtemp(join(tmpdir(), 'dsh-ws-'))
-    const seeder = createSeeder({
-      commitCount: 10,
-      budgetMs: 20_000,
-      gitExecutable: await scriptedGit(['', '   ']),
-    })
+    const workspace = await gitWorkspace(['only commit'])
+    // A zero window is a real `git log -0`: it succeeds and prints nothing, which is
+    // the same empty stdout a fresh repository produces without needing a scripted git.
+    const seeder = createSeeder({ commitCount: 0, budgetMs: 20_000 })
 
     const outcome = await seeder.seed(memory, bank, workspace, new AbortController().signal, logger)
 
     expect(outcome).toMatchObject({ seeded: false, commits: 0, reason: 'no commits' })
     expect(calls).toHaveLength(0)
+  })
+
+  describe('parseCommitLines', () => {
+    it('reads one record per well-formed line in output order', () => {
+      expect(parseCommitLines([
+        `abc1234def5678${RECORD_SEPARATOR}first commit subject`,
+        `deadbeefcafebabe${RECORD_SEPARATOR}second commit subject`,
+        '',
+      ].join('\n'))).toEqual([
+        { sha: 'abc1234def5678', subject: 'first commit subject' },
+        { sha: 'deadbeefcafebabe', subject: 'second commit subject' },
+      ])
+    })
+
+    it('drops a line without the separator and one carrying it in front', () => {
+      expect(parseCommitLines([
+        'no-separator-on-this-line',
+        `${RECORD_SEPARATOR}leading-separator-is-skipped`,
+        `abc1234def5678${RECORD_SEPARATOR}kept subject`,
+        '   ',
+      ].join('\n'))).toEqual([{ sha: 'abc1234def5678', subject: 'kept subject' }])
+    })
+
+    it('reads no records from empty output', () => {
+      expect(parseCommitLines('')).toEqual([])
+    })
   })
 
   it('reports no git history when the git executable is missing', async () => {
