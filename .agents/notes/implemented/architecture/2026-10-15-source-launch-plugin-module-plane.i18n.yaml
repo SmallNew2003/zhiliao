@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-15-source-launch-plugin-module-plane.md
-2026-10-15-source-launch-plugin-module-plane.md: 4e326e3c46405224da52b776b6dca30503863f77
-2026-10-15-source-launch-plugin-module-plane.zh.md: 9d30234c7d057924b2ace3578c521fa07752370b
+2026-10-15-source-launch-plugin-module-plane.md: d7a187a3c78a7123ffea97e9f02b1c15d6f2a1ef
+2026-10-15-source-launch-plugin-module-plane.zh.md: 1dcbb4232c10e726d4658c1a0358755893b26f65

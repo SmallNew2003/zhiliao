@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-源码启动——即 [`boot()`](../../../../packages/boot/app-boot/src/index.ts) 未收到 `bareModuleBaseUrl` 的情况——让工作区与 vendored 插件入口改走环境模块管道，也就是图内其余部分已在使用的 tsconfig `paths` 投影，而不再用 Node 的内部 ESM 加载器。[`source-plane.ts`](../../../../packages/boot/app-boot/src/source-plane.ts) 在 `loader.internal` 上安装了一个源码平面包装器：只有当插件入口自己的位置把该裸标识符解析到 `node_modules` 之外时，它才改走普通动态 `import()`。环境管道无法投影的标识符、被入口自己的位置解析进 `node_modules` 的标识符，以及相对或内建标识符，仍走内部加载器。打包运行会传入 `bareModuleBaseUrl`，对所有裸标识符继续使用内部加载器，其解析不变。判据单独成模块而不是挨着 `boot()`，是为了让逐文件覆盖率门禁能直接度量它。
+源码启动——即 [`boot()`](../../../../packages/boot/app-boot/src/index.ts) 未收到 `bareModuleBaseUrl` 的情况——让工作区与 vendored 插件入口改走环境模块管道，也就是图内其余部分已在使用的 tsconfig `paths` 投影，而不再用 Node 的内部 ESM 加载器。[`source-plane.ts`](../../../../packages/boot/app-boot/src/source-plane.ts) 在 `loader.internal` 上安装了一个源码平面包装器：只有当插件入口自己的位置把该裸标识符解析到 `node_modules` 之外时，它才改走普通动态 `import()`。环境管道无法投影的标识符、被入口自己的位置解析进 `node_modules` 的标识符，以及相对或内建标识符，仍走内部加载器。打包运行会传入 `bareModuleBaseUrl`，对所有裸标识符继续使用内部加载器，其解析不变。判据单独成模块而不是挨着 `boot()`，是为了让逐文件覆盖率门禁能直接度量它；判据读取一个可注入的解析器，默认实现才是环境解析，单测因此不依赖环境解析状态。
 
 「入口自己的位置」这个条件是包装器不接管配置自有解析的关键。tsx 会把裸标识符无条件投影到工作区的 `src` 入口，与导入方无关，因此单看投影无法区分「工作区包」和「组合用自己 `node_modules` 里的副本遮蔽了 harness 包名」这两种情况。从 profile 基准 URL 解析该标识符——启动时即 profile 解析路由器给出的答案——才能分开它们：工作区包解析进检出目录，而遮蔽包解析进组合自己的 `node_modules`，于是保留组合自己的副本。
 
@@ -32,4 +32,4 @@ Status: implemented
 
 ## 测试
 
-`packages/boot/app-boot/tests/app-boot.spec.ts` 覆盖了判据的两半：源码启动下工作区插件经由同一模块实例解析；组合用自己 `node_modules` 里的副本遮蔽 `@deepseek-ai/dsh-system-prompt` 时保留该副本。`packages/boot/app-boot/tests/source-plane.spec.ts` 直接钉住判据的每个分支：相对、绝对、import-map 与内建标识符，环境管道无法投影的标识符，`node_modules` 下的依赖，仓库内外的插件入口位置，以及遮蔽场景。`snapshots/session`、`snapshots/sdk`、`snapshots/acp` 的无密钥录制会话复放跑的是真实子进程启动向量；拆掉包装器会在那里重新出现 `prepare` 崩溃。
+`packages/boot/app-boot/tests/app-boot.spec.ts` 覆盖了判据的两半：源码启动下工作区插件经由同一模块实例解析；组合用自己 `node_modules` 里的副本遮蔽 `@deepseek-ai/dsh-system-prompt` 时保留该副本。`packages/boot/app-boot/tests/source-plane.spec.ts` 通过注入的解析器驱动判据，因为环境答案是进程级状态、并发套件能改变它：直接断言环境答案会单独跑通过、在全量车道上失败。每个分支各有一对固定解析结果：相对、绝对、import-map 与内建标识符，两个平面都无法解析的标识符，两个平面都解析进检出的工作区包，以及 `node_modules` 下组合自有的副本。`snapshots/session`、`snapshots/sdk`、`snapshots/acp` 的无密钥录制会话复放跑的是真实子进程启动向量；拆掉包装器会在那里重新出现 `prepare` 崩溃。
