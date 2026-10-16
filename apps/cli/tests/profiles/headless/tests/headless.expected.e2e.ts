@@ -94,11 +94,12 @@ async function deepseekDefaultsServer(options: { waitForTitleRequest?: boolean; 
       requests.push(JSON.parse(body) as JsonObject)
       paths.push(request.url ?? '')
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      // The DeepSeek defaults fixture pins streamIdleTimeoutMs at 1000: comments
-      // every 25ms keep the stream inside it while the response lands past it,
-      // so the comments stay load-bearing rather than incidental. A tighter
-      // watchdog turns a contended runner's scheduling stall into a retry.
-      let keepAlives = 50
+      // The DeepSeek defaults fixture pins streamIdleTimeoutMs at 1000 and that
+      // route resets its watchdog on any received byte, so comments every 25ms
+      // hold the stream inside it while the response lands past it: the comments
+      // stay load-bearing rather than incidental. The pi-ai route resets only on
+      // parsed events, so its response lands inside its own watchdog instead.
+      let keepAlives = options.protocol === 'messages' ? 50 : 3
       const write = (): void => {
         // One-shot teardown may cancel background title work after the main response.
         if (keepAlives-- > 0
