@@ -94,10 +94,11 @@ async function deepseekDefaultsServer(options: { waitForTitleRequest?: boolean; 
       requests.push(JSON.parse(body) as JsonObject)
       paths.push(request.url ?? '')
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      // The DeepSeek defaults fixture pins streamIdleTimeoutMs at 150: comments
+      // The DeepSeek defaults fixture pins streamIdleTimeoutMs at 1000: comments
       // every 25ms keep the stream inside it while the response lands past it,
-      // so the comments stay load-bearing rather than incidental.
-      let keepAlives = 12
+      // so the comments stay load-bearing rather than incidental. A tighter
+      // watchdog turns a contended runner's scheduling stall into a retry.
+      let keepAlives = 50
       const write = (): void => {
         // One-shot teardown may cancel background title work after the main response.
         if (keepAlives-- > 0
