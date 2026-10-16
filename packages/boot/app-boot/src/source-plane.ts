@@ -1,6 +1,7 @@
 /** Source-plane plugin entry loading for a source launch. */
 
 import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import type Loader from '@deepseek-ai/cordis-plugin-loader'
 import type { ModuleLoader } from '@deepseek-ai/cordis-plugin-loader'
 
@@ -8,7 +9,7 @@ import type { ModuleLoader } from '@deepseek-ai/cordis-plugin-loader'
 export interface SourcePlaneResolution {
   /** URL the ambient module pipeline projects the specifier to. */
   readonly projected: string
-  /** Path the plugin entry's own location resolves the specifier to. */
+  /** URL the plugin entry's own location resolves the specifier to. */
   readonly resolved: string
 }
 
@@ -25,13 +26,15 @@ export type SourcePlaneResolver = (specifier: string, parentURL: string) => Sour
  * The ambient resolver: the tsconfig `paths` projection the rest of the graph
  * uses, and Node's own resolution from the entry's location, which the profile
  * resolution router owns during a launch and the ambient pipeline never touches.
+ * The entry-side answer arrives as a file URL so a Windows path separator never
+ * hides a `node_modules` segment from the decision.
  * @param specifier - plugin module specifier to resolve.
  * @param parentURL - base URL the Loader resolves the specifier against.
  * @returns both resolutions.
  */
 export const resolveSourcePlane: SourcePlaneResolver = (specifier, parentURL) => ({
   projected: import.meta.resolve(specifier),
-  resolved: createRequire(parentURL).resolve(specifier),
+  resolved: pathToFileURL(createRequire(parentURL).resolve(specifier)).href,
 })
 
 /**

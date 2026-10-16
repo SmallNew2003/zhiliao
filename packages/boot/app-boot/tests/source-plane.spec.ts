@@ -12,9 +12,18 @@ const repoParentURL = (): string => import.meta.url
 /** A resolver answering with one fixed pair of resolutions. */
 const resolverReturning = (resolution: SourcePlaneResolution): SourcePlaneResolver => () => resolution
 
-const checkout = (file: string): SourcePlaneResolution => ({ projected: `file:///repo/${file}/src/index.ts`, resolved: `/repo/${file}/lib/index.js` })
-const installed = (file: string): SourcePlaneResolution => ({ projected: `file:///repo/${file}/src/index.ts`, resolved: `/repo/node_modules/${file}/index.mjs` })
-const dependency = (name: string): SourcePlaneResolution => ({ projected: `file:///repo/node_modules/.pnpm/${name}/index.mjs`, resolved: `/repo/node_modules/.pnpm/${name}/index.js` })
+const checkout = (file: string): SourcePlaneResolution => ({
+  projected: `file:///repo/${file}/src/index.ts`,
+  resolved: `file:///repo/${file}/lib/index.js`,
+})
+const installed = (file: string): SourcePlaneResolution => ({
+  projected: `file:///repo/${file}/src/index.ts`,
+  resolved: `file:///repo/node_modules/${file}/index.mjs`,
+})
+const dependency = (name: string): SourcePlaneResolution => ({
+  projected: `file:///repo/node_modules/.pnpm/${name}/index.mjs`,
+  resolved: `file:///repo/node_modules/.pnpm/${name}/index.js`,
+})
 
 describe('loadsFromSourcePlane', () => {
   it('leaves relative, absolute, import-map, and builtin specifiers on the internal loader', () => {
@@ -36,7 +45,7 @@ describe('loadsFromSourcePlane', () => {
     expect(loadsFromSourcePlane('js-yaml', repoParentURL(), resolverReturning(dependency('js-yaml')))).toBe(false)
     expect(loadsFromSourcePlane('@deepseek-ai/dsh-tools', repoParentURL(), resolverReturning({
       projected: 'file:///repo/node_modules/@deepseek-ai/dsh-tools/src/index.ts',
-      resolved: '/repo/node_modules/@deepseek-ai/dsh-tools/lib/index.js',
+      resolved: 'file:///repo/node_modules/@deepseek-ai/dsh-tools/lib/index.js',
     }))).toBe(false)
   })
 
