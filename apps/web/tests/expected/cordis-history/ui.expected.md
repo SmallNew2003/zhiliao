@@ -113,8 +113,6 @@
   - img
   - text: Ran for {{duration}}
 - text: 9/1 {{clock}}
-- button "Back to bottom":
-  - img
 - textbox "Message or run a task, / commands, @ files or sessions"
 - button "Add files or run commands":
   - img

@@ -6,7 +6,8 @@ import { chromium } from 'playwright'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, readPersistedEvents, parseSeedFixture, realizeSeedFixture,
+  captureStableAria, compareOrRefreshGolden, launchWebScaffold, scrollConversationToBottom, seedSession,
+  readPersistedEvents, parseSeedFixture, realizeSeedFixture,
   watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { expandOwningTurnProcess, newEnglishPage } from './support.ts'
@@ -54,6 +55,9 @@ describe.skipIf(MODE === 'record')('web e2e: historical Cordis cards', () => {
     const stop = page.locator('[data-tool="cordis_stop"]').first()
     await expandOwningTurnProcess(page, stop)
     await expect.poll(() => stop.getAttribute('data-state')).toBe('ok')
+    // The scroll affordance depends on where the expansions above left the viewport
+    // and on how tall the host's fonts make the transcript, so pin the position.
+    await scrollConversationToBottom(page)
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)

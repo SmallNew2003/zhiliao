@@ -197,6 +197,28 @@ class GrepOutputMatches(TypedDict):
 class GrepOutput(TypedDict):
     matches: list[GrepOutputMatches]
 
+class HindsightRememberArgs(TypedDict):
+    # The finding to keep, stated so it still makes sense out of context.
+    content: str
+    # Additional keys beyond those declared are allowed.
+
+class HindsightRememberOutput(TypedDict):
+    remembered: bool
+    detail: str
+
+class HindsightSearchArgs(TypedDict):
+    # What to look for. Max 12 memories are returned.
+    query: str
+    # Additional keys beyond those declared are allowed.
+
+class HindsightSearchOutputMemories(TypedDict):
+    id: str
+    text: str
+
+class HindsightSearchOutput(TypedDict):
+    memories: list[HindsightSearchOutputMemories]
+    truncated: bool
+
 class InterruptAgentArgs(TypedDict):
     # The agent id of the running agent to interrupt.
     agent_id: str
@@ -518,6 +540,10 @@ class Tools(Protocol):
         """Find files whose paths match a glob pattern. Returns matching file paths — never directories — including hidden and ignored files (VCS metadata directories are excluded). Up to 100 paths come back in modification-time order; a larger result returns the first 100 paths in modification-time order, says so, and reports where the complete sorted list was saved. This tool does not enumerate directory entries."""
     async def grep(self, args: GrepArgs) -> GrepOutput:
         """Search file contents with a ripgrep regular expression. Returns matching lines with line numbers, grouped by file. Returns the first 250 matches inline; a capped result reports where the complete match list was saved. Use read on a matched file for surrounding context."""
+    async def hindsight_remember(self, args: HindsightRememberArgs) -> HindsightRememberOutput:
+        """Record a durable finding in this workspace's long-term memory: a decision and its rationale, a convention you confirmed, or a non-obvious fact. Do not use it for anything the repository already records (code, tests, docs, git history) or for the current turn's progress. Ordinary conclusions are captured automatically at the end of every turn."""
+    async def hindsight_search(self, args: HindsightSearchArgs) -> HindsightSearchOutput:
+        """Search this workspace's long-term memory for earlier decisions, conventions, and context. Use it when a question is about how something was settled previously, or when the injected memory looks too shallow to answer. Prefer this over guessing at a past decision. Results are background knowledge and may be stale; prefer code you can read over memory."""
     async def interrupt_agent(self, args: InterruptAgentArgs) -> InterruptAgentOutput:
         """Request cancellation of a background agent's current turn by its agent id. The target may be your direct child or a deeper agent created under you. Only the current turn stops: messages already queued for the agent stay parked until a later send_message, agents it started keep running, and the agent itself stays available for follow-ups. This call returns as soon as the stop request is accepted, so the target may keep running briefly; interrupting an agent that already finished is an accepted no-op."""
     async def job_kill(self, args: JobKillArgs) -> JobKillOutput:

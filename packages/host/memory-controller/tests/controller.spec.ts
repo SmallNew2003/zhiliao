@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
 import { MemoryError, MemoryRuntime } from '@deepseek-ai/dsh-memory'
@@ -16,10 +16,10 @@ afterEach(async () => {
 function serve(body: unknown, init: { readonly status?: number; readonly text?: string } = {}): string[] {
   const urls: string[] = []
   globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-    urls.push(String(input))
+    urls.push(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
     const text = init.text ?? JSON.stringify(body)
     return new Response(text, { status: init.status ?? 200 })
-  }) as typeof fetch
+  })
   return urls
 }
 
@@ -303,8 +303,11 @@ describe('MemoryController unavailability', () => {
     const { controller } = await harness()
     serve({}, { status: 500, text: 'internal explosion' })
     const answer = await controller.list()
-    expect(answer).toMatchObject({ available: false, reason: 'failed' })
-    expect(answer.available === false && answer.detail).toContain('internal explosion')
+    expect(answer).toMatchObject({
+      available: false,
+      reason: 'failed',
+      detail: expect.stringContaining('internal explosion') as string,
+    })
   })
 
   it('classifies an unknown bank as a failed read, not a missing capability', async () => {
@@ -321,10 +324,13 @@ describe('MemoryController unavailability', () => {
 
   it('classifies an unreachable daemon as an unreachable read', async () => {
     const { controller } = await harness()
-    globalThis.fetch = vi.fn(async () => { throw new TypeError('fetch failed') }) as typeof fetch
+    globalThis.fetch = vi.fn<typeof fetch>(async () => { throw new TypeError('fetch failed') })
     const answer = await controller.list()
-    expect(answer).toMatchObject({ available: false, reason: 'failed' })
-    expect(answer.available === false && answer.detail).toContain('unreachable')
+    expect(answer).toMatchObject({
+      available: false,
+      reason: 'failed',
+      detail: expect.stringContaining('unreachable') as string,
+    })
   })
 
   it('classifies a failure the seam reports as its own MemoryError', async () => {
@@ -369,19 +375,22 @@ describe('MemoryController unavailability', () => {
     const { controller } = await harness()
     // Some runtimes reject with a bare reason rather than an Error; the message
     // it reports is still the transport's own words.
-    globalThis.fetch = vi.fn(async () => { throw 'socket hang up' }) as typeof fetch
+    globalThis.fetch = vi.fn<typeof fetch>(async () => { throw 'socket hang up' })
     const answer = await controller.list()
-    expect(answer).toMatchObject({ available: false, reason: 'failed' })
-    expect(answer.available === false && answer.detail).toContain('socket hang up')
+    expect(answer).toMatchObject({
+      available: false,
+      reason: 'failed',
+      detail: expect.stringContaining('socket hang up') as string,
+    })
   })
 
   it('classifies a caller-aborted request as an unreachable read too', async () => {
     const { controller } = await harness()
     // A browser that navigated away mid-read aborts the request; from the panel's
     // side that is the same condition as the daemon going silent.
-    globalThis.fetch = vi.fn(async () => {
+    globalThis.fetch = vi.fn<typeof fetch>(async () => {
       throw Object.assign(new Error('aborted'), { name: 'AbortError' })
-    }) as typeof fetch
+    })
     expect(await controller.list()).toMatchObject({ available: false, reason: 'unreachable' })
   })
 
@@ -394,7 +403,7 @@ describe('MemoryController unavailability', () => {
 })
 
 describe('MemoryController configuration', () => {
-  let warn: ReturnType<typeof vi.spyOn>
+  let warn: MockInstance<typeof console.warn>
 
   beforeEach(() => {
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
