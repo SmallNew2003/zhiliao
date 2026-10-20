@@ -72,18 +72,18 @@ describe('master-only platform scheduling', () => {
     expect(evaluateCondition(workflow('ci.yml').jobs['all-checks-passed']!.if as string, true, ['success'])).toBe(false)
   })
 
-  it('keeps only Linux and Windows x64 runtimes in required PR CI', () => {
+  it('keeps the release-shaped runtime builder out of required PR CI', () => {
     const pr = workflow('ci.yml')
     expect(Object.keys(pr.on)).toEqual(['pull_request'])
-    expect(pr.jobs['python-runtime']).toMatchObject({
-      if: "github.event_name == 'pull_request'",
-      uses: runtimeBuilder,
-      with: { ci: true, targets: 'node24-linux-x64,node24-win-x64' },
-    })
+    // The builder's real-API preflight fails loud when DEEPSEEK_API_KEY_EXTERNAL
+    // is unset, so a PR lane calling it would be permanently red on a
+    // repository without that secret. It stays a manual master lane.
+    expect(pr.jobs['python-runtime']).toBeUndefined()
+    expect(JSON.stringify(pr.jobs)).not.toContain(runtimeBuilder)
     expect(pr.jobs.windows).toBeUndefined()
     expect(JSON.stringify(pr.jobs)).not.toMatch(/wine-windows-gates|check:windows-wine/)
     const aggregate = pr.jobs['all-checks-passed']!
-    expect(aggregate.needs).toContain('python-runtime')
+    expect(aggregate.needs).not.toContain('python-runtime')
     expect(aggregate.needs).not.toContain('windows')
     expect(aggregate.needs!.every(id => id in pr.jobs)).toBe(true)
     expect(aggregate.if).toBe("${{ !cancelled() && github.event_name == 'pull_request' }}")
@@ -92,17 +92,20 @@ describe('master-only platform scheduling', () => {
     }))
   })
 
-  it('runs all three deferred carriers on master pushes with fail-loud API credentials', () => {
+  it('runs the deferred runtime carriers only on manual dispatch with fail-loud API credentials', () => {
     const master = workflow('ci-master.yml')
     expect(master.on.push).toEqual({ branches: ['master'] })
     expect(Object.keys(master.on).sort()).toEqual(['push', 'workflow_dispatch'])
     const runtime = master.jobs['python-runtime']!
     expect(runtime).toMatchObject({
-      if: masterPush,
+      if: "github.event_name == 'workflow_dispatch' && inputs.suite == 'python-runtime'",
       uses: runtimeBuilder,
       with: { ci: true, targets: 'node24-linux-arm64,node24-macos-arm64,node24-macos-x64' },
       secrets: { DEEPSEEK_API_KEY_EXTERNAL: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}' },
     })
+    // Not push-reachable: a master push must not schedule a lane that cannot
+    // pass without the credential.
+    expect(runtime.if).not.toContain(masterPush)
     expect(runtime.needs).toBeUndefined()
     expect(runtime['continue-on-error']).toBeUndefined()
     const builder = workflow('build-exe-for-python-sdk.yml')
@@ -115,6 +118,8 @@ describe('master-only platform scheduling', () => {
     expect(preflight.if).toContain("github.event_name != 'pull_request'")
     expect(preflight.if).toContain('github.event.pull_request.head.repo.fork')
     expect(preflight.if).toContain("github.event.pull_request.user.login == 'dependabot[bot]'")
+    // The preflight hard-fails on a missing key instead of self-skipping, which
+    // is what keeps the lane out of the automatic PR path.
     expect(preflight.run).toContain('exit 1')
   })
 
