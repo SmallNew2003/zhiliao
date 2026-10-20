@@ -808,7 +808,8 @@ describe('Issue lifecycle workflow', () => {
 
     expect(lifecycle.on).toHaveProperty('pull_request')
     expect(lifecycle.on).toHaveProperty('pull_request_review')
-    expect(lifecycleJob.if).toContain("github.repository == 'deepseek-harness/deepseek-harness'")
+    expect(lifecycle.permissions).toEqual({ contents: 'read', issues: 'write', 'pull-requests': 'read' })
+    expect(lifecycleJob.if).toContain("vars.DSH_ISSUE_MANAGEMENT_ENABLED == 'true'")
     expect(lifecycleJob.if).toContain("github.event.review.state == 'changes_requested'")
     expect(lifecycleJob.if).toContain('github.event.changes.body != null')
     // Keep the subscription-type gates: issue-lifecycle does not re-subscribe
@@ -829,50 +830,38 @@ describe('Issue lifecycle workflow', () => {
     expect(issueEvents.types).toContain('typed')
     expect(issueEvents.types).toContain('untyped')
     const steps = lifecycleJob.steps.filter(isRecord)
-    const tokenStep = steps.find(s => s.name === 'Create project token')
     const handleStep = steps.find(s => s.name === 'Handle repository event')
-    expect(tokenStep?.if).toBeUndefined()
-    expect(handleStep?.if).toBeUndefined()
+    expect(steps).toHaveLength(2)
+    expect(handleStep).toMatchObject({
+      env: {
+        GH_TOKEN: '${{ github.token }}',
+        PROJECT_TOKEN: '${{ secrets.DSH_PROJECT_TOKEN }}',
+      },
+    })
 
     // issue-policy owns PR validation; it is read-only and a real gate.
     const policyPullRequest = workflowEvent(policy, 'pull_request')
     expect(policyPullRequest.types).toContain('ready_for_review')
   })
 
-  it('mints Project credentials only after preflight and always revalidates current metadata', () => {
+  it('uses the Project credential only after preflight and always revalidates current metadata', () => {
     const policy = loadWorkflow('.github/workflows/issue-policy.yml')
     const policyJob = workflowJob(policy, 'policy')
     if (!Array.isArray(policyJob.steps)) throw new TypeError('Issue policy job must define steps')
     const steps = policyJob.steps.filter(isRecord)
-    const tokenStep = steps.find(step => step.name === 'Create Project read token')
     const validateStep = steps.find(step => step.name === 'Validate pull request')
     const preflightStep = steps.find(step => step.id === 'preflight')
     expect(preflightStep).toMatchObject({ shell: 'bash' })
     expect(preflightStep?.run).toContain('if [ -f .github/issue-management/selective-preflight.json ]; then')
     expect(preflightStep?.run).toContain('node .github/issue-management/policy.mjs pr-preflight')
     expect(preflightStep?.if).toBeUndefined()
-    // The job runs only in the repository whose config.json names an existing
-    // Project board and Issue App installation.
-    expect(policyJob.if).toBe("github.repository == 'deepseek-harness/deepseek-harness'")
+    expect(policyJob.if).toBe("vars.DSH_ISSUE_MANAGEMENT_ENABLED == 'true'")
     expect(validateStep?.if).toBe("${{ steps.preflight.outputs.legacy-automated != 'true' }}")
-
-    expect(tokenStep).toMatchObject({
-      id: 'app-token',
-      if: "${{ steps.preflight.outputs.needs-project == 'true' }}",
-      uses: 'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1',
-      with: {
-        'client-id': '${{ vars.DSH_ISSUE_APP_CLIENT_ID }}',
-        'private-key': '${{ secrets.DSH_ISSUE_APP_PRIVATE_KEY }}',
-        owner: 'deepseek-harness',
-        repositories: 'deepseek-harness',
-        'permission-issues': 'read',
-        'permission-organization-projects': 'read',
-      },
-    })
+    expect(steps).toHaveLength(3)
     expect(validateStep).toMatchObject({
       env: {
         GITHUB_TOKEN: '${{ github.token }}',
-        PROJECT_TOKEN: '${{ steps.app-token.outputs.token }}',
+        PROJECT_TOKEN: '${{ secrets.DSH_PROJECT_TOKEN }}',
       },
     })
   })

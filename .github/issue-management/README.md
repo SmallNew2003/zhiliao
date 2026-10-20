@@ -24,7 +24,7 @@ Contributors can link Issues as context without coupling pull-request validation
 <a id="pull-request-policy"></a>
 ## Pull-request policy
 
-[Issue policy](../workflows/issue-policy.yml) applies to non-draft, human-authored PRs with a requested review or submitted review. Exempt PRs finish successfully without resolving Issue references, minting a Project App token, or querying ProjectV2. Eligibility uses live repository state before expensive reads; the required job remains present for subscribed events. Final validation re-reads live state: preflight is not a cached verdict or an exemption for metadata edits.
+[Issue policy](../workflows/issue-policy.yml) applies to non-draft, human-authored PRs with a requested review or submitted review. Exempt PRs finish successfully without resolving Issue references, starting Project reads, or querying ProjectV2. Eligibility uses live repository state before expensive reads; the required job remains present for subscribed events. Final validation re-reads live state: preflight is not a cached verdict or an exemption for metadata edits.
 
 Selective preflight requires [selective-preflight.json](selective-preflight.json) in the trusted checkout. Without that marker, the workflow preserves legacy behavior: human PRs receive a Project token and full legacy validation; Bot/App PRs skip both. A failed supported preflight fails the job rather than falling back.
 
@@ -34,7 +34,7 @@ Eligible PRs need at least one same-repository Issue reference, exactly one cano
 - Resolving references use closing keywords such as `Fixes #123`, `Closes #123`, or `Resolves #123`. Only references that resolve to actual Issues require Project reads during validation. A PR Priority must match the highest resolving-Issue Priority; a resolving PR with a Priority label requires every resolving Issue to have Priority. If all resolving Priorities are empty, the PR may omit Priority.
 - References inside HTML comments, code fences, or inline code do not count. Cross-repository references and references to PRs do not satisfy the Issue requirement.
 
-REST reads use the repository `GITHUB_TOKEN`. Project validation uses a separate App token with Issues and organization Projects read permissions. Missing required Project access or invalid field configuration fails validation rather than bypassing resolving-Issue Priority checks.
+REST reads use the repository `GITHUB_TOKEN`. Project validation uses `DSH_PROJECT_TOKEN`, a classic personal access token with the `project` scope stored as a repository secret. Missing required Project access or invalid field configuration fails validation rather than bypassing resolving-Issue Priority checks.
 
 -----
 
@@ -45,16 +45,20 @@ REST reads use the repository `GITHUB_TOKEN`. Project validation uses a separate
 
 Approval-only and comment-only reviews do not allocate a lifecycle runner. PR pushes and label changes, and Issue assignment changes, do not trigger lifecycle work. Other subscribed Issue events maintain membership, state, and audit comments; exact subscriptions live in the workflow.
 
-PR opening initializes an empty Project `Start Date` for every referenced Issue, including informational references, using the PR creation date in the configured time zone. This lifecycle operation can add Project membership and needs Project write access; the informational-reference read exemption applies only to PR validation. [Planning-field ownership](../../.agents/notes/implemented/process/2026-09-02-project-local-issue-planning-fields.md) defines date preservation.
+PR opening initializes an empty Project `Start Date` for every referenced Issue, including informational references, using the PR creation date in the configured time zone. This lifecycle operation can add Project membership and needs Project write access; the informational-reference read exemption applies only to PR validation. Repository Issue writes use `GITHUB_TOKEN`; Project writes use `DSH_PROJECT_TOKEN`. [Planning-field ownership](../../.agents/notes/implemented/process/2026-09-02-project-local-issue-planning-fields.md) defines date preservation.
 
 -----
 
 <a id="configuration-and-limitations"></a>
 ## Configuration and limitations
 
-[config.json](config.json) selects the repository, Project, field names, statuses, lifecycle actor, and time zone. The policy reads the Project custom single-select `Priority` field, not a native organization Issue Priority field. Maintainers set Project Priority manually; skill guidance that directs edits to native Issue fields does not populate this value. Issue audits remove PR-only kinds and retired label aliases before validating the remaining metadata. There is no field migration or Priority synchronization.
+[config.json](config.json) selects the account owner, repository, Project, field names, statuses, lifecycle actor, and time zone. The policy reads the Project custom single-select `Priority` field, not a native Issue Priority field. Maintainers set Project Priority manually; skill guidance that directs edits to native Issue fields does not populate this value. Issue audits remove PR-only kinds and retired label aliases before validating the remaining metadata. There is no field migration or Priority synchronization.
 
-Both jobs run only in the repository named by that file, `deepseek-harness/deepseek-harness`. Any other repository has no Issue, Project board, or Issue App installation for them to read, so the jobs skip instead of failing.
+Personal-account repositories cannot apply native Issue Types even though the REST issue-type endpoint lists defaults. This repository therefore sets `requireIssueType` to `false`; Issue audit does not demand a native Type that GitHub cannot store. Organization deployments can set it to `true` and keep the five-type rule.
+
+Both jobs run only when the repository variable `DSH_ISSUE_MANAGEMENT_ENABLED` is `true`. The selected user-owned Project must be linked to the repository and expose the configured fields. GitHub App installation tokens and fine-grained personal access tokens cannot write user-owned ProjectsV2, so this personal-account setup uses a classic `DSH_PROJECT_TOKEN` with `project` scope. Project mutations are attributed to that token's owner, and `lifecycleActor` must name the same login.
+
+Because human and automated Project status changes share that login, the lifecycle cannot distinguish a maintainer's manual `In review` change from its own. The terminal-status and forward-transition protections still apply, but the actor-specific review protection is weaker for a personal Project than for an organization Project backed by a bot identity. The [personal-account issue automation decision](../../.agents/notes/implemented/process/2026-10-20-personal-account-issue-automation.md) records the credential trade-off.
 
 Lifecycle processing is event-driven, not a reconciler. Omitted events do not repair Project state, and concurrent Project mutations have no atomic compare-and-swap. Selective evaluation does not redesign required-check authority or guarantee measured Actions-minute savings. The [selective-evaluation decision](../../.agents/notes/implemented/process/2026-09-07-selective-issue-policy-evaluation.md) records the trade-offs.
 
@@ -85,7 +89,7 @@ The focused, keyless policy suite runs from the repository root:
 node --test .github/issue-management/policy.test.mjs
 ```
 
-[Workflow tests](../../scripts/ci-workflow.spec.ts) verify trigger and permission declarations. Local tests do not establish live GitHub delivery, App installation access, or actual runner cost; repository maintainers verify those in Actions.
+[Workflow tests](../../scripts/ci-workflow.spec.ts) verify trigger and permission declarations. Local tests do not establish live GitHub delivery, Project-token access, or actual runner cost; repository maintainers verify those in Actions.
 
 -----
 
