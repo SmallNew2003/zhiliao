@@ -470,6 +470,8 @@ const EXPECTED_TOOLS = [
   'edit',
   'exit_plan_mode',
   'get_goal',
+  'hindsight_remember',
+  'hindsight_search',
   'interrupt_agent',
   'job_kill',
   'job_list',
@@ -581,11 +583,14 @@ it('assembles the shipped Web transport, catalog, guidance, and defaults', async
     }
   `)
   // The catalog belongs to an AGENT, not to the process: every model-facing row
-  // now lives in a preset mounted under one session's scope, so the global
-  // layer holds nothing and a caller must name the agent to see anything. This
-  // composes from the deployment default — what a session that names no preset
-  // gets — which is the shape this test has always been about.
-  expect(ctx.tools.schemas().map(schema => schema.name)).toEqual([])
+  // lives in a preset mounted under one session's scope, so a caller must name
+  // the agent to see anything. This composes from the deployment default — what
+  // a session that names no preset gets — which is the shape this test has
+  // always been about. The memory tools are the host-level exception: the seam
+  // resolves every session's banks against one backend, so they register from
+  // the host composition rather than a preset, and any other global row fails
+  // this assertion.
+  expect(ctx.tools.schemas().map(schema => schema.name).sort()).toEqual(['hindsight_remember', 'hindsight_search'])
   const handle = await ctx.agents.create({
     sessionId: SessionId('shipped-composition'),
     setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),
