@@ -41,6 +41,9 @@ for (const status of ['In progress', 'In review']) {
 if (typeof config.lifecycleActor !== 'string' || !config.lifecycleActor) {
   throw new Error('config.lifecycleActor 未设置')
 }
+if (typeof config.requireIssueType !== 'boolean') {
+  throw new Error('config.requireIssueType 必须为布尔值')
+}
 if (typeof config.priorityField !== 'string' || !config.priorityField) {
   throw new Error('config.priorityField 未设置')
 }
@@ -215,7 +218,9 @@ export function validateIssue(issue) {
   if (invalidLabels.length > 0) {
     errors.push(`Issue 不得使用 PR kind 或旧版标签：${invalidLabels.join(', ')}`)
   }
-  if (!TYPES.has(issue.type ?? '')) errors.push('Type 必须是五种原生英文 Type 之一')
+  if (config.requireIssueType && !TYPES.has(issue.type ?? '')) {
+    errors.push('Type 必须是五种原生英文 Type 之一')
+  }
   if (!status || !config.statuses.includes(status)) errors.push('Issue 必须在 Project 中且具有合法 Status')
   if (issue.priority !== null && !PRIORITIES.includes(issue.priority.toLowerCase())) {
     errors.push('Priority 必须为空或为 P0–P3')

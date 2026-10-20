@@ -69,7 +69,7 @@ export async function graphql(query, variables) {
  * @returns {Promise<object|null>} Issue snapshot, or null when the number identifies a pull request.
  */
 export async function issueSnapshot(number, status = undefined) {
-  const issue = await api(`/repos/${config.organization}/${config.repository}/issues/${number}`)
+  const issue = await api(`/repos/${config.owner}/${config.repository}/issues/${number}`)
   if (issue.pull_request) return null
   const context = await projectContext(number)
   return {
@@ -94,7 +94,7 @@ export async function issueSnapshot(number, status = undefined) {
 export async function projectContext(number, includeStatusActor = false, includeStartDate = false) {
   const data = await graphql(
     `query(
-      $organization: String!
+      $owner: String!
       $repository: String!
       $number: Int!
       $project: Int!
@@ -103,7 +103,7 @@ export async function projectContext(number, includeStatusActor = false, include
       $priorityField: String!
       $startDateField: String!
     ) {
-      organization(login: $organization) {
+      repository(owner: $owner, name: $repository) {
         projectV2(number: $project) {
           id
           title
@@ -125,8 +125,6 @@ export async function projectContext(number, includeStatusActor = false, include
             }
           }
         }
-      }
-      repository(owner: $organization, name: $repository) {
         issue(number: $number) {
           id
           timelineItems(last: 100, itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT])
@@ -159,7 +157,7 @@ export async function projectContext(number, includeStatusActor = false, include
       }
     }`,
     {
-      organization: config.organization,
+      owner: config.owner,
       repository: config.repository,
       number,
       project: config.projectNumber,
@@ -169,7 +167,7 @@ export async function projectContext(number, includeStatusActor = false, include
       startDateField: config.startDateField,
     },
   )
-  const project = data.organization?.projectV2
+  const project = data.repository?.projectV2
   const issue = data.repository?.issue
   if (!project || project.title !== config.projectTitle) throw new Error('目标 Project 不存在或标题不匹配')
   if (!issue) throw new Error(`#${number} 不存在`)

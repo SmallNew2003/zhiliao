@@ -24,7 +24,7 @@ description: "面向仓库维护者的 Issue 策略强制范围、Project 访问
 <a id="pull-request-policy"></a>
 ## PR 策略
 
-[Issue policy](../workflows/issue-policy.yml)适用于已请求评审或已有评审、非草稿且由人类创建的 PR。豁免 PR 成功结束，不解析 Issue 引用、不签发 Project App token，也不查询 ProjectV2。工作流在昂贵读取前根据仓库实时状态判断强制范围；订阅事件仍保留必需 job。最终校验重新读取实时状态：预检不是缓存结论，也不是元数据编辑的豁免。
+[Issue policy](../workflows/issue-policy.yml)适用于已请求评审或已有评审、非草稿且由人类创建的 PR。豁免 PR 成功结束，不解析 Issue 引用、不启动 Project 读取，也不查询 ProjectV2。工作流在昂贵读取前根据仓库实时状态判断强制范围；订阅事件仍保留必需 job。最终校验重新读取实时状态：预检不是缓存结论，也不是元数据编辑的豁免。
 
 选择性预检要求受信任的检出中存在 [selective-preflight.json](selective-preflight.json)。缺少该标记时，工作流保留旧版行为：人类 PR 获取 Project token 并执行完整旧版校验；Bot/App PR 跳过两者。受支持的预检执行失败时，job 失败而不回退。
 
@@ -34,7 +34,7 @@ description: "面向仓库维护者的 Issue 策略强制范围、Project 访问
 - 解决型引用使用关闭关键词，如 `Fixes #123`、`Closes #123` 或 `Resolves #123`。校验期间只有解析为实际 Issue 的解决型引用需要读取 Project。PR Priority 必须匹配被解决 Issue 中的最高 Priority；带 Priority 标签的解决型 PR 要求每个被解决 Issue 均有 Priority。若所有被解决 Issue 的 Priority 均为空，PR 可以省略 Priority。
 - HTML 注释、代码围栏或行内代码中的引用不计入。跨仓库引用与指向 PR 的引用不能满足 Issue 引用要求。
 
-REST 读取使用仓库 `GITHUB_TOKEN`。Project 校验使用独立的 App token，具有 Issues 和组织 Projects 读取权限。缺少所需 Project 访问权限或字段配置无效时，校验失败，而不是绕过解决型 Issue 的 Priority 检查。
+REST 读取使用仓库 `GITHUB_TOKEN`。Project 校验使用仓库 secret `DSH_PROJECT_TOKEN`，它是具有 `project` scope 的 classic personal access token。缺少所需 Project 访问权限或字段配置无效时，校验失败，而不是绕过解决型 Issue 的 Priority 检查。
 
 -----
 
@@ -45,16 +45,20 @@ REST 读取使用仓库 `GITHUB_TOKEN`。Project 校验使用独立的 App token
 
 仅批准或仅评论的评审不分配生命周期 runner。PR 推送与标签变更，以及 Issue 指派变更，不触发生命周期工作。其他已订阅的 Issue 事件维护 Project 归属、状态及审计评论；精确订阅列表由工作流定义。
 
-PR 打开时，工作流按配置时区中的 PR 创建日期，为每个被引用 Issue（包括信息型引用）初始化空的 Project `Start Date`。此生命周期操作可以添加 Project 归属，并需要 Project 写权限；信息型引用的读取豁免仅适用于 PR 校验。[规划字段归属](../../.agents/notes/implemented/process/2026-09-02-project-local-issue-planning-fields.zh.md)定义日期保留规则。
+PR 打开时，工作流按配置时区中的 PR 创建日期，为每个被引用 Issue（包括信息型引用）初始化空的 Project `Start Date`。此生命周期操作可以添加 Project 归属，并需要 Project 写权限；信息型引用的读取豁免仅适用于 PR 校验。仓库 Issue 写入使用 `GITHUB_TOKEN`，Project 写入使用 `DSH_PROJECT_TOKEN`。[规划字段归属](../../.agents/notes/implemented/process/2026-09-02-project-local-issue-planning-fields.zh.md)定义日期保留规则。
 
 -----
 
 <a id="configuration-and-limitations"></a>
 ## 配置与限制
 
-[config.json](config.json)选择仓库、Project、字段名、状态、生命周期操作者和时区。策略读取 Project 自定义单选 `Priority` 字段，而非组织原生 Issue Priority 字段。维护者手动设置 Project Priority；指引编辑原生 Issue 字段的 skill 不会填充该值。Issue 审计先移除 PR 专用 kind 标签和已停用的标签别名，再校验其余元数据。不提供字段迁移或 Priority 同步。
+[config.json](config.json)选择账号所有者、仓库、Project、字段名、状态、生命周期操作者和时区。策略读取 Project 自定义单选 `Priority` 字段，而非原生 Issue Priority 字段。维护者手动设置 Project Priority；指引编辑原生 Issue 字段的 skill 不会填充该值。Issue 审计先移除 PR 专用 kind 标签和已停用的标签别名，再校验其余元数据。不提供字段迁移或 Priority 同步。
 
-两个 job 只在该文件选定的仓库 `deepseek-harness/deepseek-harness` 运行。其他仓库没有可供读取的 Issue、Project 看板和 Issue App 安装，因此 job 跳过而不是失败。
+个人账号仓库即使 REST Issue Type 端点列出默认类型，也无法把原生 Issue Type 应用到 Issue。因此本仓库将 `requireIssueType` 设为 `false`，Issue 审计不会要求 GitHub 实际无法保存的原生 Type。组织部署可以设为 `true`，保留五种原生 Type 的规则。
+
+两个 job 仅在仓库变量 `DSH_ISSUE_MANAGEMENT_ENABLED` 为 `true` 时运行。选定的个人 Project 必须链接到仓库，并提供配置中的字段。GitHub App 安装 token 与 fine-grained personal access token 无法写入个人拥有的 ProjectsV2，因此此个人账号配置使用具有 `project` scope 的 classic `DSH_PROJECT_TOKEN`。Project mutation 归属于该 token 的所有者，`lifecycleActor` 必须使用同一登录名。
+
+由于人工和自动化的 Project 状态变更共享该登录名，生命周期无法区分维护者手动设置的 `In review` 与自身的写入。终态保护和向前状态转换保护仍然有效，但个人 Project 的 actor 专属评审保护弱于由 bot 身份操作的组织 Project。[个人账号 Issue 自动化决策](../../.agents/notes/implemented/process/2026-10-20-personal-account-issue-automation.zh.md)记录凭据取舍。
 
 生命周期处理由事件驱动，不是协调器。被省略的事件不会修复 Project 状态，并发 Project mutation 也没有原子比较并交换保护。选择性求值不重新设计必需检查的权威来源，也不保证已测得的 Actions 分钟节省。[选择性求值决策](../../.agents/notes/implemented/process/2026-09-07-selective-issue-policy-evaluation.zh.md)记录取舍。
 
@@ -85,7 +89,7 @@ PR 打开时，工作流按配置时区中的 PR 创建日期，为每个被引�
 node --test .github/issue-management/policy.test.mjs
 ```
 
-[工作流测试](../../scripts/ci-workflow.spec.ts)验证触发器与权限声明。本地测试不能证明 GitHub 实际事件交付、App 安装访问权限或实际 runner 成本；仓库维护者在 Actions 中验证这些内容。
+[工作流测试](../../scripts/ci-workflow.spec.ts)验证触发器与权限声明。本地测试不能证明 GitHub 实际事件交付、Project token 访问权限或实际 runner 成本；仓库维护者在 Actions 中验证这些内容。
 
 -----
 
