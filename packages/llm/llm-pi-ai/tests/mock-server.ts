@@ -6,8 +6,6 @@ export interface MockServer {
   paths: string[]
   requests: unknown[]
   headers: IncomingMessage['headers'][]
-  readonly closedResponses: number
-  responseClosed: Promise<void>
 }
 
 const servers: Server[] = []
@@ -36,13 +34,7 @@ export async function mockServer(script: {
   const paths: string[] = []
   const requests: unknown[] = []
   const headers: IncomingMessage['headers'][] = []
-  let closedResponses = 0
-  const responseClosed = Promise.withResolvers<undefined>()
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    response.on('close', () => {
-      closedResponses += 1
-      responseClosed.resolve(undefined)
-    })
     let body = ''
     request.on('data', (chunk: Buffer) => { body += chunk.toString('utf8') })
     request.on('end', () => {
@@ -81,7 +73,5 @@ export async function mockServer(script: {
     paths,
     requests,
     headers,
-    responseClosed: responseClosed.promise,
-    get closedResponses() { return closedResponses },
   }
 }
