@@ -9,8 +9,9 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { mountDiscovery, startCatalogConnection } from './discovery-fixture.ts'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
-import { startConnection, resolveReconnectPolicy } from '../src/connection.ts'
+import { resolveReconnectPolicy } from '../src/connection.ts'
 import type { Config } from '../src/index.ts'
 
 const { mockTransport } = vi.hoisted(() => ({ mockTransport: vi.fn<() => Transport>() }))
@@ -25,10 +26,11 @@ async function connect(server: McpServer, options?: { resources: true }): Promis
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await mountDiscovery(ctx)
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const serving = serveStdio(() => server, { transport: serverTransport })
   mockTransport.mockReturnValue(clientTransport)
-  const connection = startConnection(ctx, config, resolveReconnectPolicy({ enabled: false }, 'fixture'))
+  const connection = startCatalogConnection(ctx, config, resolveReconnectPolicy({ enabled: false }, 'fixture'))
   onTestFinished(async () => {
     await connection.dispose()
     await serving.close()
@@ -49,7 +51,7 @@ describe('modern MCP connections', () => {
       contents: [{ uri: 'memo://readme', text: 'memo' }],
     }))
     const ctx = await connect(server)
-    expect(ctx.tools.schemas()).toEqual([])
+    expect(ctx.tools.schemas().map(tool => tool.name)).toEqual(['discover_mcp_tools'])
   })
 
   it('keeps shared resource tools for a configured server without resource capability', async () => {
@@ -60,7 +62,7 @@ describe('modern MCP connections', () => {
     const ctx = await connect(server, { resources: true })
     const names = ctx.tools.schemas().map(tool => tool.name)
     expect(names.toSorted()).toEqual([
-      'list_mcp_resource_templates', 'list_mcp_resources', 'mcp__fixture__ping', 'read_mcp_resource',
+      'discover_mcp_tools', 'list_mcp_resource_templates', 'list_mcp_resources', 'mcp__fixture__ping', 'read_mcp_resource',
     ])
     for (const [name, expected] of [
       ['list_mcp_resources', { resources: [] }],

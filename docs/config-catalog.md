@@ -599,7 +599,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:130`](../packages/experi
 
 ## `@deepseek-ai/dsh-experimental-browser-use-chrome-devtools-mcp`
 
-Requires: `browserUse` · `agents` · `tools` · `systemPrompt`
+Requires: `browserUse` · `agents` · `tools` · `systemPrompt` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Fixed Chromium launch or existing-browser attachment settings. */
@@ -614,7 +614,7 @@ Source: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:14`
 
 ## `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp`
 
-Requires: `browserUse` · `agents` · `tools` · `systemPrompt`
+Requires: `browserUse` · `agents` · `tools` · `systemPrompt` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Fixed Chromium launch or existing-browser attachment settings. */
@@ -671,7 +671,7 @@ Source: [`packages/experimental/browser-use-stagehand-native/src/index.ts:28`](.
 
 ## `@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp`
 
-Requires: `computerUse` · `tools`
+Requires: `computerUse` · `tools` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Installed executable and MCP connection overrides. */
@@ -1652,7 +1652,7 @@ Source: [`packages/lsp/lsp-stdio/src/index.ts:82`](../packages/lsp/lsp-stdio/src
 
 ## `@deepseek-ai/dsh-mcp-client`
 
-Requires: `tools`
+Requires: `tools` · `mcpDiscovery`
 
 ```ts config-catalog
 /** Configuration for one stdio or Streamable HTTP MCP server. */
@@ -1724,6 +1724,50 @@ export interface ReconnectConfig {
 ```
 
 Source: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
+
+<a id="deepseek-aidsh-mcp-discovery"></a>
+
+## `@deepseek-ai/dsh-mcp-discovery`
+
+Requires: `tools` · `systemPrompt` · `sessionProjections`
+
+```ts config-catalog
+/** UTF-8 limits cover complete emitted MCP representations. */
+export interface Config {
+  /** Maximum UTF-8 bytes of complete directory text, including wrappers and continuation guidance. */
+  catalogBytes: number
+  /** Maximum UTF-8 bytes of serialized complete MCP schemas, including discovery. */
+  nativeBytes: number
+  /** Maximum UTF-8 bytes of the complete generated MCP SDK, including discovery. */
+  sdkBytes: number
+  /** Maximum UTF-8 bytes of activated literal server instructions, including attribution. */
+  instructionBytes: number
+  /** Maximum UTF-8 bytes of complete serialized discovery results. */
+  resultBytes: number
+  /** Maximum descriptors per search page; byte admission may return fewer. */
+  resultLimit: number
+  /** Independent auxiliary configuration; omission disables auxiliary requests. */
+  selector?: SelectorConfig | undefined
+}
+
+/** Independent auxiliary route; omission disables all selector calls. */
+export interface SelectorConfig {
+  /** Explicit registered auxiliary provider route; never inherited from the conversation. */
+  provider: string
+  /** Auxiliary model id resolved by that provider. */
+  model: string
+  /** Maximum UTF-8 bytes of exact auxiliary system and message text. */
+  inputBytes: number
+  /** Maximum UTF-8 bytes accepted from the auxiliary reply. */
+  outputBytes: number
+  /** Explicit auxiliary generation token limit, independent of reply byte admission. */
+  maxTokens: number
+  /** Cooperative auxiliary deadline in milliseconds; cancellation awaits owned work. */
+  timeoutMs: number
+}
+```
+
+Source: [`packages/mcp/mcp-discovery/src/index.ts:36`](../packages/mcp/mcp-discovery/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -2913,7 +2957,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:256`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 
@@ -3496,7 +3540,7 @@ export interface Config {
 export type ToolPresentationMode = 'native' | 'ptc' | 'both'
 ```
 
-Source: [`packages/core/tools/src/index.ts:656`](../packages/core/tools/src/index.ts)
+Source: [`packages/core/tools/src/index.ts:664`](../packages/core/tools/src/index.ts)
 
 <a id="deepseek-aidsh-typert-loader"></a>
 
@@ -3843,7 +3887,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@deepseek-ai/dsh-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
-- `@deepseek-ai/dsh-mcp-resources` — requires `tools` ([`packages/mcp/mcp-resources/src/index.ts`](../packages/mcp/mcp-resources/src/index.ts))
+- `@deepseek-ai/dsh-mcp-resources` — requires `tools` · `mcpDiscovery` ([`packages/mcp/mcp-resources/src/index.ts`](../packages/mcp/mcp-resources/src/index.ts))
 - `@deepseek-ai/dsh-sandbox-ssh` — requires `ssh` ([`packages/ssh/sandbox-ssh/src/index.ts`](../packages/ssh/sandbox-ssh/src/index.ts))
 - `@deepseek-ai/dsh-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
 - `@deepseek-ai/dsh-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))

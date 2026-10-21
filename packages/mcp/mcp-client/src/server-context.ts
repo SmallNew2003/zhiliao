@@ -6,10 +6,12 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { McpResourceProvider } from '@deepseek-ai/dsh-mcp-resources'
-import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-mcp-discovery'
 
 /** Connection-owned values used by the resource and prompt consumers. */
 export interface ServerContext {
+  /** Whether the current connection generation is ready to accept requests. */
+  connected(): boolean
   /** Resource access through the current connection generation. */
   resources: McpResourceProvider
   /**
@@ -26,15 +28,8 @@ export interface ServerContext {
  * @param connection - live resource operations and successful instruction snapshot.
  */
 export function registerServerContext(ctx: Context, server: string, connection: ServerContext): void {
+  ctx.mcpDiscovery.registerServer(server, connection)
   ctx.inject(['mcpResources'], (inner) => {
     inner.mcpResources.register(server, connection.resources)
-  })
-  ctx.inject(['systemPrompt'], (inner) => {
-    inner.systemPrompt.section({
-      name: `mcp:${server}`,
-      order: inner.systemPrompt.getSectionOrder('MCP_SERVERS'),
-      interpolate: false,
-      text: () => connection.instructions(),
-    })
   })
 }

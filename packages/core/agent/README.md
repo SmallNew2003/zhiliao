@@ -82,6 +82,8 @@ The package is built on one separation: the public `Agent` surface and registry 
 
 ### Step admission
 
+`assembleContextFor(agent, signal?, stepInput?)` couples the Agent and its scope for prompt assembly. During a proposed step, `AssembleContext.stepInput` carries the claimed readonly messages and proposed `turn`/`step` coordinates before `agent/pre-step` may rewrite or reject them. Diagnostic assembly may omit it; these messages are not yet admitted to model history.
+
 `PreStepDecision` is either `{ kind: 'reject' }` or `{ kind: 'enter', messages, startsRequestSeries? }`. The enter branch contains the complete identified, frozen message batch. Acceptance does not commit it: after assembly and `step/start`, `agent/request` and `prepareCall()` resolve the route before the loop commits the system prompt and user batch. Cancellation during either async phase commits neither. `startsRequestSeries: true` declares a distinct model-message series; a wrapping listener preserves that declaration and the batch unless it intentionally replaces either one. Claiming removes offered messages from the inbox, while messages inserted after the claim remain pending for a later boundary.
 
 ### Durable inbox

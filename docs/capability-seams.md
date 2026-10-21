@@ -18,9 +18,11 @@ flowchart LR
   svc_connection["ctx.connection<br/>Authenticated browser transport"]
   pkg_api_gateway["api-gateway"]
   pkg_host_frontend_static["host-frontend-static"]
+  pkg_mcp_discovery["mcp-discovery"]
+  svc_mcpDiscovery["ctx.mcpDiscovery<br/>Scoped MCP discovery and request admission"]
+  pkg_mcp_client["mcp-client"]
   pkg_mcp_resources["mcp-resources"]
   svc_mcpResources["ctx.mcpResources<br/>Scoped MCP resource access"]
-  pkg_mcp_client["mcp-client"]
   pkg_browser_use["browser-use"]
   svc_browserUse["ctx.browserUse<br/>Browser-use provider registration"]
   pkg_experimental_browser_use_playwright_mcp["experimental-browser-use-playwright-mcp"]
@@ -319,6 +321,7 @@ flowchart LR
   pkg_lsp --> svc_lsp
   pkg_lsp_stdio --> svc_lsp
   pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_discovery --> svc_mcpDiscovery
   pkg_mcp_resources --> svc_mcpResources
   pkg_message_feedback --> svc_messageFeedback
   pkg_office_to_pdf --> svc_officeToPdf
@@ -439,6 +442,8 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_mcpDiscovery --> pkg_mcp_client
+  svc_mcpDiscovery --> pkg_mcp_resources
   svc_mcpResources --> pkg_mcp_resources
   svc_officeToPdf --> pkg_client_ui_sidebar_documentpreview
   svc_pluginManager --> pkg_plugin_manager
@@ -541,6 +546,7 @@ flowchart LR
 | `ctx.pluginManager` | `core` | [`plugin-manager`](../packages/boot/plugin-manager) | - | [`plugin-manager`](../packages/boot/plugin-manager), `ui-settings-plugin-inventory` | - | Shares profile package operations with the CLI and reports persisted and running state to Web and agent callers. |
 | `ctx.profileContext` | `core` | [`app-boot`](../packages/boot/app-boot) | - | [`plugin-manager`](../packages/boot/plugin-manager) | - | The dsh launcher supplies data-only profile locations and composition inputs; reload scheduling belongs to dsh-hmr. |
 | `ctx.connection` | `core` | [`client-connection`](../packages/client/connection) | - | [`api-gateway`](../packages/api/gateway), [`host-frontend-static`](../packages/host/frontend-static) | - | Owns browser authentication and shared HTTP request dispatch; API adapters register endpoints and streams. |
+| `ctx.mcpDiscovery` | `core` | [`mcp-discovery`](../packages/mcp/mcp-discovery) | - | [`mcp-client`](../packages/mcp/mcp-client), [`mcp-resources`](../packages/mcp/mcp-resources) | - | Owns bounded discovery, complete selected definitions and instructions, and durable request identities without changing tool permissions. |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | Connection-owned providers serve shared resource tools in the calling agent scope. |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API. |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | One provider-owned name per service instance. Each provider also owns its model tools; the service has no common action API, runtime selection, or Session workflow lock. |

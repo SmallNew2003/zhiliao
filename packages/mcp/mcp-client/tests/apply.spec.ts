@@ -7,6 +7,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
+import { mountDiscovery } from './discovery-fixture.ts'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
 
@@ -56,6 +57,7 @@ async function mountRegistry(): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await mountDiscovery(ctx)
   return ctx
 }
 
@@ -84,7 +86,7 @@ const stdioConfig: Config = {
 describe('mcp-client plugin module exports', () => {
   it('exports name, inject, and Config', () => {
     expect(name).toBe('mcp-client')
-    expect(inject).toEqual(['tools'])
+    expect(inject).toEqual(['tools', 'mcpDiscovery'])
     expect(ConfigSchema).toBeDefined()
   })
 
@@ -218,6 +220,33 @@ describe('apply (plugin lifecycle)', () => {
     expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
   })
 
+  it('closes a pending connection when discovery server registration fails', async () => {
+    const connecting: PromiseWithResolvers<void> = Promise.withResolvers()
+    mockConnect.mockImplementation(() => connecting.promise)
+    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
+      this.onclose?.()
+      connecting.resolve()
+      return Promise.resolve()
+    })
+    ctx.mcpDiscovery.registerServer('srv', { connected: () => true, instructions: () => '' })
+    const fiber = ctx.plugin({ name: 'mcp-client-registration-conflict', inject, apply }, {
+      ...stdioConfig, reconnect: { enabled: false },
+    })
+    try {
+      await expect(Promise.resolve(fiber)).rejects.toThrow('already registered')
+      await fiber.dispose()
+      expect(mockConnect).toHaveBeenCalledTimes(1)
+      expect(mockClose).toHaveBeenCalledTimes(1)
+      expect(mockListTools).not.toHaveBeenCalled()
+      expect(ctx.mcpDiscovery.search().items).toEqual([
+        { server: 'srv', description: 'MCP server; activate for resource access.', connected: true },
+      ])
+    } finally {
+      connecting.resolve()
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('closes the transport when its owner unloads during initial connection', async () => {
     const connecting: PromiseWithResolvers<void> = Promise.withResolvers()
     mockConnect.mockImplementation(() => connecting.promise)
@@ -234,7 +263,7 @@ describe('apply (plugin lifecycle)', () => {
       await activation
       expect(mockClose).toHaveBeenCalledTimes(1)
       expect(mockListTools).not.toHaveBeenCalled()
-      expect(ctx.tools.schemas()).toEqual([])
+      expect(ctx.tools.schemas().filter(tool => tool.name.startsWith('mcp__'))).toEqual([])
     } finally {
       connecting.resolve()
       await ctx.fiber.dispose()
@@ -242,8 +271,12 @@ describe('apply (plugin lifecycle)', () => {
   })
 
   it('allows one serverName in each independent registration scope', async () => {
-    const first = createScope(ctx, {})
-    const second = createScope(ctx, {})
+    let first!: ReturnType<typeof createScope>
+    let second!: ReturnType<typeof createScope>
+    await ctx.plugin({ inject, apply(inner: Context) {
+      first = createScope(inner, {})
+      second = createScope(inner, {})
+    } })
 
     await Promise.all([apply(first.ctx, stdioConfig), apply(second.ctx, stdioConfig)])
 
@@ -255,6 +288,7 @@ describe('apply (plugin lifecycle)', () => {
     const first = new Context()
     await first.plugin(SystemPrompt)
     await first.plugin(ToolRuntime)
+    await mountDiscovery(first)
     await apply(first, stdioConfig)
 
     await first.fiber.dispose()
@@ -265,6 +299,7 @@ describe('apply (plugin lifecycle)', () => {
     const second = new Context()
     await second.plugin(SystemPrompt)
     await second.plugin(ToolRuntime)
+    await mountDiscovery(second)
     await expect(apply(second, stdioConfig)).resolves.toBeUndefined()
     await second.fiber.dispose()
   })
@@ -393,7 +428,7 @@ describe('apply (plugin lifecycle)', () => {
   it('effect disposer unregisters the CURRENT generation and closes client', async () => {
     // Load through ctx.plugin so ONLY the plugin's fiber is disposed — the
     // registry must survive to observe the unregistration.
-    const fiber = ctx.plugin({ name: 'mcp-client', inject: ['tools'], apply }, stdioConfig)
+    const fiber = ctx.plugin({ name: 'mcp-client', inject: ['tools', 'mcpDiscovery'], apply }, stdioConfig)
     await fiber
 
     // Advance to a second generation first.
@@ -460,7 +495,7 @@ describe('server instruction limits', () => {
       assert(failure instanceof Error)
       assert(failure.cause instanceof Error)
       expect(failure.cause.message).toContain('server instructions exceed maxInstructionBytes')
-      expect(ctx.tools.schemas()).toEqual([])
+      expect(ctx.tools.schemas().filter(tool => tool.name.startsWith('mcp__'))).toEqual([])
     } finally {
       spy.mockRestore()
       await ctx.fiber.dispose()

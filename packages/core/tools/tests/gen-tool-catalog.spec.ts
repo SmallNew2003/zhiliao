@@ -28,7 +28,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
     expect(names).toEqual([
       'ask_user_question', 'bash', 'bash', 'cordis_inspect_list',
       'cordis_inspect_query',
-      'create_goal', 'edit', 'exit_plan_mode', 'get_goal', 'glob', 'grep',
+      'create_goal', 'discover_mcp_tools', 'edit', 'exit_plan_mode', 'get_goal', 'glob', 'grep',
       'interrupt_agent', 'interrupt_agent', 'job_kill', 'job_list', 'job_output',
       'list_agents', 'list_agents', 'list_mcp_resource_templates', 'list_mcp_resources',
       'list_subagent_models', 'lsp', 'plugin_manager', 'present', 'pwsh', 'pwsh', 'ralph',
@@ -70,6 +70,12 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       list_agents: 'packages/subagent/tool-subagent-control/src/list-agents.ts',
       send_message: 'packages/subagent/tool-subagent-control/src/index.ts',
     })
+    const discovery = catalog.find(entry => entry.pkg === '@deepseek-ai/dsh-mcp-discovery')
+    expect(discovery?.sources).toEqual({ discover_mcp_tools: 'packages/mcp/mcp-discovery/src/index.ts' })
+    const resources = catalog.find(entry => entry.pkg === '@deepseek-ai/dsh-mcp-resources')
+    expect(resources?.schemas.map(schema => schema.name).sort()).toEqual([
+      'list_mcp_resource_templates', 'list_mcp_resources', 'read_mcp_resource',
+    ])
   })
 
   it('harvests search tools without depending on the generator process PATH', async () => {
