@@ -1387,6 +1387,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'memory',
+    summary: 'The long-term memory service.',
+    description: 'The long-term memory service. Registered as `ctx.memory` (one instance per context).\n\nSelection semantics (resolved at call time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `MEMORY_PROVIDER_CONFIGURED_MISSING`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `MEMORY_PROVIDER_UNAVAILABLE`.\n- No id configured, no usable provider → `MEMORY_PROVIDER_UNAVAILABLE`.\n\nEvery method degrades loudly rather than silently: a missing or unhealthy backend raises MemoryError so callers can decide to warn and continue. Callers on the agent hot path are expected to catch, because memory must never block a turn.',
+    methods: [
+      {
+        signature: 'registerProvider(provider: MemoryProvider): () => void',
+        description: 'Register a memory provider. Throws MemoryError `MEMORY_DUPLICATE_PROVIDER` when its id is taken. Returns a disposer; disposed with the calling fiber.',
+        parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'isAvailable(): boolean',
+        description: 'Whether a usable provider is currently registered. Callers on the agent hot path check this first so a disabled or unreachable backend costs nothing.\n\nThis never throws: "is memory usable" must be answerable as `false`, otherwise every caller needs its own try/catch around the question. A misconfigured provider id is still reported through MemoryError on the calls that need a provider.',
+        parameters: [],
+        returns: 'true when at least one registered provider reports itself available.',
+      },
+      {
+        signature: 'async resolveBank(workspaceRoot: string, signal?: AbortSignal): Promise<MemoryBankId>',
+        description: 'Resolve the bank that owns `workspaceRoot`, creating it when absent. Selection errors surface here unchanged.',
+        parameters: [{ name: 'workspaceRoot', description: 'absolute directory whose bank should be resolved.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the bank id for that workspace.',
+      },
+      {
+        signature: 'async search(request: MemorySearchRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemorySearchResult>',
+        description: 'Search a bank\'s memories through the selected provider. The seam enforces `request.limit`: an over-returning provider\'s `units` are truncated and `truncated` set.',
+        parameters: [{ name: 'request', description: 'the query and optional limit.' }, { name: 'bankId', description: 'the bank to search.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the search outcome, capped to `request.limit`.',
+      },
+      {
+        signature: 'async recall(request: MemoryRecallRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRecallResult>',
+        description: 'Recall memories relevant to a session opening. The seam enforces `request.limit`.',
+        parameters: [{ name: 'request', description: 'the opening prompt and optional limit.' }, { name: 'bankId', description: 'the bank to recall from.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the recall outcome, capped to `request.limit`.',
+      },
+      {
+        signature: 'async retain(request: MemoryRetainRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRetainResult>',
+        description: 'Retain a finished session\'s transcript into a bank.',
+        parameters: [{ name: 'request', description: 'the transcript to retain.' }, { name: 'bankId', description: 'the bank to retain into.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the retention outcome reported by the backend.',
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Session-log service; cold operations never construct a Session or Agent.',
     description: 'Session-log service; cold operations never construct a Session or Agent.',
@@ -5097,6 +5140,42 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
   },
   {
+    name: 'MemoryBankId',
+    declaration: 'export type MemoryBankId = string & {\n    readonly [memoryBrand]: \'MemoryBankId\';\n};',
+  },
+  {
+    name: 'MemoryId',
+    declaration: 'export type MemoryId = string & {\n    readonly [memoryBrand]: \'MemoryId\';\n};',
+  },
+  {
+    name: 'MemoryProvider',
+    declaration: 'export interface MemoryProvider {\n    readonly id: string;\n    available(): boolean;\n    resolveBank(workspaceRoot: string, signal?: AbortSignal): Promise<MemoryBankId>;\n    search(request: MemorySearchRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemorySearchResult>;\n    recall(request: MemoryRecallRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRecallResult>;\n    retain(request: MemoryRetainRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRetainResult>;\n}',
+  },
+  {
+    name: 'MemoryRecallRequest',
+    declaration: 'export interface MemoryRecallRequest {\n    readonly prompt: string;\n    readonly limit?: number;\n}',
+  },
+  {
+    name: 'MemoryRecallResult',
+    declaration: 'export interface MemoryRecallResult {\n    readonly units: readonly MemoryUnit[];\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'MemoryRetainRequest',
+    declaration: 'export interface MemoryRetainRequest {\n    readonly turns: readonly TranscriptTurn[];\n    readonly bankId?: MemoryBankId;\n}',
+  },
+  {
+    name: 'MemoryRetainResult',
+    declaration: 'export interface MemoryRetainResult {\n    readonly retained: boolean;\n    readonly detail?: string;\n}',
+  },
+  {
+    name: 'MemorySearchRequest',
+    declaration: 'export interface MemorySearchRequest {\n    readonly query: string;\n    readonly limit?: number;\n}',
+  },
+  {
+    name: 'MemoryUnit',
+    declaration: 'export interface MemoryUnit {\n    readonly id: MemoryId;\n    readonly text: string;\n    readonly bankId?: MemoryBankId;\n}',
+  },
+  {
     name: 'Message',
     declaration: 'export interface Message {\n    readonly id: MessageId;\n    readonly role: \'system\' | \'user\' | \'assistant\';\n    readonly content: ContentBlock[];\n    readonly source: MessageSource;\n}',
   },
@@ -6803,6 +6882,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ToolSchema',
     declaration: 'export interface ToolSchema {\n    name: string;\n    description: string;\n    parameters: Record<string, unknown>;\n}',
+  },
+  {
+    name: 'TranscriptTurn',
+    declaration: 'export interface TranscriptTurn {\n    readonly turn: number;\n    readonly prompt: string;\n    readonly response?: string;\n}',
   },
   {
     name: 'TurnEndCancelCause',

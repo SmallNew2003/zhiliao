@@ -136,6 +136,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   workspaceChanges: 'deliverables.md',
   terminalController: 'workspace.md',
   directoryPickerController: 'workspace.md',
+  memory: 'memory.md',
 }
 
 /**
@@ -840,6 +841,14 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   TerminalFrame: 'Browser terminal stream frames are owned by packages/api/terminal-controller/README.md',
   TerminalRetentionFrame: 'Browser terminal window holds are owned by packages/api/terminal-controller/README.md',
   WebTerminalId: 'Browser terminal identity is owned by packages/api/terminal-controller/README.md',
+  MemoryProvider: 'memory seam provider contract is owned by packages/memory/memory/src/types.ts',
+  MemoryBankId: 'memory bank identity is owned by packages/memory/memory/src/types.ts',
+  MemorySearchRequest: 'memory search input is owned by packages/memory/memory/src/types.ts',
+  MemorySearchResult: 'memory search result is owned by packages/memory/memory/src/types.ts',
+  MemoryRecallRequest: 'memory recall input is owned by packages/memory/memory/src/types.ts',
+  MemoryRecallResult: 'memory recall result is owned by packages/memory/memory/src/types.ts',
+  MemoryRetainRequest: 'memory retain input is owned by packages/memory/memory/src/types.ts',
+  MemoryRetainResult: 'memory retain result is owned by packages/memory/memory/src/types.ts',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */
