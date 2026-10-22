@@ -2510,7 +2510,7 @@ describe('process group chat rendering', () => {
       turnEnds: new Map([[1, 8]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    const headers = view.getAllByRole('button', { name: '执行工具 1 次' })
+    const headers = view.getAllByRole('button', { name: '运行命令' })
     const bodies = [...view.container.querySelectorAll<HTMLElement>('[data-process-group-body]')]
 
     expect(headers).toHaveLength(2)
@@ -2586,7 +2586,7 @@ describe('process group chat rendering', () => {
       turnEnds: new Map([[1, 3]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    const header = view.getByRole('button', { name: '已处理' })
+    const header = view.getByRole('button', { name: '分析请求' })
     const body = view.container.querySelector<HTMLElement>('[data-process-group-body]')
 
     expect(header.getAttribute('aria-expanded')).toBe('false')
@@ -2616,7 +2616,7 @@ describe('process group chat rendering', () => {
       turnEnds: new Map([[1, 4]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    const header = view.getByRole('button', { name: '已处理' })
+    const header = view.getByRole('button', { name: '分析请求' })
     const body = view.container.querySelector<HTMLElement>('[data-process-group-body]')!
     expect(body.getAttribute('hidden')).toBe('until-found')
 
@@ -2650,13 +2650,13 @@ describe('process group chat rendering', () => {
       turnEnds: new Map([[1, 4]]),
     })
     const view = render(<h.ChatView {...h.props} />)
-    const header = view.getByRole('button', { name: '已处理' })
+    const header = view.getByRole('button', { name: '分析请求' })
     fireEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('true')
 
     view.rerender(<div />)
     view.rerender(<h.ChatView {...h.props} />)
-    expect(view.getByRole('button', { name: '已处理' }).getAttribute('aria-expanded')).toBe('true')
+    expect(view.getByRole('button', { name: '分析请求' }).getAttribute('aria-expanded')).toBe('true')
   })
 
   it('marks a scrolling process body for edge fades', () => {

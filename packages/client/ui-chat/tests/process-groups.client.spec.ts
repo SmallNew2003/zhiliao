@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { AssistantMessageNode, ConversationNode, ToolResultNode, UserMessageNode } from '@deepseek-ai/dsh-client-ui-chat/client'
+import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { processGroupTitle } from '../src/client/chat/process-group-title.ts'
+import { en } from '../src/client/locale.ts'
 import { projectProcessGroups } from '../src/client/conversation-nodes/process-groups.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
@@ -25,6 +29,20 @@ function toolResult(seq: number, callId: string, isError = false): ToolResultNod
     callId,
     call: { name: 'bash', argsRaw: `{"command":"cmd-${callId}"}` },
     callTime: seq * 1_000 - 500,
+    content: [{ type: 'text', text: isError ? 'failed' : 'ok' }],
+    isError,
+    subCalls: [],
+  }
+}
+
+function truncatedToolResult(seq: number, callId: string, isError = false): ToolResultNode {
+  return {
+    kind: 'tool-result',
+    seq,
+    time: seq * 1_000,
+    callId,
+    call: null,
+    callTime: null,
     content: [{ type: 'text', text: isError ? 'failed' : 'ok' }],
     isError,
     subCalls: [],
@@ -96,9 +114,38 @@ describe('process groups', () => {
     if (groupEntry?.kind !== 'group') throw new Error('expected a process group')
     const group = groups.get(groupEntry.groupKey)
     expect(group?.closed).toBe(true)
-    expect(group?.summary.toolCount).toBe(2)
-    expect(group?.summary.failedToolCount).toBe(1)
+    expect(group?.summary.failed).toBe(true)
     expect(group?.summary.counts).toEqual([{ kind: 'commands', count: 2 }])
+  })
+
+  it('keeps unknown truncated tool calls and their failure state in the summary', () => {
+    const snapshot = chatSnapshotFixture({
+      nodes: [
+        user(1),
+        toolResult(2, 'truncated-call'),
+        assistant(3, [{ kind: 'text', text: 'done' }]),
+      ],
+      turnEnds: new Map([[1, 4]]),
+    })
+    const turnLocation = snapshot.nodes.get('fixture:assistant:3')?.location
+    const nodes = snapshot.order.flatMap((key) => {
+      const node = snapshot.nodes.get(key)
+      if (node === undefined) return []
+      return node.kind === 'tool-call'
+        ? [{
+          ...node,
+          ...turnLocation === undefined ? {} : { location: turnLocation },
+          data: { root: truncatedToolResult(2, 'truncated-call', true) },
+        }]
+        : [node]
+    })
+    const groups = projectProcessGroups(nodes, snapshot.timeline)
+
+    const groupEntry = groups.layout.find(entry => entry.kind === 'group')
+    if (groupEntry?.kind !== 'group') throw new Error('expected a process group')
+    const group = groups.get(groupEntry.groupKey)
+    expect(group?.summary.counts).toEqual([{ kind: 'tools', count: 1 }])
+    expect(group?.summary.failed).toBe(true)
   })
 
   it('leaves the final process group open until the turn or a later response closes it', () => {
@@ -190,11 +237,7 @@ describe('process group snapshot projection', () => {
 })
 
 describe('process group titles', () => {
-  it('localizes a completed tool summary and its failure count', async () => {
-    const { processGroupTitle } = await import('../src/client/chat/process-group-title.ts')
-    const { en } = await import('../src/client/locale.ts')
-    const { en: commonEn } = await import('@deepseek-ai/dsh-client-locale/src/locales/en.ts')
-    const { makeTranslate } = await import('@deepseek-ai/dsh-client-test-runtime')
+  it('describes the two main completed actions without counts and appends failure state', () => {
     const t = makeTranslate(en, commonEn)
     const group = {
       key: 'group',
@@ -202,21 +245,54 @@ describe('process group titles', () => {
       members: [],
       closed: true,
       summary: {
-        counts: [{ kind: 'commands' as const, count: 2 }],
-        toolCount: 2,
-        failedToolCount: 1,
+        counts: [
+          { kind: 'commands' as const, count: 3 },
+          { kind: 'read' as const, count: 1 },
+        ],
+        failed: true,
         running: undefined,
-        runningDetail: '',
       },
     }
-    expect(processGroupTitle(group, '', t)).toBe('2 tool calls · 1 failed')
+    expect(processGroupTitle(group, '', t)).toBe('ran commands, read files · some actions failed')
   })
 
-  it('uses a localized running activity and appends elapsed time', async () => {
-    const { processGroupTitle } = await import('../src/client/chat/process-group-title.ts')
-    const { en } = await import('../src/client/locale.ts')
-    const { en: commonEn } = await import('@deepseek-ai/dsh-client-locale/src/locales/en.ts')
-    const { makeTranslate } = await import('@deepseek-ai/dsh-client-test-runtime')
+  it('signals additional action types without showing counts', () => {
+    const t = makeTranslate(en, commonEn)
+    const group = {
+      key: 'group',
+      turn: 1,
+      members: [],
+      closed: true,
+      summary: {
+        counts: [
+          { kind: 'commands' as const, count: 3 },
+          { kind: 'read' as const, count: 2 },
+          { kind: 'search' as const, count: 1 },
+        ],
+        failed: false,
+        running: undefined,
+      },
+    }
+    expect(processGroupTitle(group, '', t)).toBe('ran commands, read files, and more')
+  })
+
+  it('describes a reasoning-only completed group as analyzed', () => {
+    const t = makeTranslate(en, commonEn)
+    const group = {
+      key: 'group',
+      turn: 1,
+      members: [],
+      closed: true,
+      summary: {
+        counts: [],
+        failed: false,
+        running: undefined,
+      },
+    }
+    expect(processGroupTitle(group, '', t)).toBe('analyzed the request')
+  })
+
+  it('uses a localized running activity and appends elapsed time', () => {
     const t = makeTranslate(en, commonEn)
     const group = {
       key: 'group',
@@ -225,10 +301,8 @@ describe('process group titles', () => {
       closed: false,
       summary: {
         counts: [],
-        toolCount: 0,
-        failedToolCount: 0,
+        failed: false,
         running: 'search' as const,
-        runningDetail: '',
       },
     }
     expect(processGroupTitle(group, '1m 26s', t)).toBe('Searching code · 1m 26s')
