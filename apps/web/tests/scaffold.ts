@@ -301,6 +301,8 @@ export interface WebScaffold {
 
 /** Options for {@link launchWebScaffold}. */
 export interface LaunchOptions {
+  /** Managed credential document used by live provider tests; values stay inside the credentials service. */
+  credentialStorePath?: string
   /** Profile resolver backend used by this test Host; defaults to runtime coverage. */
   profileResolutionMode?: Extract<ProfileResolutionMode, 'dual' | 'runtime'>
   /** Enable the real Open In rows with deterministic launch-environment facts. */
@@ -467,8 +469,8 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   if (mode === 'record') {
     // Both owning vitest configs (web unconditionally, snapshot in record
     // mode) load the repo-root .env before this file runs.
-    if (process.env.DEEPSEEK_API_KEY === undefined || process.env.DEEPSEEK_API_KEY.length === 0) {
-      throw new Error('web e2e record mode needs DEEPSEEK_API_KEY (env or repo-root .env)')
+    if (!process.env.DEEPSEEK_API_KEY && options.credentialStorePath === undefined) {
+      throw new Error('web e2e record mode needs DEEPSEEK_API_KEY or a managed credentialStorePath')
     }
   }
   if (mode === 'record' && options.deepSeekMissingCredential === true) {
@@ -634,7 +636,10 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       ? []
       : [{ id: 'connection', config: { trustedHosts: [options.remoteAuthority] } }],
     { id: 'settings', config: { dshHome: harnessHome } },
-    { id: 'credentials', config: { dshHome: harnessHome } },
+    { id: 'credentials', config: {
+      dshHome: harnessHome,
+      ...options.credentialStorePath === undefined ? {} : { path: options.credentialStorePath, watch: false },
+    } },
     // The shipped directory-picker row is the -auto chooser, which resolves
     // the interaction from the RUNNING host (display, SSH launch, bind). The
     // lane's goldens are interaction-specific (workspace-management drives

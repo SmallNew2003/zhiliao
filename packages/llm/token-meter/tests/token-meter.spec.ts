@@ -468,6 +468,16 @@ describe('malformed replay and listener lifecycle', () => {
     expect(() => service.measure(session)).toThrow(pattern)
   }
 
+  it('rejects an edited input without its latest-input replay checkpoint on repeated reads', () => {
+    const session = Session.create(SessionId('bad-edit-checkpoint'))
+    session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'original' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    appendUnchecked(session, {
+      type: 'user/message-edit', seq: SessionSeq(session.seq), time: 0,
+      data: { targetSeq: SessionSeq(99), message: createUserMessage({ content: [{ type: 'text', text: 'edited' }], source: { kind: 'user' } }) },
+    })
+    expectRepeatedFailure(meter(), session, /edit target is not the latest user input/)
+  })
+
   it('rejects an assistant without its step boundary transactionally', () => {
     const session = Session.create(SessionId('bad-step'))
     appendHeader(session, header('deepseek-v4-flash'))

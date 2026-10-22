@@ -137,6 +137,7 @@ export function fileRef(id: string, name = 'notes.txt'): FileAttachmentRef {
 export const sessionWorld: RemoteTable = {
   unary: {
     'session/prompt': ok({ accepted: true }),
+    'session/editMessage': ok({ accepted: true }),
     'session/cancel': ok({ accepted: true }),
     'session/updateQueue': ok({ accepted: true }),
     'session/rename': ok({ title: 'fk-renamed', seq: 0 }),

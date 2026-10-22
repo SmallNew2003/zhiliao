@@ -95,7 +95,10 @@ A selection turns earlier images into placeholder text, so provider cache reuse 
 - **Every offload costs one failed attempt** — nothing plans an offload before dispatch; the route's rejection is the signal, which matches the planned move to provider-reported uncacheable images.
 - **A temporary small budget offloads permanently** — a Files outage that forces the inline fallback, or a temporary switch to a small-budget route, offloads images a later route would have sent.
 
+Edited inputs are eligible image-offload targets. Subsequent text admission retains selected image flags at the input’s unchanged sequence, so replay cannot restore an image already omitted from model requests.
+
 <a id="dev-note"></a>
+
 ### Dev Note
 
 <details>

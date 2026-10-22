@@ -135,7 +135,10 @@ None; Conversation assembly and browser input state do not alter provider-side p
 - **Factory occurrences inherit their render-position Session** — `conversation.content` does not accept an independently addressed Session; that requires a separate Session-provider capability.
 
 
+System-prompt inspection restores its saved pre-input state when the latest input is edited. Input-only updates retain the last system event, allowing prompt cards to keep their existing owner without duplicating the initial prompt.
+
 <a id="dev-note"></a>
+
 ### Dev Note
 
 <details>

@@ -57,6 +57,60 @@ function outlineOf(ctx: Context, session: Session): readonly TurnOutlineEntry[] 
 }
 
 describe('turn outline projection unit', () => {
+  it('restores the outline before latest input and attaches edited prompt to its new turn', async () => {
+    const { ctx, session } = await harness(true)
+    session.append('turn/start', { turn: 1 })
+    const targetSeq = appendPrompt(session, 'old prompt')
+    appendAssistant(session, 1, 1, 'old answer')
+    endTurn(session, 1)
+    session.append('user/message-edit', { targetSeq, message: createUserMessage({ content: [{ type: 'text', text: 'edited prompt' }], source: { kind: 'user' } }) })
+    expect(outlineOf(ctx, session)).toEqual([])
+    const start = session.append('turn/start', { turn: 2 }).seq
+    appendAssistant(session, 2, 1, 'new answer')
+    endTurn(session, 2)
+    expect(outlineOf(ctx, session)).toEqual([{ turn: 2, seq: SessionSeq(start - 1), prompt: 'edited prompt', response: 'new answer' }])
+  })
+
+  it('retains the earlier response when editing same-turn steering and supports repeated edits after checkpoint recovery', async () => {
+    const { ctx, session } = await harness(true)
+    session.append('turn/start', { turn: 1 })
+    appendPrompt(session, 'opening')
+    appendAssistant(session, 1, 1, 'retained answer')
+    const targetSeq = appendPrompt(session, 'steering')
+    appendAssistant(session, 1, 2, 'discarded answer')
+    endTurn(session, 1)
+    const edit = session.append('user/message-edit', { targetSeq, message: createUserMessage({ content: [{ type: 'text', text: 'edited steering' }], source: { kind: 'user' } }) })
+    expect(outlineOf(ctx, session)).toEqual([{ turn: 1, seq: 0, prompt: 'opening', response: 'retained answer' }])
+    session.append('turn/start', { turn: 2 })
+    appendAssistant(session, 2, 1, 'new answer')
+    endTurn(session, 2)
+    const state = ctx.sessionProjections.stateOf(session, 'turnOutline')!
+    const parsed = turnOutlineProjectionDefinition.stateSchema.parse(state)
+    const repeat: SessionEvent<'user/message-edit'> = {
+      type: 'user/message-edit', seq: SessionSeq(50), time: 0,
+      data: { targetSeq: edit.seq, message: createUserMessage({ content: [{ type: 'text', text: 'edited twice' }], source: { kind: 'user' } }) },
+    }
+    const restored = turnOutlineProjectionDefinition.apply(parsed, repeat)
+    expect(restored.turns).toEqual([{ turn: 1, seq: 0, prompt: 'opening', response: 'retained answer' }])
+    expect(restored.pendingEdit).toEqual({ seq: 50, prompt: 'edited twice' })
+  })
+
+  it('updates admitted prompt text without moving the edit checkpoint', async () => {
+    const { ctx, session } = await harness(true)
+    session.append('turn/start', { turn: 1 })
+    const targetSeq = appendPrompt(session, 'original')
+    endTurn(session, 1)
+    const message = createUserMessage({ content: [{ type: 'text', text: '@reference' }], source: { kind: 'user' } })
+    const edit = session.append('user/message-edit', { targetSeq, message })
+    session.append('turn/start', { turn: 2 })
+    const before = ctx.sessionProjections.stateOf(session, 'turnOutline')!.latestInput
+    session.append('user/message-admit', { targetSeq: edit.seq, message: { ...message, content: [{ type: 'text', text: 'preprocessed' }] } })
+    expect(outlineOf(ctx, session)).toEqual([{ turn: 2, seq: edit.seq, prompt: 'preprocessed', response: '' }])
+    expect(ctx.sessionProjections.stateOf(session, 'turnOutline')!.latestInput).toBe(before)
+    session.append('user/message-edit', { targetSeq: edit.seq, message: createUserMessage({ content: [{ type: 'text', text: 'again' }], source: { kind: 'user' } }) })
+    expect(outlineOf(ctx, session)).toEqual([])
+  })
+
   it('exposes the turn boundary as a branded event identity', () => {
     expectTypeOf<TurnOutlineEntry['seq']>().toEqualTypeOf<ReturnType<typeof SessionSeq>>()
   })
@@ -65,7 +119,7 @@ describe('turn outline projection unit', () => {
     const { ctx, session } = await harness(true)
     expect(outlineOf(ctx, session)).toEqual([])
     expect(ctx.sessionProjections.checkpoint(session).turnOutline)
-      .toEqual({ ver: 2, seq: -1, val: { turns: [], draft: '' } })
+      .toEqual({ ver: 3, seq: -1, val: { turns: [], draft: '', latestInput: null, pendingEdit: null } })
   })
 
   it('folds each turn with its boundary seq, first prompt, and turn-end response', async () => {
@@ -179,7 +233,7 @@ describe('turn outline projection unit', () => {
       time: 0,
       data: { message: { content: blocks } },
     }) as unknown as SessionEvent
-    const base: TurnOutlineState = { turns: [{ turn: 1, seq: SessionSeq(0), prompt: 'p', response: '' }], draft: '' }
+    const base: TurnOutlineState = { latestInput: null, pendingEdit: null, turns: [{ turn: 1, seq: SessionSeq(0), prompt: 'p', response: '' }], draft: '' }
     // Non-text blocks are skipped; whitespace-heavy short blocks cross the raw
     // reading bound early, so the collapsed (short) draft still marks the
     // unread remainder with an ellipsis.
@@ -198,16 +252,16 @@ describe('turn outline projection unit', () => {
       time: 0,
       data: { turn: 1, reason: { kind: 'completed' } },
     } as unknown as SessionEvent
-    expect(def.apply({ turns: [], draft: 'orphan' }, end)).toEqual({ turns: [], draft: '' })
+    expect(def.apply({ latestInput: null, pendingEdit: null, turns: [], draft: 'orphan' }, end)).toEqual({ turns: [], draft: '', latestInput: null, pendingEdit: null })
     // …and a re-settled identical response keeps the entries' identity.
-    const settled: TurnOutlineState = { turns: [{ turn: 1, seq: SessionSeq(0), prompt: 'p', response: 'done' }], draft: 'done' }
+    const settled: TurnOutlineState = { latestInput: null, pendingEdit: null, turns: [{ turn: 1, seq: SessionSeq(0), prompt: 'p', response: 'done' }], draft: 'done' }
     const recommitted = def.apply(settled, end)
     expect(recommitted.turns).toBe(settled.turns)
     expect(recommitted.draft).toBe('')
   })
 
   it('skips a boundary that does not advance the turn number (fabricated envelope)', () => {
-    const state: TurnOutlineState = { turns: [{ turn: 2, seq: SessionSeq(5), prompt: 'kept', response: '' }], draft: '' }
+    const state: TurnOutlineState = { latestInput: null, pendingEdit: null, turns: [{ turn: 2, seq: SessionSeq(5), prompt: 'kept', response: '' }], draft: '' }
     const regressive = {
       type: 'turn/start',
       seq: SessionSeq(9),
@@ -245,6 +299,7 @@ describe('turn outline projection unit', () => {
       turnOutline: {
         ...row!,
         val: {
+          latestInput: null, pendingEdit: null,
           turns: [
             { turn: 2, seq: 1, prompt: '', response: '' },
             { turn: 2, seq: 4, prompt: '', response: '' },
@@ -258,6 +313,7 @@ describe('turn outline projection unit', () => {
       turnOutline: {
         ...row!,
         val: {
+          latestInput: null, pendingEdit: null,
           turns: [
             { turn: 1, seq: 1, prompt: 'ok', response: 'done' },
             { turn: 2, seq: 4, prompt: '', response: '' },

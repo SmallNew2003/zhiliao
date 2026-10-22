@@ -14,6 +14,7 @@ kind: "package-reference"
 
 ## 目录
 
+- [编辑最新输入](#editing-the-latest-input)
 - [引用预览](#reference-previews)
 - [系统提示词行](#system-prompt-row)
 - [轮次 token 用量](#turn-token-usage)
@@ -25,6 +26,13 @@ kind: "package-reference"
 - [开发备注](#dev-note)
 
 -----
+
+<a id="editing-the-latest-input"></a>
+## 编辑最新输入
+
+最新已发送的人类输入提供仅编辑文本的行内编辑器，包括分支继承的输入和已编辑输入。原附件保持只读并复用持久引用。回复执行和停止清理期间禁用编辑；草稿打开后若启动运行，则禁用重新发送并保留文本。取消或 Escape 关闭编辑器，Ctrl/Cmd+Enter 重新发送，文本未变时直接关闭而不发送请求。
+
+编辑被接受后，Chat 显示替换输入，并从对话、导航和旧式 transcript 数据中排除目标及编辑事件前的后续回复行。目标之前的普通压缩历史保持可见，原始 Session 事件仍可查看。步骤前的文本调整更新同一输入，不改变其编辑序号。错误会保留草稿；相同文本的重试复用请求标识，包括接受响应丢失后的重试。另一客户端替换目标时，原文本消失而打开的草稿仍可恢复。关闭后焦点回到消息操作或 Chat 滚动区域。
 
 <a id="reference-previews"></a>
 ## 引用预览

@@ -1,4 +1,5 @@
 /** Chat-owned Slot declarations and composed component props. */
+import type { ISession } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type {
@@ -78,6 +79,16 @@ export interface ChatNodeTurnDataInjected {
 
 /** Stable owner currency delivered to a keyed Chat renderer. */
 export interface ChatNodeOwnerProps {
+  /** Latest effective human input sequence in the loaded Chat. */
+  latestInputSeq?: number | undefined
+  /** Keep the open editor mounted when another client replaces its target. */
+  editDraftChanged?: ((node: ChatNode, open: boolean) => void) | undefined
+  /** The edited original row is absent from the effective transcript. */
+  editDraftDetached?: boolean | undefined
+  /** Host-confirmed run and cleanup state. */
+  running?: boolean | undefined
+  /** Resend edited text with the original attachments. */
+  editMessage?: ISession['editMessage'] | undefined
   cwd?: string | undefined
   /** Open the current source file of a skill referenced by a sent message. */
   openSkill: (name: string) => void
@@ -130,6 +141,8 @@ export interface ChatScrollPosition {
 
 /** Business callbacks injected into the Chat view. */
 export interface ChatViewInjected {
+  /** Resend edited text through the current session binding. */
+  editMessage?: ISession['editMessage'] | undefined
   hooks: {
     /** Persisted completed-Turn transcript presentation. */
     transcriptView: SnapshotStore<TranscriptViewMode>

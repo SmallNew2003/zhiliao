@@ -1,0 +1,7 @@
+version: 1
+scenario: message-edit-resend
+profile: sdk
+composition: default
+recording: authored
+header:
+  class: default

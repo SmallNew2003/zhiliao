@@ -94,6 +94,9 @@ SNAPSHOT_SESSION_ID = "advanced-executable"
 SNAPSHOT_DIRECT_CHILD_PROMPT = "Reply with exactly DIRECT_CHILD_OK and nothing else."
 SNAPSHOT_WORKFLOW_CHILD_PROMPT = "Reply with exactly WORKFLOW_CHILD_OK and nothing else."
 SNAPSHOT_FINAL_TEXT = "ADVANCED_EXECUTABLE_OK"
+SNAPSHOT_EDIT_TEXT = "Replace the advanced snapshot input."
+SNAPSHOT_PREPARED_EDIT_TEXT = "Prepared replacement for the advanced snapshot input."
+SNAPSHOT_EDIT_RESPONSE = "ADVANCED_EDITED_EXECUTABLE_OK"
 RESTART_FIRST_PROMPT = "Complete the first isolated Python SDK process turn."
 RESTART_FIRST_TEXT = "PROCESS_ONE_OK"
 RESTART_SECOND_PROMPT = "Complete the second isolated Python SDK process turn."
@@ -109,7 +112,7 @@ ADVANCED_SNAPSHOT_DIRECTORY = (
     Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "advanced"
 )
 ADVANCED_SNAPSHOT_FILENAMES = (
-    "result.json", "session.v3.jsonl", "session.1.v3.jsonl", "session.2.v3.jsonl",
+    "result.json", "request-history.json", "session.v3.jsonl", "session.1.v3.jsonl", "session.2.v3.jsonl",
 )
 MINIMAL_SNAPSHOT_DIRECTORY = (
     Path(__file__).resolve().parent / "snapshots" / "python-sdk-single-exe" / "minimal"
@@ -358,6 +361,7 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
         SNAPSHOT_DIRECT_CHILD_PROMPT,
         SNAPSHOT_WORKFLOW_CHILD_PROMPT,
         SNAPSHOT_PROMPT,
+        SNAPSHOT_PREPARED_EDIT_TEXT,
         CODE_PROMPT,
         WORKFLOW_PROMPT,
         FS_SEARCH_PROMPT,
@@ -375,6 +379,11 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
         return text_chunks("DIRECT_CHILD_OK")
     if prompt == SNAPSHOT_WORKFLOW_CHILD_PROMPT:
         return text_chunks("WORKFLOW_CHILD_OK")
+    if prompt == SNAPSHOT_PREPARED_EDIT_TEXT:
+        request_text = json.dumps(messages, ensure_ascii=False)
+        if SNAPSHOT_PROMPT in request_text or SNAPSHOT_FINAL_TEXT in request_text:
+            raise AssertionError("edited packaged request retained original input or response")
+        return text_chunks(SNAPSHOT_EDIT_RESPONSE)
     if prompt == SNAPSHOT_PROMPT:
         assert_advertised_tool(body, "snapshot_double")
         assert_advertised_tool(body, "run_code")
@@ -1332,6 +1341,7 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
     """Drive and compare the advanced SDK/executable behavioral snapshot."""
     from deepseek_harness import DeepSeekHarness
 
+    first_request = len(MockModelHandler.requests)
     with tempfile.TemporaryDirectory(prefix="dsh-sdk-snapshot-") as temporary:
         root = Path(temporary).resolve()
         dsh_home = root / "home"
@@ -1354,6 +1364,13 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
             {"id": "snapshot-feedback-producer", "name": (
                 Path(__file__).resolve().parent.parent / "snapshots/sdk/text-turn/feedback-producer.mjs"
             ).as_uri()},
+            {"id": "snapshot-message-edit-producer", "name": (
+                Path(__file__).resolve().parent.parent / "snapshots/sdk/message-edit-resend/producer.mjs"
+            ).as_uri(), "config": {
+                "replacementText": SNAPSHOT_EDIT_TEXT,
+                "preparedText": SNAPSHOT_PREPARED_EDIT_TEXT,
+                "originalResponse": SNAPSHOT_FINAL_TEXT,
+            }},
         ]}])
         creation_patch = write_profile_patch(root, "creation.patch.yml", sessions, [
             {"insert": [{
@@ -1378,7 +1395,19 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
         ) as harness:
             result = harness.run(SNAPSHOT_PROMPT, session_id=SNAPSHOT_SESSION_ID)
 
-        assert result.final_response == SNAPSHOT_FINAL_TEXT, result.final_response
+        assert result.final_response == SNAPSHOT_EDIT_RESPONSE, (
+            result.final_response,
+            [event for event in result.events if event.get("type") == "turn/end"],
+        )
+        edits = [event for event in result.events if event.get("type") == "user/message-edit"]
+        admissions = [event for event in result.events if event.get("type") == "user/message-admit"]
+        assert len(edits) == len(admissions) == 1, (edits, admissions)
+        assert admissions[0]["data"]["targetSeq"] == edits[0]["seq"], admissions
+        assert admissions[0]["data"]["message"]["id"] == edits[0]["data"]["message"]["id"], admissions
+        assert admissions[0]["data"]["message"]["content"] == [{"type": "text", "text": SNAPSHOT_PREPARED_EDIT_TEXT}], admissions
+        human_inputs = [event for event in result.events if event.get("type") == "user/message"
+                        and event["data"]["source"]["kind"] == "user"]
+        assert len(human_inputs) == 1, human_inputs
         offloads = [event for event in result.events if event.get("type") == "image/offload"]
         if len(offloads) != 1 or "surfaceOp" in offloads[0]:
             raise AssertionError(f"advanced snapshot expected one standalone image offload: {offloads}")
@@ -1387,7 +1416,7 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
             raise AssertionError(f"advanced snapshot selected unexpected image occurrences: {targets}")
         feedback_types = [event.get("type") for event in result.events
                           if str(event.get("type")).startswith("feedback/")]
-        if feedback_types != ["feedback/record", "feedback/record", "feedback/message-put", "feedback/message-put", "feedback/message-delete"]:
+        if feedback_types != ["feedback/record", "feedback/record", "feedback/message-put", "feedback/message-put", "feedback/message-delete"] * 2:
             raise AssertionError(f"advanced snapshot did not exercise all feedback mutations: {feedback_types}")
         methods = [notification.method for notification in result.notifications]
         if methods.count("subagent.started") != 2 or methods.count("subagent.finished") != 2:
@@ -1420,7 +1449,8 @@ def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) 
         if "WORKFLOW_CHILD_OK" not in render_jsonl(logs[child_ids[1]]):
             raise AssertionError("second advanced child log has no workflow-subagent result")
 
-        files = build_snapshot_files(result, logs, child_ids, root)
+        requests = MockModelHandler.requests[first_request:]
+        files = build_snapshot_files(result, logs, child_ids, root, requests)
         compare_snapshot_files(
             files, update_snapshots, ADVANCED_SNAPSHOT_DIRECTORY, ADVANCED_SNAPSHOT_FILENAMES,
         )
@@ -2014,8 +2044,9 @@ def build_snapshot_files(
     logs: dict[str, list[dict[str, object]]],
     child_ids: list[str],
     cwd: Path,
+    requests: list[dict[str, object]],
 ) -> dict[str, str]:
-    """Render the SDK result and three persisted logs into stable expected outputs."""
+    """Render SDK output, original/edited request history, and three persisted logs."""
     replacements = [(str(cwd), "{{cwd}}"), (SNAPSHOT_SESSION_ID, "{{parent}}")]
     replacements.append((snapshot_workflow_run_id(result), "{{workflow-run}}"))
     for index, child_id in enumerate(child_ids, start=1):
@@ -2058,11 +2089,21 @@ def build_snapshot_files(
         ],
     }
     normalized_result = normalize_snapshot_value(result_value, replacements)
+    original_request = next(request for request in requests
+                            if SNAPSHOT_PROMPT in json.dumps(request.get("messages")))
+    edited_requests = [request for request in requests
+                       if SNAPSHOT_PREPARED_EDIT_TEXT in json.dumps(request.get("messages"))]
+    assert len(edited_requests) == 1, edited_requests
+    histories = normalize_snapshot_value([
+        {"system": "{{system}}", "messages": request["messages"]}
+        for request in [original_request, edited_requests[0]]
+    ], replacements)
     parent_records = project_session_snapshot([
         normalize_snapshot_value(record, replacements) for record in logs[SNAPSHOT_SESSION_ID]
     ])
     files = {
         "result.json": json.dumps(normalized_result, indent=2, ensure_ascii=False) + "\n",
+        "request-history.json": json.dumps(histories, indent=2, ensure_ascii=False) + "\n",
         snapshot_session_filename(
             0, session_header_version(render_jsonl(parent_records), "advanced parent"),
         ): render_jsonl(parent_records),

@@ -14,6 +14,7 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 
 ## Table of Contents
 
+- [Editing the latest input](#editing-the-latest-input)
 - [Reference previews](#reference-previews)
 - [System prompt row](#system-prompt-row)
 - [Turn token usage](#turn-token-usage)
@@ -25,6 +26,13 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 - [Dev Note](#dev-note)
 
 -----
+
+<a id="editing-the-latest-input"></a>
+## Editing the latest input
+
+The latest sent human input has a text-only inline editor, including input inherited from a branch and previously edited input. Original attachments remain readonly and reuse their durable references. Reply execution and stop cleanup disable editing; starting a run while a draft is open disables resending without discarding text. Cancel or Escape closes the editor, Ctrl/Cmd+Enter resends, and unchanged text closes without a request.
+
+An accepted edit displays the replacement input and excludes the target and subsequent response rows before the edit from Chat, navigation, and legacy transcript data. Ordinary compaction history before the target remains visible, and raw Session events remain inspectable. Pre-step text adjustments update the same input without changing its editing sequence. Errors preserve the draft; retrying the same text reuses its request identity, including after a lost acceptance response. If another client replaces the target, the original text disappears while the open draft remains recoverable. Closing restores focus to the message action or Chat scroll area.
 
 <a id="reference-previews"></a>
 ## Reference previews
@@ -81,7 +89,7 @@ None; Chat presentation does not assemble or mutate provider requests.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The transcript reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation is wider than the window: the rail merges the loaded Turns with the host `turnOutline` projection, so every started Turn gets a fixed-pitch mark (10px apart; a ladder taller than the frame scrolls inside it with gradient fades), and activating an unloaded mark pages history through the Turn's `turn/start` seq before landing on its row. Without the projection (assemblies not mounting `dsh-session-turn-outline`) the rail falls back to loaded Turns only.
+- **The transcript reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation is wider than the window: the rail merges the loaded Turns with the host `turnOutline` projection, so every started Turn gets a fixed-pitch mark (10px apart; a ladder taller than the frame scrolls inside it with gradient fades), and activating an unloaded mark pages history through the Turn's outline seq before landing on its row. Without the projection (assemblies not mounting `dsh-session-turn-outline`) the rail falls back to loaded Turns only.
 - **Rail previews are card-sized** — one prompt line (50 characters) and up to three response lines (120), on loaded and unloaded Turns alike; an unloaded Turn's response arrives from the outline only once the Turn settled, so an open Turn previews its prompt (or just the Turn number) until then.
 
 

@@ -141,7 +141,10 @@ These limits define where the measurement stops and future work begins. They are
 - **A system-prompt rewrite carries no shadow price** — the loop replaces a system node without an adjacent metering event, so `contextPressure.projectedTokens` folds that replacement at zero delta until the next usage sample; `contextBreakdown.systemTokens` and `measure()` reprice the new prompt immediately.
 - **Composition checkpoints retain the current surface** — exact system/message classification needs positional entries; checkpoint size and surface-event folding are O(current retained surface).
 
+Editing restores one saved pre-latest-input token state and prices the replacement. Spent usage remains recorded. Text admission reprices the existing node while preserving offloaded image occurrences; context breakdown and pressure use checkpoint version 6.
+
 <a id="dev-note"></a>
+
 ### Dev Note
 
 <details>

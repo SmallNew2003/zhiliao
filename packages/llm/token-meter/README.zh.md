@@ -141,6 +141,8 @@ const price = ctx.tokenMeter.estimateMessage(message)
 - **系统提示词改写不带影子价**——循环替换 system 节点时没有紧邻的计量事件，因此 `contextPressure.projectedTokens` 以零增量折叠该替换，直到下一个用量样本；`contextBreakdown.systemTokens` 与 `measure()` 会立即按新提示词重新计价。
 - **构成检查点保留当前 surface**——精确的 system/message 分类需要位置条目；检查点大小和 surface 事件折叠成本为 O(当前保留 surface)。
 
+编辑恢复一份最近输入前的计量状态，并计量替换输入。已经产生的用量仍保留记录。文字接纳重新计量已有节点，并保留已卸载的图片；上下文构成与压力使用第 6 版检查点。
+
 <a id="dev-note"></a>
 ### 开发备注
 

@@ -96,6 +96,34 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeqTyp
 }
 
 describe('contextBreakdown session projection', () => {
+  it('rejects an edit or admission when its input checkpoint is missing', async () => {
+    const { session } = await harness()
+    const target = appendUser(session, 'original')
+    const edited = createUserMessage({ content: [{ type: 'text', text: 'edited' }], source: { kind: 'user' } })
+    const edit = session.append('user/message-edit', { targetSeq: target, message: edited })
+    const admit = session.append('user/message-admit', { targetSeq: edit.seq, message: edited })
+    const state = contextBreakdownProjectionDefinition.init()
+    expect(() => contextBreakdownProjectionDefinition.apply(state, edit)).toThrow(/edit target is not the latest user input/)
+    expect(() => contextBreakdownProjectionDefinition.apply(state, admit)).toThrow(/admitted input is not retained/)
+    expect(state).toEqual(contextBreakdownProjectionDefinition.init())
+  })
+  it('restores occupancy before the latest input while preserving earlier messages', async () => {
+    const { ctx, session } = await harness()
+    appendUser(session, 'earlier conversation')
+    const before = projected(ctx, session)
+    const latest = appendUser(session, 'discarded original input')
+    const edited = createUserMessage({ content: [{ type: 'text', text: 'replacement' }], source: { kind: 'user' } })
+    const edit = session.append('user/message-edit', { targetSeq: latest, message: edited })
+    expect(projected(ctx, session).messageTokens).toBe(before.messageTokens + estimateMessage(edited))
+    expect(ctx.tokenMeter.measure(session).surfaceTokens).toBe(before.messageTokens + estimateMessage(edited))
+    const admitted = { ...edited, content: [{ type: 'text' as const, text: 'expanded reference with prepared context' }] }
+    session.append('user/message-admit', { targetSeq: edit.seq, message: admitted })
+    expect(projected(ctx, session).messageTokens).toBe(before.messageTokens + estimateMessage(admitted))
+    expect(ctx.tokenMeter.measure(session).surfaceTokens).toBe(before.messageTokens + estimateMessage(admitted))
+    const replacement = createUserMessage({ content: [{ type: 'text', text: 'third input' }], source: { kind: 'user' } })
+    session.append('user/message-edit', { targetSeq: edit.seq, message: replacement })
+    expect(projected(ctx, session).messageTokens).toBe(before.messageTokens + estimateMessage(replacement))
+  })
   it('serves zeros for an empty log', async () => {
     const { ctx, session } = await harness()
     expect(projected(ctx, session)).toEqual({ systemTokens: 0, toolsTokens: 0, messageTokens: 0 })
@@ -405,7 +433,7 @@ describe('contextBreakdown session projection', () => {
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
     const row = checkpoint['contextBreakdown']!
-    expect(row.ver).toBe(5)
+    expect(row.ver).toBe(6)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).contextBreakdown).toEqual(projected(ctx, session))
     const replacement = session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary' }], source: { kind: 'user' },
@@ -424,7 +452,7 @@ describe('contextBreakdown session projection', () => {
       stale, session.snapshotEvents(), SessionLogOffset(0), session.header, session.inheritedEventCount,
     )
     expect(replayed.snapshot.values.contextBreakdown).toEqual(projected(ctx, session))
-    expect(replayed.checkpoint['contextBreakdown']?.ver).toBe(5)
+    expect(replayed.checkpoint['contextBreakdown']?.ver).toBe(6)
     const invalid = {
       ...checkpoint,
       contextBreakdown: {
@@ -458,7 +486,7 @@ describe('contextBreakdown session projection', () => {
         systemTokens: 8, toolsTokens: staleValue.toolsTokens, messageTokens: 9,
       })
       expect(restored.checkpoint).toEqual(current)
-      expect(restored.checkpoint['contextBreakdown']?.ver).toBe(5)
+      expect(restored.checkpoint['contextBreakdown']?.ver).toBe(6)
     } finally {
       await ctx.fiber.dispose()
     }

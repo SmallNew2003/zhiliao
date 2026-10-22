@@ -26,6 +26,19 @@ interface UserMessage extends Message {
  */
 interface SessionEventMap {
   /**
+   * Replace the latest human-authored input and its subsequent model history.
+   * Replay restores the surface immediately before the original input, including
+   * nodes later shadowed by compaction, and adds the identified replacement.
+   * Repeated edits follow the target's earlier edit to the original input.
+   * Raw events and chronological turn/step numbering remain unchanged.
+   */
+  'user/message-edit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
+   * Update only text blocks of the current latest human input after pre-step preparation.
+   * Preserve its identity, metadata, attachments, and surface position.
+   */
+  'user/message-admit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
    * Opens turn `turn` before the loop claims queued input or runs pre-step.
    * Rejection, empty input, cancellation, or failure may close it with no
    * step; otherwise the following identified `user/message` event or batch
@@ -847,6 +860,13 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
  * @returns acknowledgement that the Agent accepted the prompt.
  */
 @Remote('prompt') prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
+
+/**
+ * Edit and resend the latest sent user input while retaining its original attachments.
+ * @param request - target event, replacement text, and stable retry identity.
+ * @returns acceptance after the edit is durable, or unchanged-text acceptance without a run.
+ */
+@Remote('editMessage') editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue>
 
 /**
  * Read one image proven reachable from the addressed Session log.

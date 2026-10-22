@@ -220,6 +220,102 @@ function toolResult(callId: string, text: string, isError = false) {
 }
 
 describe('built-in conversation node Definitions', () => {
+  it('projects edited input and excludes superseded rows after append, prepend, and reconnect', () => {
+    const history = [
+      at(0, 'turn/start', { turn: 1 }),
+      at(1, 'user/message', textMessage('a', 'A'), { surfaceOp: 'append' }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/message', { turn: 1, step: 1, message: assistantMessage('r', 'old answer') }, { surfaceOp: 'append' }),
+      at(4, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      at(5, 'user/message-edit', { targetSeq: 1, message: textMessage('a2', 'A2') }),
+      at(6, 'turn/start', { turn: 2 }),
+      at(7, 'step/start', { turn: 2, step: 1 }),
+      at(8, 'assistant/message', { turn: 2, step: 1, message: assistantMessage('r2', 'new answer') }, { surfaceOp: 'append' }),
+      at(9, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+    ]
+    const full = assembler(history)
+    const paged = assembler(history.slice(5), true)
+    paged.prepend(history.slice(0, 5), false)
+    paged.flush()
+    const live = assembler(history.slice(0, 5))
+    for (const event of history.slice(5)) { live.append(event); live.flush() }
+    for (const value of [full, paged, live]) {
+      const current = snapshot(value)
+      const visible = current.order.map(key => current.nodes.get(key))
+      expect(visible.filter(row => row?.kind === 'user').map(row => row?.data)).toMatchObject([{ content: [{ text: 'A2' }] }])
+      expect(current.legacy.nodes.some(row => row.seq === 1 || row.seq === 3)).toBe(false)
+      expect(current.navigation.items().map(row => [row.turn, row.prompt, row.response])).toEqual([[2, 'A2', 'new answer']])
+      expect(visible.some(row => row?.kind === 'unknown')).toBe(false)
+    }
+  })
+
+  it('keeps compaction history before the target while excluding tools, retry, context, and tails after it', () => {
+    const history = [
+      at(0, 'turn/start', { turn: 1 }),
+      at(1, 'user/message', textMessage('a', 'retained input'), { surfaceOp: 'append' }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'assistant/message', { turn: 1, step: 1, message: assistantMessage('r', 'retained answer') }, { surfaceOp: 'append' }),
+      at(4, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      at(5, 'compaction/start', { compactionId: 'checkpoint', turn: null }),
+      at(6, 'compaction/summary', { compactionId: 'checkpoint', summary: [{ type: 'text', text: 'summary' }], shadowedSeqs: [1, 3], shadowedTokenCount: 200 }),
+      at(7, 'user/message', { ...textMessage('checkpoint', 'summary'), source: { kind: 'plugin', plugin: 'compact', compactionId: 'checkpoint' } }, { surfaceOp: { op: 'replace', startSeq: 1, endSeq: 3 } }),
+      at(8, 'compaction/end', { compactionId: 'checkpoint', turn: null }),
+      at(9, 'turn/start', { turn: 2 }),
+      systemUpdateAt(10, '# Before target', 2, 1),
+      at(11, 'user/message', textMessage('b', 'discarded input'), { surfaceOp: 'append' }),
+      at(12, 'step/start', { turn: 2, step: 1 }),
+      at(13, 'tool/call', { turn: 2, step: 1, callId: 'call', name: 'read', arguments: '{}' }),
+      at(14, 'tool/result', { turn: 2, step: 1, message: toolResult('call', 'discarded output') }, { surfaceOp: 'append' }),
+      at(15, 'llm/retry', { retryId: 'retry', turn: 2, step: 1, provider: 'fake', mode: 'normal', policyKey: 'fake', retry: 1, maxRetries: 2, delayMs: 10, failure: { code: 'TRANSPORT', message: 'retry' } }),
+      at(16, 'user/message', { ...textMessage('context', 'discarded context'), source: { kind: 'plugin', plugin: 'context' } }, { surfaceOp: 'append' }),
+      at(17, 'assistant/message', { turn: 2, step: 1, message: assistantMessage('old', 'discarded answer') }, { surfaceOp: 'append' }),
+      at(18, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+      at(19, 'user/message-edit', { targetSeq: 11, message: textMessage('b2', 'replacement') }),
+      at(20, 'turn/start', { turn: 3 }),
+    ]
+    const current = snapshot(assembler(history))
+    const visible = current.order.map(key => current.nodes.get(key))
+    expect(visible.some(row => row?.kind === 'compaction')).toBe(true)
+    expect(visible.some(row => row?.kind === 'tool-call' || row?.kind === 'model-retry' || row?.kind === 'context')).toBe(false)
+    expect(current.legacy.nodes.some(row => row.seq >= 11 && row.seq < 19)).toBe(false)
+    expect(current.legacy.turnEnds.has(2)).toBe(false)
+    expect(current.timeline.turnOrder).toEqual([1, 3])
+    expect(current.navigation.items().map(row => row.turn)).toEqual([1, 3])
+  })
+
+  it('updates admitted text on the same edited input without changing its edit sequence or attachment identity', () => {
+    const replacement = { ...textMessage('replacement', '@session reference'), content: [{ type: 'text', text: '@session reference' }, { type: 'file', attachment: { attachmentId: 'file', name: 'original.txt', bytes: 4 } }] }
+    const admitted = { ...replacement, content: [{ type: 'text', text: 'preprocessed text' }, replacement.content[1]] }
+    const prefix = [
+      at(0, 'turn/start', { turn: 1 }),
+      at(1, 'user/message', textMessage('original', 'old input'), { surfaceOp: 'append' }),
+      at(2, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      at(3, 'user/message-edit', { targetSeq: 1, message: replacement }),
+      at(4, 'turn/start', { turn: 2 }),
+    ]
+    const value = assembler(prefix)
+    const initial = snapshot(value)
+    const key = initial.order.find(key => initial.nodes.get(key)?.kind === 'user')
+    const admission = at(5, 'user/message-admit', { targetSeq: 3, message: admitted })
+    value.append(admission)
+    value.flush()
+    const current = snapshot(value)
+    expect(current.order.filter(key => current.nodes.get(key)?.kind === 'user')).toEqual([key])
+    expect(current.nodes.get(key!)?.data).toMatchObject({ seq: 3, editTargetSeq: 1, content: admitted.content })
+    expect(current.navigation.items().map(row => row.prompt)).toEqual(['preprocessed text'])
+    expect(current.order.some(key => current.nodes.get(key)?.kind === 'unknown')).toBe(false)
+    const paged = assembler([admission], true)
+    paged.prepend(prefix, false)
+    paged.flush()
+    const replay = assembler([...prefix, admission])
+    for (const restored of [paged, replay]) {
+      expect(snapshot(restored).nodes.get(key!)?.data).toMatchObject({ seq: 3, content: admitted.content })
+    }
+    value.append(at(6, 'user/message-edit', { targetSeq: 3, message: textMessage('again', 'second edit') }))
+    value.flush()
+    expect(snapshot(value).legacy.nodes.filter(row => row.kind === 'user').map(row => row.seq)).toEqual([6])
+  })
+
   it('rejects an unrelated event passed directly to the request-prompt start', () => {
     const input = at(1, 'turn/start', { turn: 1 })
     const invalidStart = {

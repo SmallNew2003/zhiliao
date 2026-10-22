@@ -55,8 +55,8 @@ export const imageOffloadProjection: SessionMessageProjection<'image/offload'> =
       if (messages.has(seq)) throw new Error(`image/offload: duplicate target seq ${seq}`)
       if (!nodes.has(seq)) throw new Error(`image/offload: target seq ${seq} is not a current surface node`)
       const source = context.events[seq - context.baseSeq]
-      if (source?.type !== 'user/message' && source?.type !== 'tool/result') {
-        throw new Error(`image/offload: target seq ${seq} must be user/message or tool/result`)
+      if (source?.type !== 'user/message' && source?.type !== 'user/message-edit' && source?.type !== 'tool/result') {
+        throw new Error(`image/offload: target seq ${seq} must be user/message, user/message-edit or tool/result`)
       }
       let previous = -1
       for (const index of target['imageIndexes'] as unknown[]) {

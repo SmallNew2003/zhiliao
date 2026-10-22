@@ -60,7 +60,9 @@ import {
   type RunResult,
   type SdkPromptContentBlock,
 } from '@deepseek-ai/dsh-sdk-client'
-import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, foldSurface, deriveEventMessage } from '@deepseek-ai/dsh-session'
+import { parseSessionLog } from '@deepseek-ai/dsh-llm-replay'
+import { currentSessionMessageProjections } from '@deepseek-ai/dsh-session-format-catalog/message-projections'
 
 const corpusRoot = fileURLToPath(new URL('../', import.meta.url))
 
@@ -124,6 +126,9 @@ interface SdkAssertions {
 }
 
 const SDK_ASSERTIONS: Readonly<Record<string, SdkAssertions>> = {
+  'message-edit-resend': {
+    patches: [fileURLToPath(new URL('./message-edit-resend/runtime.cordis.yml', import.meta.url))],
+  },
   'tool-error-details': {
     patches: [fileURLToPath(new URL('./tool-error-details/runtime.cordis.yml', import.meta.url))],
     expectedFinalResponse: 'ERROR_DETAILS_OK',
@@ -631,6 +636,12 @@ async function runScenario(scenario: CorpusScenario): Promise<{
           },
         })
         results.push(result)
+        if (scenario.name === 'message-edit-resend') {
+          expect(result.events.filter(event => event.type === 'turn/end'), 'both edit snapshot turns settle').toMatchObject([
+            { data: { reason: { kind: 'completed' } } },
+            { data: { reason: { kind: 'completed' } } },
+          ])
+        }
         if (scenario.manifest.environment?.DSH_SNAPSHOT_FEEDBACK === '1') {
           const feedback = result.events.filter(event => event.type.startsWith('feedback/'))
           expect(feedback.map(event => event.type)).toEqual([
@@ -812,6 +823,46 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         assertions.dshSdkChild !== undefined,
       )
       const actualContext = contextOf(ordered, cwd)
+      if (scenario.name === 'message-edit-resend') {
+        const events = results.flatMap(result => result.events)
+        const edits = events.filter(event => event.type === 'user/message-edit')
+        const admissions = events.filter(event => event.type === 'user/message-admit')
+        expect(edits).toHaveLength(1)
+        expect(admissions).toHaveLength(1)
+        const edited = edits[0]!
+        const admitted = admissions[0]!
+        expect(admitted.data.targetSeq).toBe(edited.seq)
+        expect(admitted.data.message.id).toBe(edited.data.message.id)
+        expect(edited.data.message.content).toEqual([{ type: 'text', text: 'EDITED_INPUT' }])
+        expect(admitted.data.message.content).toEqual([{ type: 'text', text: 'PREPARED_EDITED_INPUT' }])
+        expect(edited).not.toHaveProperty('surfaceOp')
+        expect(admitted).not.toHaveProperty('surfaceOp')
+        const originalInputs = events.filter(event => event.type === 'user/message'
+          && event.data.source.kind === 'user')
+        expect(originalInputs).toHaveLength(1)
+        expect(edited.data.targetSeq).toBe(originalInputs[0]!.seq)
+        expect(results).toHaveLength(1)
+        expect(results[0]?.finalResponse).toBe('EDITED_RESPONSE')
+        const raw = parseSessionLog(ordered[0]!.content)
+        const histories = raw.flatMap((event, index) => {
+          if (event.type !== 'assistant/message') return []
+          const prefix = raw.slice(0, index)
+          const surface = foldSurface(prefix, currentSessionMessageProjections)
+          return [surface.nodes.flatMap(seq => {
+            const message = deriveEventMessage(prefix[seq]!, surface.projectedMessages)
+            return message === null ? [] : [{
+              role: message.role,
+              content: message.role === 'system'
+                ? [{ type: 'text', text: '{{system}}' }]
+                : message.content,
+            }]
+          })]
+        })
+        expect(histories).toHaveLength(2)
+        const historyPath = join(scenario.dir, 'request-history.expected.json')
+        if (refreshing) await writeFile(historyPath, JSON.stringify(histories, null, 2) + '\n')
+        expect(histories).toEqual(JSON.parse(await readFile(historyPath, 'utf8')))
+      }
       if (scenario.name === 'subagent-activation-limit') {
         expect(ordered).toHaveLength(2)
         const denied = records(ordered[0]!.content).find(record => record.type === 'tool/result'

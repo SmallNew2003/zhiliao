@@ -10,6 +10,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
+import { estimateMessage } from './estimate.ts'
 
 const zeroBuckets = (): TokenUsageProjection => ({
   uncachedInputTokens: 0,
@@ -103,6 +104,13 @@ const contextPressureStateSchema = z.object({
     end: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(SessionSeq),
     tokens: z.number().int().nonnegative(),
   }).optional(),
+  latestInput: z.object({
+    inputTokens: z.number().int().nonnegative(),
+    seq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(SessionSeq),
+    surfaceTokens: z.number().int().nonnegative(),
+    pressureTokens: z.number().int().nonnegative().optional(),
+    sampledSurfaceTokens: z.number().int().nonnegative().optional(),
+  }).strict().optional(),
 }).strict()
 
 type ContextPressureState = z.infer<typeof contextPressureStateSchema>
@@ -172,12 +180,42 @@ export const tokenUsageProjectionDefinition = {
  */
 export const contextPressureProjectionDefinition = {
   key: 'contextPressure',
-  stateVersion: 5,
+  stateVersion: 6,
   stateSchema: contextPressureStateSchema,
   init: () => ({ surfaceTokens: 0 }),
   apply: (state, event) => {
+    if (event.type === 'user/message-admit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('context pressure: admitted input is not the latest input')
+      const inputTokens = estimateMessage(event.data.message)
+      return {
+        ...state, surfaceTokens: state.surfaceTokens + inputTokens - previous.inputTokens,
+        latestInput: { ...previous, inputTokens },
+      }
+    }
+    if (event.type === 'user/message-edit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('context pressure: edit target is not the latest user input')
+      return {
+        ...state.contextWindow === undefined ? {} : { contextWindow: state.contextWindow },
+        surfaceTokens: previous.surfaceTokens + estimateMessage(event.data.message),
+        ...previous.pressureTokens === undefined ? {} : { pressureTokens: previous.pressureTokens },
+        ...previous.sampledSurfaceTokens === undefined ? {} : { sampledSurfaceTokens: previous.sampledSurfaceTokens },
+        latestInput: { ...previous, seq: event.seq, inputTokens: estimateMessage(event.data.message) },
+      }
+    }
     const fold = foldSurfaceProjection(state.claim, event)
     let next = state
+    if (event.type === 'user/message' && event.data.source.kind === 'user') {
+      next = {
+        ...next,
+        latestInput: {
+          seq: event.seq, surfaceTokens: state.surfaceTokens, inputTokens: estimateMessage(event.data),
+          ...state.pressureTokens === undefined ? {} : { pressureTokens: state.pressureTokens },
+          ...state.sampledSurfaceTokens === undefined ? {} : { sampledSurfaceTokens: state.sampledSurfaceTokens },
+        },
+      }
+    }
     if (event.type === 'request/context') {
       const contextWindow = event.data.contextWindow
       if (contextWindow !== state.contextWindow) {

@@ -52,12 +52,7 @@ type StepEndReason = Extract<TurnEndReason, { kind: 'completed' | 'max-tokens' }
 
 type PreparedStep =
   | { kind: 'reject' }
-  | {
-    kind: 'enter'
-    messages: UserMessage[]
-    startsRequestSeries?: true
-    assembly: PromptAssembly
-  }
+  | (Extract<PreStepDecision, { kind: 'enter' }> & { assembly: PromptAssembly })
 
 /** Remove adapter-derived values before plugins propose the next request config. */
 function requestProposal(header: EpochHeader): LlmCallConfig {
@@ -322,7 +317,8 @@ export class ReactLoopAgent implements Agent {
       }
     } catch (error: unknown) {
       if (signal.aborted) {
-        turnEnds = { kind: 'aborted', reason: signal.reason as AgentCancelCause }
+        // Node fetch may attach a non-enumerable stack to the shared abort reason.
+        turnEnds = { kind: 'aborted', reason: { ...signal.reason as AgentCancelCause } }
         throw error
       }
       // Every failure is structured: an `LlmError` keeps its facts, anything
@@ -373,6 +369,13 @@ export class ReactLoopAgent implements Agent {
       }
       if (firstAttempt) {
         for (const message of decision.messages) {
+          const committed = decision.committedMessages?.find(receipt => receipt.message.id === message.id)
+          if (committed !== undefined) {
+            if (JSON.stringify(message) !== JSON.stringify(committed.message)) {
+              this.session.append('user/message-admit', { targetSeq: committed.seq, message })
+            }
+            continue
+          }
           this.session.append('user/message', message, { surfaceOp: 'append' })
         }
       }

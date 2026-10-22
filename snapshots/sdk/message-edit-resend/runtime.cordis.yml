@@ -1,0 +1,7 @@
+- insert:
+    - id: snapshot-message-edit-producer
+      name: './producer.mjs'
+      config:
+        replacementText: EDITED_INPUT
+        preparedText: PREPARED_EDITED_INPUT
+        originalResponse: ORIGINAL_RESPONSE

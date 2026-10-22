@@ -33,7 +33,7 @@ import type {
 import { contextBreakdownProjectionDefinition } from './breakdown-projection.ts'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from './usage-projection.ts'
 import { estimateContent, estimateMessage, estimateToolsTokens, ROLE_OVERHEAD } from './estimate.ts'
-import { commitSurfaceTokens, planSurfaceTokens } from './surface-fold.ts'
+import { analyzeNode, commitSurfaceTokens, planSurfaceTokens } from './surface-fold.ts'
 import type { MeterSurfaceNode } from './surface-fold.ts'
 import { priceSurface } from './route-pricing.ts'
 
@@ -65,6 +65,7 @@ interface ReplayState {
   surface: MeterSurfaceNode[]
   stepStart: { turn: number; step: number } | undefined
   anchor: MeasurementAnchor | undefined
+  latestInput?: { seq: SessionSeq; surface: readonly MeterSurfaceNode[]; anchor: MeasurementAnchor | undefined }
 }
 
 /** Sum disjoint provider usage buckets without double-counting reasoning output. */
@@ -245,6 +246,25 @@ export class TokenMeter extends Service {
    * retry instead of half-applying.
    */
   private _foldEvent(state: ReplayState, event: SessionEvent): void {
+    if (event.type === 'user/message-admit') {
+      state.surface = state.surface.map((node) => {
+        if (node.seq !== event.data.targetSeq) return node
+        const admitted = analyzeNode(node.seq, event.data.message)
+        return { ...admitted, images: node.images }
+      })
+      return
+    }
+    if (event.type === 'user/message-edit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('token meter: edit target is not the latest user input')
+      state.surface = [...previous.surface, analyzeNode(event.seq, event.data.message)]
+      state.anchor = previous.anchor
+      state.latestInput = { ...previous, seq: event.seq }
+      return
+    }
+    if (event.type === 'user/message' && event.data.source.kind === 'user') {
+      state.latestInput = { seq: event.seq, surface: [...state.surface], anchor: state.anchor }
+    }
     let nextHeader = state.header
     let nextStepStart = state.stepStart
     let nextAnchor = state.anchor

@@ -152,7 +152,10 @@ These limits define when this package is a poor fit or needs special operational
 - **Exact reads replay whole logs** — `readSession`, `readSurface`, `filterEvents`, and event traces load and validate the complete logical log, so very large histories pay full inspection per call; `listSessions` stays lightweight.
 - **Literal text scan, not full-text search** — the `text` filter scans extracted documents with a regular expression and does not rank; ranked search requires the mounted backend.
 
+Edited input text and admitted text remain searchable in raw event history. Current-surface queries restore earlier nodes shadowed by later compaction and return projected input content at its original sequence, including admitted text and image-offload selections.
+
 <a id="dev-note"></a>
+
 ### Dev Note
 
 <details>

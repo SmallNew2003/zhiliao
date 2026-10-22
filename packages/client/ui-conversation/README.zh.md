@@ -135,6 +135,8 @@ selector 必须是 owner currency 的纯函数。非 null 返回值作为 `match
 - **Factory occurrence 继承渲染位置的 Session**——`conversation.content` 不接受独立寻址的 Session；该能力需要单独的 Session provider。
 
 
+最近输入被编辑时，系统提示词检查恢复保存的输入前状态。仅更新输入时保留最后一条系统事件，使提示词卡片保留原有归属且不重复显示初始提示词。
+
 <a id="dev-note"></a>
 ### 开发备注
 

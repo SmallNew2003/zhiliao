@@ -9,6 +9,7 @@ import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
+import { MessageEditControls } from './MessageEditControls.tsx'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
 type UserFile = Extract<UserMessageNode['content'][number], { type: 'file' }>
@@ -313,24 +314,25 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, openFile, openSkill, t,
+  node, renderMessageImages, openFile, openSkill, latestInputSeq, running = false, editMessage, editDraftChanged,
+  editDraftDetached = false, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
   return (
     <UserStyleBubble
-      content={data.content}
+      content={editDraftDetached ? data.content.filter(block => block.type !== 'text') : data.content}
       references={{ openFile, openSkill }}
       renderMessageImages={renderMessageImages}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
       t={t}
-      actions={text => (
-        <MessageIconActions
-          text={text}
-          time={data.time}
-          clock="start"
-          className={css.actions}
-          t={t}
+      actions={text => editMessage === undefined ? (
+        <MessageIconActions text={text} time={data.time} clock="start" className={css.actions} t={t} />
+      ) : (
+        <MessageEditControls text={contentParts(data.content).text} targetSeq={data.seq} latest={data.seq === latestInputSeq}
+          running={running} hasAttachments={data.content.some(block => block.type !== 'text')}
+          editMessage={editMessage} t={t} onEditingChange={open => editDraftChanged?.(node, open)}
+          renderActions={trigger => editDraftDetached ? null : <MessageIconActions text={text} time={data.time} clock="start" className={css.actions} extraActions={trigger} t={t} />}
         />
       )}
     />

@@ -8,6 +8,7 @@
  * @module @deepseek-ai/dsh-session/surface
  */
 
+import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import { SessionLogOffset, SessionSeq } from './types.ts'
 import { KNOWN_SESSION_EVENT_TYPES, MESSAGE_PROJECTION_EVENT_TYPES } from './known-event-types.ts'
@@ -137,6 +138,9 @@ export function deriveEventMessage(
     case 'user/message': {
       return event.data
     }
+    case 'user/message-edit': {
+      return event.data.message
+    }
     // An empty-content message projects to no wire message. For
     // system/message the node records "no system prompt" while keeping its
     // surface position; for assistant/message the event exists only to host a
@@ -249,8 +253,10 @@ interface SurfaceReplacePlan extends SurfaceFoldReplacement {
 /** One validated surface transition that has not mutated fold state yet. */
 type SurfacePlan =
   | { kind: 'append'; seq: SessionSeq }
+  | { kind: 'admit'; seq: SessionSeq; message: Message }
   | SurfaceReplacePlan
   | { kind: 'project'; projection: SessionMessageProjection; messages: ReadonlyMap<SessionSeq, Message> }
+  | { kind: 'edit'; seq: SessionSeq; target: SessionSeq; nodes: SessionSeq[]; messages: ReadonlyMap<SessionSeq, Message>; shadowedSeqs: SessionSeq[] }
 
 /** Create an empty surface fold state. */
 function createFoldState(): SurfaceFoldState {
@@ -470,6 +476,70 @@ function planSurfaceEvent(
     throw new Error(`session event seq ${event.seq} is not contiguous; expected ${expectedSeq}`)
   }
   const surfaceOp = validateSurfaceMetadata(event)
+  if (event.type === 'user/message-admit') {
+    const { targetSeq, message } = event.data
+    if (!isEventSeq(targetSeq) || targetSeq >= event.seq || !state.nodes.includes(targetSeq)) {
+      throw new Error('user/message-admit target must be a current earlier input')
+    }
+    const target = events[targetSeq - baseSeq]
+    if (target?.type !== 'user/message' && target?.type !== 'user/message-edit') {
+      throw new Error('user/message-admit target must be a user message')
+    }
+    const original = target.type === 'user/message' ? target.data : target.data.message
+    if (original.source.kind !== 'user') throw new Error('user/message-admit target must be a human-authored input')
+    const latest = events.slice(0, event.seq - baseSeq).findLast(candidate =>
+      (candidate.type === 'user/message' && candidate.data.source.kind === 'user') || candidate.type === 'user/message-edit')
+    if (latest?.seq !== targetSeq) throw new Error('user/message-admit target must be the latest human input')
+    const mask = (value: Message) => ({ ...value, content: value.content.map(block => block.type === 'text' ? { ...block, text: null } : block) })
+    if (!isDeepEqualJson(mask(original), mask(message))) {
+      throw new Error('user/message-admit may change only text blocks')
+    }
+    const current = state.projectedMessages.get(targetSeq) ?? original
+    return {
+      kind: 'admit', seq: targetSeq,
+      message: deepFreeze({ ...current, content: current.content.map((block, index) => {
+        const admitted = message.content[index]
+        return block.type === 'text' && admitted?.type === 'text' ? admitted : block
+      }) }),
+    }
+  }
+  if (event.type === 'user/message-edit') {
+    if (baseSeq !== 0) throw new Error('user/message-edit requires the complete historical event prefix')
+    const { targetSeq, message } = event.data
+    if (!isEventSeq(targetSeq) || targetSeq >= event.seq) {
+      throw new Error('user/message-edit targetSeq must reference an earlier user message')
+    }
+    const previousEvents = events.slice(0, event.seq)
+    const target = previousEvents[targetSeq]
+    const latest = previousEvents.findLast(candidate =>
+      (candidate.type === 'user/message' && candidate.data.source.kind === 'user')
+      || candidate.type === 'user/message-edit')
+    if (target?.type !== 'user/message' && target?.type !== 'user/message-edit') {
+      throw new Error('user/message-edit target must be a user message')
+    }
+    if (target.type === 'user/message' && target.data.source.kind !== 'user') {
+      throw new Error('user/message-edit target must be a human-authored user message')
+    }
+    if (latest?.seq !== targetSeq) throw new Error('user/message-edit target must be the latest user message')
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- durable JSON must satisfy the declared user role
+    if (message.role !== 'user' || message.source.kind !== 'user') {
+      throw new Error('user/message-edit replacement must be a human-authored user message')
+    }
+    let prefixEnd = targetSeq
+    let edited = previousEvents[prefixEnd]
+    while (edited?.type === 'user/message-edit') {
+      prefixEnd = edited.data.targetSeq
+      edited = previousEvents[prefixEnd]
+    }
+    const prefix = foldSurface(previousEvents.slice(0, prefixEnd), projections)
+    const retained = new Set(prefix.nodes)
+    return {
+      kind: 'edit', seq: event.seq, target: targetSeq,
+      nodes: [...prefix.nodes, event.seq],
+      messages: new Map([...prefix.projectedMessages, [event.seq, message] as const]),
+      shadowedSeqs: state.nodes.filter(seq => !retained.has(seq)),
+    }
+  }
   const projection = projections.find(item => item.type === event.type)
   if (projection !== undefined) {
     return { kind: 'project', projection, messages: projection.project(event, {
@@ -520,10 +590,19 @@ function applySurfacePlan(
     state.nodes.splice(plan.startIdx, plan.endIdx - plan.startIdx + 1, plan.seq)
     state.replaceGeneration += 1
     state.contentGeneration += 1
+  } else if (plan?.kind === 'admit') {
+    state.projectedMessages.set(plan.seq, plan.message)
+    state.contentGeneration += 1
   } else if (plan?.kind === 'project') {
     for (const [seq, message] of plan.messages) state.projectedMessages.set(seq, message)
     state.projections.add(plan.projection)
     state.contentGeneration += 1
+  } else if (plan?.kind === 'edit') {
+    state.nodes = plan.nodes
+    state.projectedMessages = new Map(plan.messages)
+    state.replaceGeneration += 1
+    state.contentGeneration += 1
+    return { seq: plan.seq, start: plan.target, end: SessionSeq(plan.seq - 1), shadowedSeqs: plan.shadowedSeqs }
   }
   if (plan?.kind !== 'replace') return
   return {

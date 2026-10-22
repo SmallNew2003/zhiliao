@@ -119,6 +119,14 @@ export class FixtureSession implements SessionFace {
     }
   }
 
+  /**
+   * Fail-loud stub; supply `editMessage` on the fixture session face.
+   * @returns never — always throws.
+   */
+  editMessage(): never {
+    throw new Error(`test session "${this.sessionId}": editMessage is not stubbed — supply it on the fixture's session face`)
+  }
+
   private submissionSeq = 0
 
   /**

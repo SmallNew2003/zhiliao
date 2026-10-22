@@ -12,6 +12,7 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
   readonly groupPart?: 'reasoning' | 'response' | undefined
   readonly groupedTranscript?: boolean | undefined
+  readonly retainedDraftNode?: ChatNode | undefined
   readonly useChatNode: ChatViewSlotProps['useChatNode']
   readonly useChatNodeProcess: ChatViewSlotProps['useChatNodeProcess']
   readonly historyIncomplete: boolean
@@ -38,14 +39,15 @@ function turnOf(node: ChatNode | undefined): number | undefined {
 
 /** Subscribe, apply Turn-process visibility, and dispatch one stable Context key. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, groupPart, groupedTranscript, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
-  cwd, openFile, openSkill, inspectCall, forkAt,
+  nodeKey, groupPart, groupedTranscript, retainedDraftNode, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
+  latestInputSeq, running, editMessage, editDraftChanged, cwd, openFile, openSkill, inspectCall, forkAt,
   loadImage, renderMessageImages, fileMentions, useStore, actions, renderSlot, t,
 }: ChatNodeSeatProps) {
-  const sourceNode = useChatNode(nodeKey)
+  const currentNode = useChatNode(nodeKey)
+  const editDraftDetached = retainedDraftNode !== undefined
   const node = useMemo(() => {
-    const value = sourceNode as ChatNode | undefined
-    if (value?.kind !== 'assistant-step' || groupPart === undefined) return sourceNode
+    const value = (currentNode ?? retainedDraftNode) as ChatNode | undefined
+    if (value?.kind !== 'assistant-step' || groupPart === undefined) return value
     return {
       ...value,
       data: {
@@ -55,7 +57,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
           : block.kind !== 'reasoning'),
       },
     }
-  }, [groupPart, sourceNode])
+  }, [currentNode, groupPart, retainedDraftNode])
   const routedNode = node as ChatNode | undefined
   const turn = turnOf(routedNode)
   const processPresentation = useChatNodeProcess(nodeKey)
@@ -119,6 +121,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const owner = useMemo<ChatNodeOwnerProps | null>(() => node === undefined
     ? null
     : {
+      latestInputSeq, running, editMessage, editDraftChanged, editDraftDetached,
       cwd,
       openFile,
       openSkill,
@@ -129,7 +132,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       fileMentions,
       turnProcess,
     }, [
-    node, cwd, openFile, openSkill, inspectCall, forkAt,
+    node, latestInputSeq, running, editMessage, editDraftChanged, editDraftDetached, cwd, openFile, openSkill, inspectCall, forkAt,
     loadImage, renderMessageImages, fileMentions, turnProcess,
   ])
   if (routedNode === undefined || owner === null) return null
