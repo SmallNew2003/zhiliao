@@ -12,6 +12,7 @@ import type { ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { ProcessGroupSeat } from './ProcessGroupSeat.tsx'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { mergeTurnRailItems, type TurnRailItem } from './turn-rail-items.ts'
 import { formatRunDuration } from './message-chrome.ts'
@@ -203,12 +204,39 @@ function TurnStatus({ startTime, t }: {
 
 type ChatNodeListProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey'> & {
   readonly order: readonly string[]
+  readonly useChat: ChatViewSlotProps['useChat']
+  readonly compactTranscript: boolean
 }
 
-const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNodeListProps) {
-  return order.map(nodeKey => (
-    <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
-  ))
+const ChatNodeList = memo(function ChatNodeList({
+  order, useChat, compactTranscript, ...seatProps
+}: ChatNodeListProps) {
+  const processLayout = useChat(snapshot => snapshot.processGroups.layout)
+  if (!compactTranscript) {
+    return order.map(nodeKey => (
+      <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} compactTranscript={compactTranscript} {...seatProps} />
+    ))
+  }
+  return processLayout.map(entry => entry.kind === 'group'
+    ? (
+      <ProcessGroupSeat
+        key={entry.key}
+        groupKey={entry.groupKey}
+        useChat={useChat}
+        compactTranscript={compactTranscript}
+        {...seatProps}
+      />
+    )
+    : (
+      <ChatNodeSeat
+        key={entry.key}
+        nodeKey={entry.nodeKey}
+        compactTranscript={compactTranscript}
+        groupedTranscript
+        {...entry.part === undefined ? {} : { groupPart: entry.part }}
+        {...seatProps}
+      />
+    ))
 })
 
 /**
@@ -785,10 +813,11 @@ export function ChatView({
           <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
             <ChatNodeList
               order={order}
+              useChat={useChat}
+              compactTranscript={compactTranscript}
               useChatNode={useChatNode}
               useChatNodeProcess={useChatNodeProcess}
               historyIncomplete={hasMore}
-              compactTranscript={compactTranscript}
               useStore={useStore}
               actions={actions}
               cwd={cwd}

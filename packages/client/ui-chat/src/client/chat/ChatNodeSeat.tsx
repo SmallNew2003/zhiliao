@@ -10,6 +10,8 @@ import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
+  readonly groupPart?: 'reasoning' | 'response' | undefined
+  readonly groupedTranscript?: boolean | undefined
   readonly useChatNode: ChatViewSlotProps['useChatNode']
   readonly useChatNodeProcess: ChatViewSlotProps['useChatNodeProcess']
   readonly historyIncomplete: boolean
@@ -36,11 +38,24 @@ function turnOf(node: ChatNode | undefined): number | undefined {
 
 /** Subscribe, apply Turn-process visibility, and dispatch one stable Context key. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
+  nodeKey, groupPart, groupedTranscript, useChatNode, useChatNodeProcess, historyIncomplete, compactTranscript,
   cwd, openFile, openSkill, inspectCall, forkAt,
   loadImage, renderMessageImages, fileMentions, useStore, actions, renderSlot, t,
 }: ChatNodeSeatProps) {
-  const node = useChatNode(nodeKey)
+  const sourceNode = useChatNode(nodeKey)
+  const node = useMemo(() => {
+    const value = sourceNode as ChatNode | undefined
+    if (value?.kind !== 'assistant-step' || groupPart === undefined) return sourceNode
+    return {
+      ...value,
+      data: {
+        ...value.data,
+        blocks: value.data.blocks.filter(block => groupPart === 'reasoning'
+          ? block.kind === 'reasoning'
+          : block.kind !== 'reasoning'),
+      },
+    }
+  }, [groupPart, sourceNode])
   const routedNode = node as ChatNode | undefined
   const turn = turnOf(routedNode)
   const processPresentation = useChatNodeProcess(nodeKey)
@@ -62,6 +77,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   const processWindowReady = processSpec !== undefined
     && processPresentation !== undefined
     && compactTranscript
+    && groupedTranscript !== true
     && processSpec.answerAnchorSeq !== null
     && processPresentation.turn === processSpec.turn
     && processPresentation.turnClosed
@@ -126,8 +142,9 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     <div
       ref={wrapperRef}
       className={css.flowItem}
-      data-chat-anchor-key={routedNode.key}
-      data-chat-flow-key={routedNode.key}
+      data-chat-anchor-key={groupPart === undefined ? routedNode.key : `${routedNode.key}:${groupPart}`}
+      data-chat-flow-key={groupPart === undefined ? routedNode.key : `${routedNode.key}:${groupPart}`}
+      data-chat-group-part={groupPart}
       data-chat-flow-kind={routedNode.kind}
       data-chat-turn={turn}
       data-turn-process-member={processMember || undefined}

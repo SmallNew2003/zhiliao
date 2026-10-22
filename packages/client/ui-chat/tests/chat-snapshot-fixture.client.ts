@@ -14,6 +14,7 @@ import {
 } from '../src/client/conversation-nodes/turn-navigation.ts'
 import { orderedVisibleChatNodes } from '../src/client/conversation-nodes/chat-snapshot-builder.ts'
 import { ChatTurnProcessProjector } from '../src/client/conversation-nodes/turn-process-presentation.ts'
+import { projectProcessGroups } from '../src/client/conversation-nodes/process-groups.ts'
 import { hasAssistantReplyContent } from '../src/client/contract/assistant-content.ts'
 import {
   isSubagentDelegationTool, sameTurnProcessSpec, TURN_PROCESS_INDEPENDENT_KINDS,
@@ -291,6 +292,7 @@ export function chatSnapshotFixture(input: {
   }
   if (legacy.partial !== null) turnNumbers.add(legacy.partial.turn)
   for (const call of legacy.runningCalls) turnNumbers.add(call.turn)
+  for (const call of previous?.legacy.runningCalls ?? EMPTY) turnNumbers.add(call.turn)
   const turns = new Map<number, TurnLocation>()
   const turnData = new Map<number, FixtureTurnDataStore>()
   for (const turn of [...turnNumbers].sort((left, right) => left - right)) {
@@ -335,9 +337,10 @@ export function chatSnapshotFixture(input: {
     }
     if (node.kind === 'compaction' && linkedCompactions.has(node)) return []
     const inferredTurn = node.kind === 'tool-result'
-      ? legacy.nodes.slice(0, index).findLast(
-        (candidate): candidate is AssistantMessageNode => candidate.kind === 'assistant',
-      )?.turn
+      ? previous?.legacy.runningCalls.find(call => call.callId === node.callId)?.turn
+        ?? legacy.nodes.slice(0, index).findLast(
+          (candidate): candidate is AssistantMessageNode => candidate.kind === 'assistant',
+        )?.turn
       : undefined
     return [settledNode(node, turns, inferredTurn)]
   })
@@ -527,6 +530,7 @@ export function chatSnapshotFixture(input: {
     nodes: store,
     locations,
     navigation: { items: () => items },
+    processGroups: projectProcessGroups(store.values(), timeline, previous?.processGroups),
     timeline,
     legacy,
   }

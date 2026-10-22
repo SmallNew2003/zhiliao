@@ -1,6 +1,6 @@
 /** Per-Session Chat view store. */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
-import type { ChatStoreState, TurnProcessViewEntry } from './contract/store.ts'
+import type { ChatStoreState, ProcessGroupViewEntry, TurnProcessViewEntry } from './contract/store.ts'
 
 type ChatActions = {
   setTurnProcessOpen: (
@@ -9,6 +9,7 @@ type ChatActions = {
     answerStep: number,
     open: boolean,
   ) => void
+  setProcessGroupOpen: (draft: ChatStoreState, key: string, open: boolean | undefined) => void
 }
 
 /**
@@ -30,7 +31,7 @@ export function storedTurnProcessEntry(
  */
 export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions> {
   return defineStore({
-    init: (): ChatStoreState => ({ turnProcesses: [] }),
+    init: (): ChatStoreState => ({ turnProcesses: [], processGroups: [] }),
     actions: {
       setTurnProcessOpen: (draft, turn, answerStep, open) => {
         const index = draft.turnProcesses.findIndex(entry => entry.turn === turn)
@@ -41,6 +42,16 @@ export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions
         const next = { turn, answerStep } satisfies TurnProcessViewEntry
         if (index < 0) draft.turnProcesses.push(next)
         else draft.turnProcesses[index] = next
+      },
+      setProcessGroupOpen: (draft, key, open) => {
+        const index = draft.processGroups.findIndex(entry => entry.key === key)
+        if (open === undefined) {
+          if (index >= 0) draft.processGroups.splice(index, 1)
+          return
+        }
+        const next = { key, open } satisfies ProcessGroupViewEntry
+        if (index < 0) draft.processGroups.push(next)
+        else draft.processGroups[index] = next
       },
     },
   })

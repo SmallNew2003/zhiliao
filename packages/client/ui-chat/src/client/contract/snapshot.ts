@@ -3,6 +3,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ChatConversationViewNode } from './chat-nodes.ts'
 import type { TurnProcessSpec } from './turn-process.ts'
+import type { ChatProcessGroups } from './process-groups.ts'
 
 export type {
   AssistantBlock, AssistantMessageNode, AssistantProviderMetadataView, AssistantRequestConfig,
@@ -94,6 +95,7 @@ export interface ChatSnapshot {
   readonly nodes: ChatNodeStore
   readonly locations: ChatLocationNodeIndex
   readonly navigation: ChatTurnNavigationIndex
+  readonly processGroups: ChatProcessGroups
   readonly timeline: ConversationTimelineSnapshot
   readonly legacy: LegacyConversationSlice
 }
@@ -130,6 +132,10 @@ export const EMPTY_CHAT_SNAPSHOT: ChatSnapshot = {
   },
   navigation: {
     items: () => EMPTY_LIST,
+  },
+  processGroups: {
+    layout: EMPTY_LIST,
+    get: () => undefined,
   },
   timeline: EMPTY_TIMELINE,
   legacy: {
