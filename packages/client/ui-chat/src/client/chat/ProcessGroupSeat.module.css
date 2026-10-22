@@ -1,0 +1,109 @@
+.root {
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  text-align: left;
+  cursor: pointer;
+}
+
+.header:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.chevronBox {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-base);
+}
+
+.root[data-running] .chevronBox {
+  animation: process-group-breathe 1.8s ease-in-out infinite;
+}
+
+.chevron {
+  transform: rotate(-90deg);
+  transition: transform 100ms ease;
+}
+
+.header[aria-expanded="true"] .chevron {
+  transform: rotate(0deg);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body {
+  max-height: min(400px, 50vh);
+  margin: 6px 0 0 9px;
+  padding: 4px 0 4px 15px;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.members {
+  --dsh-chat-flow-gap: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.members > :not([hidden]):not(:empty) ~ :not([hidden]):not(:empty) {
+  margin-top: var(--dsh-chat-flow-gap);
+}
+
+.fadeTop {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+}
+
+.fadeBottom {
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.fadeTop.fadeBottom {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+@keyframes process-group-breathe {
+  50% { border-color: var(--dsw-alias-label-tertiary); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-running] .chevronBox {
+    animation: none;
+  }
+
+  .chevron {
+    transition: none;
+  }
+}
