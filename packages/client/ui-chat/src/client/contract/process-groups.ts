@@ -17,10 +17,8 @@ export interface ProcessGroupMember {
 /** Aggregated activity for one consecutive process range. */
 export interface ProcessGroupSummary {
   readonly counts: readonly { readonly kind: ProcessGroupActivity; readonly count: number }[]
-  readonly toolCount: number
-  readonly failedToolCount: number
+  readonly failed: boolean
   readonly running: ProcessGroupActivity | undefined
-  readonly runningDetail: string
 }
 
 /** Current presentation for one stable process group. */
