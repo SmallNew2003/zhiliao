@@ -41,21 +41,17 @@ function activity(name: string): ProcessGroupActivity {
 
 function summary(nodes: readonly ChatNode[]): ProcessGroupSummary {
   const counts = new Map<ProcessGroupActivity, number>()
-  let toolCount = 0
-  let failedToolCount = 0
+  let failed = false
   let running: ProcessGroupActivity | undefined
   const seen = new Set<string>()
   const visit = (block: ToolChatData['root']): void => {
     if (seen.has(block.callId)) return
     seen.add(block.callId)
     const call = isRunningTool(block) ? block : block.call
-    if (call !== null) {
-      const kind = activity(call.name)
-      counts.set(kind, (counts.get(kind) ?? 0) + 1)
-      toolCount += 1
-      if (isRunningTool(block)) running = kind
-      else if (block.isError) failedToolCount += 1
-    }
+    const kind = call === null ? 'tools' : activity(call.name)
+    counts.set(kind, (counts.get(kind) ?? 0) + 1)
+    if (isRunningTool(block)) running = kind
+    else if (block.isError) failed = true
     for (const child of block.subCalls) visit(child)
   }
   for (const node of nodes) {
@@ -66,10 +62,8 @@ function summary(nodes: readonly ChatNode[]): ProcessGroupSummary {
   }
   return {
     counts: [...counts].map(([kind, count]) => ({ kind, count })).sort((left, right) => right.count - left.count),
-    toolCount,
-    failedToolCount,
+    failed,
     running,
-    runningDetail: '',
   }
 }
 

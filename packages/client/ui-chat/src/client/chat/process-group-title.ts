@@ -19,15 +19,16 @@ export function processGroupTitle(
     const label = t(`message.processGroup.running.${activity}`)
     return elapsed === '' ? label : `${label}${t('message.turnProcess.separator')}${elapsed}`
   }
-  let label = group.summary.toolCount === 0
-    ? t('message.processGroup.done')
-    : t(group.summary.toolCount === 1 ? 'message.processGroup.tools.one' : 'message.processGroup.tools.other', {
-      count: group.summary.toolCount,
-    })
-  if (group.summary.failedToolCount > 0) {
-    label += `${t('message.turnProcess.separator')}${t('message.processGroup.failed', {
-      count: group.summary.failedToolCount,
-    })}`
+  const actions = group.summary.counts.slice(0, 2)
+    .map(({ kind }) => t(`message.processGroup.completed.${kind}`))
+  let label = actions.length === 0
+    ? t('message.processGroup.completed.thinking')
+    : actions.join(t('message.processGroup.completed.listSeparator'))
+  if (group.summary.counts.length > actions.length) {
+    label += t('message.processGroup.completed.more')
+  }
+  if (group.summary.failed) {
+    label += `${t('message.turnProcess.separator')}${t('message.processGroup.completed.failed')}`
   }
   return label
 }
