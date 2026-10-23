@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/comet/changes/chat-process-groups/brief.md
+brief.md: f771e7b7fa92d9476039320008d76d2b76927621
+brief.zh.md: 9f8cd16ad6a887af23d4154cd35f3353745407e3

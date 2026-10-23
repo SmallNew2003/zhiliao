@@ -1,69 +1,71 @@
-# 目标
+# Outcome
 
-将 `ui-chat` 的紧凑会话展示调整为 Codex/Qoder 风格的“正文段 + 半折叠执行组”：Assistant 的可见正文继续作为段落总结，正文之间连续的思考、工具调用和重试行按段时间聚合；运行中的组展开，已完成的组默认收起，展开后的组内过程限高滚动，避免整串执行日志铺满会话。
+English | [中文](brief.zh.md)
 
-# 范围
+Change the `ui-chat` Compact conversation display to a Codex/Qoder-style sequence of response segments and semi-collapsed process groups: visible Assistant text remains the segment summary, while consecutive reasoning, tool calls, and retry rows between responses are grouped by time segment; running groups expand, completed groups collapse by default, and expanded group content scrolls within a height limit so the full execution log does not fill the conversation.
 
-- `packages/client/ui-chat` 的 Chat Node 投影、分组渲染、折叠交互、本地化文案、样式和相关测试。
-- `Compact` 会话展示使用执行组；`Normal` 保持当前平铺展示。
-- 更新 `packages/client/ui-chat/README.md` 与 `README.zh.md` 中“轮次过程折叠”的当前行为说明。
-- 用户提供的 Qoder 截图是行为与视觉参考，不是要复制的品牌资产；实现使用现有设计 token、图标和字体阶梯。
+# Scope
+
+- Chat Node projection, grouped rendering, folding interactions, localized copy, styles, and related tests in `packages/client/ui-chat`.
+- `Compact` conversation display uses process groups; `Normal` retains its current flat presentation.
+- Update the current “turn process folding” behavior in `packages/client/ui-chat/README.md` and `README.zh.md`.
+- The user-provided Qoder screenshot is a behavior and visual reference, not a brand asset to copy; implementation uses existing design tokens, icons, and type scale.
 
 ## Source coverage
 
 | Source item and location | Read status | Content to preserve | Spec location | Acceptance ID | Coverage status | Reason or replacement |
 | --- | --- | --- | --- | --- | --- | --- |
-| S1: 截图，完成态折叠行 | complete | 只有思考过程的已完成执行组显示简洁的“分析请求”摘要并可展开 | `specs/chat-process-groups/spec.md` 的“已完成组显示摘要并默认收起”场景 | A7 | covered | 当前需求 |
-| S2: 截图，第一段 Assistant 正文 | complete | Assistant 的可见正文段保留在会话流中，不被并入执行组 | `specs/chat-process-groups/spec.md` 的“Assistant 正文分隔执行组”场景 | A3 | covered | 当前需求 |
-| S3: 截图，完成态执行摘要 | complete | 含工具调用的已完成组根据去重后的动作类型生成简短描述，最多展示两类主要动作且不显示次数；存在失败时追加“部分操作失败” | `specs/chat-process-groups/spec.md` 的“已完成组显示摘要并默认收起”和“完成摘要只描述动作类型”场景 | A7 | covered | 当前需求 |
-| S4: 截图，第二段 Assistant 正文 | complete | 后续 Assistant 正文继续分隔前后执行组，并保持原始时间顺序 | `specs/chat-process-groups/spec.md` 的“Assistant 正文分隔执行组”场景 | A3 | covered | 当前需求 |
-| S5: 截图，“正在执行中 · 86s”展开行 | complete | 运行中的执行组默认展开，标题显示运行状态和该轮已经过的时间 | `specs/chat-process-groups/spec.md` 的“运行中的组默认展开”场景 | A6 | covered | 当前需求 |
-| S6: 截图，运行组内的思考、搜索、终端、打开网页和进行中思考行 | complete | 组内保留逐项状态行，已完成项与进行中项状态可区分，逐项仍可独立折叠 | `specs/chat-process-groups/spec.md` 的“组内过程保持紧凑且可独立展开”场景 | A9 | covered | 当前需求 |
-| S7: 截图，运行组左侧缩进线和渐隐区域 | complete | 展开组采用缩进的半折叠容器，内容超过高度上限时内部滚动并在可滚动边缘渐隐 | `specs/chat-process-groups/spec.md` 的“展开组限高并内部滚动”场景 | A8 | covered | 当前需求 |
-| S8: 截图，执行过程未铺满整个会话 | complete | 已完成组收起；运行中组的过程区域有高度上限，不把完整日志长串铺开 | `specs/chat-process-groups/spec.md` 的“展开组限高并内部滚动”场景 | A8 | covered | 当前需求 |
+| S1: Screenshot, completed collapsed row | complete | A completed process group containing only reasoning shows a concise “Analyze request” summary and can expand | `specs/chat-process-groups/spec.md` “Completed groups show a summary and collapse by default” scenario | A7 | covered | Current requirement |
+| S2: Screenshot, first Assistant response segment | complete | The visible Assistant response segment remains in the conversation stream and is not merged into a process group | `specs/chat-process-groups/spec.md` “Assistant responses delimit process groups” scenario | A3 | covered | Current requirement |
+| S3: Screenshot, completed process summary | complete | A completed group containing tool calls generates a short description from deduplicated action types, shows at most two main action types without counts, and appends “Some actions failed” when a failure exists | `specs/chat-process-groups/spec.md` “Completed groups show a summary and collapse by default” and “Completed summaries describe only action types” scenarios | A7 | covered | Current requirement |
+| S4: Screenshot, second Assistant response segment | complete | Later Assistant responses continue to delimit process groups before and after them while preserving original chronological order | `specs/chat-process-groups/spec.md` “Assistant responses delimit process groups” scenario | A3 | covered | Current requirement |
+| S5: Screenshot, expanded “Running · 86s” row | complete | A running process group expands by default, and the title shows running state and elapsed time for the turn | `specs/chat-process-groups/spec.md` “Running groups start expanded” scenario | A6 | covered | Current requirement |
+| S6: Screenshot, reasoning, search, terminal, web-page, and in-progress reasoning rows in a running group | complete | Per-item status rows remain inside the group, completed and running items are distinguishable, and each item can still collapse independently | `specs/chat-process-groups/spec.md` “Group content stays compact and expands independently” scenario | A9 | covered | Current requirement |
+| S7: Screenshot, indentation line and fade area at the left of a running group | complete | An expanded group uses an indented, semi-collapsed container; content scrolls internally when it exceeds the height limit, with fades at scrollable edges | `specs/chat-process-groups/spec.md` “Expanded groups limit height and scroll internally” scenario | A8 | covered | Current requirement |
+| S8: Screenshot, process content not filling the conversation | complete | Completed groups collapse; the process area of a running group has a height limit and does not spread the complete long log | `specs/chat-process-groups/spec.md` “Expanded groups limit height and scroll internally” scenario | A8 | covered | Current requirement |
 
-# 非目标
+# Non-goals
 
-- 不调用模型生成新的过程总结，不新增模型请求或模型可见输入。
-- 不修改 Session 事件、持久化格式、SDK 投影或轨迹视图。
-- 不重做工具卡片、思考 Markdown、运行轨迹详情或统计面板。
-- 不为 `Normal` 模式新增分组标题；它继续平铺展示过程行。
-- 不移植上游完整的多档 work-details 设置体系。
+- Do not call a model to generate new process summaries or add model requests or model-visible inputs.
+- Do not change Session events, persistence format, SDK projection, or trace view.
+- Do not rework tool cards, reasoning Markdown, run-trace details, or the statistics panel.
+- Do not add group headers to `Normal`; it continues to show process rows flat.
+- Do not port the upstream complete multi-level work-details settings system.
 
-# 验收示例
+# Acceptance examples
 
-- 在一个已完成轮次中渲染“执行组、Assistant 正文、执行组、Assistant 正文、最终回答”时，会话顺序与日志一致；两段正文保持可见，两个执行组各自可展开，已完成组默认收起。
-- 在一个运行中的轮次中，当前执行组默认展开并显示运行状态与经过时间；上一条正文出现后，前一个执行组默认收起，组内最新过程仍可辨认。
+- When a completed turn renders “process group, Assistant response, process group, Assistant response, final answer”, the conversation order matches the log; both responses remain visible, both process groups can expand independently, and completed groups collapse by default.
+- In a running turn, the current process group expands by default and shows running state and elapsed time; after the preceding response appears, the previous process group collapses by default while the latest process content in the group remains identifiable.
 
-# 约束与不变量
+# Constraints and invariants
 
-- 分组只改变展示：不得改变 `SessionEventMap`、Session 日志、模型历史或应答顺序。
-- 用户消息、steering、系统提示词、错误、最大 token 提示和轮次尾部保持独立，不进入执行组。
-- 同一个 Assistant Node 可以贡献两部分：推理进入执行组，可见正文留在组外；不得重复渲染同一块内容。
-- 执行组以首成员的稳定标识作为 key；流式追加、轮次完成和历史分页不得改变既有成员相对顺序。
-- 切换折叠状态不得重新挂载有状态的工具 renderer；折叠通过可见性、高度或滚动状态完成。
-- 组内子项继续使用现有思考行和工具行；组默认展开时，子项仍遵守各自默认折叠状态。
-- 组标题、状态和摘要文案进入 `ui-chat` 的本地化字典，不在组件内硬编码中文或英文。
-- 复用的隐藏过程内容继续支持浏览器页内查找；命中隐藏内容时打开对应执行组。
-- 视觉使用现有 `--dsw-*` 与 `--dsh-*` token；展开组正文上限为 `min(400px, 50vh)`，上下可滚动边缘显示渐隐。
-- `Compact` 为默认模式；`Normal` 不显示组标题且不限制过程高度。
+- Grouping changes presentation only: it must not change `SessionEventMap`, Session logs, model history, or response order.
+- User messages, steering, system prompts, errors, max-token notices, and turn-tail remain independent and do not enter process groups.
+- One Assistant Node can contribute two parts: reasoning enters the process group and visible text remains outside it; the same content must not render twice.
+- A process group uses the stable identity of its first member as its key; streaming appends, turn completion, and history pagination must not change the relative order of existing members.
+- Toggling collapse state must not remount stateful tool renderers; folding uses visibility, height, or scroll state.
+- Child items inside a group continue to use existing reasoning and tool rows; when a group expands by default, its children still follow their own default collapsed state.
+- Group titles, states, and summaries belong in the `ui-chat` locale dictionaries rather than hardcoded Chinese or English component text.
+- Reused hidden process content continues to support browser in-page find; a match in hidden content opens the corresponding process group.
+- Visuals use existing `--dsw-*` and `--dsh-*` tokens; expanded group content has a maximum height of `min(400px, 50vh)` with fades at the top and bottom scrollable edges.
+- `Compact` is the default mode; `Normal` shows no group titles and does not cap process height.
 
-# 决策
+# Decisions
 
-- 使用 Assistant 已有的可见正文作为“小总结”，不额外生成文本。
-- 分组边界是下一条可见 Assistant 正文或轮次边界；单条 Assistant Node 内以回复块是否存在拆分推理与正文。
-- 运行中的组默认展开；标题显示“正在分析/读取/搜索/执行”等当前活动与该轮经过时间。
-- 已完成的组默认收起；仅思考的组显示“分析请求”，含工具的组根据去重后的动作类型显示最多两类主要动作，不展示次数；存在失败时追加“部分操作失败”。
-- 保留现有 `Compact / Normal` 偏好；`Compact` 应用执行组，`Normal` 平铺。
-- 在当前 `ui-chat` 投影层实现，不引入 Session 事件，也不升级到上游完整的 work-details 模式架构。
+- Use the existing visible Assistant text as the “brief summary” without generating additional text.
+- Group boundaries are the next visible Assistant response or turn boundary; within a single Assistant Node, the presence of a response block determines how reasoning and visible text are split.
+- Running groups expand by default; the title shows the current activity such as “Analyzing / reading / searching / running” and the elapsed time for the turn.
+- Completed groups collapse by default; reasoning-only groups show “Analyze request”, groups with tools show at most two main deduplicated action types without counts, and failures append “Some actions failed”.
+- Preserve the existing `Compact / Normal` preference; `Compact` applies process groups and `Normal` stays flat.
+- Implement in the current `ui-chat` projection layer without introducing Session events or adopting the full upstream work-details mode architecture.
 
-# 待解决问题
+# Open questions
 
-无。
+None.
 
-# 验证预期
+# Verification expectations
 
-- 为分组投影补充单元测试，覆盖正文边界、推理与正文拆分、动作类型排序、失败状态、运行与完成状态。
-- 为 `ChatView` 补充组件测试，覆盖运行组展开、完成组收起、组内限高滚动、手动展开、页内查找、键盘操作和 `Normal` 平铺。
-- 运行 `packages/client/ui-chat` 的聚焦测试、仓库类型检查和 lint；若改动影响 Web 快照或可访问性断言，同步更新对应 owner-local 期望。
-- 手工预览 Web 会话，确认运行中与完成后两种状态均符合截图节奏，且没有整串执行日志铺满会话。
+- Add unit tests for grouped projection covering response boundaries, reasoning and response splitting, action-type ordering, failure state, and running and completed states.
+- Add component tests for `ChatView` covering running group expansion, completed group collapse, internal height-limited scrolling, manual expansion, in-page find, keyboard operation, and flat `Normal` presentation.
+- Run focused `packages/client/ui-chat` tests, repository type checking, and lint; if the change affects Web snapshots or accessibility assertions, update the corresponding owner-local expectations.
+- Manually preview a Web conversation to confirm both running and completed states match the screenshot rhythm and that the complete execution log does not fill the conversation.

@@ -21,8 +21,8 @@ generated_from_state_version: 10
 | A1 | passed | brief.md | Scenario: 前端根据 cwd 渲染工作区相对路径图片 - **WHEN** Agent 在回复中输出包含相对路径的图片（如 `![图表](charts/figure.png)` 或 `./figure.png`），且提供了有效的会话 `cwd` - **THEN** 前端将其解析为指向 `/api/file?path=...` 的绝对路径并在界面中渲染图片 | 已通过测试用例验证：在提供 cwd 时，相对路径图片正确解析为指向 /api/file?path=... 的绝对路径并在 AssistantMarkdown 中渲染 |
 | A2 | passed | brief.md | Scenario: 缺失 cwd 时保持非绝对路径静态回退 - **WHEN** 未提供 `cwd` 且图片目标为相对路径 - **THEN** 前端不构造 `/api/file` 请求，保持安全降级 | 已通过测试用例验证：在缺失 cwd 时，相对路径图片保持静态回退，不构造 /api/file 请求 |
 | A3 | passed | brief.md | Scenario: 系统提示词注入完整的文件与图片引用指引 - **WHEN** 挂载 `ui-deliverables` 插件并装配系统提示词 - **THEN** 生成的系统提示词中包含文件 Markdown 链接与图片 Markdown 嵌入语法的指导说明 | 已通过单元测试验证：ui-deliverables 的 FILE_REFERENCE_PROMPT 注入包含文件链接与图片嵌入说明 |
-| A4 | passed | specs/conversation-media-references/spec.md | 解析并渲染相对路径图片 - **WHEN** Agent 输出 `![图表](charts/figure.png)` 且提供有效 `cwd` - **THEN** 前端构造指向 `/api/file?path=...` 的请求地址并在界面中渲染图片 | Spec 验收通过：Agent 输出 ![图表](charts/figure.png) 且提供有效 cwd 时前端正确构造 /api/file?path=... 请求 |
-| A5 | passed | specs/conversation-media-references/spec.md | 提示词包含图片嵌入指引 - **WHEN** 挂载 `ui-deliverables` 插件并装配提示词 - **THEN** 提示词文本明确指示使用 `![alt](path)` 嵌入图片 | Spec 验收通过：挂载 ui-deliverables 插件时提示词明确指示使用 ![alt](path) 嵌入图片 |
+| A4 | passed | specs/conversation-media-references/spec.md | 解析并渲染相对路径图片 - **WHEN** Agent 输出 `![图表](charts/figure.png)` 且提供有效 `cwd` - **THEN** 前端构造指向 `/api/file?path=...` 的请求地址并在界面中渲染图片 | Spec 验收通过：Agent 输出 `![图表](charts/figure.png)` 且提供有效 cwd 时前端正确构造 /api/file?path=... 请求 |
+| A5 | passed | specs/conversation-media-references/spec.md | 提示词包含图片嵌入指引 - **WHEN** 挂载 `ui-deliverables` 插件并装配提示词 - **THEN** 提示词文本明确指示使用 `![alt](path)` 嵌入图片 | Spec 验收通过：挂载 ui-deliverables 插件时提示词明确指示使用 `![alt](path)` 嵌入图片 |
 
 ## 检查
 

@@ -1,115 +1,115 @@
-# 会话执行组
+# Conversation process groups
 
-English | 中文
+English | [中文](spec.zh.md)
 
-## 正文分段
+## Response segmentation
 
-会话必须保留 Assistant 的可见正文，并把相邻正文段之间的连续过程内容聚合为独立执行组。分组只改变展示，不改变持久化的 Session 顺序或模型可见内容。
+The conversation must retain visible Assistant text and aggregate consecutive process content between adjacent response segments into separate process groups. Grouping changes presentation only and does not change the persisted Session order or model-visible content.
 
-### Scenario: Assistant 正文分隔执行组
+### Scenario: Assistant responses delimit process groups
 
-- **WHEN** 一个轮次包含“过程内容、可见 Assistant 正文、过程内容、可见 Assistant 正文、最终回答”
-- **THEN** 两段可见正文都留在执行组之外并保持原顺序
-- **AND** 每段连续过程内容分别形成一个执行组
-- **AND** 首个正文之前的独立过程内容也可以形成执行组
+- **WHEN** A turn contains “process content, visible Assistant response, process content, visible Assistant response, final answer”
+- **THEN** Both visible responses remain outside process groups and retain their original order
+- **AND** Each consecutive run of process content forms a separate process group
+- **AND** Standalone process content before the first response may also form a process group
 
-### Scenario: 单个 Assistant Node 按内容分拆
+### Scenario: Split one Assistant Node by content
 
-- **WHEN** 一个 Assistant Node 同时包含非空推理块和可见回复块
-- **THEN** 推理块进入所在执行组
-- **AND** 可见回复块留在执行组之外
-- **AND** 同一内容块不会重复渲染
+- **WHEN** One Assistant Node contains both a non-empty reasoning block and a visible response block
+- **THEN** The reasoning block enters the process group that contains it
+- **AND** The visible response block remains outside process groups
+- **AND** The same content block does not render twice
 
-### Scenario: 独立行不进入执行组
+### Scenario: Standalone rows stay outside process groups
 
-- **WHEN** 轮次中出现用户消息、steering、系统提示词、错误、最大 token 提示或轮次尾部
-- **THEN** 该行保持独立并按原顺序渲染
-- **AND** 它成为相邻执行组之间的边界
+- **WHEN** A turn contains a user message, steering, system prompt, error, max-token notice, or turn-tail
+- **THEN** The row remains standalone and renders in its original order
+- **AND** It becomes a boundary between adjacent process groups
 
-## 运行与完成状态
+## Running and completed states
 
-执行组必须根据自身是否仍有后续正文或轮次结束来区分运行中与已完成状态。
+A process group must distinguish running from completed state based on whether more response content or the end of the turn follows it.
 
-### Scenario: 运行中的组默认展开
+### Scenario: Running groups start expanded
 
-- **WHEN** 执行组仍处于运行中
-- **THEN** 组默认展开
-- **AND** 标题显示当前活动状态和该轮已经过时间
-- **AND** 进行中的思考或工具行显示运行状态
+- **WHEN** A process group is still running
+- **THEN** The group starts expanded
+- **AND** The title shows current activity and elapsed time for the turn
+- **AND** In-progress reasoning or tool rows show running state
 
-### Scenario: 已完成组显示摘要并默认收起
+### Scenario: Completed groups show a summary and collapse by default
 
-- **WHEN** 后续可见 Assistant 正文出现或轮次结束关闭执行组
-- **THEN** 组默认收起
-- **AND** 仅含思考的组显示“分析请求”
-- **AND** 含工具调用的组根据组内实际动作生成简短摘要
-- **AND** 存在失败调用时追加“部分操作失败”
+- **WHEN** A subsequent visible Assistant response appears or the end of the turn closes the process group
+- **THEN** The group starts collapsed
+- **AND** A reasoning-only group shows “Analyze request”
+- **AND** A group containing tool calls generates a short summary from its actual actions
+- **AND** A failed call appends “Some actions failed”
 
-### Scenario: 完成摘要只描述动作类型
+### Scenario: Completed summaries describe only action types
 
-- **WHEN** 一个已完成执行组包含一种或多种工具动作
-- **THEN** 组标题最多描述两类主要动作，例如“读取文件、运行命令”
-- **AND** 标题不显示任何调用次数
-- **AND** 动作类型以执行组内去重后的工具调用归类
-- **AND** 存在超过两类动作时在描述后追加“等操作”
+- **WHEN** A completed process group contains one or more tool actions
+- **THEN** The group title describes at most two main action types, such as “Read files, ran commands”
+- **AND** The title does not show any call counts
+- **AND** Actions are classified from deduplicated tool calls within the group
+- **AND** More than two action types append “and more” after the description
 
-### Scenario: 展开组限高并内部滚动
+### Scenario: Expanded groups limit height and scroll internally
 
-- **WHEN** 用户展开一个执行组
-- **THEN** 组内过程区域最大高度为 `min(400px, 50vh)`
-- **AND** 内容超出高度时在执行组内部滚动
-- **AND** 可继续向上或向下滚动时对应边缘显示渐隐提示
+- **WHEN** Users expand a process group
+- **THEN** The group content area has a maximum height of `min(400px, 50vh)`
+- **AND** Content that exceeds the height scrolls inside the process group
+- **AND** The corresponding edge fades when more content can be scrolled into view
 
-### Scenario: 组内过程保持紧凑且可独立展开
+### Scenario: Group content stays compact and expands independently
 
-- **WHEN** 执行组展开并包含多条思考或工具行
-- **THEN** 每行保持现有紧凑摘要形态
-- **AND** 已完成、失败和进行中状态可区分
-- **AND** 思考行和工具行仍可各自展开详情
+- **WHEN** An expanded process group contains multiple reasoning or tool rows
+- **THEN** Each row retains its existing compact summary form
+- **AND** Completed, failed, and running states are distinguishable
+- **AND** Reasoning and tool rows can each expand their details
 
-## 交互与展示模式
+## Interaction and presentation modes
 
-### Scenario: 组标题支持键盘和指针操作
+### Scenario: Group titles support keyboard and pointer operation
 
-- **WHEN** 用户点击执行组标题或聚焦后按 Enter 或 Space
-- **THEN** 执行组切换展开状态
-- **AND** 标题暴露 `aria-expanded`
-- **AND** 展开前的焦点停留在标题上
+- **WHEN** Users click a process group title or focus it and press Enter or Space
+- **THEN** The process group toggles its expanded state
+- **AND** The title exposes `aria-expanded`
+- **AND** Focus remains on the title after toggling
 
-### Scenario: 页内查找揭示隐藏过程
+### Scenario: In-page find reveals hidden process content
 
-- **WHEN** 浏览器页内查找命中已收起执行组内的文字
-- **THEN** 对应执行组自动展开并显示命中内容
+- **WHEN** Browser in-page find matches text inside a collapsed process group
+- **THEN** The corresponding process group expands automatically and shows the match
 
-### Scenario: Compact 使用执行组
+### Scenario: Compact uses process groups
 
-- **WHEN** 会话展示设置为 `Compact`
-- **THEN** 符合条件的连续过程内容使用执行组
-- **AND** 运行中组展开、已完成组收起
+- **WHEN** Conversation display is set to `Compact`
+- **THEN** Eligible consecutive process content uses process groups
+- **AND** Running groups expand while completed groups collapse
 
-### Scenario: Normal 保持平铺
+### Scenario: Normal stays flat
 
-- **WHEN** 会话展示设置为 `Normal`
-- **THEN** 过程行按现有平铺方式显示
-- **AND** 不显示执行组标题或组级限高
+- **WHEN** Conversation display is set to `Normal`
+- **THEN** Process rows render in their existing flat presentation
+- **AND** No process group titles or group-level height limits appear
 
-### Scenario: 流式追加与历史分页保持顺序
+### Scenario: Streaming appends and history pagination preserve order
 
-- **WHEN** 执行组内容流式增长、轮次完成或历史分页改变已加载窗口
-- **THEN** 既有成员保持稳定 key 和相对顺序
-- **AND** 用户手动展开状态仅在对应组仍存在时保留
-- **AND** 不因重新渲染改变工具或思考节点已选择的状态
+- **WHEN** Process group content streams in, a turn completes, or history pagination changes the loaded window
+- **THEN** Existing members retain stable keys and relative order
+- **AND** A user's manual expansion state is retained only while the corresponding group still exists
+- **AND** Re-rendering does not change state already chosen by tool or reasoning nodes
 
-## 本地化与可访问性
+## Localization and accessibility
 
-### Scenario: 执行组文案来自本地化字典
+### Scenario: Process group copy comes from locale dictionaries
 
-- **WHEN** 执行组显示运行状态、完成摘要或失败状态
-- **THEN** 文案来自 `ui-chat` 的本地化字典
-- **AND** 中文与英文均覆盖全部新增键
+- **WHEN** A process group shows running state, a completed summary, or failure state
+- **THEN** Copy comes from the `ui-chat` locale dictionaries
+- **AND** Chinese and English cover every new key
 
-### Scenario: 运行状态不依赖颜色单独表达
+### Scenario: Running state does not rely on color alone
 
-- **WHEN** 执行组或组内行处于运行中
-- **THEN** 同时提供文本或状态语义
-- **AND** 动画在 `prefers-reduced-motion` 下停止
+- **WHEN** A process group or a row inside it is running
+- **THEN** Text or status semantics are provided as well
+- **AND** Animation stops under `prefers-reduced-motion`
