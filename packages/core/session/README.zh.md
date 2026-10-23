@@ -187,7 +187,7 @@ session.deriveMessages()         // the derived model history
 - **`TurnEndReasonMap` 不含 ACP（Agent Client Protocol）命名的 `refusal`／`max_turn_requests` 变体**：受生产方约束；只有当适配器或循环首次产生这些变体时才加入。
 - **fork 之外没有会话树**：基于分支会话的 pi 风格条目树被推迟，除非消费方需要超越基于边界的 forking 的能力。
 
-`user/message-edit` 恢复最近一条人工输入之前的有效消息并加入替换输入，不删除原始事件。连续编辑保留同一个原始前缀。`user/message-admit` 在最近人工输入已有序号上记录后续步骤准备中的文字处理；消息标识、来源元数据、附件和此前的图片卸载选择保持不变。
+`user/message-edit` 恢复最近一条人工输入之前的有效消息并加入替换输入，不删除原始事件。连续编辑保留同一个原始前缀。旧版循环以相同消息标识重写出的 `user/message` 不构成更新的人工输入，后续编辑仍以持久的编辑事件为目标。`user/message-admit` 在最近人工输入已有序号上记录后续步骤准备中的文字处理；消息标识、来源元数据、附件和此前的图片卸载选择保持不变。
 
 <a id="dev-note"></a>
 ### 开发备注
