@@ -68,6 +68,22 @@ describe('latest user message editing', () => {
     expect(texts(session)).toEqual(['A', 'answer A', 'B3'])
   })
 
+  it('keeps an edited input latest when a legacy loop re-emitted it as user/message', () => {
+    const { session, input, latest } = conversation()
+    const firstEdit = session.append('user/message-edit', { targetSeq: latest.seq, message: input('B2') })
+    session.append('assistant/message', {
+      turn: 3, step: 1, stream: [],
+      message: createMessage({
+        role: 'assistant', content: [{ type: 'text', text: 'answer B2' }],
+        source: { kind: 'model', provider: 'test', model: 'test' },
+      }),
+    }, { surfaceOp: 'append' })
+    session.append('user/message', firstEdit.data.message, { surfaceOp: 'append' })
+    const secondEdit = session.append('user/message-edit', { targetSeq: firstEdit.seq, message: input('B3') })
+    expect(texts(session)).toEqual(['A', 'answer A', 'B3'])
+    expect(session.surface.nodes).toEqual([0, 1, secondEdit.seq])
+  })
+
   it('restores earlier context when a compaction summary also covered the edited input', () => {
     const { session, input, latest } = conversation()
     const nodes = [...session.surface.nodes]
