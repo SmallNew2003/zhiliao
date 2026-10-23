@@ -214,6 +214,29 @@
 .bodyScroll {
   max-height: 260px;
   overflow-y: auto;
+  margin-right: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.bodyScroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bodyScroll::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.bodyScroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
+}
+
+.bodyScroll::-webkit-scrollbar-track {
+  margin: 6px;
+  background: transparent;
 }
 
 /* Expanded input/output card (figma 1249:35657): the code-block surface and
@@ -223,11 +246,12 @@
 .ioCard {
   display: flex;
   flex-direction: column;
-  margin: 4px 0 4px 4px;
+  margin: 4px 12px 6px 4px;
   border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
   background: var(--dsw-alias-markdown-code-block);
   font: var(--dsw-font-markdown-code-block-small);
+  overflow: hidden;
 }
 
 /* One card section (IN or OUT): the gutter-label grid, capped and scrolling
@@ -237,23 +261,35 @@
   grid-template-columns: max-content 1fr;
   column-gap: 14px;
   align-items: baseline;
-  padding: 12px 16px;
+  padding: 12px 18px 12px 16px;
   max-height: 150px;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
 }
 
-/* Card-internal scrollbar: a 2px transparent border clips the thumb inward so
-   it floats off the rounded card edge instead of hugging it (the terminal
-   card's own output scroller carries the same treatment in TerminalBlock). */
+.ioSection::-webkit-scrollbar {
+  width: 6px;
+}
+
+/* Card-internal scrollbar: a transparent border and track margin clip the thumb
+   inward so it floats off the rounded card edge instead of hugging it. */
 .ioSection::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background-clip: padding-box;
   border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.ioSection::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
 }
 
 /* Track end-margins keep the thumb's travel out of the rounded corners. */
 .ioSection::-webkit-scrollbar-track {
-  margin: 6px 0;
+  margin: 6px;
+  background: transparent;
 }
 
 /* Caption (not tertiary): one step dimmer than the payload text so the
@@ -334,14 +370,14 @@
 .imageBody,
 .searchBody,
 .webBody {
-  margin: 4px 0 4px 4px;
+  margin: 4px 12px 6px 4px;
 }
 
 /* The recovery footer for a capped search: the result text (its `Full … stored
    at …` locator) below the card in the muted tone, since the card holds only the
    retained rows. Same column indent as the card body. */
 .searchRecovery {
-  margin: 4px 0 4px 4px;
+  margin: 4px 12px 4px 4px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: var(--dsw-font-xs-13);
