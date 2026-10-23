@@ -30,7 +30,7 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 <a id="editing-the-latest-input"></a>
 ## Editing the latest input
 
-The latest sent human input has a text-only inline editor, including input inherited from a branch and previously edited input. Original attachments remain readonly and reuse their durable references. Reply execution and stop cleanup disable editing; starting a run while a draft is open disables resending without discarding text. Cancel or Escape closes the editor, Ctrl/Cmd+Enter resends, and unchanged text closes without a request.
+The latest sent human input has a text-only inline editor, including input inherited from a branch and previously edited input. Original attachments remain readonly and reuse their durable references. Reply execution and stop cleanup disable editing; starting a run while a draft is open disables resending without discarding text. Cancel or Escape closes the editor, Ctrl/Cmd+Enter resends, and unchanged text resends the same input with another response.
 
 An accepted edit displays the replacement input and excludes the target and subsequent response rows before the edit from Chat, navigation, and legacy transcript data. Ordinary compaction history before the target remains visible, and raw Session events remain inspectable. Pre-step text adjustments update the same input without changing its editing sequence. Errors preserve the draft; retrying the same text reuses its request identity, including after a lost acceptance response. If another client replaces the target, the original text disappears while the open draft remains recoverable. Closing restores focus to the message action or Chat scroll area.
 

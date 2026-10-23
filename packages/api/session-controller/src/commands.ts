@@ -377,7 +377,7 @@ export class SessionCommandController {
   /**
    * Commit a text replacement of the latest sent input, then request a response from its restored history.
    * @param request - latest input sequence, replacement text, and stable retry identity.
-   * @returns durable acceptance; unchanged text accepts without another event or response.
+   * @returns durable acceptance; unchanged text resends the original input with another response.
    * @throws RemoteError when the Agent is active, the target is stale, or an original attachment is unreadable.
    */
   async editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue> {
@@ -410,8 +410,11 @@ export class SessionCommandController {
           signal.throwIfAborted()
           const original = validate(reserved.events)
           const originalText = original.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('')
-          if (request.text === originalText) return { accepted: true }
-          const content = replaceInputText(original.content, request.text)
+          // Unchanged text resends the original blocks verbatim, so text
+          // interleaved with attachments keeps its original block order.
+          const content = request.text === originalText
+            ? original.content
+            : replaceInputText(original.content, request.text)
           if (!content.some(part => part.type !== 'text' || part.text.trim().length > 0)) {
             throw new RemoteError('gateway/bad-request', 'edited input must include non-whitespace text or an attachment', {})
           }

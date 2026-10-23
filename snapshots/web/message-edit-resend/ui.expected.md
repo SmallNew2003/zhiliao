@@ -12,7 +12,7 @@
     - tab "Trajectory"
 - navigation "Turn navigation":
   - button "Jump to turn 1"
-  - button "Jump to turn 3"
+  - button "Jump to turn 4"
 - button "System prompt":
   - img
   - img
@@ -20,7 +20,7 @@
 - text: Earlier input A {{clock}}
 - button "Copy":
   - img
-- button "Worked"
+- button "analyzed the request"
 - paragraph: Earlier answer A
 - button "Copy":
   - img
@@ -43,7 +43,7 @@
   - img
   - img
   - text: System prompt
-- paragraph: Revised answer B
+- paragraph: Repeated answer B
 - button "Copy":
   - img
 - button "Good response":
@@ -64,6 +64,6 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "3 turns 3 steps":
+- button "4 turns 4 steps":
   - img
-  - text: 3 turns 3 steps
+  - text: 4 turns 4 steps

@@ -36,7 +36,6 @@ export function MessageEditControls({
   const [error, setError] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const pending = useRef(false)
-  const originalText = useRef(text)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const request = useRef<{ text: string; requestId: SessionRequestId } | null>(null)
   const reasonId = useId()
@@ -49,7 +48,6 @@ export function MessageEditControls({
   }
   const submit = async (): Promise<void> => {
     if (draft === null || running || pending.current) return
-    if (draft === originalText.current) { close(); return }
     if (!latest && (request.current === null || request.current.text !== draft)) { setError(t('message.edit.stale')); return }
     if (draft.trim() === '' && !hasAttachments) { setError(t('message.edit.empty')); return }
     if (request.current === null || request.current.text !== draft) {
@@ -79,7 +77,6 @@ export function MessageEditControls({
         aria-disabled={running || sending || !latest || undefined}
         aria-describedby={running ? reasonId : undefined}
         onClick={running || sending || !latest ? undefined : () => {
-          originalText.current = text
           setDraft(text); setError(null); request.current = null; onEditingChange?.(true)
         }}>
         <IconEditOutline16 />

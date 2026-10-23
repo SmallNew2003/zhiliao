@@ -8,9 +8,9 @@ import { en, zh } from '../src/client/locale.ts'
 afterEach(cleanup)
 
 describe('latest input editing', () => {
-  it.each([en, zh])('prefills text, cancels with focus, and closes unchanged without a request', async (dictionary) => {
+  it.each([en, zh])('prefills text, cancels with focus, and resends unchanged text', async (dictionary) => {
     const t = makeTranslate(dictionary)
-    const editMessage = vi.fn()
+    const editMessage = vi.fn().mockResolvedValue({ ok: true, value: { accepted: true } })
     render(<MessageEditControls text="original" targetSeq={4} latest running={false} hasAttachments={false} editMessage={editMessage} t={t} />)
     const trigger = screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit') })
     fireEvent.click(trigger)
@@ -21,7 +21,10 @@ describe('latest input editing', () => {
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit.resend') }))
     await waitFor(() =>{  expect(screen.queryByRole('textbox')).toBeNull() })
-    expect(editMessage).not.toHaveBeenCalled()
+    expect(editMessage).toHaveBeenCalledTimes(1)
+    expect(editMessage.mock.calls[0]).toEqual([{
+      targetSeq: 4, text: 'original', requestId: expect.any(String) as unknown as string,
+    }])
   })
 
   it('keeps draft and request identity after a lost reply, and disables submission during cleanup', async () => {

@@ -74,7 +74,7 @@ An original attachment required for resending is unavailable. The system explain
 
 ### Scenario: Submitted content is unchanged
 
-Users open the editor without changing text, or restore the original text. The UI makes no resend request and does not call the model or tools again.
+Users open the editor without changing text, or restore the original text. The UI resends the same input: the original input and its response are excluded and the model is called again with the replacement input. Original attachments keep their identities, order, and content without another upload.
 
 ## Failures and retries
 

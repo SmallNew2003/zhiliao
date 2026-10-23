@@ -247,15 +247,38 @@ describe('Session latest-message editing', () => {
     } finally { await h.ctx.fiber.dispose() }
   })
 
-  it('rejects empty input and leaves unchanged text without another model request', async () => {
+  it('rejects empty input and resends unchanged text with another model request', async () => {
     const h = await harness()
     try {
       await h.send(input('A'))
       const target = await h.latest()
       await expect(h.edit(target, ' \n')).rejects.toMatchObject({ code: 'gateway/bad-request' })
-      expect(await h.edit(target, 'A')).toEqual({ accepted: true })
-      expect(h.adapter.requests).toHaveLength(1)
-      expect((await h.events()).some(event => event.type === 'user/message-edit')).toBe(false)
+      expect(await h.edit(target, 'A', 'unchanged-edit')).toEqual({ accepted: true })
+      await h.agent.whenIdle()
+      expect(h.adapter.requests).toHaveLength(2)
+      // The edit excludes the original input and its response, so the resent
+      // request carries only the replacement input.
+      expect(h.adapter.requests.at(-1)?.messages.filter(message => message.role !== 'system').map(message => [message.role, message.content])).toEqual([
+        ['user', [{ type: 'text', text: 'A' }]],
+      ])
+      const edits = (await h.events()).filter(event => event.type === 'user/message-edit')
+      expect(edits).toHaveLength(1)
+      expect(edits[0]?.data).toMatchObject({ targetSeq: target, message: { content: [{ type: 'text', text: 'A' }] } })
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
+  it('resends unchanged text with the original interleaved block order', async () => {
+    const h = await harness()
+    try {
+      const original = createUserMessage({ content: [
+        { type: 'image', attachment: image }, { type: 'text', text: 'B' },
+        { type: 'file', attachment: file }, { type: 'text', text: 'tail' },
+      ], source: { kind: 'user' } })
+      await h.send(original)
+      expect(await h.edit(await h.latest(), 'Btail', 'unchanged-edit')).toEqual({ accepted: true })
+      await h.agent.whenIdle()
+      expect(h.agent.session.deriveMessages().find(message => message.role === 'user')?.content).toEqual(original.content)
+      expect(h.adapter.requests).toHaveLength(2)
     } finally { await h.ctx.fiber.dispose() }
   })
 

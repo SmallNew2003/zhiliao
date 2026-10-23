@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/comet/changes/message-edit-resend/specs/message-edit-resend/spec.md
-spec.md: 03b0db7a07236a7726eea1d0736b4a03e428e078
-spec.zh.md: 32c2b50ffaacab028ff997c80aff3bc566206b83
+spec.md: 0edbc85e8289fddd3f367d8e807a328bee671e6a
+spec.zh.md: d499f147243fe0f4ccbb6c031ffeea7b6fe5c872

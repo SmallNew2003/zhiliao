@@ -37,7 +37,9 @@ describe.skipIf(MODE === 'record')('web e2e: latest message edit and resend', ()
   beforeAll(async () => {
     scratch = await mkdtemp(join(tmpdir(), 'dsh-message-edit-'))
     const override = join(scratch, 'replay.override.json')
-    await writeFile(override, JSON.stringify([response('Earlier answer A'), response('Original answer B'), response('Revised answer B')]))
+    await writeFile(override, JSON.stringify([
+      response('Earlier answer A'), response('Original answer B'), response('Revised answer B'), response('Repeated answer B'),
+    ]))
     scaffold = await launchWebScaffold({ replayFixture: join(DIR, 'session.v3.jsonl'),
       ...MODE === 'refresh' ? { replayOverride: override } : {}, paceMs: 80 })
     browser = await chromium.launch()
@@ -88,9 +90,21 @@ describe.skipIf(MODE === 'record')('web e2e: latest message edit and resend', ()
     expect(JSON.stringify(effective)).not.toContain('Original answer B')
     expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message' && event.data.source.kind === 'user')).toHaveLength(2)
     expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message-edit')).toHaveLength(1)
+    // Resending without changing the text re-requests the same input: the
+    // edited input stays effective and its answer is replaced again.
+    await edit.click()
+    expect(await editor.inputValue()).toBe(EDIT_B)
+    const resendSettled = scaffold.whenTurnSettled()
+    await page.getByRole('button', { name: 'Resend', exact: true }).click()
+    await expect.poll(() => edit.getAttribute('aria-disabled')).toBe('true')
+    await resendSettled
+    await page.getByText('Repeated answer B', { exact: true }).waitFor()
+    await page.getByText(EDIT_B, { exact: true }).waitFor()
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'user/message-edit')).toHaveLength(2)
     await page.reload()
-    await page.getByText('Revised answer B', { exact: true }).waitFor()
+    await page.getByText('Repeated answer B', { exact: true }).waitFor()
     expect(await page.getByText(INPUT_B, { exact: true }).count()).toBe(0)
+    expect(await page.getByText('Revised answer B', { exact: true }).count()).toBe(0)
     await edit.focus()
     await compareOrRefreshGolden(join(DIR, 'ui.expected.md'), await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd), MODE)
     expect(tripwire.pageErrors).toEqual([])

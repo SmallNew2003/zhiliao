@@ -369,7 +369,7 @@ export class SessionController extends TypertRemoteService {
   /**
    * Edit and resend the latest sent user input while retaining its original attachments.
    * @param request - target event, replacement text, and stable retry identity.
-   * @returns acceptance after the edit is durable, or unchanged-text acceptance without a run.
+   * @returns acceptance after the edit is durable, including an unchanged-text resend.
    */
   @Remote('editMessage')
   editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue> {
