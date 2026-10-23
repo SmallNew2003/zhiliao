@@ -594,7 +594,7 @@ describe('ConnectionIndicator', () => {
 })
 
 describe('DisclosureRow', () => {
-  it('renders icon and preview chevron when closed, and switches to chevron-up when open', () => {
+  it('renders icon and preview chevron when closed, and switches to chevron-down when open', () => {
     const onToggle = vi.fn()
     const { container, rerender } = render(
       <DisclosureRow
@@ -631,7 +631,7 @@ describe('DisclosureRow', () => {
 
     expect(screen.queryByTestId('tool-icon')).toBeNull()
     expect(screen.getByText('Content')).toBeDefined()
-    // Open state renders ChevronUp (viewBox="0 0 14 14" with path)
+    // Open state renders ChevronDown (viewBox="0 0 14 14" with path)
     const svg = container.querySelector('svg')
     expect(svg).not.toBeNull()
   })
