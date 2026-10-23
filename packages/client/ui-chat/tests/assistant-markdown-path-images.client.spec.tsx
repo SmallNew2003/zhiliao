@@ -40,6 +40,21 @@ describe('localPathMediaUrl', () => {
     expect(localPathMediaUrl('http:', ORIGIN, '/tmp/my graph.png'))
       .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/tmp/my graph.png')}`)
   })
+
+  it('resolves workspace-relative paths when cwd is provided', () => {
+    expect(localPathMediaUrl('http:', ORIGIN, 'graph.png', '/workspace'))
+      .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/workspace/graph.png')}`)
+    expect(localPathMediaUrl('http:', ORIGIN, './images/graph.png', '/workspace'))
+      .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/workspace/images/graph.png')}`)
+    expect(localPathMediaUrl('http:', ORIGIN, 'nested/graph.png', '/workspace/'))
+      .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/workspace/nested/graph.png')}`)
+    expect(localPathMediaUrl('http:', ORIGIN, '图表/架构图.png', '/workspace'))
+      .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/workspace/图表/架构图.png')}`)
+    expect(localPathMediaUrl('http:', ORIGIN, 'charts/my graph.png', '/workspace'))
+      .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/workspace/charts/my graph.png')}`)
+    expect(localPathMediaUrl('http:', ORIGIN, 'charts/graph.png?v=1', '/workspace'))
+      .toBe(`${ORIGIN}/api/file?path=${encodeURIComponent('/workspace/charts/graph.png?v=1')}`)
+  })
 })
 
 describe('AssistantMarkdown local-path images', () => {
@@ -59,8 +74,59 @@ describe('AssistantMarkdown local-path images', () => {
     expect(url.searchParams.get('path')).toBe('/tmp/graph.png')
   })
 
-  it('keeps non-absolute destinations inert', () => {
+  it('renders a workspace-relative image path when cwd is provided', () => {
     const { container } = render(
+      <AssistantMarkdown
+        blocks={[textBlock('See ![diagram](charts/graph.png) for the layout.')]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+        cwd="/workspace"
+        t={t}
+      />,
+    )
+    const image = container.querySelector('img')
+    expect(image?.getAttribute('alt')).toBe('diagram')
+    const url = new URL(image?.getAttribute('src') ?? '')
+    expect(url.pathname).toBe('/api/file')
+    expect(url.searchParams.get('path')).toBe('/workspace/charts/graph.png')
+  })
+
+  it('renders a workspace-relative image path with Chinese characters', () => {
+    const { container } = render(
+      <AssistantMarkdown
+        blocks={[textBlock('See ![架构图](图表/架构图.png) for details.')]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+        cwd="/workspace"
+        t={t}
+      />,
+    )
+    const image = container.querySelector('img')
+    expect(image?.getAttribute('alt')).toBe('架构图')
+    const url = new URL(image?.getAttribute('src') ?? '')
+    expect(url.pathname).toBe('/api/file')
+    expect(url.searchParams.get('path')).toBe('/workspace/图表/架构图.png')
+  })
+
+  it('renders a workspace-relative image path with spaces when enclosed in angle brackets', () => {
+    const { container } = render(
+      <AssistantMarkdown
+        blocks={[textBlock('See ![架构图](<图表/我的 架构图.png>) for details.')]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+        cwd="/workspace"
+        t={t}
+      />,
+    )
+    const image = container.querySelector('img')
+    expect(image?.getAttribute('alt')).toBe('架构图')
+    const url = new URL(image?.getAttribute('src') ?? '')
+    expect(url.pathname).toBe('/api/file')
+    expect(url.searchParams.get('path')).toBe('/workspace/图表/我的 架构图.png')
+  })
+
+  it('keeps non-absolute destinations inert when cwd is absent or empty', () => {
+    const { container: absentCwd } = render(
       <AssistantMarkdown
         blocks={[textBlock('See ![diagram](relative.png).')]}
         streaming={false}
@@ -68,7 +134,38 @@ describe('AssistantMarkdown local-path images', () => {
         t={t}
       />,
     )
+    expect(absentCwd.querySelector('img')).toBeNull()
+    expect(absentCwd.textContent).toContain('diagram')
+
+    const { container: emptyCwd } = render(
+      <AssistantMarkdown
+        blocks={[textBlock('See ![diagram](relative.png).')]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+        cwd=""
+        t={t}
+      />,
+    )
+    expect(emptyCwd.querySelector('img')).toBeNull()
+    expect(emptyCwd.textContent).toContain('diagram')
+  })
+
+  it('keeps URI scheme destinations inert even when cwd is provided', () => {
+    expect(localPathMediaUrl('http:', 'http://localhost:3000', 'javascript:alert(1)', '/workspace')).toBeUndefined()
+    expect(localPathMediaUrl('http:', 'http://localhost:3000', 'data:image/png;base64,abc', '/workspace')).toBeUndefined()
+    expect(localPathMediaUrl('http:', 'http://localhost:3000', 'blob:http://localhost/123', '/workspace')).toBeUndefined()
+    expect(localPathMediaUrl('http:', 'http://localhost:3000', 'http://example.com/a.png', '/workspace')).toBeUndefined()
+
+    const { container } = render(
+      <AssistantMarkdown
+        blocks={[textBlock('See ![payload](javascript:alert(1)).')]}
+        streaming={false}
+        renderMessageImages={renderMessageImages}
+        cwd="/workspace"
+        t={t}
+      />,
+    )
     expect(container.querySelector('img')).toBeNull()
-    expect(container.textContent).toContain('diagram')
+    expect(container.textContent).toContain('payload')
   })
 })
