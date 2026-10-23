@@ -20,7 +20,7 @@
 - button "Copy":
   - img
 - tooltip "Copy"
-- button "Worked"
+- button "analyzed the request"
 - paragraph: I will read both files before answering.
 - button "Copy":
   - img
@@ -35,7 +35,7 @@
   - img
   - text: Ran for {{duration}}
 - text: {{clock}}
-- button "2 tool calls"
+- button "read files"
 - button "System prompt":
   - img
   - img
