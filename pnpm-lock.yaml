@@ -2819,7 +2819,7 @@ importers:
         version: link:../../core/tools
       '@deepseek-ai/dsh-util-crypto':
         specifier: workspace:^
-        version: link:../../util/util-crypto
+        version: link:../../util/crypto
       '@deepseek-ai/dsh-util-workspace-path':
         specifier: workspace:^
         version: link:../../util/workspace-path
