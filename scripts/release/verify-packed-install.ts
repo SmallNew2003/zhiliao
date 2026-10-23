@@ -16,7 +16,7 @@
  * checkout cannot stand in for a missing file here.
  */
 
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -67,6 +67,32 @@ function packedDependencies(directories: readonly string[]): Map<string, { url: 
   return dependencies
 }
 
+/**
+ * Installed packages that another installed package lists under
+ * `optionalDependencies`: the per-platform binary packages a consumer which
+ * omits optional dependencies does not receive.
+ * @param modulesRoot - the consumer's installed `node_modules` directory.
+ * @returns Absolute paths of the installed matches, sorted.
+ */
+export function optionalPlatformPackagePaths(modulesRoot: string): string[] {
+  const optionalNames = new Set<string>()
+  for (const entry of readdirSync(modulesRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+    const packages = entry.name.startsWith('@')
+      ? readdirSync(join(modulesRoot, entry.name), { withFileTypes: true })
+        .filter(child => child.isDirectory() && !child.name.startsWith('.'))
+        .map(child => join(modulesRoot, entry.name, child.name))
+      : [join(modulesRoot, entry.name)]
+    for (const packageDirectory of packages) {
+      const manifest = JSON.parse(readFileSync(join(packageDirectory, 'package.json'), 'utf8')) as {
+        optionalDependencies?: Record<string, string>
+      }
+      for (const name of Object.keys(manifest.optionalDependencies ?? {})) optionalNames.add(name)
+    }
+  }
+  return [...optionalNames].map(name => join(modulesRoot, name)).filter(path => existsSync(path)).sort()
+}
+
 /** Install every tarball under `--from` and drive the `--family` entry. */
 function main(): void {
   const { values } = parseArgs({
@@ -100,15 +126,22 @@ function main(): void {
 
     const environment = consumerEnvironment(consumerRoot)
     console.log(`release verify-packed-install: installing ${String(packed.size)} tarball(s) into ${consumerRoot}`)
-    // Optional dependencies are omitted: the Landlock platform packages behind
-    // them need a musl toolchain and one build per architecture, and a consumer
-    // that cannot install them must still start — which is what optional means
-    // here. Their entry package is a plain dependency of dsh-sandbox-local, so
-    // its tarball is supplied through --from.
-    capture('npm', ['install', '--no-audit', '--no-fund', '--package-lock=false', '--omit=optional', '--loglevel=http'],
+    // Optional dependencies stay installed: koffi resolves its binary through an
+    // optional per-platform package and compiles from source without it, which
+    // fails on any Node release newer than its published prebuilds. Removing
+    // those packages afterwards leaves the tree an `--omit=optional` consumer
+    // receives, which is what the checks below must survive. The Landlock entry
+    // package is a plain dependency of dsh-sandbox-local, so its tarball is
+    // supplied through --from while its platform packages come from the registry.
+    capture('npm', ['install', '--no-audit', '--no-fund', '--package-lock=false', '--loglevel=http'],
       { cwd: consumerRoot, env: environment })
 
-    const installedEntry = join(consumerRoot, 'node_modules', entry.packageName)
+    const modulesRoot = join(consumerRoot, 'node_modules')
+    const platformPackages = optionalPlatformPackagePaths(modulesRoot)
+    for (const packageDirectory of platformPackages) rmSync(packageDirectory, { recursive: true, force: true })
+    console.log(`release verify-packed-install: removed ${String(platformPackages.length)} optional platform package(s)`)
+
+    const installedEntry = join(modulesRoot, entry.packageName)
     const packageCount = verifyInstalledProductIsolation(installedEntry)
     console.log(`release verify-packed-install: ${String(packageCount)} default-product packages exclude experimental packages`)
     const bin = join(consumerRoot, 'node_modules', ...entry.packageName.split('/'), entry.binPath)

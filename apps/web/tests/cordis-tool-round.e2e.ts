@@ -54,6 +54,20 @@ describe.skipIf(MODE === 'record')('web e2e: historical Cordis cards', () => {
     const stop = page.locator('[data-tool="cordis_stop"]').first()
     await expandOwningTurnProcess(page, stop)
     await expect.poll(() => stop.getAttribute('data-state')).toBe('ok')
+    // The golden pins the scrolled-up state, where the Back-to-bottom control
+    // is present. Establish that state instead of inheriting whatever scroll
+    // position the expansions left behind: settle fonts first, then scroll up
+    // off the bottom and wait for the control to appear.
+    await page.evaluate(async () => { await document.fonts.ready })
+    const scrollport = page.locator('[data-conversation-scroll]')
+    const backToBottom = page.getByRole('button', { name: 'Back to bottom', exact: true })
+    await expect.poll(async () => {
+      const distance = await scrollport.evaluate((host) => {
+        host.scrollTop = Math.max(0, host.scrollTop - 200)
+        return host.scrollHeight - host.clientHeight - host.scrollTop
+      })
+      return distance > 1 && await backToBottom.count() === 1
+    }, { timeout: 10_000 }).toBe(true)
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(SEED_ID).join('{{seededId}}')
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)

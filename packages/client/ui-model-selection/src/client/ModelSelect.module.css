@@ -103,14 +103,11 @@
   z-index: 1100;
   display: flex;
   flex-direction: column;
-  /* Let the visible pane's rows set the card width, but keep pathological ids
-     and narrow screens inside a bounded card where ellipsis remains. */
-  width: max-content;
-  min-width: min(240px, calc(100vw - 32px));
-  max-width: min(420px, calc(100vw - 32px));
-  max-height: min(360px, calc(100vh - 96px));
-  overflow: hidden;
-  padding: 4px;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(480px, calc(100dvh - 24px));
+  overflow-y: auto;
+  padding: 8px;
   /* Surface tokens match the Menu primitive card (ui-primitives
    * Menu.module.css) so every dropdown reads as the same material. */
   border: 0;
@@ -168,8 +165,7 @@
 }
 
 .groups {
-  min-height: 0;
-  overflow-y: auto;
+  flex: none;
 }
 
 .group + .group {
@@ -193,8 +189,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: auto;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   min-height: 38px;
   padding: 6px 8px;
   border: none;
@@ -211,10 +207,8 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* Selection marker is the trailing check, not a fill — matches the Menu
- * primitive's selected treatment. */
 .selected {
-  background: transparent;
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .option:disabled {
@@ -246,48 +240,38 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* Two-level root cells (figma 496:26454 .Menu_cell): 40px row, 10px side
-   padding, 8px gap, 10px radius; 14/22 label in primary, value in the
-   #81858C tertiary tone, right chevron drilling into the sub-list. */
-.cell {
-  box-sizing: border-box;
+.efforts {
+  flex: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.effortTitle {
+  padding: 4px 8px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.effortOptions {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.effortOption {
   width: auto;
-  min-width: 100%;
-  height: 40px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  line-height: 22px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.cell:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.cellLabel {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-.cellValue {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
-  color: var(--dsw-alias-label-tertiary);
+  max-width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
 }
 
-.cellChevron {
-  flex: 0 0 auto;
-  color: var(--dsw-alias-label-tertiary);
+.effortOption .modelName {
+  font-size: 13px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

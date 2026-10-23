@@ -14,17 +14,6 @@ const runnerPrivatePnpmDestination = /^\$\{\{ runner\.temp \}\}\/setup-pnpm-\$\{
 const nativeWindowsPnpmDestination = '${{ runner.temp }}/setup-pnpm-js-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}'
 
 describe('CI workflow', () => {
-  it('prepares confinement before Node compatibility smokes', () => {
-    const job = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-compat')
-    if (!Array.isArray(job.steps)) throw new TypeError('Node compatibility job must define steps')
-    const steps = job.steps.filter(isRecord)
-    const preparation = steps.findIndex(step => step.run === 'bash scripts/prepare-ci-bubblewrap.sh')
-    const smoke = steps.findIndex(step => step.run === 'pnpm run check:node-compat')
-    expect(preparation).toBeGreaterThanOrEqual(0)
-    expect(smoke).toBeGreaterThan(preparation)
-    expect(steps[preparation]).not.toHaveProperty('continue-on-error', true)
-  })
-
   it.each(['ci.yml', 'ci-master.yml', 'e2e.yml', 'release.yml', 'release-vendor.yml'])(
     '%s cancels superseded validation runs without crossing workflow or ref boundaries', (name) => {
       const workflow = loadWorkflow('.github/workflows/' + name)
@@ -148,67 +137,57 @@ describe('CI workflow', () => {
     }
   })
 
-  it('keeps split native Windows PR jobs with failover, plus a master-only standby', () => {
+  it('runs every blocking PR lane on a standard hosted runner without failover switches', () => {
     const workflow = loadWorkflow('.github/workflows/ci.yml')
-    const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
-    if (!isRecord(workflow.jobs)
-      || !isRecord(workflow.jobs['windows-build'])
-      || !isRecord(workflow.jobs['windows-coverage'])
-      || !isRecord(workflow.jobs['windows-native-tests'])
-      || !isRecord(workflow.jobs['windows-observational'])
-      || !isRecord(workflow.jobs['node-24'])
-      || !isRecord(workflow.jobs['node-24-coverage'])
-      || !isRecord(workflow.jobs['node-24-bench'])
-      || !isRecord(workflow.jobs['node-24-consumers'])
-      || !isRecord(workflow.jobs['node-compat'])
-      || !isRecord(workflow.jobs['all-checks-passed'])
-      || !isRecord(masterWorkflow.jobs)
-      || !isRecord(masterWorkflow.jobs['serial-windows'])) {
-      throw new TypeError('CI workflow must define windows-build, windows-coverage, windows-native-tests, windows-observational, node-24, node-24-coverage, node-24-bench, node-24-consumers, node-compat, and all-checks-passed; ci-master must define serial-windows')
+    if (!isRecord(workflow.jobs)) throw new TypeError('CI workflow must define jobs')
+    const blocking = ['node-24', 'node-24-coverage', 'node-24-consumers', 'node-compat', 'python-sdk', 'windows-build', 'windows-coverage'] as const
+    for (const jobName of [...blocking, 'all-checks-passed']) {
+      workflowJob(workflow, jobName)
     }
+    const node24 = workflowJob(workflow, 'node-24')
+    const node24Coverage = workflowJob(workflow, 'node-24-coverage')
+    const node24Consumers = workflowJob(workflow, 'node-24-consumers')
+    const windowsBuild = workflowJob(workflow, 'windows-build')
+    const windowsCoverage = workflowJob(workflow, 'windows-coverage')
+    const aggregate = workflowJob(workflow, 'all-checks-passed')
 
-    const windowsBuild = workflow.jobs['windows-build']
-    const windowsCoverage = workflow.jobs['windows-coverage']
-    const windowsNativeTests = workflow.jobs['windows-native-tests']
-    const windowsObservational = workflow.jobs['windows-observational']
-    const serialWindows = masterWorkflow.jobs['serial-windows']
-    const node24 = workflow.jobs['node-24']
-    const node24Coverage = workflow.jobs['node-24-coverage']
-    const node24Bench = workflow.jobs['node-24-bench']
-    const node24Consumers = workflow.jobs['node-24-consumers']
-    const nodeCompat = workflow.jobs['node-compat']
-    const aggregate = workflow.jobs['all-checks-passed']
-    if (!Array.isArray(aggregate.needs)) {
-      throw new TypeError('CI aggregate must define needs')
-    }
-    // The split native jobs all resolve their pool through the Windows switch.
-    for (const [jobName, job] of [['windows-build', windowsBuild], ['windows-coverage', windowsCoverage], ['windows-native-tests', windowsNativeTests], ['windows-observational', windowsObservational]] as const) {
-      expect(typeof job['runs-on']).toBe('string')
-      expect(job['runs-on'], `${jobName} runs-on must use the Windows failover switch`).toContain('DSH_CI_FAILOVER_WINDOWS')
-      expect(job['runs-on'], `${jobName} runs-on must not use the Linux failover switch`).not.toContain('DSH_CI_FAILOVER_LINUX')
-      expect(job['runs-on']).toContain('self-hosted')
-      expect(job['runs-on']).toContain('dsh-win-ci')
-      expect(job['runs-on']).toContain('dsh-windows-2025-16core')
-      expect(job['runs-on']).toContain('blacksmith-16vcpu-windows-2025')
-      expect(job.if).toBe("github.event_name == 'pull_request'")
-    }
-
-    // windows-build runs the blocking build/site pair.
+    expect(node24.name).toBe('node 24 / static')
+    expect(node24Coverage.name).toBe('node 24 / coverage')
+    expect(node24Consumers.name).toBe('node 24 / snapshots and artifacts')
     expect(windowsBuild.name).toBe('windows node 24 / build')
-    const buildSteps = windowsBuild.steps as unknown[]
-    const buildCommands = buildSteps.filter((step): step is Record<string, unknown> & { run: string } => (
-      isRecord(step) && typeof step.run === 'string'
-    ))
-    expect(buildCommands.map(step => step.run)).toContain('pnpm run check:ci:windows-blocking')
+    expect(windowsCoverage.name).toBe('windows node 24 / coverage')
 
-    // The four native Windows installs branch on the workspace filesystem:
+    // This repository carries no enterprise or self-hosted pool, so every lane
+    // must name a label GitHub schedules for free. A reintroduced pool
+    // expression would queue forever on a label no runner answers. Reusable
+    // workflow calls own their own runner selection.
+    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+      if (!isRecord(job) || typeof job.uses === 'string') continue
+      expect(job['runs-on'], `${jobName} must use a standard hosted label`).toBe(
+        jobName.startsWith('windows-') ? 'windows-latest' : 'ubuntu-latest',
+      )
+    }
+    // The pool selectors are gone from runner selection. Self-hosted guards
+    // inside a step stay valid: they only arm when a persistent runner is
+    // registered, and this repository has none, so they never fire.
+    expect(JSON.stringify(workflow)).not.toContain('DSH_CI_FAILOVER')
+    expect(JSON.stringify(workflow)).not.toContain('blacksmith')
+
+    // The verdict is the single stable required check: it must name every
+    // blocking job and nothing else, so a new lane cannot silently skip it.
+    expect(aggregate.needs).toEqual([...blocking])
+    expect(aggregate['runs-on']).toBe('ubuntu-latest')
+
+    // The two native Windows installs branch on the workspace filesystem:
     // clone (ReFS block clone) only on ReFS, plain install elsewhere. This
     // keeps the TS6231 store-path leak (see the Windows ReFS store note) out
-    // of the self-hosted pool without forcing clone onto hosted NTFS, which
-    // rejects copy-on-write. The branch must stay, or a hosted fallback would
-    // fail installs with ERR_PNPM_LINKING_FAILED.
-    for (const [jobName, job] of [['windows-build', windowsBuild], ['windows-coverage', windowsCoverage], ['windows-native-tests', windowsNativeTests], ['windows-observational', windowsObservational]] as const) {
+    // of hosted NTFS, which rejects copy-on-write.
+    for (const [jobName, job] of [['windows-build', windowsBuild], ['windows-coverage', windowsCoverage]] as const) {
       const steps = job.steps as unknown[]
+      const developerMode = steps.find((step): step is Record<string, unknown> & { run: string } => (
+        isRecord(step) && typeof step.run === 'string' && step.run.includes('AllowDevelopmentWithoutDevLicense')
+      ))
+      expect(developerMode, `${jobName} must enable Developer Mode for symlinks`).toBeDefined()
       const install = steps.find((step): step is Record<string, unknown> & { run: string } => (
         isRecord(step) && step.name === 'Install (immutable)' && typeof step.run === 'string'
       ))
@@ -230,14 +209,30 @@ describe('CI workflow', () => {
       expect(install!.run).not.toContain('$cloneFlag')
     }
 
-    // windows-coverage uses the lower 4-partition profile.
-    expect(windowsCoverage.name).toBe('windows node 24 / coverage')
-    expect(windowsCoverage.env).toMatchObject({ DSH_COVERAGE_PARTITIONS: '4' })
-    const coverageSteps = windowsCoverage.steps as unknown[]
-    const coverageCommands = coverageSteps.filter((step): step is Record<string, unknown> & { run: string } => (
-      isRecord(step) && typeof step.run === 'string'
-    ))
-    expect(coverageCommands.map(step => step.run)).toContain('pnpm run check:ci:coverage')
+    expect(windowsBuild.steps).toContainEqual({
+      name: 'Run blocking Windows builds',
+      shell: 'pwsh',
+      run: 'pnpm run check:ci:windows-blocking',
+    })
+
+    // Both coverage lanes share the standard-runner partition profile and keep
+    // the measured-duration cache that weights partitions on later runs.
+    for (const [jobName, job] of [['node-24-coverage', node24Coverage], ['windows-coverage', windowsCoverage]] as const) {
+      expect(job.env, `${jobName} partition profile`).toMatchObject({
+        DSH_COVERAGE_PARTITIONS: '2',
+        DSH_COVERAGE_TEST_TIMEOUT_MS: '90000',
+        DSH_GATE_FAIL_FAST: '1',
+      })
+      const steps = job.steps as unknown[]
+      expect(steps).toContainEqual(expect.objectContaining({
+        name: 'Save coverage duration history', if: '${{ !cancelled() }}',
+      }))
+      const restore = steps.find((step): step is Record<string, unknown> => (
+        isRecord(step) && step.name === 'Restore coverage duration history'
+      ))
+      expect(restore, `${jobName} must restore the duration history`).toBeDefined()
+    }
+
     // Windows coverage runs zero-build like the Linux lane: workspace imports
     // resolve to src through the tsconfig paths map, and the lib-consuming
     // suites (webworker-packer image-loadable, webworker-runtime
@@ -245,149 +240,43 @@ describe('CI workflow', () => {
     // unbuilt checkouts. The regex catches a regression spelled as
     // 'corepack pnpm run build' or folded into a multi-line run block, which
     // an exact string match would miss.
-    expect(coverageCommands.every(step => !/\bpnpm\s+run\s+build(?:\s|$)/.test(step.run))).toBe(true)
-
-    // windows-native-tests runs the Windows-specific specs.
-    expect(windowsNativeTests.name).toBe('windows node 24 / native tests')
-    const nativeTestSteps = windowsNativeTests.steps as unknown[]
-    const nativeTestCommands = nativeTestSteps.filter((step): step is Record<string, unknown> & { run: string } => (
-      isRecord(step) && typeof step.run === 'string'
-    ))
-    const nativeTestCommand = nativeTestCommands.map(step => step.run).join('\n')
-    expect(nativeTestCommand).toContain('--no-file-parallelism')
-    expect(nativeTestCommand).toContain('--testTimeout 90000')
-    expect(nativeTestCommand).toContain('tool-pwsh/tests/loader.spec.ts')
-    expect(nativeTestCommand).toContain('workflow-ptc.spec.ts')
-
-    // windows-observational is non-blocking.
-    expect(windowsObservational.name).toBe('windows node 24 / observational')
-    expect(windowsObservational['continue-on-error']).toBe(true)
-
-    // serial-windows: master-only standby, self-hosted, non-blocking, lives in ci-master.
-    expect(serialWindows.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
-    expect(serialWindows['runs-on']).toEqual(['self-hosted', 'dsh-win-ci', 'windows'])
-    expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
-    // Its store must share the ReFS workspace volume for clone; the install
-    // must carry the same filesystem branch as the PR jobs.
-    const serialSteps = serialWindows.steps as unknown[]
-    const serialStore = serialSteps.find((step): step is Record<string, unknown> & { run: string } => (
-      isRecord(step) && step.name === 'Configure persistent pnpm store' && typeof step.run === 'string'
-    ))
-    expect(serialStore).toBeDefined()
-    expect(serialStore!.run).toContain('[IO.Path]::GetPathRoot($env:GITHUB_WORKSPACE)')
-    expect(serialStore!.run).toContain("'.pnpm-store'")
-    const serialInstall = serialSteps.find((step): step is Record<string, unknown> & { run: string } => (
-      isRecord(step) && step.name === 'Install (immutable)' && typeof step.run === 'string'
-    ))
-    expect(serialInstall).toBeDefined()
-    expect(serialInstall!.run).toContain("$fs -eq 'ReFS'")
-    expect(serialInstall!.run).toContain('--package-import-method=clone')
-    expect(serialInstall!.run).toContain('corepack pnpm install')
-    // Distinct else-branch line, as for the PR jobs: the corepack clone line
-    // contains the plain-install substring too.
-    expect(serialInstall!.run.split('\n').map(line => line.trim())).toContain('} else {')
-    expect(serialInstall!.run.split('\n').map(line => line.trim())).toContain('pnpm install --frozen-lockfile')
-    expect(serialInstall!.run).not.toContain('$cloneFlag')
-    // The unsharded reference runs the whole coverage inventory at the same
-    // per-test budget the PR coverage lane grants; the default 5000ms times
-    // out load-sensitive store scans (e.g. gen-third-party-notices).
-    const serialGate = serialSteps.find((step): step is Record<string, unknown> & { env?: Record<string, unknown> } => (
-      isRecord(step) && step.name === 'Run complete unsharded Windows gate inventory serially'
-    ))
-    expect(serialGate).toBeDefined()
-    expect(serialGate!.env).toMatchObject({ DSH_COVERAGE_TEST_TIMEOUT_MS: '90000' })
-
-    // windows-coverage is temporarily non-blocking while Windows ACP
-    // half-close tests are stabilized; observational stays out too.
-    expect(aggregate.needs).not.toContain('windows')
-    expect(aggregate.needs).toContain('windows-build')
-    // The benchmark lane is a required verdict input and runs alone so its
-    // wall-clock budgets never share a runner with a concurrent aggregate.
-    expect(aggregate.needs).toContain('node-24-bench')
-    expect(node24Bench.name).toBe('node 24 / benchmarks')
-    expect(node24Bench.env).toBeUndefined()
-    expect(node24Bench.steps).toContainEqual({
-      name: 'Install benchmark browser and hosted dependencies',
-      run: 'pnpm --filter @deepseek-ai/dsh-benchmarks exec playwright install --with-deps chromium',
-    })
-    expect(JSON.stringify(node24Bench.steps)).not.toContain('DSH_CI_FAILOVER_LINUX')
-    expect(node24Bench.steps).toContainEqual({
-      name: 'Run performance benchmarks',
-      env: { DSH_GATE_VERBOSE: '1' },
-      run: 'pnpm run check:ci:bench',
-    })
-    expect(aggregate.needs).not.toContain('windows-coverage')
-    expect(aggregate.needs).toContain('windows-native-tests')
-    expect(aggregate.needs).not.toContain('windows-observational')
-    expect(aggregate.needs).not.toContain('serial-windows')
-
-    // Linux failover is a separate switch: the three enterprise Linux workers
-    // and the verdict job resolve their pool through DSH_CI_FAILOVER_LINUX,
-    // never the Windows switch.
-    for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers]] as const) {
-      expect(typeof job['runs-on']).toBe('string')
-      expect(job['runs-on'], `${jobName} runs-on must use the Linux failover switch`).toContain('DSH_CI_FAILOVER_LINUX')
-      expect(job['runs-on'], `${jobName} runs-on must not use the Windows failover switch`).not.toContain('DSH_CI_FAILOVER_WINDOWS')
-      expect(job['runs-on']).toContain('vm-backup')
-      expect(job['runs-on']).toContain('blacksmith-16vcpu-ubuntu-2404')
-    }
-    expect(aggregate['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
-    expect(aggregate['runs-on']).not.toContain('DSH_CI_FAILOVER_WINDOWS')
-    expect(aggregate['runs-on']).toContain('vm-backup')
-    expect(aggregate['runs-on']).toContain('blacksmith-4vcpu-ubuntu-2404')
-
-    // Evaluating the full selector, not just substring containment, proves the
-    // blacksmith branch is standalone: it must not fall through to the
-    // self-hosted pool when the two values are mutually exclusive.
-    const selectors = {
-      linux: node24['runs-on'] as string,
-      linuxAggregate: aggregate['runs-on'] as string,
-      windows: windowsBuild['runs-on'] as string,
-    }
-    const evaluate = (expression: string, vars: Record<string, string>, login = 'maintainer'): unknown => {
-      return evaluateRunsOn(expression, {
-        vars,
-        fromJSON: JSON.parse,
-        github: { event: { pull_request: { user: { login } } } },
-      })
-    }
-    for (const [name, selector, variable, pool, hosted] of [
-      ['linux gates', selectors.linux, 'DSH_CI_FAILOVER_LINUX', ['self-hosted', 'linux', 'x64', 'vm-backup'], 'dsh-ubuntu-24-04-16core'],
-      ['linux aggregate', selectors.linuxAggregate, 'DSH_CI_FAILOVER_LINUX', ['self-hosted', 'linux', 'x64', 'vm-backup'], 'ubuntu-latest'],
-      ['windows lanes', selectors.windows, 'DSH_CI_FAILOVER_WINDOWS', ['self-hosted', 'dsh-win-ci', 'windows'], 'dsh-windows-2025-16core'],
-    ] as const) {
-      expect(evaluate(selector, { [variable]: 'blacksmith' }), `${name} blacksmith value`).toMatch(/^blacksmith-/)
-      expect(evaluate(selector, { [variable]: 'selfhosted' }), `${name} selfhosted value`).toEqual(pool)
-      // The blacksmith branch must not capture the selfhosted pool, and the
-      // dependabot exclusion applies to the pool, not to the blacksmith tier.
-      expect(evaluate(selector, { [variable]: 'selfhosted' }, 'dependabot[bot]'), `${name} dependabot on selfhosted`).toBe(hosted)
-      for (const mode of ['', 'hosted', 'unexpected']) {
-        expect(evaluate(selector, { [variable]: mode }), `${name} default on ${mode}`).toBe(hosted)
-      }
-    }
+    const coverageCommands = (windowsCoverage.steps as unknown[])
+      .filter((step): step is Record<string, unknown> & { run: string } => (
+        isRecord(step) && typeof step.run === 'string'
+      ))
+      .map(step => step.run)
+    expect(coverageCommands).toContain('pnpm run check:ci:coverage')
+    expect(coverageCommands.every(command => !/\bpnpm\s+run\s+build(?:\s|$)/.test(command))).toBe(true)
 
     // The run-gates aggregate lanes stop at the first blocking gate failure so
     // a red aggregate does not keep burning runner time on the remaining
     // gates. Removing the flag silently reverts to running every independent
     // gate to completion.
-    for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers], ['node-compat', nodeCompat]] as const) {
+    for (const [jobName, job] of [['node-24', node24], ['node-24-coverage', node24Coverage], ['node-24-consumers', node24Consumers], ['windows-build', windowsBuild], ['windows-coverage', windowsCoverage]] as const) {
       expect(job.env, `${jobName} must enable fail-fast`).toMatchObject({ DSH_GATE_FAIL_FAST: '1' })
     }
 
-    // The native Windows lanes with run-gates aggregates fail fast for the
-    // same reason: a failing gate aborts the sibling gate instead of waiting
-    // out the multi-minute instrumented coverage run.
-    expect(windowsBuild.env, 'windows-build must enable fail-fast').toMatchObject({ DSH_GATE_FAIL_FAST: '1' })
-    expect(windowsCoverage.env, 'windows-coverage must enable fail-fast').toMatchObject({ DSH_GATE_FAIL_FAST: '1' })
+    // ci-consumers defaults to one worker per gate, which oversubscribes the
+    // standard runner's CPU count because the build gate alone drives tsc.
+    expect(node24Consumers.env).toMatchObject({ DSH_GATE_CONCURRENCY: '3' })
+    const consumersConcurrency = Number.parseInt(
+      String((node24Consumers.env as Record<string, unknown>).DSH_GATE_CONCURRENCY),
+      10,
+    )
+    expect(consumersConcurrency).toBeLessThanOrEqual(4)
 
-    // The observational lane stays complete: it is continue-on-error by design
-    // and exists to collect as much Windows-native evidence per run as
-    // possible, so the first failure must not truncate the rest.
-    expect(windowsObservational.env).toBeDefined()
-    expect(windowsObservational.env).not.toMatchObject({ DSH_GATE_FAIL_FAST: '1' })
+    // The verdict reports a failure when any needed job failed, was cancelled,
+    // or was skipped, so a lane dropped from `needs` cannot pass silently.
+    const verdict = (aggregate.steps as unknown[]).find((step): step is Record<string, unknown> & { if: string } => (
+      isRecord(step) && step.name === 'Fail if any needed job did not succeed'
+    ))
+    expect(verdict).toBeDefined()
+    for (const result of ['failure', 'cancelled', 'skipped']) {
+      expect(verdict!.if).toContain(result)
+    }
   })
 
-  it('gates standalone keyless blacksmith jobs and benchmark tiers on the failover variables', () => {
+  it('gates standalone keyless jobs on the failover variables', () => {
     const expectedFilenames = workflowJob(loadWorkflow('.github/workflows/expected-filenames.yml'), 'expected-filenames')
     const sandbox = workflowJob(loadWorkflow('.github/workflows/sandbox.yml'), 'sandbox-e2e')
     expect(expectedFilenames['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
@@ -397,63 +286,8 @@ describe('CI workflow', () => {
     expect(sandbox['runs-on']).toContain("matrix.runner == 'bwrap'")
     expect(sandbox['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
     expect(sandbox['runs-on']).toContain('blacksmith-4vcpu-ubuntu-2404')
-    for (const name of ['larger-runner-benchmark', 'consolidated-runner-benchmark'] as const) {
-      const benchmark = workflowJob(loadWorkflow('.github/workflows/ci-master.yml'), name)
-      if (!isRecord(benchmark.strategy) || !isRecord(benchmark.strategy.matrix) || !Array.isArray(benchmark.strategy.matrix.include)) {
-        throw new TypeError(`${name} must define a matrix include list`)
-      }
-      expect(benchmark['runs-on']).toContain('matrix.blacksmith')
-      expect(benchmark['runs-on']).toContain('DSH_CI_FAILOVER_LINUX')
-      expect(benchmark['runs-on']).toContain('DSH_CI_FAILOVER_WINDOWS')
-      for (const row of benchmark.strategy.matrix.include as Array<Record<string, string>>) {
-        expect(typeof row.blacksmith, `${name} ${row.cores}-core row must declare a blacksmith label`).toBe('string')
-        if (row.cores === '64' || row.cores === '96') {
-          expect(row.blacksmith, `${name} ${row.cores}-core row has no Blacksmith tier`).toBe('')
-        } else {
-          expect(row.blacksmith).toContain(`blacksmith-${row.cores}vcpu`)
-        }
-      }
-    }
   })
 
-  it('runs required benchmarks on standard hosted Linux independently of failover', () => {
-    const workflow = loadWorkflow('.github/workflows/ci.yml')
-    const benchmark = workflowJob(workflow, 'node-24-bench')
-    const aggregate = workflowJob(workflow, 'all-checks-passed')
-
-    expect(benchmark['runs-on']).toBe('ubuntu-24.04')
-    expect(benchmark.if).toBe("github.event_name == 'pull_request'")
-    expect(benchmark.needs).toBeUndefined()
-    expect(benchmark['continue-on-error']).toBeUndefined()
-    expect(benchmark.env).toBeUndefined()
-    expect(aggregate.needs).toContain('node-24-bench')
-  })
-
-  it('always restores the hosted benchmark pnpm cache', () => {
-    const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
-    if (!Array.isArray(benchmark.steps)) throw new TypeError('benchmark job must define steps')
-    const caches = benchmark.steps.filter(step => isRecord(step) && step.uses === 'actions/cache/restore@v4')
-
-    expect(caches).toHaveLength(1)
-    expect(caches[0]).not.toHaveProperty('if')
-    expect(caches[0]).toMatchObject({
-      with: {
-        path: '${{ steps.pnpm-store.outputs.path }}',
-        key: "${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}",
-      },
-    })
-  })
-
-  it('bounds the complete benchmark job to fifteen minutes', () => {
-    const benchmark = workflowJob(loadWorkflow('.github/workflows/ci.yml'), 'node-24-bench')
-
-    expect(benchmark['timeout-minutes']).toBe(15)
-    expect(benchmark.steps).toContainEqual({
-      name: 'Run performance benchmarks',
-      env: { DSH_GATE_VERBOSE: '1' },
-      run: 'pnpm run check:ci:bench',
-    })
-  })
 
   it('gives the Wine Host TypeScript compile the repository heap budget', () => {
     const wineGates = readFileSync(resolve(root, 'scripts/wine-windows-gates.sh'), 'utf8')
@@ -489,19 +323,12 @@ describe('CI workflow', () => {
     expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_dispatch'])
     expect(Object.keys(prWorkflow.on)).toEqual(['pull_request'])
 
-    // Drills share the parent run’s supersession policy.
-    for (const name of ['serial-linux-selfhosted', 'serial-windows']) {
-      const job = workflow.jobs[name]
-      if (!isRecord(job)) throw new TypeError(`${name} must be defined`)
-      expect(job.concurrency).toBeUndefined()
-      // Standby drills remain post-merge work, but share run cancellation.
-      expect(job.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
-    }
-
-    // Pin the post-merge runtime, Wine, and standby inventory.
-    const NOT_PUSH_REACHABLE = new Set([
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'larger-runner-benchmark'",
-      "github.event_name == 'workflow_dispatch' && inputs.suite == 'consolidated-runner-benchmark'",
+    // Pin the post-merge inventory: the Wine lane plus two manual references.
+    // A push reaches exactly the gated lane; the release-shaped runtime
+    // carriers need a real API credential, so they stay manual.
+    const MANUAL_ONLY = new Set([
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'serial-macos'",
+      "github.event_name == 'workflow_dispatch' && inputs.suite == 'python-runtime'",
     ])
     const pushReachable = Object.entries(workflow.jobs)
       .filter(([, job]) => {
@@ -509,31 +336,31 @@ describe('CI workflow', () => {
         if (job.if === undefined) return true // unconditional: runs on every event
         if (job.if === false) return false // `if: false` parses as a boolean
         if (typeof job.if !== 'string') return true // unrecognized shape: surface it
-        return !NOT_PUSH_REACHABLE.has(job.if.trim())
+        return !MANUAL_ONLY.has(job.if.trim())
       })
       .map(([name]) => name)
       .sort()
-    expect(pushReachable).toEqual(['python-runtime', 'serial-linux-selfhosted', 'serial-windows', 'windows'])
+    expect(pushReachable).toEqual(['windows'])
 
-    // Manual benchmarks retain their bounded fan-out.
-    for (const name of ['larger-runner-benchmark', 'consolidated-runner-benchmark']) {
-      const job = workflow.jobs[name]
-      if (!isRecord(job) || !isRecord(job.strategy)) {
-        throw new TypeError(`${name} must define a matrix strategy`)
-      }
-      expect(job.strategy['max-parallel']).toBe(12)
-      expect(job['timeout-minutes']).toBe(15)
+    // Every post-merge lane also resolves to a label this repository can
+    // schedule: no enterprise or self-hosted pool survives the migration.
+    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+      if (!isRecord(job) || typeof job.uses === 'string') continue // reusable workflow owns its own runners
+      expect(job['runs-on'], `${jobName} must use a standard hosted label`).toBe(
+        jobName === 'windows' ? 'ubuntu-latest' : 'macos-latest',
+      )
     }
+    expect(JSON.stringify(workflow)).not.toContain('DSH_CI_FAILOVER')
+    expect(JSON.stringify(workflow)).not.toContain('self-hosted')
+    expect(JSON.stringify(workflow)).not.toContain('blacksmith')
   })
 
   it('redirects the Node compile cache to the data-volume runner temp before the first pnpm call', () => {
     const prWorkflow = loadWorkflow('.github/workflows/ci.yml')
-    const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
     const redirectLanes = [
       [prWorkflow, 'node-24'],
       [prWorkflow, 'node-24-coverage'],
       [prWorkflow, 'node-24-consumers'],
-      [masterWorkflow, 'serial-linux-selfhosted'],
     ] as const
     for (const [workflow, jobKey] of redirectLanes) {
       const job = workflowJob(workflow, jobKey)
@@ -564,28 +391,6 @@ describe('CI workflow', () => {
     expect(config).not.toContain('packages/lsp/lsp-stdio/src/instance.ts')
   })
 
-  it('requires release-shaped Python runtime validation on Linux and Windows x64', () => {
-    const workflow = loadWorkflow('.github/workflows/ci.yml')
-    const pythonRuntime = workflowJob(workflow, 'python-runtime')
-    const aggregate = workflowJob(workflow, 'all-checks-passed')
-    if (!Array.isArray(aggregate.needs)) {
-      throw new TypeError('CI aggregate must define required job dependencies')
-    }
-
-    expect(pythonRuntime).toMatchObject({
-      if: "github.event_name == 'pull_request'",
-      name: 'python runtime / release-shaped matrix',
-      uses: './.github/workflows/build-exe-for-python-sdk.yml',
-      with: {
-        targets: 'node24-linux-x64,node24-win-x64',
-        ci: true,
-      },
-      secrets: {
-        DEEPSEEK_API_KEY_EXTERNAL: '${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}',
-      },
-    })
-    expect(aggregate.needs).toContain('python-runtime')
-  })
 
   it('keeps every Vitest project process-isolated on native Windows', () => {
     const config = readFileSync(resolve(root, 'vitest.config.ts'), 'utf8')
@@ -1003,6 +808,7 @@ describe('Issue lifecycle workflow', () => {
 
     expect(lifecycle.on).toHaveProperty('pull_request')
     expect(lifecycle.on).toHaveProperty('pull_request_review')
+    expect(lifecycleJob.if).toContain("github.repository == 'deepseek-harness/deepseek-harness'")
     expect(lifecycleJob.if).toContain("github.event.review.state == 'changes_requested'")
     expect(lifecycleJob.if).toContain('github.event.changes.body != null')
     // Keep the subscription-type gates: issue-lifecycle does not re-subscribe
@@ -1045,7 +851,9 @@ describe('Issue lifecycle workflow', () => {
     expect(preflightStep?.run).toContain('if [ -f .github/issue-management/selective-preflight.json ]; then')
     expect(preflightStep?.run).toContain('node .github/issue-management/policy.mjs pr-preflight')
     expect(preflightStep?.if).toBeUndefined()
-    expect(policyJob.if).toBeUndefined()
+    // The job runs only in the repository whose config.json names an existing
+    // Project board and Issue App installation.
+    expect(policyJob.if).toBe("github.repository == 'deepseek-harness/deepseek-harness'")
     expect(validateStep?.if).toBe("${{ steps.preflight.outputs.legacy-automated != 'true' }}")
 
     expect(tokenStep).toMatchObject({

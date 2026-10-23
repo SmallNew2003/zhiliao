@@ -14,6 +14,9 @@ permissions:
 jobs:
   policy:
     name: Issue policy
+    # config.json, the Project board, and the Issue App installation exist in one
+    # repository; any other repository has no board for this job to read.
+    if: github.repository == 'deepseek-harness/deepseek-harness'
     runs-on: ubuntu-latest
     steps:
       - name: Check out trusted policy
