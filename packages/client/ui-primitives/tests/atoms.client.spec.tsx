@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Button, ConnectionIndicator, Input, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, ConnectionIndicator, DisclosureRow, Input, Menu, Modal, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import { POINTER_GRACE_MS } from '../src/pointer-grace.ts'
 
 afterEach(cleanup)
@@ -590,5 +590,49 @@ describe('ConnectionIndicator', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('DisclosureRow', () => {
+  it('renders icon and preview chevron when closed, and switches to chevron-down when open', () => {
+    const onToggle = vi.fn()
+    const { container, rerender } = render(
+      <DisclosureRow
+        icon={<span data-testid="tool-icon">tool</span>}
+        title="bash"
+        open={false}
+        expandable
+        expandOnRowClick
+        onToggle={onToggle}
+      >
+        <div>Content</div>
+      </DisclosureRow>,
+    )
+
+    expect(screen.getByTestId('tool-icon')).toBeDefined()
+    expect(screen.queryByText('Content')).toBeNull()
+
+    const button = screen.getByRole('button')
+    fireEvent.click(button)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <DisclosureRow
+        icon={<span data-testid="tool-icon">tool</span>}
+        title="bash"
+        open
+        expandable
+        expandOnRowClick
+        onToggle={onToggle}
+      >
+        <div>Content</div>
+      </DisclosureRow>,
+    )
+
+    expect(screen.queryByTestId('tool-icon')).toBeNull()
+    expect(screen.getByText('Content')).toBeDefined()
+    // Open state renders ChevronDown (viewBox="0 0 14 14" with path)
+    const svg = container.querySelector('svg')
+    expect(svg).not.toBeNull()
   })
 })
