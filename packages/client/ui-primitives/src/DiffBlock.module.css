@@ -28,10 +28,32 @@
 }
 
 .body {
-  padding: 12px 14px;
+  padding: 12px 18px 12px 14px;
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.body::-webkit-scrollbar {
+  height: 6px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
+}
+
+.body::-webkit-scrollbar-track {
+  margin: 0 12px;
+  background: transparent;
 }
 
 /* No wrapping, no word-break: a diff is read by its indentation. */

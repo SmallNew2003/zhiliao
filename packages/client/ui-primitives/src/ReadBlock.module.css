@@ -81,10 +81,32 @@
 }
 
 .body {
-  padding: 12px 0;
+  padding: 12px 16px 12px 0;
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.body::-webkit-scrollbar {
+  height: 6px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
+}
+
+.body::-webkit-scrollbar-track {
+  margin: 0 12px;
+  background: transparent;
 }
 
 /* One row per file line: a fixed gutter column, then the content. No wrapping —

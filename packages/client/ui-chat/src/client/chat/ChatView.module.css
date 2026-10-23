@@ -57,6 +57,12 @@
   min-width: 0;
 }
 
+/* Members of an expanded process group keep a modest trailing clearance so
+   summary rows and tool disclosures never touch the container edge. */
+.flowItem[data-turn-process-member] {
+  padding-right: 4px;
+}
+
 /* A closed process reads as one summary immediately followed by its answer.
    Expanded process rows return to the ordinary 16px rhythm. */
 .flowItem[data-turn-process-answer] {
