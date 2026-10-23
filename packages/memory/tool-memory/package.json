@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-memory",
   "description": "Model-facing memory tools and session lifecycle wiring for the DeepSeek Harness — hindsight_search and hindsight_remember over ctx.memory, plus automatic opening recall, turn retention, and cold-bank seeding",
-  "version": "0.1.6-alpha.2",
+  "version": "0.1.6-alpha.2.20261023.1",
   "publishConfig": {
     "access": "public"
   },
