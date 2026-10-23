@@ -66,6 +66,12 @@
   scrollbar-gutter: stable;
 }
 
+.body[hidden] {
+  margin: 0;
+  padding: 0;
+  border-left: none;
+}
+
 .members {
   --dsh-chat-flow-gap: 6px;
   display: flex;
