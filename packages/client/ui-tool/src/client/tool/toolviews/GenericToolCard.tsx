@@ -52,18 +52,19 @@ export function GenericToolCard({ toolName, block, cwd, home, openFile, inspect,
       icon={VARIANT_ICONS[model.variant]}
       title={t(model.titleKey)}
       summary={model.summary}
-      // Single-file tools never expose an args body — the path link is the only
-      // args interaction. A card is not an args body: a read/write/edit row is
-      // single-file AND carries a card, so the card expands under the path link.
-      bodyRaw={singleFile || autoReview !== null ? null : model.bodyRaw}
+      // Single-file tools suppress their body only when successful — the path link is the only
+      // args interaction. On error, keep bodyRaw so the failed arguments remain inspectable.
+      bodyRaw={(singleFile && state !== 'error') || autoReview !== null ? null : model.bodyRaw}
       output={autoReview?.output ?? model.output}
       errorSummary={autoReview?.summary ?? model.errorSummary}
+      toolError={autoReview !== null ? null : model.toolError}
       terminal={terminal}
       diff={diff}
       read={read}
       search={search}
       web={web}
       state={state}
+      durationMs={model.durationMs}
       filePath={model.filePath}
       onOpenFile={singleFile ? openFile : undefined}
       inspect={inspect}

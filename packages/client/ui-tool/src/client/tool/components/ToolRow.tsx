@@ -2,7 +2,7 @@ import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode 
 import clsx from 'clsx'
 import {
   CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
-  diffTotals,
+  diffTotals, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { OpenFileOptions } from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -21,6 +21,9 @@ import type { AskQuestionCardModel } from '../models/ask-question-card-model.ts'
 import {
   formatToolBody, type ToolRowState, type ToolRowVariant,
 } from '../models/tool-call-model.ts'
+import {
+  localizeToolError, parseToolError, type ToolErrorModel,
+} from '../models/tool-error-model.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { AskQuestionCard } from './AskQuestionCard.tsx'
 import css from './ToolRow.module.css'
@@ -49,6 +52,8 @@ export interface ToolRowProps {
   askQuestion?: AskQuestionCardModel | null | undefined
   /** Error first line shown as the collapsed summary on an error row; null/absent = keep `summary`. */
   errorSummary?: string | null | undefined
+  /** Structured tool failure model parsed from output; null/absent = derived from errorSummary/output. */
+  toolError?: ToolErrorModel | null | undefined
   /** Terminal card; card fields are mutually exclusive and replace text sections. */
   terminal?: TerminalCardModel | null | undefined
   diff?: DiffCardModel | null | undefined
@@ -71,6 +76,8 @@ export interface ToolRowProps {
   search?: SearchCardModel | null | undefined
   web?: WebCardModelProps | null | undefined
   state: ToolRowState
+  /** Elapsed duration in milliseconds from call to result; null/absent = no duration pill. */
+  durationMs?: number | null | undefined
   /**
    * Filesystem path from tool args; when set with onOpenFile, the summary
    * renders as a hover-underline link that opens the host default app.
@@ -108,6 +115,13 @@ function stateStatus(state: ToolRowState, t: TranslateNS<'conversation'>): strin
   }
 }
 
+function formatDurationLabel(ms: number | null | undefined, t: TranslateNS<'conversation'>): string | null {
+  if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return null
+  if (ms < 1000) return t('row.durationMs', { ms: Math.round(ms) })
+  const sec = (ms / 1000).toFixed(ms < 10000 ? 1 : 0)
+  return t('row.durationSec', { sec })
+}
+
 export function ToolRow({
   t,
   variant,
@@ -120,6 +134,7 @@ export function ToolRow({
   output,
   askQuestion,
   errorSummary,
+  toolError,
   terminal,
   diff,
   read,
@@ -129,12 +144,22 @@ export function ToolRow({
   search,
   web,
   state,
+  durationMs,
   filePath,
   filePathLine,
   onOpenFile,
   inspect,
 }: ToolRowProps) {
   const [expanded, setExpanded] = useState(false)
+  const [copiedSection, setCopiedSection] = useState<'input' | 'output' | null>(null)
+  const durationText = useMemo(() => formatDurationLabel(durationMs, t), [durationMs, t])
+  const copySection = (type: 'input' | 'output', text: string) => {
+    void writeClipboard(text).then((ok) => {
+      if (!ok) return
+      setCopiedSection(type)
+      window.setTimeout(() => { setCopiedSection(null) }, 1000)
+    })
+  }
   const terminalLabels = useMemo(() => terminalBlockLabels(t), [t])
   const diffLabels = useMemo(() => diffBlockLabels(t), [t])
   const readLabels = useMemo(() => readBlockLabels(t), [t])
@@ -161,8 +186,17 @@ export function ToolRow({
     [card, inputRaw, open, variant],
   )
   const status = stateStatus(state, t)
+  const parsedError = useMemo(() => {
+    if (state !== 'error') return null
+    if (toolError !== undefined && toolError !== null) return toolError
+    return parseToolError(errorSummary ?? outputText, toolName)
+  }, [errorSummary, outputText, state, toolError, toolName])
+  const localizedError = useMemo(
+    () => parsedError !== null ? localizeToolError(parsedError, t) : null,
+    [parsedError, t],
+  )
   // A failure must replace, not supplement, the normal summary.
-  const failureLine = state === 'error' ? errorSummary ?? null : null
+  const failureLine = state === 'error' ? localizedError ?? errorSummary ?? null : null
   const summaryText = failureLine ?? terminalBody?.description ?? summary
   // A diff row's collapsed line carries the card's +/- totals (the same
   // numbers the expanded footer prints) so the change size reads without
@@ -232,6 +266,9 @@ export function ToolRow({
             {suffix !== null && (
               <span className={clsx(css.summarySuffix, suffix === diffStat && css.diffStat)}>{suffix}</span>
             )}
+            {durationText !== null && (
+              <span className={css.duration}>{durationText}</span>
+            )}
           </>
         )}
       >
@@ -279,6 +316,10 @@ export function ToolRow({
                             labels={searchLabels}
                             maxLines={CHAT_SEARCH_MAX_LINES}
                             className={css.searchBody}
+                            onOpenPath={onOpenFile !== undefined ? (path, line) => {
+                              if (line === undefined) onOpenFile(path)
+                              else onOpenFile(path, { line })
+                            } : undefined}
                           />
                           {/* A capped search's recovery locator lives only in the result
                           text; show it below the card so the dropped rows survive. */}
@@ -300,7 +341,17 @@ export function ToolRow({
                               <div className={css.ioCard}>
                                 {cardBody !== null && (
                                   <div className={css.ioSection}>
-                                    <span className={css.ioLabel}>{t('row.input')}</span>
+                                    <div className={css.ioHeader}>
+                                      <span className={css.ioLabel}>{t('row.input')}</span>
+                                      <button
+                                        type="button"
+                                        className={css.ioCopyButton}
+                                        onClick={() => { copySection('input', cardBody) }}
+                                        aria-label={copiedSection === 'input' ? t('copied') : t('copy')}
+                                      >
+                                        {copiedSection === 'input' ? t('copied') : t('copy')}
+                                      </button>
+                                    </div>
                                     <span className={css.ioText}>{cardBody}</span>
                                   </div>
                                 )}
@@ -308,8 +359,20 @@ export function ToolRow({
                                   <span className={css.ioDivider} aria-hidden />
                                 )}
                                 {outputText !== null && (
-                                  <div className={css.ioSection}>
-                                    <span className={css.ioLabel}>{t('row.output')}</span>
+                                  <div className={clsx(css.ioSection, state === 'error' && css.ioErrorSection)}>
+                                    <div className={css.ioHeader}>
+                                      <span className={clsx(css.ioLabel, state === 'error' && css.ioErrorLabel)}>
+                                        {t('row.output')}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className={css.ioCopyButton}
+                                        onClick={() => { copySection('output', outputText) }}
+                                        aria-label={copiedSection === 'output' ? t('copied') : t('copy')}
+                                      >
+                                        {copiedSection === 'output' ? t('copied') : t('copy')}
+                                      </button>
+                                    </div>
                                     <span className={css.ioText} data-error={state === 'error' || undefined}>
                                       {outputText}
                                     </span>

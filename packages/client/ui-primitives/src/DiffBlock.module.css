@@ -28,10 +28,32 @@
 }
 
 .body {
-  padding: 12px 14px;
+  padding: 12px 18px 12px 14px;
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.body::-webkit-scrollbar {
+  height: 6px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
+}
+
+.body::-webkit-scrollbar-track {
+  margin: 0 12px;
+  background: transparent;
 }
 
 /* No wrapping, no word-break: a diff is read by its indentation. */
@@ -45,9 +67,44 @@
    line's end for it — a long path scrolls under the button otherwise, and the
    button's hit area would eat clicks on the path's tail. */
 .path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--dsw-alias-label-primary);
   font-weight: 600;
   padding-right: 56px;
+}
+
+.pathText {
+  white-space: pre;
+}
+
+.copyPathButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.copyPathButton:hover {
+  color: var(--dsw-alias-label-primary);
+  background-color: color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+}
+
+.copyPathButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-focus, var(--dsw-alias-label-primary));
+  outline-offset: 1px;
 }
 
 /* A same-file second hunk's separator (a scattered edit), in the dim tone. */
@@ -74,6 +131,25 @@
 
 .add {
   color: var(--dsw-alias-state-success-primary);
+}
+
+/* Intra-line word/character differences within paired replacement lines. */
+.wordHighlight,
+.charHighlight {
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.del .wordHighlight,
+.del .charHighlight {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 28%, transparent);
+  font-weight: 600;
+}
+
+.add .wordHighlight,
+.add .charHighlight {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, transparent);
+  font-weight: 600;
 }
 
 .context {

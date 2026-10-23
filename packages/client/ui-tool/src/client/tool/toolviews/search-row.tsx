@@ -15,7 +15,7 @@ const SEARCH_TITLE_KEYS = {
 } as const
 
 /** Lets users expand grep or glob results and recover capped searches. */
-export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
+export function SearchRow({ toolName, block, inspect, t, openFile }: SearchRowProps) {
   const model = toolRowModel(toolName, block)
   const search = searchCardModel(block)
   return (
@@ -28,12 +28,15 @@ export function SearchRow({ toolName, block, inspect, t }: SearchRowProps) {
         ? SEARCH_TITLE_KEYS.grep
         : toolName === 'glob' ? SEARCH_TITLE_KEYS.glob : model.titleKey)}
       summary={model.summary}
+      bodyRaw={model.state === 'error' ? model.bodyRaw : null}
       // ToolRow ignores output when a structured card is present; otherwise it
       // preserves the generic fallback for errors and legacy results.
       output={model.output}
       errorSummary={model.errorSummary}
       search={search}
       state={model.state}
+      durationMs={model.durationMs}
+      onOpenFile={openFile}
       inspect={inspect}
     />
   )

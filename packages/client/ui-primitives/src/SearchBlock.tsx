@@ -1,6 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { headTailCap } from './head-tail-cap.ts'
+import { IconInspectOutline12 } from './icons/index.tsx'
 import { useCopyFeedback } from './use-copy-feedback.ts'
 import css from './SearchBlock.module.css'
 
@@ -28,7 +29,7 @@ export interface SearchFileGroup {
 }
 
 /** Fields both search shapes carry (the render site positions; this component draws). */
-interface SearchBlockCommon {
+export interface SearchBlockCommon {
   /** Localized chrome supplied by the owning render site. */
   labels: SearchBlockLabels
   /**
@@ -42,6 +43,10 @@ interface SearchBlockCommon {
   total: number
   /** Height cap in rows before the middle collapses (default {@link DEFAULT_SEARCH_MAX_LINES}). */
   maxLines?: number | undefined
+  /** Search query to highlight within matched lines (case-insensitive substring match). */
+  query?: string | undefined
+  /** Callback to open a file path, optionally jumping to a 1-based line number. */
+  onOpenPath?: ((path: string, line?: number) => void) | undefined
   /** Extra class merged onto the wrapper. */
   className?: string | undefined
 }
@@ -85,7 +90,7 @@ export type SearchBlockProps = SearchMatchesBlockProps | SearchPathsBlockProps
  */
 type SearchRow =
   | { type: 'file'; path: string; count: number; index: number; collapsed: boolean }
-  | { type: 'match'; lineNumber: number; line: string; key: string; fileIndex: number }
+  | { type: 'match'; lineNumber: number; line: string; key: string; fileIndex: number; filePath: string }
   | { type: 'path'; path: string }
 
 /**
@@ -148,7 +153,14 @@ function toRows(props: SearchBlockProps, collapsed: ReadonlySet<number>): Search
     rows.push({ type: 'file', path: file.path, count: file.matches.length, index, collapsed: isCollapsed })
     if (isCollapsed) return
     for (const match of file.matches) {
-      rows.push({ type: 'match', lineNumber: match.lineNumber, line: match.line, key: `${index}:${match.lineNumber}`, fileIndex: index })
+      rows.push({
+        type: 'match',
+        lineNumber: match.lineNumber,
+        line: match.line,
+        key: `${index}:${match.lineNumber}`,
+        fileIndex: index,
+        filePath: file.path,
+      })
     }
   })
   return rows
@@ -167,6 +179,41 @@ function rowKey(row: SearchRow): string {
     case 'file': return `file:${row.index}`
     case 'path': return `path:${row.path}`
   }
+}
+
+/**
+ * Highlight occurrences of `query` within `text` (case-insensitive substring match).
+ * Preserves the original casing of the matched substrings.
+ * @param text - the line text to render.
+ * @param query - the search query, if provided.
+ * @returns React node with `<mark className={css.matchHighlight}>` for matches, or raw text.
+ */
+function highlightQuery(text: string, query?: string): ReactNode {
+  if (!query) return text
+  const lowerQuery = query.toLowerCase()
+  const lowerText = text.toLowerCase()
+  let startIndex = 0
+  let matchIndex = lowerText.indexOf(lowerQuery, startIndex)
+  if (matchIndex === -1) return text
+
+  const nodes: ReactNode[] = []
+  let key = 0
+  while (matchIndex !== -1) {
+    if (matchIndex > startIndex) {
+      nodes.push(text.slice(startIndex, matchIndex))
+    }
+    nodes.push(
+      <mark key={key++} className={css.matchHighlight}>
+        {text.slice(matchIndex, matchIndex + query.length)}
+      </mark>,
+    )
+    startIndex = matchIndex + query.length
+    matchIndex = lowerText.indexOf(lowerQuery, startIndex)
+  }
+  if (startIndex < text.length) {
+    nodes.push(text.slice(startIndex))
+  }
+  return nodes
 }
 
 /**
@@ -218,12 +265,96 @@ export function SearchBlock(props: SearchBlockProps) {
   const tail = tailHeader === undefined ? naturalTail : naturalTail.slice(1)
 
   const renderRow = (row: SearchRow): ReactNode => {
-    if (row.type === 'path') return <div className={css.line}>{row.path}</div>
+    if (row.type === 'path') {
+      return (
+        <div
+          className={clsx(css.line, props.onOpenPath && css.clickableLine)}
+          role={props.onOpenPath ? 'button' : undefined}
+          tabIndex={props.onOpenPath ? 0 : undefined}
+          onClick={props.onOpenPath ? () => { props.onOpenPath?.(row.path) } : undefined}
+          onKeyDown={props.onOpenPath ? (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              props.onOpenPath?.(row.path)
+            }
+          } : undefined}
+        >
+          {highlightQuery(row.path, props.query)}
+        </div>
+      )
+    }
     if (row.type === 'match') {
       return (
-        <div className={css.line}>
+        <div
+          className={clsx(css.line, props.onOpenPath && css.clickableLine)}
+          role={props.onOpenPath ? 'button' : undefined}
+          tabIndex={props.onOpenPath ? 0 : undefined}
+          onClick={props.onOpenPath ? () => { props.onOpenPath?.(row.filePath, row.lineNumber) } : undefined}
+          onKeyDown={props.onOpenPath ? (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              props.onOpenPath?.(row.filePath, row.lineNumber)
+            }
+          } : undefined}
+        >
           <span className={css.lineNumber}>{row.lineNumber}: </span>
-          {row.line}
+          {highlightQuery(row.line, props.query)}
+        </div>
+      )
+    }
+    if (props.onOpenPath) {
+      return (
+        <div
+          className={css.fileHeader}
+          role="button"
+          tabIndex={0}
+          aria-expanded={!row.collapsed}
+          onClick={() => { toggleFile(row.index) }}
+          onKeyDown={(event) => {
+            if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault()
+              toggleFile(row.index)
+            }
+          }}
+        >
+          <span
+            role="button"
+            tabIndex={0}
+            className={clsx(css.filePath, css.clickablePath)}
+            onClick={(event) => {
+              event.stopPropagation()
+              props.onOpenPath?.(row.path)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                event.stopPropagation()
+                props.onOpenPath?.(row.path)
+              }
+            }}
+          >
+            {row.path}
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label={row.path}
+            className={css.openIcon}
+            onClick={(event) => {
+              event.stopPropagation()
+              props.onOpenPath?.(row.path)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                event.stopPropagation()
+                props.onOpenPath?.(row.path)
+              }
+            }}
+          >
+            <IconInspectOutline12 />
+          </span>
+          <span className={css.fileCount}>{row.count}</span>
         </div>
       )
     }

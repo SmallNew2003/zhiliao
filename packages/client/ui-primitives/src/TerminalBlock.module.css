@@ -38,24 +38,36 @@
      keep their positions. The banner shares the card's own surface (no banner
      token): the l2 divider below is the section boundary. */
   margin-left: calc(-1 * var(--dsl-terminal-gutter));
-  padding: 9px 14px 9px var(--dsl-terminal-gutter);
+  padding: 9px 18px 9px var(--dsl-terminal-gutter);
   border-top-left-radius: var(--dsl-terminal-radius);
   border-top-right-radius: var(--dsl-terminal-radius);
   /* A long multi-line command scrolls inside the banner (same cap as the
      IN/OUT card's sections) instead of pushing the output off screen. */
   max-height: 150px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.header::-webkit-scrollbar {
+  width: 6px;
 }
 
 /* Banner scrollbar floats off the card edge like the output's. */
 .header::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background-clip: padding-box;
   border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.header::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
 }
 
 .header::-webkit-scrollbar-track {
   margin: 6px;
+  background: transparent;
 }
 
 /* Full-width l2 hairline between the command banner and the body — the same
@@ -133,6 +145,16 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
+.actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  background-color: var(--dsw-alias-markdown-code-block);
+}
+
 .copyButton {
   flex: none;
   position: sticky;
@@ -155,25 +177,38 @@
    Unset, the max-height is none and the auto overflow never engages. */
 .output {
   max-height: var(--dsl-terminal-output-max-height, none);
-  padding: 12px 14px 12px 0;
+  padding: 12px 18px 12px 0;
   font: var(--dsl-terminal-font);
   overflow-x: auto;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.output::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
 /* Both output scrollbars (vertical cap, horizontal pre overflow) float 2px
    off the card edge: a transparent border clips the thumb inward so it never
    hugs the rounded corner. */
 .output::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background-clip: padding-box;
   border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.output::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
 }
 
 /* Track end-margins keep the thumb's travel out of the card's rounded
    corners in both directions. */
 .output::-webkit-scrollbar-track {
   margin: 6px;
+  background: transparent;
 }
 
 /* No wrapping, no word-break: alignment is the payload of terminal output. */

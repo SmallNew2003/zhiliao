@@ -11,8 +11,10 @@
 import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { LocaleKeysOf } from '@deepseek-ai/dsh-client-ui-slots'
 import { abbreviateHomePath, relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
+import { parseToolError, type ToolErrorModel } from './tool-error-model.ts'
 
 export type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-chat/client'
+export type { ToolErrorModel } from './tool-error-model.ts'
 
 /** Tool-call row variants selected by the generic atomic renderer. */
 export type ToolRowVariant = 'search' | 'read' | 'bash' | 'write' | 'edit' | 'code' | 'others'
@@ -90,7 +92,14 @@ const TOOL_TITLE_KEYS: Record<string, ToolTitleKey> = {
  * @returns matching variant, others when unknown.
  */
 export function classifyTool(toolName: string): ToolRowVariant {
-  return TOOL_VARIANTS[toolName] ?? 'others'
+  const direct = TOOL_VARIANTS[toolName]
+  if (direct !== undefined) return direct
+  const firstWord = toolName.trim().split(/\s+/)[0]
+  if (firstWord !== undefined && firstWord !== toolName) {
+    const candidate = TOOL_VARIANTS[firstWord]
+    if (candidate !== undefined) return candidate
+  }
+  return 'others'
 }
 
 /** Everything ToolRow needs, derived once from the frozen slice. */
@@ -110,9 +119,13 @@ export interface ToolRowModel {
   output: string | null
   /** First line of the result text on an error row; null for every other state. */
   errorSummary: string | null
+  /** Structured tool failure model; null for non-error or unparsable results. */
+  toolError: ToolErrorModel | null
   /** Structured Auto-review denial identity; null for every ordinary result. */
   autoReviewDenial: AutoReviewDenial | null
   state: ToolRowState
+  /** Elapsed duration in milliseconds from call to result; null when callTime is unknown or running. */
+  durationMs: number | null
 }
 
 function deriveAutoReviewDenial(block: ToolCallBlock): AutoReviewDenial | null {
@@ -254,8 +267,12 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   // call with blank content has nothing to expand, and a blank first line
   // would erase the collapsed error row's summary slot.
   const output = done ? (resultText(block) || null) : null
-  const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
+  const toolError = state === 'error' ? parseToolError(output, toolName) : null
+  const errorSummary = toolError !== null ? toolError.summary : (state === 'error' && output !== null ? firstLine(output) : null)
   const bodyRaw = argsRaw === '' ? null : argsRaw
+  const durationMs = done && typeof block.callTime === 'number' && block.time >= block.callTime
+    ? block.time - block.callTime
+    : null
   return {
     variant,
     titleKey: toolTitleKey ?? VARIANT_TITLE_KEYS[variant],
@@ -264,7 +281,9 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     bodyRaw,
     output,
     errorSummary,
+    toolError,
     autoReviewDenial: deriveAutoReviewDenial(block),
     state,
+    durationMs,
   }
 }

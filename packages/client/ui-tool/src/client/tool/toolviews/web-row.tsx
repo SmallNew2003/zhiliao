@@ -29,10 +29,12 @@ export function WebRow({ toolName, block, inspect, t }: WebRowProps) {
         ? WEB_TITLE_KEYS.web_search
         : toolName === 'web_fetch' ? WEB_TITLE_KEYS.web_fetch : model.titleKey)}
       summary={model.summary}
+      bodyRaw={model.state === 'error' ? model.bodyRaw : null}
       output={model.output}
       errorSummary={model.errorSummary}
       web={web}
       state={model.state}
+      durationMs={model.durationMs}
       inspect={inspect}
     />
   )

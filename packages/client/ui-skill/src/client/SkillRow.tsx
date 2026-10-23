@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  IconChevronDownOutline14, IconInspectOutline12, IconSkillOutline16, StateDot,
+  IconChevronDownOutline14, IconChevronRightOutline14, IconInspectOutline12, IconSkillOutline16, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -89,7 +89,7 @@ function disclosureLeading(state: SkillRowState, open: boolean, expandable: bool
   return (
     <>
       <span className={css.iconIdle}>{icon}</span>
-      <IconChevronDownOutline14 className={`${css.chevron} ${css.chevronHover}`} />
+      <IconChevronRightOutline14 className={`${css.chevron} ${css.chevronHover}`} />
     </>
   )
 }

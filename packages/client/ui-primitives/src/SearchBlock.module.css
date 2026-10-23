@@ -41,17 +41,39 @@
 }
 
 .body {
-  padding: 8px 14px 12px 0;
+  padding: 8px 16px 12px 0;
   font: var(--dsw-font-markdown-code-block);
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.body::-webkit-scrollbar {
+  height: 6px;
+}
+
+.body::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
+}
+
+.body::-webkit-scrollbar-track {
+  margin: 0 12px;
+  background: transparent;
 }
 
 /* No wrapping: a match line or a path keeps its content on one row and scrolls
    sideways instead of folding. */
 .line {
   min-height: var(--dsl-search-line-height);
-  padding-left: 14px;
+  padding: 0 16px 0 14px;
   white-space: pre;
 }
 
@@ -109,4 +131,43 @@
   padding: 12px 14px;
   font: var(--dsw-font-markdown-code-block);
   color: var(--dsw-alias-label-tertiary);
+}
+
+.matchHighlight {
+  background-color: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-label-primary);
+  border-radius: 2px;
+}
+
+.clickableLine {
+  cursor: pointer;
+}
+
+.clickableLine:hover {
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+.clickablePath {
+  cursor: pointer;
+}
+
+.clickablePath:hover {
+  color: var(--dsw-alias-link);
+  text-decoration: underline;
+}
+
+.openIcon {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.openIcon:hover {
+  color: var(--dsw-alias-label-primary);
+  background-color: var(--dsw-alias-interactive-bg-hover);
 }

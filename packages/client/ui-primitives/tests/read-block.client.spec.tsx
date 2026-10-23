@@ -134,6 +134,29 @@ describe('ReadBlock banner', () => {
     expect(view.queryByText(/显示/u)).toBeNull()
   })
 
+  it('renders a position track indicator with proportional thumb style when windowed', () => {
+    const view = render(<ReadBlock label="src/a.ts" lines={lines(20, 21)} totalLines={100} />)
+    const track = view.container.querySelector('[class^="_positionTrack_"]')
+    expect(track).toBeTruthy()
+    const thumb = view.container.querySelector('[class^="_positionThumb_"]') as HTMLElement
+    expect(thumb).toBeTruthy()
+    expect(thumb.style.left).toBe('20%')
+    expect(thumb.style.width).toBe('20%')
+  })
+
+  it('clamps thumb minimum width to 4% for very small windows', () => {
+    const view = render(<ReadBlock label="src/a.ts" lines={lines(1, 50)} totalLines={1000} />)
+    const thumb = view.container.querySelector('[class^="_positionThumb_"]') as HTMLElement
+    expect(thumb).toBeTruthy()
+    expect(thumb.style.left).toBe('4.9%')
+    expect(thumb.style.width).toBe('4%')
+  })
+
+  it('omits the position track when the window covers the full file', () => {
+    const view = render(<ReadBlock label="a.ts" lines={lines(10, 1)} totalLines={10} />)
+    expect(view.container.querySelector('[class^="_positionTrack_"]')).toBeNull()
+  })
+
   it('draws an empty label and empty language when neither is given', () => {
     const view = render(<ReadBlock lines={lines(1)} totalLines={1} />)
     expect(view.container.querySelector('[class^="_label_"]')?.textContent).toBe('')

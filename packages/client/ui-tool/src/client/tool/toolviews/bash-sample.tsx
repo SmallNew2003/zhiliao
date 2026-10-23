@@ -2,7 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
-  IconApiOutline14, IconChevronDownOutline14, IconInspectOutline12, StateDot, TerminalBlock,
+  IconApiOutline14, IconChevronDownOutline14, IconChevronRightOutline14, IconInspectOutline12, StateDot, TerminalBlock,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
@@ -82,7 +82,7 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
       ? (
         <>
           <span className={css.iconIdle}>{leadingFor(state)}</span>
-          <IconChevronDownOutline14 className={clsx(css.chevron, css.chevronHover)} />
+          <IconChevronRightOutline14 className={clsx(css.chevron, css.chevronHover)} />
         </>
       )
       : leadingFor(state)
