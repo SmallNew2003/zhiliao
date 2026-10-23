@@ -18,6 +18,7 @@ export interface ProcessGroupMember {
 export interface ProcessGroupSummary {
   readonly counts: readonly { readonly kind: ProcessGroupActivity; readonly count: number }[]
   readonly failed: boolean
+  readonly failedCount?: number
   readonly running: ProcessGroupActivity | undefined
 }
 

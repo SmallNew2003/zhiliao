@@ -108,6 +108,7 @@ export const ProcessGroupSeat = memo(function ProcessGroupSeat({
       data-chat-flow-kind="process-group"
       data-chat-turn={group.turn}
       data-running={group.closed ? undefined : ''}
+      data-failed={group.summary.failed ? '' : undefined}
     >
       <button
         type="button"
@@ -127,6 +128,14 @@ export const ProcessGroupSeat = memo(function ProcessGroupSeat({
           <IconChevronDownOutline14 className={css.chevron} />
         </span>
         <span className={css.label}>{title}</span>
+        {group.summary.failed && (
+          <span className={css.failedBadge} role="status">
+            <span className={css.failedDot} aria-hidden />
+            {group.summary.failedCount !== undefined && group.summary.failedCount > 1
+              ? seatProps.t('message.processGroup.failedCount', { count: group.summary.failedCount })
+              : seatProps.t('message.processGroup.failedSingle')}
+          </span>
+        )}
       </button>
       <div
         ref={bodyRef}

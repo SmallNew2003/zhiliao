@@ -26,11 +26,21 @@ export function localPathMediaUrl(protocol: string, origin: string, value: strin
   if (value.length === 0 || value.startsWith('//')) return undefined
   let targetPath = value
   if (!targetPath.startsWith('/')) {
-    if (cwd === undefined || cwd === '' || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetPath)) return undefined
+    if (cwd === undefined || cwd === '') return undefined
     targetPath = resolveWorkspacePath(cwd, targetPath.replace(/^\.[/\\]/, ''))
   }
   if (!targetPath.startsWith('/') || targetPath.startsWith('//')) return undefined
   return `${origin}/api/file?path=${encodeURIComponent(targetPath)}`
+}
+
+/**
+ * Strip unescaped pseudo-XML tool calls accidentally emitted in text streams by models.
+ * @param text - markdown text from model chunk.
+ * @returns sanitized text without pseudo tool-call XML blocks.
+ */
+export function cleanModelPseudoToolCalls(text: string): string {
+  if (!text.includes('<tool_call>')) return text
+  return text.replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|<\/parameter>\s*(?:<\/parameter>\s*)*)(?:\n|$)/gi, '').trim()
 }
 
 export interface AssistantMarkdownProps {
@@ -80,11 +90,13 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
     const block = blocks[i]
     if (block === undefined) continue
     switch (block.kind) {
-      case 'text':
+      case 'text': {
+        const text = cleanModelPseudoToolCalls(block.text)
+        if (text === '') break
         rendered.push(
           <MarkdownText
             key={i}
-            text={block.text}
+            text={text}
             streaming={streaming}
             labels={labels}
             fileMentions={mentions}
@@ -92,6 +104,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
           />,
         )
         break
+      }
       case 'reasoning':
         rendered.push(
           <ProcessReasoning
