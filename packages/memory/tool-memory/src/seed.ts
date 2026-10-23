@@ -135,6 +135,21 @@ async function readRecentCommits(
     workspaceRoot,
     signal,
   )
+  return parseCommitLines(stdout)
+}
+
+/**
+ * Parse `git log` output whose lines each carry one `sha<US>subject` record.
+ *
+ * The ASCII unit separator cannot occur in a commit subject, so the split is
+ * unambiguous; a line without one, or with it in front, carries no record and is
+ * dropped rather than surfaced as a half-read commit.
+ * @param stdout - raw `git log` output to parse.
+ * @returns one entry per well-formed line, in output order.
+ */
+export function parseCommitLines(stdout: string): readonly CommitLine[] {
+  // ASCII unit separator: cannot occur in a commit subject, so the split is unambiguous.
+  const separator = '\u001F'
   const commits: CommitLine[] = []
   for (const line of stdout.split('\n')) {
     const trimmed = line.trim()

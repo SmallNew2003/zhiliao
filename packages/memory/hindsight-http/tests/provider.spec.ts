@@ -29,7 +29,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
     }
     server = createServer((req, res) => {
       let raw = ''
-      req.on('data', chunk => raw += chunk)
+      req.on('data', (chunk: Buffer) => { raw += String(chunk) })
       req.on('end', () => {
         let body: unknown
         try {
@@ -47,7 +47,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   afterEach(async () => {
-    await new Promise<void>(resolve => server.close(() => resolve()))
+    await new Promise<void>((resolve) => { server.close((() => { resolve() })) })
     vi.restoreAllMocks()
   })
 
@@ -74,11 +74,11 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('reports available after a healthy probe and memoizes the result', async () => {
-    handler = (_req, res) => reply(res, 200, { status: 'healthy' })
+    handler = (_req, res) => { reply(res, 200, { status: 'healthy' }) }
     const provider = makeProvider()
 
     expect(provider.available()).toBe(true)
-    await vi.waitFor(() => expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1))
+    await vi.waitFor(() => { expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1) })
 
     // Within the freshness window the answer is reused, so no second probe follows.
     expect(provider.available()).toBe(true)
@@ -87,24 +87,24 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('reports unavailable once a probe fails', async () => {
-    handler = (_req, res) => reply(res, 500, { error: 'down' })
+    handler = (_req, res) => { reply(res, 500, { error: 'down' }) }
     const provider = makeProvider()
 
     provider.available()
-    await vi.waitFor(() => expect(provider.available()).toBe(false))
+    await vi.waitFor(() => { expect(provider.available()).toBe(false) })
   })
 
   it('re-probes once the freshness window has elapsed, so a restarted daemon is noticed', async () => {
-    handler = (_req, res) => reply(res, 200, { status: 'healthy' })
+    handler = (_req, res) => { reply(res, 200, { status: 'healthy' }) }
     // A zero window means every call past the first re-probes.
     const provider = makeProvider({ probeTtlMs: 1 })
 
     provider.available()
-    await vi.waitFor(() => expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1))
+    await vi.waitFor(() => { expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1) })
     await new Promise(resolve => setTimeout(resolve, 5))
 
     provider.available()
-    await vi.waitFor(() => expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(2))
+    await vi.waitFor(() => { expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(2) })
   })
 
   it('answers optimistically while the very first probe is still in flight', async () => {
@@ -114,18 +114,18 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
     // Nothing has been learned yet, so the answer is optimistic rather than false: a cold
     // daemon must not read as "memory disabled" on the first turn.
     expect(provider.available()).toBe(true)
-    await vi.waitFor(() => expect(provider.available()).toBe(false), { timeout: 2000 })
+    await vi.waitFor(() => { expect(provider.available()).toBe(false) }, { timeout: 2000 })
   })
 
   it('reuses an in-flight probe rather than starting a second one', async () => {
-    handler = (_req, res) => reply(res, 200, { status: 'healthy' })
+    handler = (_req, res) => { reply(res, 200, { status: 'healthy' }) }
     const provider = makeProvider()
 
     provider.available()
     provider.available()
     provider.available()
 
-    await vi.waitFor(() => expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1))
+    await vi.waitFor(() => { expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1) })
     expect(provider.available()).toBe(true)
     expect(recorded.filter(entry => entry.path === '/health')).toHaveLength(1)
   })
@@ -199,6 +199,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
 
   it('classifies a non-Error transport rejection as a backend error', async () => {
     // A hostile or stubbed fetch can reject with anything, including a bare value.
+    // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- a non-Error rejection is the scenario under test.
     vi.stubGlobal('fetch', () => Promise.reject('just a string'))
     try {
       await expect(makeProvider().recall({ prompt: 'p' }, bank)).rejects.toThrow(
@@ -210,7 +211,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('encodes the bank id into request paths', async () => {
-    handler = (_req, res) => reply(res, 200, { results: [] })
+    handler = (_req, res) => { reply(res, 200, { results: [] }) }
 
     await makeProvider().search({ query: 'q' }, bank)
 
@@ -218,7 +219,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('sends the query and limit on search', async () => {
-    handler = (_req, res) => reply(res, 200, { results: [] })
+    handler = (_req, res) => { reply(res, 200, { results: [] }) }
 
     await makeProvider().search({ query: '审批流程', limit: 5 }, bank)
 
@@ -226,7 +227,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('defaults the search limit when the request omits one', async () => {
-    handler = (_req, res) => reply(res, 200, { results: [] })
+    handler = (_req, res) => { reply(res, 200, { results: [] }) }
 
     await makeProvider().search({ query: 'q' }, bank)
 
@@ -234,12 +235,12 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('projects recall rows onto memory units', async () => {
-    handler = (_req, res) => reply(res, 200, {
+    handler = (_req, res) => { reply(res, 200, {
       results: [
         { id: 'm-1', text: 'first' },
         { id: 'm-2', text: 'second' },
       ],
-    })
+    }) }
 
     const result = await makeProvider().recall({ prompt: 'p', limit: 2 }, bank)
 
@@ -250,9 +251,9 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('skips malformed recall rows instead of failing the whole call', async () => {
-    handler = (_req, res) => reply(res, 200, {
+    handler = (_req, res) => { reply(res, 200, {
       results: [{ id: 'ok', text: 'good' }, { id: 'no-text' }, { text: 'no-id' }, null, 42],
-    })
+    }) }
 
     const result = await makeProvider().recall({ prompt: 'p' }, bank)
 
@@ -260,13 +261,13 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('returns no units for a response without a results array', async () => {
-    handler = (_req, res) => reply(res, 200, { unexpected: true })
+    handler = (_req, res) => { reply(res, 200, { unexpected: true }) }
 
     await expect(makeProvider().recall({ prompt: 'p' }, bank)).resolves.toEqual({ units: [], truncated: false })
   })
 
   it('sends one retain item per transcript turn', async () => {
-    handler = (_req, res) => reply(res, 200, { success: true, operation_id: 'op-1' })
+    handler = (_req, res) => { reply(res, 200, { success: true, operation_id: 'op-1' }) }
 
     const result = await makeProvider().retain({
       turns: [
@@ -286,7 +287,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('stops adding retain items once the character budget is spent', async () => {
-    handler = (_req, res) => reply(res, 200, { success: true })
+    handler = (_req, res) => { reply(res, 200, { success: true }) }
 
     await makeProvider({ maxRetainChars: 50 }).retain({
       turns: [
@@ -308,13 +309,13 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('reports retention as refused when the backend answers success: false', async () => {
-    handler = (_req, res) => reply(res, 200, { success: false })
+    handler = (_req, res) => { reply(res, 200, { success: false }) }
 
     await expect(makeProvider().retain({ turns: [{ turn: 0, prompt: 'q' }] }, bank)).resolves.toMatchObject({ retained: false })
   })
 
   it('classifies a 404 as a missing bank', async () => {
-    handler = (_req, res) => reply(res, 404, { error: 'no such bank' })
+    handler = (_req, res) => { reply(res, 404, { error: 'no such bank' }) }
 
     await expect(makeProvider().recall({ prompt: 'p' }, bank)).rejects.toThrow(
       expect.objectContaining({ code: 'MEMORY_BANK_NOT_FOUND' }),
@@ -322,7 +323,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('classifies a non-2xx answer as a backend error and quotes the status', async () => {
-    handler = (_req, res) => reply(res, 503, 'service unavailable')
+    handler = (_req, res) => { reply(res, 503, 'service unavailable') }
 
     await expect(makeProvider().recall({ prompt: 'p' }, bank)).rejects.toThrow(
       expect.objectContaining({ code: 'MEMORY_BACKEND_ERROR' }),
@@ -330,7 +331,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('classifies a non-JSON body as a backend error', async () => {
-    handler = (_req, res) => reply(res, 200, 'not json at all')
+    handler = (_req, res) => { reply(res, 200, 'not json at all') }
 
     await expect(makeProvider().recall({ prompt: 'p' }, bank)).rejects.toThrow(
       expect.objectContaining({ code: 'MEMORY_BACKEND_ERROR' }),
@@ -374,7 +375,7 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
   })
 
   it('falls back to the configured suffix when a path has no usable leaf', async () => {
-    handler = (_req, res) => reply(res, 200, { banks: [] })
+    handler = (_req, res) => { reply(res, 200, { banks: [] }) }
     const provider = makeProvider({ defaultBankSuffix: 'fallback' })
 
     await expect(provider.resolveBank('')).resolves.toBe(memoryBankId('coding-agent::fallback'))
@@ -424,6 +425,6 @@ describe('memory-hindsight-http plugin', () => {
   ])('rejects a non-positive %s at configuration time', (_field, bad) => {
     const ctx = { memory: { registerProvider: () => undefined } } as never
 
-    expect(() => plugin.apply(ctx, bad)).toThrow(/must be a positive finite number/)
+    expect(() => { plugin.apply(ctx, bad) }).toThrow(/must be a positive finite number/)
   })
 })

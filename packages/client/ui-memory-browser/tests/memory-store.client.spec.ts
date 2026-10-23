@@ -40,7 +40,7 @@ async function harness(script: Script = {}) {
     page: vi.fn(script.page ?? (() => Promise.resolve(ok({ available: true })))),
   }
   ctx.provide('remote', { memoryController: calls })
-  const controller = new MemoryBrowserController(ctx as never)
+  const controller = new MemoryBrowserController(ctx)
   return Object.assign(controller, { calls })
 }
 
@@ -321,6 +321,22 @@ describe('MemoryBrowserController', () => {
     await pending
     expect(controller.getSnapshot().banks).toEqual([])
     expect(controller.getSnapshot().status).toBe('idle')
+  })
+
+  it('abandons a read whose listing lands after disposal superseded it', async () => {
+    const slow = deferred<unknown>()
+    const controller = await harness({ list: () => slow.promise })
+    const pending = controller.load()
+    // The read records its generation once it is actually awaiting the Host, so
+    // disposal after that point is what the stale-generation guard rejects.
+    await vi.waitFor(() => { expect(controller.calls.list).toHaveBeenCalled() })
+    controller.dispose()
+    const atDisposal = controller.getSnapshot()
+    slow.settle(ok(BANKS))
+    await pending
+    // The listing landed after disposal, so nothing it carried reaches the panel.
+    expect(controller.getSnapshot()).toBe(atDisposal)
+    expect(controller.getSnapshot().banks).toEqual([])
   })
 
   it('drops a bank detail that arrived after the panel moved to another bank', async () => {

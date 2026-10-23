@@ -5,6 +5,7 @@
   - img
   - text: New Session
 - navigation "Global panels":
+  - button "Memory"
   - button "Plugins"
 - text: Workspaces
 - button "Search sessions":
