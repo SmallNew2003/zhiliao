@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import config from './config.json' with { type: 'json' }
 import { api, graphql, initializeIssueStartDate, issueSnapshot } from './github.mjs'
 import { auditIssue, initializePullRequestStartDates, repairIssueLabels, runLifecycle } from './lifecycle.mjs'
 import {
@@ -35,7 +36,7 @@ const projectGraphqlData = ({
   startDateType = 'DATE',
   startDateIsIssueField = false,
 } = {}) => ({
-  organization: {
+  repository: {
     projectV2: {
       id: 'project-id',
       title: 'DSH Issue Management',
@@ -72,8 +73,6 @@ const projectGraphqlData = ({
         ],
       },
     },
-  },
-  repository: {
     issue: {
       id: 'issue-id',
       projectItems: {
@@ -240,6 +239,11 @@ test('allows optional metadata in every open Status', () => {
   }
 })
 
+test('allows a personal Issue without a native Type when the fallback is configured', () => {
+  assert.equal(config.requireIssueType, false)
+  assert.deepEqual(validateIssue({ ...legalIssue, type: null, status: 'Inbox' }), [])
+})
+
 test('reserves PR kind and legacy labels for pull requests', () => {
   for (const label of [
     ...canonicalKinds,
@@ -285,11 +289,11 @@ test('removes reserved labels from Issues before validation', async (t) => {
   assert.deepEqual(validateIssue(repaired), [])
   assert.deepEqual(requests, [
     {
-      url: 'https://api.github.com/repos/deepseek-harness/deepseek-harness/issues/42/labels/kind%2Fbug-fix',
+      url: 'https://api.github.com/repos/SmallNew2003/zhiliao/issues/42/labels/kind%2Fbug-fix',
       method: 'DELETE',
     },
     {
-      url: 'https://api.github.com/repos/deepseek-harness/deepseek-harness/issues/42/labels/bug-fix',
+      url: 'https://api.github.com/repos/SmallNew2003/zhiliao/issues/42/labels/bug-fix',
       method: 'DELETE',
     },
   ])
@@ -333,18 +337,18 @@ test('deletes a stale audit comment after repairing its only violation', async (
   assert.deepEqual(
     requests.map(({ url, method }) => ({ path: new URL(url).pathname + new URL(url).search, method })),
     [
-      { path: '/repos/deepseek-harness/deepseek-harness/issues/42', method: 'GET' },
+      { path: '/repos/SmallNew2003/zhiliao/issues/42', method: 'GET' },
       { path: '/graphql', method: 'POST' },
       {
-        path: '/repos/deepseek-harness/deepseek-harness/issues/42/labels/kind%2Fbug-fix',
+        path: '/repos/SmallNew2003/zhiliao/issues/42/labels/kind%2Fbug-fix',
         method: 'DELETE',
       },
       {
-        path: '/repos/deepseek-harness/deepseek-harness/issues/42/comments?per_page=100',
+        path: '/repos/SmallNew2003/zhiliao/issues/42/comments?per_page=100',
         method: 'GET',
       },
       {
-        path: '/repos/deepseek-harness/deepseek-harness/issues/comments/99',
+        path: '/repos/SmallNew2003/zhiliao/issues/comments/99',
         method: 'DELETE',
       },
     ],
@@ -446,7 +450,7 @@ test('reads Priority and Status from Project custom fields', async (t) => {
   assert.equal(issue.priority, 'P1')
   assert.equal(issue.status, 'Inbox')
   assert.deepEqual(urls, [
-    'https://api.github.com/repos/deepseek-harness/deepseek-harness/issues/42',
+    'https://api.github.com/repos/SmallNew2003/zhiliao/issues/42',
     'https://api.github.com/graphql',
   ])
 })
@@ -462,7 +466,9 @@ test('writes an empty Project Start Date with the configured field', async (t) =
   assert.equal(requests.length, 2)
   assert.match(requests[0].query, /isIssueField/)
   assert.doesNotMatch(requests[0].query, /issueField\s*\{/)
+  assert.match(requests[0].query, /repository\(owner: \$owner/)
   assert.match(requests[0].query, /priorityValue: fieldValueByName/)
+  assert.equal(requests[0].variables.owner, 'SmallNew2003')
   assert.equal(requests[0].variables.priorityField, 'Priority')
   assert.match(requests[0].query, /ProjectV2ItemFieldDateValue/)
   assert.match(requests[1].query, /updateProjectV2ItemFieldValue/)
@@ -672,7 +678,7 @@ test('toggles automation-owned work on request changes and repeated review reque
   let status = nextResolvingIssueStatus(
     'In review',
     'changes-requested',
-    'dsh-issue-management',
+    'SmallNew2003',
   )
   assert.equal(status, 'In progress')
   status = nextResolvingIssueStatus(status, 'review-requested')
@@ -891,14 +897,14 @@ test('performs no lifecycle requests for removed signals or title-only edits', a
   assert.deepEqual(fixture.requests, [])
 })
 
-test('keeps trusted preflight before token minting and requires policy in the configured repository', () => {
+test('keeps trusted preflight before validation and gates policy by repository capability', () => {
   const source = readFileSync(new URL('../workflows/issue-policy.yml', import.meta.url), 'utf8')
   const job = source.slice(source.indexOf('  policy:'))
   assert.ok(job.includes('    name: Issue policy'))
-  assert.ok(job.includes("    if: github.repository == 'deepseek-harness/deepseek-harness'"))
+  assert.ok(job.includes("    if: vars.DSH_ISSUE_MANAGEMENT_ENABLED == 'true'"))
   assert.ok(source.includes('types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review, review_requested]'))
   const steps = job.split('      - name: ').slice(1)
-  assert.equal(steps.length, 4)
+  assert.equal(steps.length, 3)
   assert.ok(steps[0].includes('ref: ${{ github.event.repository.default_branch }}'))
   assert.ok(steps[0].includes('persist-credentials: false'))
   assert.doesNotMatch(source, /pull_request\.head|pull_request_target/)
@@ -907,18 +913,16 @@ test('keeps trusted preflight before token minting and requires policy in the co
   assert.ok(steps[1].includes('node .github/issue-management/policy.mjs pr-preflight'))
   assert.ok(steps[1].includes('if [ -f .github/issue-management/selective-preflight.json ]; then'))
   assert.doesNotMatch(steps[1], /secrets\.|PROJECT_TOKEN|if:/)
-  assert.ok(steps[2].includes("if: ${{ steps.preflight.outputs.needs-project == 'true' }}"))
-  assert.ok(steps[2].includes('permission-organization-projects: read'))
-  assert.ok(steps[3].includes('PROJECT_TOKEN: ${{ steps.app-token.outputs.token }}'))
-  assert.ok(steps[3].includes('run: node .github/issue-management/policy.mjs pr'))
-  assert.ok(steps[3].includes("if: ${{ steps.preflight.outputs.legacy-automated != 'true' }}"))
+  assert.ok(steps[2].includes('PROJECT_TOKEN: ${{ secrets.DSH_PROJECT_TOKEN }}'))
+  assert.ok(steps[2].includes('run: node .github/issue-management/policy.mjs pr'))
+  assert.ok(steps[2].includes("if: ${{ steps.preflight.outputs.legacy-automated != 'true' }}"))
 })
 
 test('runs trusted rollout selection with absent and present capability markers', { skip: process.platform === 'win32' ? 'The policy workflow executes under hosted Ubuntu bash' : false }, (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'dsh-policy-rollout-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   const source = readFileSync(new URL('../workflows/issue-policy.yml', import.meta.url), 'utf8')
-  const script = source.split('        run: |\n')[1].split('      - name: Create Project read token')[0]
+  const script = source.split('        run: |\n')[1].split('      # Re-read current state')[0]
     .split('\n').map((line) => line.slice(10)).join('\n')
   assert.deepEqual(JSON.parse(readFileSync(new URL('./selective-preflight.json', import.meta.url), 'utf8')), { version: 1 })
   const cases = [
@@ -966,6 +970,7 @@ test('allocates lifecycle runners only for relevant reviews and PR body edits', 
   const job = source.slice(source.indexOf('  lifecycle:'))
   const beforeSteps = job.slice(0, job.indexOf('    steps:'))
   assert.ok(beforeSteps.includes('    if: >-'))
+  assert.ok(beforeSteps.includes("vars.DSH_ISSUE_MANAGEMENT_ENABLED == 'true' &&"))
   assert.ok(beforeSteps.includes("(github.event_name != 'pull_request_review' || github.event.review.state == 'changes_requested') &&"))
   assert.ok(beforeSteps.includes("(github.event_name != 'pull_request' || github.event.action != 'edited' || github.event.changes.body != null)"))
   assert.ok(source.includes('ref: ${{ github.event.repository.default_branch }}'))
@@ -1024,7 +1029,7 @@ test('reads policy snapshots in reference order and only resolving Project prior
     references: { all: [2, 4], resolving: [2], related: [4] },
     issues: new Map([[2, { priority: 'P1' }], [4, { priority: null }]]),
   })
-  const repo = '/repos/deepseek-harness/deepseek-harness'
+  const repo = '/repos/SmallNew2003/zhiliao'
   assert.deepEqual(fixture.requests, [
     repo + '/pulls/10',
     repo + '/pulls/10/requested_reviewers',
@@ -1048,7 +1053,7 @@ test('reads lifecycle references for draft Bot PRs without review or Project req
     issues: new Map([[2, { priority: null }], [4, { priority: null }]]),
     createdAt: '2026-08-27T16:00:00Z',
   })
-  const repo = '/repos/deepseek-harness/deepseek-harness'
+  const repo = '/repos/SmallNew2003/zhiliao'
   assert.deepEqual(fixture.requests, [repo + '/pulls/10', repo + '/issues/2', repo + '/issues/4'])
   assert.deepEqual(fixture.output, [])
 })

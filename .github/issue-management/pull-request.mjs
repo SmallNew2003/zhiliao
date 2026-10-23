@@ -21,12 +21,12 @@ import {
 export async function resolvingReferencesSnapshot(number, pull) {
   const references = parseReferences({
     body: pull.body ?? '',
-    repository: `${config.organization}/${config.repository}`,
+    repository: `${config.owner}/${config.repository}`,
   })
   const issues = new Map()
   for (const issueNumber of references.all) {
     const issue = await api(
-      `/repos/${config.organization}/${config.repository}/issues/${issueNumber}`,
+      `/repos/${config.owner}/${config.repository}/issues/${issueNumber}`,
     )
     if (!issue.pull_request) issues.set(issueNumber, { priority: null })
   }
@@ -44,7 +44,7 @@ export async function resolvingReferencesSnapshot(number, pull) {
  * @returns {Promise<object>} Policy snapshot; rejects any failed read and performs no writes.
  */
 export async function pullRequestSnapshot(number, includeProject = true) {
-  const pull = await api(`/repos/${config.organization}/${config.repository}/pulls/${number}`)
+  const pull = await api(`/repos/${config.owner}/${config.repository}/pulls/${number}`)
   const snapshot = {
     number,
     isDraft: pull.draft,
@@ -57,8 +57,8 @@ export async function pullRequestSnapshot(number, includeProject = true) {
   }
   if (snapshot.isDraft || ['Bot', 'App'].includes(snapshot.authorType)) return snapshot
   const [reviewRequests, reviews] = await Promise.all([
-    api(`/repos/${config.organization}/${config.repository}/pulls/${number}/requested_reviewers`),
-    api(`/repos/${config.organization}/${config.repository}/pulls/${number}/reviews?per_page=100`),
+    api(`/repos/${config.owner}/${config.repository}/pulls/${number}/requested_reviewers`),
+    api(`/repos/${config.owner}/${config.repository}/pulls/${number}/reviews?per_page=100`),
   ])
   snapshot.reviewRequestCount = reviewRequests.users.length + reviewRequests.teams.length
   snapshot.reviewCount = reviews.length
@@ -79,7 +79,7 @@ export async function pullRequestSnapshot(number, includeProject = true) {
  * @returns {Promise<object>} Lifecycle snapshot without Project reads or writes.
  */
 export async function lifecyclePullRequestSnapshot(number) {
-  const pull = await api(`/repos/${config.organization}/${config.repository}/pulls/${number}`)
+  const pull = await api(`/repos/${config.owner}/${config.repository}/pulls/${number}`)
   return {
     ...(await resolvingReferencesSnapshot(number, pull)),
     createdAt: pull.created_at,
