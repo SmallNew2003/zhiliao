@@ -45,9 +45,44 @@
    line's end for it — a long path scrolls under the button otherwise, and the
    button's hit area would eat clicks on the path's tail. */
 .path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--dsw-alias-label-primary);
   font-weight: 600;
   padding-right: 56px;
+}
+
+.pathText {
+  white-space: pre;
+}
+
+.copyPathButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.copyPathButton:hover {
+  color: var(--dsw-alias-label-primary);
+  background-color: color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+}
+
+.copyPathButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-focus, var(--dsw-alias-label-primary));
+  outline-offset: 1px;
 }
 
 /* A same-file second hunk's separator (a scattered edit), in the dim tone. */
@@ -74,6 +109,25 @@
 
 .add {
   color: var(--dsw-alias-state-success-primary);
+}
+
+/* Intra-line word/character differences within paired replacement lines. */
+.wordHighlight,
+.charHighlight {
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.del .wordHighlight,
+.del .charHighlight {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 28%, transparent);
+  font-weight: 600;
+}
+
+.add .wordHighlight,
+.add .charHighlight {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, transparent);
+  font-weight: 600;
 }
 
 .context {

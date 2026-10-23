@@ -268,6 +268,19 @@ describe('tool-call-model', () => {
       titleKey: 'tool.title.removeCordis',
       summary: 'dyn-2',
     })
+    expect(toolRowModel('bash', result({
+      call: { name: 'bash', argsRaw: '{"command":"ls"}' },
+      callTime: 1_000,
+      time: 2_450,
+    }))).toMatchObject({
+      durationMs: 1450,
+    })
+    expect(toolRowModel('bash', running({
+      name: 'bash',
+      argsRaw: '{"command":"ls"}',
+    }))).toMatchObject({
+      durationMs: null,
+    })
   })
 })
 
@@ -294,7 +307,7 @@ describe('ToolRow', () => {
     expect(view.getByText('List files')).toBeTruthy()
     expect(view.getByText(/"a": 1/)).toBeTruthy()
     expect(view.container.querySelector('[class*="ioCard"]')).not.toBeNull()
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.getByRole('button', { expanded: true }))
     expect(view.queryByTestId('tool-icon')).not.toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
   })
@@ -335,7 +348,7 @@ describe('ToolRow', () => {
     expect(bodyFormatCalls()).toBe(1)
     expect(view.getByText(/"a": 1/)).toBeTruthy()
 
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.getByRole('button', { expanded: true }))
     expect(bodyFormatCalls()).toBe(1)
     expect(view.queryByText(/"a": 1/)).toBeNull()
   })
@@ -490,6 +503,26 @@ describe('ToolRow', () => {
     expect(outputOnly.getByText('输出')).toBeTruthy()
     expect(outputOnly.getByText('only out')).toBeTruthy()
   })
+
+  it('renders duration when durationMs is provided', () => {
+    const viewMs = render(<ToolRow {...rowProps} durationMs={450} />)
+    expect(viewMs.getByText('450ms')).toBeTruthy()
+    cleanup()
+    const viewSec = render(<ToolRow {...rowProps} durationMs={2500} />)
+    expect(viewSec.getByText('2.5s')).toBeTruthy()
+  })
+
+  it('allows copying input and output sections in ioCard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const view = render(<ToolRow {...rowProps} output="output content" />)
+    fireEvent.click(view.getByRole('button'))
+    const copyButtons = view.getAllByRole('button', { name: '复制' })
+    expect(copyButtons.length).toBe(2)
+    fireEvent.click(copyButtons[0]!)
+    expect(writeText).toHaveBeenCalledWith('{\n  "a": 1\n}')
+    expect(await view.findByRole('button', { name: '复制成功' })).toBeTruthy()
+  })
 })
 
 describe('GenericToolCard', () => {
@@ -580,5 +613,18 @@ describe('GenericToolCard', () => {
     ))).toBe(false)
     expect(view.queryByText('Tool execution rejected by user')).toBeNull()
     expect(view.queryByText(/"path"/)).toBeNull()
+  })
+
+  it('preserves bodyRaw when a singleFile tool encounters an error', () => {
+    const errorBlock: ToolResultNode = {
+      ...result({
+        call: { name: 'edit', argsRaw: '{"path":"src/x.ts","old_str":"foo","new_str":"bar"}' },
+      }),
+      isError: true,
+      content: [{ type: 'text', text: 'string not found' }],
+    }
+    const view = render(<GenericToolCard {...props('edit', errorBlock)} />)
+    fireEvent.click(view.getByRole('button'))
+    expect(view.getByText(/"old_str": "foo"/)).toBeTruthy()
   })
 })

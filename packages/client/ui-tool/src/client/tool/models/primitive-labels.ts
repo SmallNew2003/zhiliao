@@ -37,6 +37,8 @@ export function diffBlockLabels(t: T): DiffBlockLabels {
     collapse: t('collapse'),
     expand: count => t('diff.expandRest', { count }),
     files: count => t(count === 1 ? 'diff.files.one' : 'diff.files.other', { count }),
+    copyPath: t('diff.copyPath'),
+    pathCopied: t('diff.pathCopied'),
   }
 }
 

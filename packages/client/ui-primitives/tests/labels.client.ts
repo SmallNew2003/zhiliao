@@ -18,6 +18,8 @@ export const diffBlockLabels: DiffBlockLabels = {
   expandAria: hidden => `展开其余 ${hidden} 行差异`,
   collapse: '收起', expand: hidden => `… 其余 ${hidden} 行`,
   files: count => `${count} ${count === 1 ? 'file' : 'files'}`,
+  copyPath: '复制路径',
+  pathCopied: '已复制路径',
 }
 
 export const readBlockLabels: ReadBlockLabels = {

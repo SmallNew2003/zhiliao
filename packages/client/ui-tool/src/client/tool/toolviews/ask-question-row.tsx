@@ -190,6 +190,7 @@ export function AskQuestionRow({ toolName, block, inspect, t }: AskQuestionRowPr
       output={transcript === null ? model.output : null}
       askQuestion={transcript}
       state={state}
+      durationMs={model.durationMs}
       inspect={inspect}
     />
   )

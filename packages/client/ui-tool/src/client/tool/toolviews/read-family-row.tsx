@@ -47,11 +47,12 @@ export function readFamilyRow(
       icon={<IconBrowseOutline16 size={14} />}
       title={t(model.titleKey)}
       summary={model.summary}
-      bodyRaw={null}
+      bodyRaw={model.state === 'error' ? model.bodyRaw : null}
       output={model.output}
       errorSummary={model.errorSummary}
       {...card}
       state={model.state}
+      durationMs={model.durationMs}
       filePath={model.filePath}
       onOpenFile={openFile}
       inspect={inspect}

@@ -41,6 +41,10 @@ export interface TerminalBlockLabels {
   expandAria: (hidden: number) => string
   /** Expand-toggle text while capped, given the hidden line count. */
   expand: (hidden: number) => string
+  /** Copy-command button idle label (optional; when present, enables copying command). */
+  copyCommand?: string | undefined
+  /** Copy-command button label during the post-copy confirmation window. */
+  copiedCommand?: string | undefined
 }
 
 export interface TerminalBlockProps {
@@ -181,6 +185,7 @@ export function TerminalBlock({
   // The raw output, never the rendered tree: the prompt line and the status pill
   // are chrome the user did not run.
   const { copied, onCopy } = useCopyFeedback(text)
+  const { copied: cmdCopied, onCopy: onCopyCmd } = useCopyFeedback(command)
 
   const onToggle = useCallback(() => { setExpanded(value => !value) }, [])
 
@@ -235,11 +240,22 @@ export function TerminalBlock({
           ))}
         </div>
         {status !== undefined && <Pill className={css.status}>{status}</Pill>}
-        {!running && !empty && (
-          <button type="button" className={css.copyButton} onClick={onCopy}>
-            {copied ? copy.copied : copy.copy}
-          </button>
-        )}
+        <div className={css.actions}>
+          {copy.copyCommand !== undefined && (
+            <button
+              type="button"
+              className={clsx(css.copyButton, css.copyCommandButton)}
+              onClick={onCopyCmd}
+            >
+              {cmdCopied ? (copy.copiedCommand ?? copy.copied) : copy.copyCommand}
+            </button>
+          )}
+          {!running && !empty && (
+            <button type="button" className={css.copyButton} onClick={onCopy}>
+              {copied ? copy.copied : copy.copy}
+            </button>
+          )}
+        </div>
       </div>
       {body && (empty
         ? <div className={css.empty}>{copy.noOutput}</div>

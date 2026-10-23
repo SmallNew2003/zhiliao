@@ -225,3 +225,297 @@ describe('SearchBlock copy', () => {
     expect(view.container.firstElementChild?.getAttribute('data-search')).toBe('paths')
   })
 })
+
+describe('SearchBlock query keyword highlighting', () => {
+  it('highlights case-insensitive query matches preserving original text', () => {
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={2}
+        query="test"
+        files={[
+          {
+            path: 'a.ts',
+            matches: [
+              { lineNumber: 1, line: 'TEST at the start' },
+              { lineNumber: 2, line: 'Run TEST or testNow or TeSt' },
+            ],
+          },
+        ]}
+      />,
+    )
+    const marks = view.container.querySelectorAll('mark')
+    expect(marks).toHaveLength(4)
+    expect(marks[0]!.textContent).toBe('TEST')
+    expect(marks[1]!.textContent).toBe('TEST')
+    expect(marks[2]!.textContent).toBe('test')
+    expect(marks[3]!.textContent).toBe('TeSt')
+    for (const mark of marks) {
+      expect(mark.className).toContain('matchHighlight')
+    }
+  })
+
+  it('renders plain text without marks when query is undefined or empty', () => {
+    const viewUndefined = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        files={[{ path: 'a.ts', matches: [{ lineNumber: 1, line: 'Hello world' }] }]}
+      />,
+    )
+    expect(viewUndefined.container.querySelectorAll('mark')).toHaveLength(0)
+
+    const viewEmpty = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        query=""
+        files={[{ path: 'a.ts', matches: [{ lineNumber: 1, line: 'Hello world' }] }]}
+      />,
+    )
+    expect(viewEmpty.container.querySelectorAll('mark')).toHaveLength(0)
+  })
+
+  it('highlights query occurrences in flat paths kind', () => {
+    const view = render(
+      <SearchBlock
+        kind="paths"
+        truncated={false}
+        total={2}
+        query="util"
+        paths={['src/utils/file.ts', 'src/app.ts']}
+      />,
+    )
+    const marks = view.container.querySelectorAll('mark')
+    expect(marks).toHaveLength(1)
+    expect(marks[0]!.textContent).toBe('util')
+  })
+})
+
+describe('SearchBlock onOpenPath callbacks', () => {
+  it('calls onOpenPath with path and line number when clicking a match line', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={2}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/file.ts',
+            matches: [
+              { lineNumber: 15, line: 'const result = true' },
+              { lineNumber: 42, line: 'return result' },
+            ],
+          },
+        ]}
+      />,
+    )
+    const matchLines = view.container.querySelectorAll('[class^="_line_"]')
+    expect(matchLines[0]!.getAttribute('role')).toBe('button')
+    fireEvent.click(matchLines[0]!)
+    expect(onOpenPath).toHaveBeenCalledWith('src/file.ts', 15)
+
+    fireEvent.click(matchLines[1]!)
+    expect(onOpenPath).toHaveBeenCalledWith('src/file.ts', 42)
+  })
+
+  it('calls onOpenPath when activating match line via Enter and Space keys', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/file.ts',
+            matches: [{ lineNumber: 10, line: 'const foo = 1' }],
+          },
+        ]}
+      />,
+    )
+    const matchLine = view.container.querySelector('[class^="_line_"]')!
+    fireEvent.keyDown(matchLine, { key: 'Escape' })
+    expect(onOpenPath).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(matchLine, { key: 'Enter' })
+    expect(onOpenPath).toHaveBeenCalledWith('src/file.ts', 10)
+
+    fireEvent.keyDown(matchLine, { key: ' ' })
+    expect(onOpenPath).toHaveBeenCalledWith('src/file.ts', 10)
+    expect(onOpenPath).toHaveBeenCalledTimes(2)
+  })
+
+  it('calls onOpenPath when clicking file path in header without toggling collapse', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/main.ts',
+            matches: [{ lineNumber: 5, line: 'main()' }],
+          },
+        ]}
+      />,
+    )
+    const pathSpan = view.getByText('src/main.ts')
+    fireEvent.click(pathSpan)
+    expect(onOpenPath).toHaveBeenCalledWith('src/main.ts')
+    // File remains expanded
+    const header = view.container.querySelector('[class^="_fileHeader_"]')!
+    expect(header.getAttribute('aria-expanded')).toBe('true')
+    expect(lines(view.container)).toEqual(['5: main()'])
+  })
+
+  it('calls onOpenPath when activating path via Enter or Space', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/main.ts',
+            matches: [{ lineNumber: 5, line: 'main()' }],
+          },
+        ]}
+      />,
+    )
+    const pathSpan = view.getByText('src/main.ts')
+    fireEvent.keyDown(pathSpan, { key: 'Escape' })
+    expect(onOpenPath).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(pathSpan, { key: 'Enter' })
+    expect(onOpenPath).toHaveBeenCalledWith('src/main.ts')
+    fireEvent.keyDown(pathSpan, { key: ' ' })
+    expect(onOpenPath).toHaveBeenCalledWith('src/main.ts')
+    expect(onOpenPath).toHaveBeenCalledTimes(2)
+  })
+
+  it('calls onOpenPath when clicking the open icon in the file header', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/main.ts',
+            matches: [{ lineNumber: 5, line: 'main()' }],
+          },
+        ]}
+      />,
+    )
+    const openIcon = view.container.querySelector('[class^="_openIcon_"]')!
+    expect(openIcon).toBeTruthy()
+    fireEvent.click(openIcon)
+    expect(onOpenPath).toHaveBeenCalledWith('src/main.ts')
+
+    fireEvent.keyDown(openIcon, { key: 'Escape' })
+    expect(onOpenPath).toHaveBeenCalledTimes(1)
+
+    fireEvent.keyDown(openIcon, { key: 'Enter' })
+    expect(onOpenPath).toHaveBeenCalledTimes(2)
+
+    fireEvent.keyDown(openIcon, { key: ' ' })
+    expect(onOpenPath).toHaveBeenCalledTimes(3)
+  })
+
+  it('toggles file collapse when clicking the header area outside path/icon', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/main.ts',
+            matches: [{ lineNumber: 5, line: 'main()' }],
+          },
+        ]}
+      />,
+    )
+    const header = view.container.querySelector('[class^="_fileHeader_"]')!
+    const countSpan = view.container.querySelector('[class^="_fileCount_"]')!
+    fireEvent.click(countSpan)
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+    expect(lines(view.container)).toEqual([])
+    expect(onOpenPath).not.toHaveBeenCalled()
+
+    fireEvent.click(header)
+    expect(header.getAttribute('aria-expanded')).toBe('true')
+    expect(lines(view.container)).toEqual(['5: main()'])
+  })
+
+  it('toggles file collapse via keyboard on the header container', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="matches"
+        truncated={false}
+        total={1}
+        onOpenPath={onOpenPath}
+        files={[
+          {
+            path: 'src/main.ts',
+            matches: [{ lineNumber: 5, line: 'main()' }],
+          },
+        ]}
+      />,
+    )
+    const header = view.container.querySelector('[class^="_fileHeader_"]')!
+    // Non-activation key ignored
+    fireEvent.keyDown(header, { key: 'Escape' })
+    expect(header.getAttribute('aria-expanded')).toBe('true')
+
+    // Enter collapses
+    fireEvent.keyDown(header, { key: 'Enter' })
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+
+    // Space expands
+    fireEvent.keyDown(header, { key: ' ' })
+    expect(header.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('calls onOpenPath with path when clicking a path row in paths kind', () => {
+    const onOpenPath = vi.fn()
+    const view = render(
+      <SearchBlock
+        kind="paths"
+        truncated={false}
+        total={2}
+        onOpenPath={onOpenPath}
+        paths={['src/a.ts', 'src/b.ts']}
+      />,
+    )
+    const pathRows = view.container.querySelectorAll('[class^="_line_"]')
+    expect(pathRows[0]!.getAttribute('role')).toBe('button')
+    fireEvent.click(pathRows[0]!)
+    expect(onOpenPath).toHaveBeenCalledWith('src/a.ts')
+
+    fireEvent.keyDown(pathRows[1]!, { key: 'Escape' })
+    expect(onOpenPath).toHaveBeenCalledTimes(1)
+
+    fireEvent.keyDown(pathRows[1]!, { key: 'Enter' })
+    expect(onOpenPath).toHaveBeenCalledWith('src/b.ts')
+
+    fireEvent.keyDown(pathRows[1]!, { key: ' ' })
+    expect(onOpenPath).toHaveBeenCalledWith('src/b.ts')
+  })
+})

@@ -88,6 +88,7 @@ describe('searchCardModel', () => {
       recovery: undefined,
       card: {
         kind: 'matches',
+        query: 'foo',
         files: [
           { path: 'a.ts', matches: [{ lineNumber: 12, line: 'const foo = 1' }, { lineNumber: 40, line: 'return foo' }] },
           { path: 'b.ts', matches: [{ lineNumber: 7, line: 'foo()' }] },

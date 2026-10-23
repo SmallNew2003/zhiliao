@@ -55,10 +55,10 @@ export type { TerminalBlockProps, TerminalBlockLabels } from './TerminalBlock.ts
 export { ReadBlock, DEFAULT_READ_MAX_LINES } from './ReadBlock.tsx'
 export type { ReadBlockProps, ReadBlockLine, ReadBlockLabels } from './ReadBlock.tsx'
 export { DiffBlock, DEFAULT_DIFF_MAX_LINES, diffTotals } from './DiffBlock.tsx'
-export type { DiffBlockProps, DiffHunk, DiffBlockLabels } from './DiffBlock.tsx'
+export type { DiffBlockProps, DiffHunk, DiffBlockLabels, DiffSpan } from './DiffBlock.tsx'
 export { SearchBlock, DEFAULT_SEARCH_MAX_LINES } from './SearchBlock.tsx'
 export type {
-  SearchBlockProps, SearchMatchesBlockProps, SearchPathsBlockProps, SearchFileGroup, SearchBlockLineMatch,
+  SearchBlockProps, SearchMatchesBlockProps, SearchPathsBlockProps, SearchBlockCommon, SearchFileGroup, SearchBlockLineMatch,
   SearchBlockLabels,
 } from './SearchBlock.tsx'
 export { WebBlock } from './WebBlock.tsx'
