@@ -11,7 +11,8 @@ import { StreamableHTTPClientTransport, type Transport } from '@modelcontextprot
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import { startConnection, resolveReconnectPolicy } from '../src/connection.ts'
+import { mountDiscovery, startCatalogConnection } from './discovery-fixture.ts'
+import { resolveReconnectPolicy } from '../src/connection.ts'
 import type { Config } from '../src/index.ts'
 
 const { mockTransport } = vi.hoisted(() => ({ mockTransport: vi.fn<() => Transport>() }))
@@ -28,6 +29,7 @@ async function connection(factory: () => Transport, retry: boolean) {
   onTestFinished(() => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await mountDiscovery(ctx)
   const errors: string[] = []
   const warns: string[] = []
   ctx.logger.error = (message: unknown) => { errors.push(String(message)) }
@@ -38,7 +40,7 @@ async function connection(factory: () => Transport, retry: boolean) {
     transports.push(transport)
     return transport
   })
-  const handle = startConnection(ctx, config, resolveReconnectPolicy({
+  const handle = startCatalogConnection(ctx, config, resolveReconnectPolicy({
     enabled: retry, initialDelayMs: 1, maxDelayMs: 1, maxAttempts: 3,
   }, 'fixture'))
   onTestFinished(async () => {

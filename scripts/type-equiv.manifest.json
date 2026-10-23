@@ -2191,6 +2191,71 @@
       "doc": "docs/subsystems/deliverables.md",
       "symbol": "WorkspaceChanges",
       "source": "packages/deliverables/workspace-changes/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "ServerSource",
+      "source": "packages/mcp/mcp-discovery/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "DiscoveryItem",
+      "source": "packages/mcp/mcp-discovery/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "SearchRequest",
+      "source": "packages/mcp/mcp-discovery/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "DiscoveryPage",
+      "source": "packages/mcp/mcp-discovery/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "LoadResult",
+      "source": "packages/mcp/mcp-discovery/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "McpDefinitionId",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "SelectedTool",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "SelectedServer",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "Selection",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "RequestSnapshot",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "SelectorRequest",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "SelectorResult",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/mcp.md",
+      "symbol": "DiscoveryState",
+      "source": "packages/mcp/mcp-discovery/src/types.ts"
     }
   ]
 }

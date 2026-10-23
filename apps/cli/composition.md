@@ -180,6 +180,8 @@ flowchart LR
   cfg --> plugin_dsh_base_memory_hindsight_http
   plugin_dsh_base_tool_memory["tool-memory<br/>@deepseek-ai/dsh-tool-memory"]
   cfg --> plugin_dsh_base_tool_memory
+  plugin_dsh_base_mcp_discovery["mcp-discovery<br/>@deepseek-ai/dsh-mcp-discovery"]
+  cfg --> plugin_dsh_base_mcp_discovery
   plugin_dsh_base_mcp_resources["mcp-resources<br/>@deepseek-ai/dsh-mcp-resources"]
   cfg --> plugin_dsh_base_mcp_resources
   plugin_dsh_base_tools["tools<br/>@deepseek-ai/dsh-tools"]
@@ -282,6 +284,7 @@ flowchart LR
 | `memory` | `@deepseek-ai/dsh-memory` |
 | `memory-hindsight-http` | `@deepseek-ai/dsh-memory-hindsight-http` |
 | `tool-memory` | `@deepseek-ai/dsh-tool-memory` |
+| `mcp-discovery` | `@deepseek-ai/dsh-mcp-discovery` |
 | `mcp-resources` | `@deepseek-ai/dsh-mcp-resources` |
 | `tools` | `@deepseek-ai/dsh-tools` |
 | `system-prompt` | `@deepseek-ai/dsh-system-prompt` |

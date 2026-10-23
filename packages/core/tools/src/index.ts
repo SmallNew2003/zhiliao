@@ -214,6 +214,14 @@ export interface ToolOutputDefinition {
 
 /** A registered tool: its schema plus the execution function. */
 export interface ToolDefinition extends ToolSchema {
+  /**
+   * Pure synchronous model-presentation predicate. Omission or `true` includes
+   * the definition in wire schemas and SDK text; `false` omits it from both.
+   * Lookup, permission restrictions, schema inspection, and execution are unchanged.
+   * @param scope - the viewing scope; omitted for global assembly.
+   * @returns whether this scope's model should see the definition.
+   */
+  isPresented?(scope?: ScopeKey): boolean
   /** Mandatory canonical output declaration. */
   readonly output: ToolOutputDefinition
   /**
@@ -878,18 +886,10 @@ export class ToolRuntime extends Service {
       name: 'tools:sdk',
       order: this.ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
       interpolate: false,
-      // Regenerate from the calling scope's visible tools in stable order.
-      text: (context) => {
-        const mode = this.modeFor(context.scope)
-        if (mode === 'native') return ''
-        const runtime = this.requirePtcRuntime(mode)
-        // Own-property read: a language like `toString`/`constructor` would
-        // otherwise resolve an inherited Object.prototype member as a renderer.
-        const render = SDK_RENDERERS[runtime.language]
-        /* v8 ignore next -- requirePtcRuntime rejects an unknown language before this runs. */
-        if (render === undefined) throw new Error(`dsh-tools: no SDK renderer for ${runtime.language}`)
-        return render(this.sdkSchemas(context.scope))
-      },
+      text: context => this.renderSdkDefinitions(
+        [...this.view(context.scope).visible.values()].filter(definition => definition.isPresented?.(context.scope) !== false),
+        context.scope,
+      ),
     }
   }
 
@@ -899,7 +899,7 @@ export class ToolRuntime extends Service {
    * @param scope - the calling agent, or undefined for the global view.
    * @returns the resolved presentation mode.
    */
-  private modeFor(scope?: ScopeKey): ToolPresentationMode {
+  modeFor(scope?: ScopeKey): ToolPresentationMode {
     // Nearest scope wins along the chain: a preset's standing declaration
     // covers every agent parented under it, and an agent's own (were one ever
     // declared) would override its preset's. The mode decides what the model
@@ -988,8 +988,9 @@ export class ToolRuntime extends Service {
   private wireSchemas(scope?: ScopeKey): ToolProviderResult {
     const view = this.view(scope)
     const mode = this.modeFor(scope)
+    const definitions = [...view.visible.values()].filter(definition => definition.isPresented?.(scope) !== false)
     if (mode === 'native') {
-      const schemas = [...view.visible.values()].map(definition => this.schemaOf(definition, false))
+      const schemas = definitions.map(definition => this.schemaOf(definition, false))
       return { schemas, knownNames: [...view.knownNames] }
     }
     // Validate the runtime language BEFORE projecting schemas: schemaOf reads
@@ -998,7 +999,7 @@ export class ToolRuntime extends Service {
     // renderer-table rejection the canonical assembly-time error for a
     // language with no SDK renderer.
     this.requirePtcRuntime(mode)
-    const schemas = [...view.visible.values()].map(definition => this.schemaOf(definition, false))
+    const schemas = definitions.map(definition => this.schemaOf(definition, false))
     if (mode === 'ptc') {
       return {
         schemas: schemas.filter(schema => schema.name === RUN_CODE_NAME),
@@ -1241,9 +1242,39 @@ export class ToolRuntime extends Service {
     return [...this.view(scope).visible.values()].map(definition => this.schemaOf(definition, true))
   }
 
-  /** Project visible callable tools onto the generated PTC mode SDK contract. */
-  private sdkSchemas(scope?: ScopeKey): ToolSdkSchema[] {
-    return [...this.view(scope).visible.values()]
+  /**
+   * Render a proposed scope-visible tool subset without changing presentation.
+   * Hidden definitions remain eligible; permissions and scoped shadows apply.
+   * Unknown or restricted names throw, including under native mode. Duplicate
+   * names render once; PTC transport is omitted from the SDK declarations.
+   * @param names - proposed names of definitions visible to this scope.
+   * @param scope - the viewing scope; omitted for the global view.
+   * @returns the complete canonical runtime-language SDK, or empty text in native mode.
+   */
+  renderSdk(names: readonly string[], scope?: ScopeKey): string {
+    const view = this.view(scope)
+    const definitions = [...new Set(names)].map((name) => {
+      const definition = view.visible.get(name)
+      if (definition === undefined) throw new Error(`dsh-tools: unknown tool "${name}" in proposed SDK for this scope`)
+      return definition
+    })
+    return this.renderSdkDefinitions(definitions, scope)
+  }
+
+  /** Render definitions with the same mode and language selection as prompt assembly. */
+  private renderSdkDefinitions(definitions: readonly ToolDefinition[], scope?: ScopeKey): string {
+    const mode = this.modeFor(scope)
+    if (mode === 'native') return ''
+    const runtime = this.requirePtcRuntime(mode)
+    const render = SDK_RENDERERS[runtime.language]
+    /* v8 ignore next -- requirePtcRuntime rejects an unknown language before this runs. */
+    if (render === undefined) throw new Error(`dsh-tools: no SDK renderer for ${runtime.language}`)
+    return render(this.sdkSchemas(definitions))
+  }
+
+  /** Project callable definitions onto the generated PTC mode SDK. */
+  private sdkSchemas(definitions: readonly ToolDefinition[]): ToolSdkSchema[] {
+    return definitions
       .filter(definition => definition.name !== RUN_CODE_NAME)
       .map((definition): ToolSdkSchema => {
         const output = snapshotJsonValue(definition.output.schema)

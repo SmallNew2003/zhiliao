@@ -1,0 +1,192 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "catalog-search",
+          "name": "discover_mcp_tools",
+          "arguments": "{\"action\":\"search\",\"server\":\"catalog\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "catalog-activate",
+          "name": "discover_mcp_tools",
+          "arguments": "{\"action\":\"load\",\"server\":\"catalog\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "resource-list",
+          "name": "list_mcp_resources",
+          "arguments": "{\"server\":\"catalog\"}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 1,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 1,
+        "block": {
+          "type": "tool-call",
+          "id": "resource-templates",
+          "name": "list_mcp_resource_templates",
+          "arguments": "{\"server\":\"catalog\"}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 2,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 2,
+        "block": {
+          "type": "tool-call",
+          "id": "resource-text",
+          "name": "read_mcp_resource",
+          "arguments": "{\"server\":\"catalog\",\"uri\":\"memo://text\"}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 3,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 3,
+        "block": {
+          "type": "tool-call",
+          "id": "resource-binary",
+          "name": "read_mcp_resource",
+          "arguments": "{\"server\":\"catalog\",\"uri\":\"memo://binary\"}"
+        }
+      },
+      {
+        "type": "block-start",
+        "index": 4,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 4,
+        "block": {
+          "type": "tool-call",
+          "id": "resource-greeting",
+          "name": "read_mcp_resource",
+          "arguments": "{\"server\":\"catalog\",\"uri\":\"memo://greeting/reader\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "text"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "text",
+          "text": "MCP_RESOURCES_DONE"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "stop"
+        }
+      }
+    ]
+  }
+]

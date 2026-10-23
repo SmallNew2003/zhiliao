@@ -1,0 +1,132 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "catalog-search",
+          "name": "run_code",
+          "arguments": "{\"code\":\"return await tools.discover_mcp_tools({action: \\\"search\\\", server: \\\"catalog\\\"});\",\"description\":\"Run the MCP workflow step\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "catalog-activate",
+          "name": "run_code",
+          "arguments": "{\"code\":\"return await tools.discover_mcp_tools({action: \\\"load\\\", server: \\\"catalog\\\"});\",\"description\":\"Run the MCP workflow step\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "tool-call"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "tool-call",
+          "id": "catalog-read",
+          "name": "run_code",
+          "arguments": "{\"code\":\"const [resources, templates] = await Promise.all([tools.list_mcp_resources({server: \\\"catalog\\\"}), tools.list_mcp_resource_templates({server: \\\"catalog\\\"})]);\\nconst text = await tools.read_mcp_resource({server: \\\"catalog\\\", uri: \\\"memo://text\\\"});\\nconst binary = await tools.read_mcp_resource({server: \\\"catalog\\\", uri: \\\"memo://binary\\\"});\\nconst greeting = await tools.read_mcp_resource({server: \\\"catalog\\\", uri: \\\"memo://greeting/reader\\\"});\\nreturn {resources, templates, text, greeting, binaryAvailable: typeof binary.contents[0].blob === \\\"string\\\"};\",\"description\":\"Run the MCP workflow step\"}"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "tool-calls"
+        }
+      }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      {
+        "type": "block-start",
+        "index": 0,
+        "blockType": "text"
+      },
+      {
+        "type": "block-end",
+        "index": 0,
+        "block": {
+          "type": "text",
+          "text": "MCP_RESOURCES_PTC_DONE"
+        }
+      },
+      {
+        "type": "usage",
+        "usage": {
+          "inputTokens": 3,
+          "outputTokens": 3
+        }
+      },
+      {
+        "type": "finish",
+        "reason": {
+          "kind": "stop"
+        }
+      }
+    ]
+  }
+]

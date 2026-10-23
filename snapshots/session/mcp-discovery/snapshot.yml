@@ -1,0 +1,14 @@
+version: 1
+scenario: mcp-discovery
+profile: headless
+composition: mcp-discovery
+recording: authored
+environment:
+  DSH_EXAMPLE_MODE: lib
+header:
+  class: mcp-discovery
+  pin: true
+  changes: 2
+  promptChanges: 2
+replay:
+  override: true

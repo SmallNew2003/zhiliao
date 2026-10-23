@@ -8,6 +8,7 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import { createScope, NamedEntries, ScopedLayers, scopeOf, type ScopeKey, type ScopeLayer } from '@deepseek-ai/dsh-scope'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-mcp-discovery'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { registerResourceTools } from './tools.ts'
 
@@ -46,7 +47,7 @@ class ResourceLayer implements ScopeLayer {
 /** Scoped resource access plus three tools shared by configured MCP servers. */
 export class McpResourceRuntime extends Service {
   /** Tool registry required by the resource consumer. */
-  static inject = ['tools']
+  static inject = ['tools', 'mcpDiscovery']
 
   private readonly layers = new ScopedLayers(() => new ResourceLayer(), () => undefined)
   /** Shared tool registrations outlive any one server's registering context. */
@@ -56,19 +57,6 @@ export class McpResourceRuntime extends Service {
     super(ctx, 'mcpResources')
     this.selfCtx = ctx
 
-    ctx.inject(['systemPrompt'], (inner) => {
-      inner.systemPrompt.section({
-        name: 'mcp-resource-servers',
-        order: inner.systemPrompt.getSectionOrder('MCP_SERVERS'),
-        interpolate: false,
-        text: ({ scope }) => {
-          const names = [...this.layers.merge(scope, layer => layer.servers).keys()].sort()
-          return names.length === 0 ? '' : '## MCP resource servers\n\n'
-            + 'Use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource with one of these names '
-            + `as the server argument: ${JSON.stringify(names)}.`
-        },
-      })
-    })
   }
 
   /**
@@ -122,6 +110,7 @@ export class McpResourceRuntime extends Service {
   private request(server: string, request: McpResourceRequest, exec: ToolExecution): Promise<JsonValue> {
     const provider = this.layers.merge(exec.agent, layer => layer.servers).get(server)
     if (!provider) throw new Error(`MCP resource server "${server}" is unavailable in this agent's scope`)
+    this.ctx.mcpDiscovery.assertServer(server, exec)
     return provider.request(request, exec)
   }
 }

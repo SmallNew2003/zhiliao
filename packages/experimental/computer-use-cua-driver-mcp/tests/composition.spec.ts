@@ -17,6 +17,7 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import McpDiscovery from '@deepseek-ai/dsh-mcp-discovery'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
 import * as Provider from '../src/index.ts'
 
@@ -68,6 +69,7 @@ async function load(mode?: string): Promise<{ ctx: Context; root: string; model:
     ['@deepseek-ai/dsh-agent', AgentRegistry],
     ['@deepseek-ai/dsh-agent-loop', AgentLoop],
     ['@deepseek-ai/dsh-session-projection', SessionProjectionRegistry],
+    ['@deepseek-ai/dsh-mcp-discovery', McpDiscovery],
     ['@deepseek-ai/dsh-attachment-local', LocalAttachmentStore],
     ['@fixture/model', { inject: ['llm'], apply(ctx: Context) { ctx.effect(() => ctx.llm.registerAdapter(['fixture'], model)) } }],
     ['@deepseek-ai/dsh-experimental-computer-use-cua-driver-mcp', Provider],
@@ -137,7 +139,7 @@ describe('installed Cua Driver Loader composition', () => {
         if (subject === agent && status === 'idle') { dispose(); resolve() }
       })
     })
-    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Inspect display zero.' }], source: { kind: 'user' } }))
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: `Use ${TOOL} to inspect display zero.` }], source: { kind: 'user' } }))
     await idle
     expect(model.requests).toHaveLength(2)
     expect(model.requests[0]?.tools?.find(tool => tool.name === TOOL)).toMatchObject({

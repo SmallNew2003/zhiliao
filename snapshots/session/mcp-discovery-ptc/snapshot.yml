@@ -1,0 +1,14 @@
+version: 1
+scenario: mcp-discovery-ptc
+profile: headless
+composition: mcp-discovery-ptc
+recording: authored
+environment:
+  DSH_EXAMPLE_MODE: lib
+header:
+  class: mcp-discovery-ptc
+  pin: true
+  changes: 2
+  promptChanges: 2
+replay:
+  override: true

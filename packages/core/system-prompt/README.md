@@ -77,6 +77,8 @@ ctx.systemPrompt.variable('cwd', ({ agent }) => agent?.session.header.cwd)
 
 Tool-schema providers are evaluated per assembly and contribute the model-visible `ToolSchema` set; `ToolRuntime` registers itself automatically, so most tools need no manual wiring here. A provider returns the post-restriction visible set plus the pre-restriction name universe used by `toolOrder`.
 
+Asynchronous prerequisites belong in `system-prompt/prepare`. `assemble()` awaits these scope-filtered listeners serially before evaluating variables, sections, runtime contexts, or tool providers. Listeners receive the assembly context and its optional cancellation signal. Failed or canceled preparation prevents provider evaluation.
+
 ### Suppress runtime context
 
 `suppressRuntimeContext()` removes every dynamic runtime-context contribution for the calling scope without disabling the services that own the underlying facts; multiple suppressors compose and the effect restores context when none remains.

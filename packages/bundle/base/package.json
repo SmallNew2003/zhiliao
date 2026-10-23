@@ -124,7 +124,8 @@
     "@deepseek-ai/dsh-plugin-manager": "workspace:^",
     "@deepseek-ai/dsh-memory": "workspace:^",
     "@deepseek-ai/dsh-memory-hindsight-http": "workspace:^",
-    "@deepseek-ai/dsh-tool-memory": "workspace:^"
+    "@deepseek-ai/dsh-tool-memory": "workspace:^",
+    "@deepseek-ai/dsh-mcp-discovery": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^"

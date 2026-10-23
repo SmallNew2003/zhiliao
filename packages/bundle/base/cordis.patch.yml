@@ -489,6 +489,9 @@
     - id: tool-memory
       name: '@deepseek-ai/dsh-tool-memory'
 
+    - id: mcp-discovery
+      name: '@deepseek-ai/dsh-mcp-discovery'
+
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'
 

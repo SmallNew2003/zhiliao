@@ -108,6 +108,52 @@ describe('agent/pre-step', () => {
     ])
   })
 
+  it('assembles from claimed messages and coordinates before pre-step rewrites', async () => {
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'echo', {}), textResponse('done'), textResponse('next turn'),
+    ])
+    const ctx = await harness(adapter)
+    ctx.tools.register(defineContentToolFixture({
+      name: 'echo', description: 'echo', parameters: {}, execute: async () => [],
+    }))
+    const agent = await ctx.agentLoop.create(SessionId('assembly-input'), { provider: 'mock', model: 'mock' })
+    const seen: Array<{ turn: number; step: number; text: string[] }> = []
+    const order: string[] = []
+    ctx.on('system-prompt/assemble', (_assembly, context, next) => {
+      if (context.agent === agent) {
+        order.push('assemble')
+        const input = context.stepInput
+        if (input) seen.push({
+          turn: input.turn, step: input.step,
+          text: input.messages.flatMap(message => message.content.flatMap(block => block.type === 'text' ? [block.text] : [])),
+        })
+      }
+      return next()
+    })
+    ctx.on('agent/pre-step', async ({ messages }, next) => {
+      order.push('pre-step')
+      const decision = await next()
+      if (messages.length > 0 && decision.kind === 'enter') {
+        return { ...decision, messages: [createUserMessage({ content: [{ type: 'text', text: 'rewritten' }], source: { kind: 'user' } })] }
+      }
+      return decision
+    })
+    agent.inject(createUserMessage({ content: [{ type: 'text', text: 'injected' }], source: { kind: 'plugin', plugin: 'test' } }))
+    send(agent, 'original')
+    await agent.whenIdle()
+    send(agent, 'later')
+    await agent.whenIdle()
+
+    expect(seen).toEqual([
+      { turn: 1, step: 1, text: ['injected', 'original'] },
+      { turn: 1, step: 2, text: [] },
+      { turn: 2, step: 1, text: ['later'] },
+    ])
+    expect(order).toEqual(['assemble', 'pre-step', 'assemble', 'pre-step', 'assemble', 'pre-step'])
+    expect(events(agent).filter(event => event.type === 'user/message').map(event => event.data.content))
+      .toEqual([[{ type: 'text', text: 'rewritten' }], [{ type: 'text', text: 'rewritten' }]])
+  })
+
   it('publishes frozen input without replacing its identity', async () => {
     const adapter = new MockAdapter([textResponse('ok')])
     const ctx = await harness(adapter)

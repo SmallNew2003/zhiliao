@@ -91,6 +91,9 @@
     - id: tools
       name: '@deepseek-ai/dsh-tools'
 
+    - id: mcp-discovery
+      name: '@deepseek-ai/dsh-mcp-discovery'
+
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'
 
