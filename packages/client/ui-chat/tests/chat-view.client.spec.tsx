@@ -589,9 +589,11 @@ describe('ChatView', () => {
     const file = { ...user(2, 'text'), content: [{ type: 'text', text: 'text' }, { type: 'file', attachment: { attachmentId: 'file', name: 'original.txt', bytes: 3 } }] } as UserMessageNode
     const h = makeHarness({ nodes: [user(1, 'earlier'), file] })
     const editMessage = vi.fn().mockResolvedValue({ ok: true, value: { accepted: true } })
-    render(<ChatView {...h.props} editMessage={editMessage} />)
+    const view = render(<ChatView {...h.props} editMessage={editMessage} />)
     expect(screen.getAllByRole('button', { name: zh['message.edit'] })).toHaveLength(1)
+    expect(view.container.querySelectorAll('[data-message-bubble]')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: zh['message.edit'] }))
+    expect(view.container.querySelectorAll('[data-message-bubble]')).toHaveLength(1)
     expect(screen.getByText('original.txt')).toBeTruthy()
     expect(screen.getByText(zh['message.edit.attachments'])).toBeTruthy()
     fireEvent.change(screen.getByRole<HTMLTextAreaElement>('textbox'), { target: { value: '' } })

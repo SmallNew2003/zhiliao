@@ -1,5 +1,5 @@
 /** Keyboard-accessible text-only editor for one sent human input. */
-import { useId, useRef, useState, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ISession } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -37,13 +37,19 @@ export function MessageEditControls({
   const [sending, setSending] = useState(false)
   const pending = useRef(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const restoreFocus = useRef(false)
   const request = useRef<{ text: string; requestId: SessionRequestId } | null>(null)
   const reasonId = useId()
+  useLayoutEffect(() => {
+    if (draft !== null || !restoreFocus.current) return
+    restoreFocus.current = false
+    triggerRef.current?.focus()
+  }, [draft])
   const close = (): void => {
     setDraft(null)
     setError(null)
     request.current = null
-    triggerRef.current?.focus()
+    restoreFocus.current = true
     onEditingChange?.(false)
   }
   const submit = async (): Promise<void> => {
@@ -85,20 +91,20 @@ export function MessageEditControls({
     {running && <span id={reasonId} className={actionCss.visuallyHidden}>{t('message.edit.busy')}</span>}
   </>
   return <>
-    {renderActions === undefined ? trigger : renderActions(trigger)}
+    {draft === null && (renderActions === undefined ? trigger : renderActions(trigger))}
     {draft !== null && <form className={css.editPanel} onSubmit={(event) => { event.preventDefault(); void submit() }}>
-      <textarea autoFocus aria-label={t('message.edit.label')} value={draft} disabled={sending}
+      <textarea autoFocus rows={1} aria-label={t('message.edit.label')} value={draft} disabled={sending}
         onChange={(event) => { setDraft(event.target.value); setError(null) }}
         onKeyDown={(event) => {
           if (event.key === 'Escape' && !sending) { event.preventDefault(); close() }
           if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
         }} />
-      {hasAttachments && <span>{t('message.edit.attachments')}</span>}
-      {running && <span role="status">{t('message.edit.busy')}</span>}
-      {error !== null && <span role="alert">{error}</span>}
+      {hasAttachments && <span className={css.editHint}>{t('message.edit.attachments')}</span>}
+      {running && <span className={css.editStatus} role="status">{t('message.edit.busy')}</span>}
+      {error !== null && <span className={css.editError} role="alert">{error}</span>}
       <div className={css.editButtons}>
-        <Button variant="outline" size="sm" disabled={sending} onClick={close}>{t('message.edit.cancel')}</Button>
-        <Button type="submit" variant="primary" size="sm" disabled={sending || running}>{t(sending ? 'message.edit.sending' : 'message.edit.resend')}</Button>
+        <Button variant="outline" disabled={sending} onClick={close}>{t('message.edit.cancel')}</Button>
+        <Button type="submit" variant="primary" disabled={sending || running}>{t(sending ? 'message.edit.sending' : 'message.edit.resend')}</Button>
       </div>
     </form>}
   </>

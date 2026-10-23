@@ -156,13 +156,15 @@ function TurnMaxTokensItem({ t }: {
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], skillNames = [],
+  content, renderMessageImages, actions, hideBubble = false, pending = false, echo = false, referenceLabels = [], skillNames = [],
   previewAttachments, references, t,
 }: {
   content: readonly unknown[]
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
   /** Optional IconActions (or similar) below the bubble; receives the joined text. */
   actions?: (text: string) => ReactNode
+  /** Suppress the authored bubble while a replacement editor occupies its position. */
+  hideBubble?: boolean
   /** Whether this is the Host-authoritative pre-admission steering projection. */
   pending?: boolean
   /** Whether this is a local submission echo (invisible marker; the echo renders exactly like its durable replacement). */
@@ -180,7 +182,7 @@ function UserStyleBubble({
   const attachments = previewAttachments ?? contentAttachments
   const compactImages = attachments.length > 1
   const truncated = (total: number): string => t('json.truncated', { total })
-  const showBubble = text !== '' || rest.length > 0
+  const showBubble = !hideBubble && (text !== '' || rest.length > 0)
   return (
     <div
       className={css.userRow}
@@ -214,7 +216,7 @@ function UserStyleBubble({
               ))}
           </div>
         )}
-        {showBubble && <div className={css.bubble}>
+        {showBubble && <div className={css.bubble} data-message-bubble>
           {projectUserText(text, referenceLabels, skillNames, 'skill', references)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
@@ -318,9 +320,11 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
   editDraftDetached = false, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
+  const [editing, setEditing] = useState(false)
   return (
     <UserStyleBubble
       content={editDraftDetached ? data.content.filter(block => block.type !== 'text') : data.content}
+      hideBubble={editing}
       references={{ openFile, openSkill }}
       renderMessageImages={renderMessageImages}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
@@ -331,7 +335,10 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
       ) : (
         <MessageEditControls text={contentParts(data.content).text} targetSeq={data.seq} latest={data.seq === latestInputSeq}
           running={running} hasAttachments={data.content.some(block => block.type !== 'text')}
-          editMessage={editMessage} t={t} onEditingChange={open => editDraftChanged?.(node, open)}
+          editMessage={editMessage} t={t} onEditingChange={(open) => {
+            setEditing(open)
+            editDraftChanged?.(node, open)
+          }}
           renderActions={trigger => editDraftDetached ? null : <MessageIconActions text={text} time={data.time} clock="start" className={css.actions} extraActions={trigger} t={t} />}
         />
       )}

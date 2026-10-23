@@ -17,8 +17,8 @@ describe('latest input editing', () => {
     expect((screen.getByRole<HTMLTextAreaElement>('textbox')).value).toBe('original')
     fireEvent.change(screen.getByRole<HTMLTextAreaElement>('textbox'), { target: { value: 'draft' } })
     fireEvent.keyDown(screen.getByRole<HTMLTextAreaElement>('textbox'), { key: 'Escape' })
-    expect(document.activeElement).toBe(trigger)
-    fireEvent.click(trigger)
+    expect(document.activeElement).toBe(screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit') }))
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit') }))
     fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit.resend') }))
     await waitFor(() =>{  expect(screen.queryByRole('textbox')).toBeNull() })
     expect(editMessage).toHaveBeenCalledTimes(1)
@@ -93,7 +93,7 @@ describe('latest input editing', () => {
     expect(editMessage).toHaveBeenCalledTimes(1)
     accepted.resolve({ ok: true, value: { accepted: true } })
     await waitFor(() => { expect(screen.queryByRole('textbox')).toBeNull() })
-    expect(document.activeElement).toBe(trigger)
+    expect(document.activeElement).toBe(screen.getByRole<HTMLButtonElement>('button', { name: t('message.edit') }))
   })
 
   it('hides earlier edit actions and explains active-run restrictions', () => {
