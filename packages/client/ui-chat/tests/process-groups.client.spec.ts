@@ -158,6 +158,18 @@ describe('process groups', () => {
     if (groupEntry?.kind !== 'group') throw new Error('expected a process group')
     expect(groups.get(groupEntry.groupKey)?.closed).toBe(false)
   })
+
+  it('assigns the earliest member timestamp as the group start time', () => {
+    const groups = projection([
+      user(1),
+      assistant(2, [{ kind: 'reasoning', text: 'still working' }]),
+      toolResult(3, 'a'),
+    ])
+
+    const groupEntry = groups.layout.find(entry => entry.kind === 'group')
+    if (groupEntry?.kind !== 'group') throw new Error('expected a process group')
+    expect(groups.get(groupEntry.groupKey)?.startTime).toBe(2_000)
+  })
 })
 
 describe('process group snapshot projection', () => {

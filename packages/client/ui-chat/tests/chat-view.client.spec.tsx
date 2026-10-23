@@ -2472,7 +2472,7 @@ describe('process group chat rendering', () => {
     vi.useFakeTimers({ now: 100_000 })
     try {
       const h = makeHarness({
-        nodes: [user(1, 'question'), reasoningAssistant(2, 'still working')],
+        nodes: [user(1, 'question'), { ...reasoningAssistant(2, 'still working'), time: 14_000 }],
         turnTimings: new Map([[1, { startTime: 14_000 }]]),
       }, { running: true })
       const view = render(<h.ChatView {...h.props} />)
@@ -2482,6 +2482,25 @@ describe('process group chat rendering', () => {
       expect(header.getAttribute('aria-expanded')).toBe('true')
       expect(body?.getAttribute('hidden')).toBeNull()
       expect(view.getByText('still working')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('measures running process group elapsed time from the group start time rather than the turn start time', () => {
+    vi.useFakeTimers({ now: 100_000 })
+    try {
+      const h = makeHarness({
+        nodes: [
+          user(1, 'question'),
+          assistant(2, 'intermediate reply', 1, 1),
+          { ...reasoningAssistant(3, 'working on second step', 1, 2), time: 90_000 },
+        ],
+        turnTimings: new Map([[1, { startTime: 10_000 }]]),
+      }, { running: true })
+      const view = render(<h.ChatView {...h.props} />)
+      const header = view.getByRole('button', { name: /正在分析请求.*10秒/ })
+      expect(header).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
