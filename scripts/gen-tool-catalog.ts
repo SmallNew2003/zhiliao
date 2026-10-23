@@ -75,6 +75,8 @@ import WorkflowEngine from '@deepseek-ai/dsh-workflow'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
+import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
+import MemoryRuntime from '@deepseek-ai/dsh-memory'
 import { githubSlug } from './verify-md-links.ts'
 
 /** Attachment seam marker that makes the attachments-conditional `read_image` schema harvestable. */
@@ -653,6 +655,21 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-memory',
+    dir: 'tool-memory',
+    source: 'packages/memory/tool-memory/src/index.ts',
+    requires: ['ctx.tools', 'ctx.memory'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never resolves a bank or reaches a backend: the seam is
+      // stubbed and both tools register their definitions against it.
+      ctx.provide('memory', {} as MemoryRuntime)
+      await ctx.plugin(ToolMemory)
+    },
+    note:
+      'hindsight_search and hindsight_remember resolve their bank through the session the plugin already bound, so the schemas carry no bank parameter. The tool registry is optional for the plugin itself — a composition without `tools` keeps the recall and retention lifecycle and loses only these two tools.',
   },
 ]
 

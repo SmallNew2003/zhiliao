@@ -29,6 +29,14 @@
     // under its own tsconfig boundary.
     "paths": {
       "@deepseek-ai/dsh/profile-boot": ["./apps/cli/src/profile-boot.ts"],
+      "@deepseek-ai/dsh-memory": ["./packages/memory/memory/src/index.ts"],
+      "@deepseek-ai/dsh-memory/types": ["./packages/memory/memory/src/types.ts"],
+      "@deepseek-ai/dsh-memory-hindsight-http": ["./packages/memory/hindsight-http/src/index.ts"],
+      "@deepseek-ai/dsh-tool-memory": ["./packages/memory/tool-memory/src/index.ts"],
+      "@deepseek-ai/dsh-host-memory-controller": ["./packages/host/memory-controller/src/index.ts"],
+      "@deepseek-ai/dsh-host-memory-controller/types": ["./packages/host/memory-controller/src/types.ts"],
+      "@deepseek-ai/dsh-client-ui-memory-browser": ["./packages/client/ui-memory-browser/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-memory-browser/client": ["./packages/client/ui-memory-browser/src/client/index.ts"],
       "@deepseek-ai/dsh-browser-use": ["./packages/browser-use/browser-use/src/index.ts"],
       "@deepseek-ai/dsh-browser-use/brand": ["./packages/browser-use/browser-use/src/brand.ts"],
       "@deepseek-ai/dsh-experimental-browser-use-runtime": ["./packages/experimental/browser-use-runtime/src/index.ts"],

@@ -98,6 +98,18 @@
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
 
+    # Read-only browse surface over the deployment's long-term memory: banks,
+    # statistics, knowledge pages, and knowledge search for the browser panel.
+    # Without the memory seam and a provider mounted it answers itself
+    # unavailable, which is why this row injects nothing.
+    - id: memory-controller
+      name: '@deepseek-ai/dsh-host-memory-controller'
+
+    # The hindsight-backed memory provider the seam selects. Remove this row to
+    # run the Web surface without long-term memory; the panel then says so.
+    - id: memory-hindsight-http
+      name: '@deepseek-ai/dsh-memory-hindsight-http'
+
     # Session commands, cold reads, and live control over Typert Remote.
     - id: session-controller
       name: '@deepseek-ai/dsh-api-session-controller'
@@ -262,6 +274,13 @@
     # bundles the sidebar page leaves out are inspected here.
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
+
+    # Long-term memory browser: the sidebar Memory panel lists the deployment's
+    # memory banks, their statistics and knowledge pages, and searches the
+    # knowledge index over the `memoryController` Remote. Without the Host row
+    # below it reports itself unavailable.
+    - id: ui-memory-browser
+      name: '@deepseek-ai/dsh-client-ui-memory-browser'
 
     - id: ui-settings-unarchive-sessions
       name: '@deepseek-ai/dsh-client-ui-settings-unarchive-sessions'
