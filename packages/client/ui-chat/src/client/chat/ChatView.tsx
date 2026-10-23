@@ -223,6 +223,10 @@ type ChatRenderSeat =
   | { readonly kind: 'node'; readonly key: string; readonly nodeKey: string; readonly part?: 'reasoning' | 'response'; readonly groupedTranscript?: boolean }
   | { readonly kind: 'process'; readonly key: string; readonly groupKey: string }
 
+type ChatRenderRow =
+  | { readonly key: string; readonly members: null; readonly seat: ChatRenderSeat }
+  | { readonly key: string; readonly members: string[]; readonly seat: null }
+
 const ChatNodeList = memo(function ChatNodeList({
   order, nodes, draftNode, useChat, compactTranscript, ...seatProps
 }: ChatNodeListProps) {
@@ -230,9 +234,9 @@ const ChatNodeList = memo(function ChatNodeList({
   const seats: ChatRenderSeat[] = compactTranscript
     ? processLayout.map(entry => entry.kind === 'group'
       ? { kind: 'process', key: entry.key, groupKey: entry.groupKey }
-      : { kind: 'node', key: entry.key, nodeKey: entry.nodeKey, part: entry.part, groupedTranscript: true })
+      : { kind: 'node', key: entry.key, nodeKey: entry.nodeKey, groupedTranscript: true, ...entry.part === undefined ? {} : { part: entry.part } })
     : order.map(nodeKey => ({ kind: 'node', key: nodeKey, nodeKey }))
-  const rows: { key: string; members: string[] | null; seat: ChatRenderSeat | null }[] = []
+  const rows: ChatRenderRow[] = []
   for (const seat of seats) {
     const nodeKey = seat.kind === 'node' ? seat.nodeKey : undefined
     const node = nodeKey === undefined ? undefined : nodes.get(nodeKey)
@@ -240,14 +244,11 @@ const ChatNodeList = memo(function ChatNodeList({
       && (node?.kind === 'context' || node?.kind === 'system-prompt')
       && node.location.kind === 'session'
     const previous = rows.at(-1)
-    if (sessionContext && previous !== undefined && previous.members !== null) {
-      previous.members.push(nodeKey)
+    if (sessionContext) {
+      if (previous !== undefined && previous.members !== null) previous.members.push(nodeKey)
+      else rows.push({ key: nodeKey, members: [nodeKey], seat: null })
     } else {
-      rows.push({
-        key: sessionContext ? nodeKey : seat.key,
-        members: sessionContext ? [nodeKey] : null,
-        seat: sessionContext ? null : seat,
-      })
+      rows.push({ key: seat.key, members: null, seat })
     }
   }
   const renderSeat = (seat: ChatRenderSeat) => seat.kind === 'process'
