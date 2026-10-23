@@ -221,3 +221,25 @@
 .modalAction {
   min-width: 72px;
 }
+
+.contextGroup {
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: 24px;
+}
+
+.contextGroup > summary {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.contextGroup > summary:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.contextGroup > .flowItem {
+  margin: 8px 0 0 16px;
+}

@@ -121,15 +121,20 @@ describe('web e2e: whole-session stats survive history paging', () => {
     // turns are NOT loaded, yet the strip already reports the whole log —
     // the sessionStats projection, not the window fold.
     expect(await page.getByText('m1', { exact: true }).count()).toBe(0)
-    await expect.poll(() => page.getByText(FULL_COUNTS, { exact: false }).count(), { timeout: 10_000 }).toBe(1)
-    const strip = page.getByText(FULL_COUNTS, { exact: false }).locator('..')
-    const stripBeforePaging = await strip.textContent()
+    const stats = page.getByRole('button', { name: /^Session statistics/ })
+    await stats.click()
+    expect(await page.getByRole('dialog', { name: 'Session statistics' }).getByText(FULL_COUNTS, { exact: true }).count()).toBe(1)
+    await page.keyboard.press('Escape')
+    const stripBeforePaging = await stats.textContent()
 
     // 加载更早: prepending the older page must not move ANY strip figure —
     // counts, wall times, or token groups.
     await page.getByRole('button', { name: 'Load earlier' }).click()
     await expect.poll(() => page.getByText('m1', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
-    expect(await strip.textContent()).toBe(stripBeforePaging)
+    expect(await stats.textContent()).toBe(stripBeforePaging)
+    await stats.click()
+    expect(await page.getByRole('dialog', { name: 'Session statistics' }).getByText(FULL_COUNTS, { exact: true }).count()).toBe(1)
+    await page.keyboard.press('Escape')
     // With the whole log loaded, the window mounts one turn-tail footer per
     // settled turn — the loaded-window probe the scroll/perf lanes count now
     // that the strip is whole-log-scoped.

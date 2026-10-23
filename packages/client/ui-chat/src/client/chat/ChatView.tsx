@@ -41,8 +41,16 @@ interface PagingAnchor {
 
 /** Find an already-rendered row without interpolating a selector. */
 function anchorElement(list: HTMLElement, key: string): HTMLElement | null {
+  const groupPrefix = 'context-group:'
+  const memberKey = key.startsWith(groupPrefix) ? key.slice(groupPrefix.length) : null
   for (const row of list.querySelectorAll<HTMLElement>('[data-chat-anchor-key]:not([hidden])')) {
-    if (row.dataset.chatAnchorKey === key) return row
+    if (row.dataset.chatAnchorKey === key) {
+      return row.closest<HTMLElement>('details[data-context-group]:not([open])') ?? row
+    }
+    // A prepended context can change the group's first member and summary key.
+    if (row.dataset.chatAnchorKey === memberKey) {
+      return row.closest<HTMLElement>('details[data-context-group]') ?? row
+    }
   }
   return null
 }
@@ -206,25 +214,85 @@ function TurnStatus({ startTime, t }: {
 type ChatNodeListProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey'> & {
   readonly draftNode?: ChatNode | null
   readonly order: readonly string[]
+  readonly nodes: ChatSnapshot['nodes']
   readonly useChat: ChatViewSlotProps['useChat']
   readonly compactTranscript: boolean
 }
 
+type ChatRenderSeat =
+  | { readonly kind: 'node'; readonly key: string; readonly nodeKey: string; readonly part?: 'reasoning' | 'response'; readonly groupedTranscript?: boolean }
+  | { readonly kind: 'process'; readonly key: string; readonly groupKey: string }
+
 const ChatNodeList = memo(function ChatNodeList({
-  order, draftNode, useChat, compactTranscript, ...seatProps
+  order, nodes, draftNode, useChat, compactTranscript, ...seatProps
 }: ChatNodeListProps) {
   const processLayout = useChat(snapshot => snapshot.processGroups.layout)
-  if (!compactTranscript) {
-    return order.map(nodeKey => (
-      <ChatNodeSeat
-        key={nodeKey}
-        nodeKey={nodeKey}
+  const seats: ChatRenderSeat[] = compactTranscript
+    ? processLayout.map(entry => entry.kind === 'group'
+      ? { kind: 'process', key: entry.key, groupKey: entry.groupKey }
+      : { kind: 'node', key: entry.key, nodeKey: entry.nodeKey, part: entry.part, groupedTranscript: true })
+    : order.map(nodeKey => ({ kind: 'node', key: nodeKey, nodeKey }))
+  const rows: { key: string; members: string[] | null; seat: ChatRenderSeat | null }[] = []
+  for (const seat of seats) {
+    const nodeKey = seat.kind === 'node' ? seat.nodeKey : undefined
+    const node = nodeKey === undefined ? undefined : nodes.get(nodeKey)
+    const sessionContext = nodeKey !== undefined
+      && (node?.kind === 'context' || node?.kind === 'system-prompt')
+      && node.location.kind === 'session'
+    const previous = rows.at(-1)
+    if (sessionContext && previous !== undefined && previous.members !== null) {
+      previous.members.push(nodeKey)
+    } else {
+      rows.push({
+        key: sessionContext ? nodeKey : seat.key,
+        members: sessionContext ? [nodeKey] : null,
+        seat: sessionContext ? null : seat,
+      })
+    }
+  }
+  const renderSeat = (seat: ChatRenderSeat) => seat.kind === 'process'
+    ? (
+      <ProcessGroupSeat
+        key={seat.key}
+        groupKey={seat.groupKey}
+        useChat={useChat}
         compactTranscript={compactTranscript}
-        retainedDraftNode={draftNode?.key === nodeKey ? draftNode : undefined}
         {...seatProps}
       />
-    ))
-  }
+    )
+    : (
+      <ChatNodeSeat
+        key={seat.key}
+        nodeKey={seat.nodeKey}
+        compactTranscript={compactTranscript}
+        retainedDraftNode={draftNode?.key === seat.nodeKey ? draftNode : undefined}
+        {...seat.groupedTranscript === true ? { groupedTranscript: true } : {}}
+        {...seat.part === undefined ? {} : { groupPart: seat.part }}
+        {...seatProps}
+      />
+    )
+  const renderContextNode = (nodeKey: string) => (
+    <ChatNodeSeat
+      key={nodeKey}
+      nodeKey={nodeKey}
+      compactTranscript={compactTranscript}
+      {...compactTranscript ? { groupedTranscript: true } : {}}
+      {...seatProps}
+    />
+  )
+  const rendered = rows.map((row) => {
+    if (row.seat !== null) return renderSeat(row.seat)
+    if (row.members.length === 1) {
+      const first = row.members[0]
+      return first === undefined ? null : renderContextNode(first)
+    }
+    return (
+      <details key={row.key} className={css.contextGroup} data-context-group data-chat-flow-key={row.key} data-chat-anchor-key={`context-group:${row.key}`}>
+        <summary>{seatProps.t('message.contextGroup', { count: row.members.length })}</summary>
+        {row.members.map(renderContextNode)}
+      </details>
+    )
+  })
   const draftSeat = draftNode === null || draftNode === undefined ? null : (
     <ChatNodeSeat
       key={`node:${draftNode.key}`}
@@ -234,27 +302,7 @@ const ChatNodeList = memo(function ChatNodeList({
       {...seatProps}
     />
   )
-  const groupedSeats = processLayout.map(entry => entry.kind === 'group'
-    ? (
-      <ProcessGroupSeat
-        key={entry.key}
-        groupKey={entry.groupKey}
-        useChat={useChat}
-        compactTranscript={compactTranscript}
-        {...seatProps}
-      />
-    )
-    : (
-      <ChatNodeSeat
-        key={entry.key}
-        nodeKey={entry.nodeKey}
-        compactTranscript={compactTranscript}
-        groupedTranscript
-        {...entry.part === undefined ? {} : { groupPart: entry.part }}
-        {...seatProps}
-      />
-    ))
-  return draftSeat === null ? groupedSeats : [...groupedSeats, draftSeat]
+  return draftSeat === null ? rendered : [...rendered, draftSeat]
 })
 
 /**
@@ -844,6 +892,7 @@ export function ChatView({
           <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
             <ChatNodeList
               order={renderedOrder}
+              nodes={nodeStore}
               draftNode={detachedDraft}
               useChat={useChat}
               compactTranscript={compactTranscript}

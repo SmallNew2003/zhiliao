@@ -142,6 +142,14 @@ describe('web e2e: queue row actions', () => {
     expect(await page.locator('[data-queue-dock] [data-submission-echo]').count()).toBe(0)
     expect(await page.locator('[data-queue-dock]').getByRole('status').count()).toBe(0)
     await input.fill(EDIT)
+    expect(await page.getByRole('button', { name: 'Stop generating', exact: true }).isEnabled()).toBe(true)
+    const queueSend = page.getByRole('button', { name: 'Queue message', exact: true })
+    expect(await queueSend.textContent()).toContain('Queue message')
+    await compareOrRefreshGolden(
+      fileURLToPath(new URL('./expected/conversation-clarity/running.expected.md', import.meta.url)),
+      await captureStableAria(page, '[data-composer-card]', scaffold.workspaceCwd),
+      MODE,
+    )
     await input.press('Enter')
     const queueHeader = page.getByRole('button', { name: '2 queued messages' })
     await expect.poll(() => queueHeader.getAttribute('aria-expanded'), { timeout: 10_000 })
