@@ -21,6 +21,9 @@ import type { AskQuestionCardModel } from '../models/ask-question-card-model.ts'
 import {
   formatToolBody, type ToolRowState, type ToolRowVariant,
 } from '../models/tool-call-model.ts'
+import {
+  localizeToolError, parseToolError, type ToolErrorModel,
+} from '../models/tool-error-model.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { AskQuestionCard } from './AskQuestionCard.tsx'
 import css from './ToolRow.module.css'
@@ -49,6 +52,8 @@ export interface ToolRowProps {
   askQuestion?: AskQuestionCardModel | null | undefined
   /** Error first line shown as the collapsed summary on an error row; null/absent = keep `summary`. */
   errorSummary?: string | null | undefined
+  /** Structured tool failure model parsed from output; null/absent = derived from errorSummary/output. */
+  toolError?: ToolErrorModel | null | undefined
   /** Terminal card; card fields are mutually exclusive and replace text sections. */
   terminal?: TerminalCardModel | null | undefined
   diff?: DiffCardModel | null | undefined
@@ -129,6 +134,7 @@ export function ToolRow({
   output,
   askQuestion,
   errorSummary,
+  toolError,
   terminal,
   diff,
   read,
@@ -180,8 +186,17 @@ export function ToolRow({
     [card, inputRaw, open, variant],
   )
   const status = stateStatus(state, t)
+  const parsedError = useMemo(() => {
+    if (state !== 'error') return null
+    if (toolError !== undefined && toolError !== null) return toolError
+    return parseToolError(errorSummary ?? outputText, toolName)
+  }, [errorSummary, outputText, state, toolError, toolName])
+  const localizedError = useMemo(
+    () => parsedError !== null ? localizeToolError(parsedError, t) : null,
+    [parsedError, t],
+  )
   // A failure must replace, not supplement, the normal summary.
-  const failureLine = state === 'error' ? errorSummary ?? null : null
+  const failureLine = state === 'error' ? localizedError ?? errorSummary ?? null : null
   const summaryText = failureLine ?? terminalBody?.description ?? summary
   // A diff row's collapsed line carries the card's +/- totals (the same
   // numbers the expanded footer prints) so the change size reads without
@@ -344,9 +359,11 @@ export function ToolRow({
                                   <span className={css.ioDivider} aria-hidden />
                                 )}
                                 {outputText !== null && (
-                                  <div className={css.ioSection}>
+                                  <div className={clsx(css.ioSection, state === 'error' && css.ioErrorSection)}>
                                     <div className={css.ioHeader}>
-                                      <span className={css.ioLabel}>{t('row.output')}</span>
+                                      <span className={clsx(css.ioLabel, state === 'error' && css.ioErrorLabel)}>
+                                        {t('row.output')}
+                                      </span>
                                       <button
                                         type="button"
                                         className={css.ioCopyButton}

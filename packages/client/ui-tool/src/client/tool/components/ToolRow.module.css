@@ -164,6 +164,7 @@
 /* Error row's collapsed summary: the failure's first line in the error color. */
 .errorSummary {
   color: var(--dsw-alias-state-error-primary);
+  font-weight: 500;
 }
 
 /* Expanded body + Inspect pill wrapper (sibling of .row: clicks never toggle). */
@@ -353,6 +354,18 @@
 /* A failed call's OUT text shares the collapsed summary's error color. */
 .ioText[data-error] {
   color: var(--dsw-alias-state-error-primary);
+}
+
+.ioErrorSection {
+  background: var(--dsw-alias-state-error-bg, rgba(239, 68, 68, 0.08));
+  border-left: 2px solid var(--dsw-alias-state-error-primary);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.ioErrorLabel {
+  color: var(--dsw-alias-state-error-primary);
+  font-weight: 500;
 }
 
 /* The block-shaped expanded bodies: the code variant's run_code program

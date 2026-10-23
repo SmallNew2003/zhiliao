@@ -7,6 +7,9 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { localizeAutoReviewDenial, normalizeAutoReviewReason } from '../src/client/tool/models/auto-review-denial.ts'
 import {
+  localizeToolError, parseToolError, sanitizeErrorMessage,
+} from '../src/client/tool/models/tool-error-model.ts'
+import {
   classifyTool, formatToolBody, resultText, toolRowModel,
 } from '../src/client/tool/models/tool-call-model.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
@@ -242,6 +245,44 @@ describe('tool-call-model', () => {
       summary: 'Auto review 已拒绝',
       output: '工具未执行。原因：Auto review 未授权此次操作',
     })
+  })
+
+  it('sanitizes and parses raw tool errors into structured models and user-friendly localized messages', () => {
+    expect(sanitizeErrorMessage('Error: unknown tool "grep -rn \'foo\' /workspace/src"')).toBe(
+      'unknown tool "grep -rn \'foo\' /workspace/src"',
+    )
+    expect(sanitizeErrorMessage('A'.repeat(100), 50)).toBe(`${'A'.repeat(49)}…`)
+
+    const unknownTool = parseToolError('Error: unknown tool "grep -rn \\"foo\\" /path/to/file.ts"')
+    expect(unknownTool).toEqual({
+      kind: 'unknown_tool',
+      name: 'grep',
+      summary: 'unknown tool "grep -rn \\"foo\\" /path/to/file.ts"',
+    })
+    expect(localizeToolError(unknownTool!, t)).toBe('未识别工具 "grep"')
+
+    const cmdFailed = parseToolError('Exit code 1: command exited with error')
+    expect(cmdFailed).toMatchObject({ kind: 'command_failed', code: 1 })
+    expect(localizeToolError(cmdFailed!, t)).toBe('命令执行失败 (退出码 1)')
+
+    const cmd127 = parseToolError('Exit code 127')
+    expect(cmd127).toMatchObject({ kind: 'command_not_found', code: 127 })
+    expect(localizeToolError(cmd127!, t)).toBe('命令不存在或未找到')
+
+    const timeout = parseToolError('Error: execution timed out after 30000ms')
+    expect(timeout).toMatchObject({ kind: 'timeout' })
+    expect(localizeToolError(timeout!, t)).toBe('执行超时')
+
+    const fileMissing = parseToolError('ENOENT: no such file or directory, open \'/tmp/foo\'')
+    expect(fileMissing).toMatchObject({ kind: 'file_not_found' })
+    expect(localizeToolError(fileMissing!, t)).toBe('文件或目录不存在')
+
+    const permission = parseToolError('EACCES: permission denied, write \'/etc/hosts\'')
+    expect(permission).toMatchObject({ kind: 'permission_denied' })
+    expect(localizeToolError(permission!, t)).toBe('访问权限受限')
+
+    expect(classifyTool('grep -rn "test" /src')).toBe('search')
+    expect(classifyTool('bash run.sh')).toBe('bash')
   })
 
   it('gives Cordis lifecycle tools action titles over their generic variants', () => {

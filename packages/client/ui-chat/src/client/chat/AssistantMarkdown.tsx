@@ -25,6 +25,20 @@ export function localPathMediaUrl(protocol: string, origin: string, value: strin
   return `${origin}/api/file?path=${encodeURIComponent(value)}`
 }
 
+/**
+ * Strip unescaped pseudo-XML tool calls accidentally emitted in text streams by models.
+ * @param text - markdown text from model chunk.
+ * @returns sanitized text without pseudo tool-call XML blocks.
+ */
+export function cleanModelPseudoToolCalls(text: string): string {
+  if (!text.includes('<tool_call>') && !text.includes('</tool_call>')) return text
+  return text
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>(?:\n|$)/gi, '')
+    .replace(/<tool_call>[\s\S]*?(?:<\/parameter>\s*)+(?:\n|$)/gi, '')
+    .replace(/<\/?tool_call>\s*/gi, '')
+    .trim()
+}
+
 export interface AssistantMarkdownProps {
   blocks: readonly AssistantBlock[]
   streaming: boolean
@@ -70,11 +84,13 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
     const block = blocks[i]
     if (block === undefined) continue
     switch (block.kind) {
-      case 'text':
+      case 'text': {
+        const text = cleanModelPseudoToolCalls(block.text)
+        if (text === '') break
         rendered.push(
           <MarkdownText
             key={i}
-            text={block.text}
+            text={text}
             streaming={streaming}
             labels={labels}
             fileMentions={mentions}
@@ -82,6 +98,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
           />,
         )
         break
+      }
       case 'reasoning':
         rendered.push(
           <ProcessReasoning
