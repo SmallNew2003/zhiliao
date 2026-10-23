@@ -34,7 +34,7 @@ A process group must distinguish running from completed state based on whether m
 
 - **WHEN** A process group is still running
 - **THEN** The group starts expanded
-- **AND** The title shows current activity and elapsed time for the turn
+- **AND** The title shows current activity and elapsed time for the process group
 - **AND** In-progress reasoning or tool rows show running state
 
 ### Scenario: Completed groups show a summary and collapse by default

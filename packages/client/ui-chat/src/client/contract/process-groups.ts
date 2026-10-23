@@ -27,6 +27,8 @@ export interface ProcessGroup {
   readonly turn: number | undefined
   readonly members: readonly ProcessGroupMember[]
   readonly closed: boolean
+  /** Wall timestamp when the group's earliest member started. */
+  readonly startTime?: number
   readonly summary: ProcessGroupSummary
 }
 
