@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { DEFAULT_DIFF_MAX_LINES, DiffBlock as LocalizedDiffBlock, type DiffHunk } from '../src/index.ts'
 import { diffBlockLabels } from './labels.client.ts'
-import { diffTotals } from '../src/DiffBlock.tsx'
+import { computeWordDiff, diffTotals, parseHunkLines } from '../src/DiffBlock.tsx'
 
 function DiffBlock(props: Omit<ComponentProps<typeof LocalizedDiffBlock>, 'labels'>) {
   return <LocalizedDiffBlock {...props} labels={diffBlockLabels} />
@@ -23,6 +23,10 @@ function bodyRows(container: HTMLElement): string[] {
 
 function changeRows(container: HTMLElement): string[] {
   return [...container.querySelectorAll('[class*="_del_"], [class*="_add_"]')].map(row => row.textContent ?? '')
+}
+
+function highlightSpans(container: HTMLElement): string[] {
+  return [...container.querySelectorAll('[class*="_wordHighlight_"]')].map(span => span.textContent ?? '')
 }
 
 function added(count: number): string {
@@ -249,5 +253,170 @@ describe('DiffBlock copy', () => {
     await act(async () => { fireEvent.click(copy) })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '复制成功' })) })
     expect(writeText).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('DiffBlock word-level highlighting', () => {
+  it('highlights fine-grained variable change within paired replacement line', () => {
+    const diffs: DiffHunk[] = [{ path: 'code.ts', oldText: 'const oldVar = 1', newText: 'const newVar = 1' }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(highlightSpans(container)).toEqual(['oldVar', 'newVar'])
+    const delLine = container.querySelector('[class*="_del_"]')
+    const addLine = container.querySelector('[class*="_add_"]')
+    expect(delLine?.querySelector('[class*="_wordHighlight_"]')?.textContent).toBe('oldVar')
+    expect(addLine?.querySelector('[class*="_wordHighlight_"]')?.textContent).toBe('newVar')
+  })
+
+  it('highlights typo fix on a single line', () => {
+    const diffs: DiffHunk[] = [{ path: 'code.ts', oldText: 'calclate()', newText: 'calculate()' }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(highlightSpans(container)).toEqual(['calclate', 'calculate'])
+  })
+
+  it('pairs and highlights multiple replacement lines of equal length', () => {
+    const diffs: DiffHunk[] = [{
+      path: 'calc.ts',
+      oldText: 'const x = 1\nconst y = 2',
+      newText: 'const x = 10\nconst y = 20',
+    }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(highlightSpans(container)).toEqual(['1', '2', '10', '20'])
+  })
+
+  it('coalesces adjacent unchanged tokens during word insertion', () => {
+    const diffs: DiffHunk[] = [{ path: 'greeting.ts', oldText: 'hello world', newText: 'hello brave world' }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(highlightSpans(container)).toEqual(['brave '])
+  })
+
+  it('does not highlight intra-line words when replacement runs have unequal lengths', () => {
+    const diffs: DiffHunk[] = [{
+      path: 'list.ts',
+      oldText: 'item 1',
+      newText: 'item 1\nitem 2',
+    }]
+    const { container } = render(<DiffBlock diffs={diffs} />)
+    expect(highlightSpans(container)).toEqual([])
+  })
+
+  it('falls back to full-line highlight when intra-line diff exceeds max edit length', () => {
+    const oldLine = Array.from({ length: 130 }, (_, i) => `a${i}`).join(' ')
+    const newLine = Array.from({ length: 130 }, (_, i) => `b${i}`).join(' ')
+    const res = computeWordDiff(oldLine, newLine)
+    expect(res.delSpans).toEqual([{ text: oldLine, highlight: true }])
+    expect(res.addSpans).toEqual([{ text: newLine, highlight: true }])
+  })
+
+  it('parses inverted hunk lines where add precedes del and context without space', () => {
+    const rows = parseHunkLines(['no-space-context', '+new line', '-old line'])
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toEqual({ kind: 'context', text: 'no-space-context' })
+    expect(rows[1]!.kind).toBe('add')
+    expect(rows[2]!.kind).toBe('del')
+    expect(rows[1]!.spans).toBeDefined()
+    expect(rows[2]!.spans).toBeDefined()
+  })
+})
+
+describe('DiffBlock copy path', () => {
+  it('renders a copy path button on the file header and copies the path', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const diffs: DiffHunk[] = [{ path: 'src/model.ts', oldText: 'a', newText: 'b' }]
+    render(<DiffBlock diffs={diffs} />)
+
+    const copyPathBtn = screen.getByRole('button', { name: '复制路径' })
+    expect(copyPathBtn).toBeTruthy()
+    expect(copyPathBtn.getAttribute('title')).toBe('复制路径')
+
+    await act(async () => { fireEvent.click(copyPathBtn) })
+    expect(writeText).toHaveBeenCalledWith('src/model.ts')
+    expect(screen.getByRole('button', { name: '已复制路径' })).toBeTruthy()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(screen.getByRole('button', { name: '复制路径' })).toBeTruthy()
+  })
+
+  it('keeps the label on a refused path clipboard write', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    })
+    render(<DiffBlock diffs={[{ path: 'src/file.ts', oldText: null, newText: 'x' }]} />)
+    const copyPathBtn = screen.getByRole('button', { name: '复制路径' })
+    await act(async () => { fireEvent.click(copyPathBtn) })
+    expect(screen.getByRole('button', { name: '复制路径' })).toBeTruthy()
+  })
+
+  it('ignores a second click on copy path while copied feedback is active', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    render(<DiffBlock diffs={[{ path: 'src/file.ts', oldText: null, newText: 'x' }]} />)
+    const copyPathBtn = screen.getByRole('button', { name: '复制路径' })
+    await act(async () => { fireEvent.click(copyPathBtn) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '已复制路径' })) })
+    expect(writeText).toHaveBeenCalledTimes(1)
+  })
+
+  it('supports copying paths independently across multiple files', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const diffs: DiffHunk[] = [
+      { path: 'first.ts', oldText: 'a', newText: 'b' },
+      { path: 'second.ts', oldText: 'c', newText: 'd' },
+    ]
+    render(<DiffBlock diffs={diffs} />)
+    const copyPathButtons = screen.getAllByRole('button', { name: '复制路径' })
+    expect(copyPathButtons).toHaveLength(2)
+
+    await act(async () => { fireEvent.click(copyPathButtons[0]!) })
+    expect(writeText).toHaveBeenCalledWith('first.ts')
+    expect(screen.getByRole('button', { name: '已复制路径' })).toBeTruthy()
+
+    // Advance 500ms so timer 1 is due at 1000ms, whereas timer 2 will be due at 1500ms
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+
+    await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: '复制路径' })[0]!) })
+    expect(writeText).toHaveBeenCalledWith('second.ts')
+
+    // Advance 500ms (reaching 1000ms): timer 1 fires, prev is second.ts, so prev !== first.ts -> preserves second.ts
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    expect(screen.getByRole('button', { name: '已复制路径' })).toBeTruthy()
+
+    // Advance 500ms (reaching 1500ms): timer 2 fires, resets back to idle
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    expect(screen.getAllByRole('button', { name: '复制路径' })).toHaveLength(2)
+  })
+
+  it('falls back to labels.copy and labels.copied when copyPath labels are omitted', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const labelsWithoutCopyPath = {
+      copy: 'Copy',
+      copied: 'Copied',
+      collapseAria: 'Collapse',
+      expandAria: (n: number) => `Expand ${n}`,
+      collapse: 'Collapse',
+      expand: (n: number) => `Expand ${n}`,
+      files: (n: number) => `${n} files`,
+    }
+    const diffs: DiffHunk[] = [{ path: 'fallback.ts', oldText: '1', newText: '2' }]
+    const { container } = render(<LocalizedDiffBlock diffs={diffs} labels={labelsWithoutCopyPath} />)
+
+    const pathButtons = container.querySelectorAll('[class*="_copyPathButton_"]')
+    expect(pathButtons).toHaveLength(1)
+    const btn = pathButtons[0] as HTMLButtonElement
+    expect(btn.getAttribute('aria-label')).toBe('Copy')
+
+    await act(async () => { fireEvent.click(btn) })
+    expect(writeText).toHaveBeenCalledWith('fallback.ts')
+    expect(btn.getAttribute('aria-label')).toBe('Copied')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(btn.getAttribute('aria-label')).toBe('Copy')
   })
 })

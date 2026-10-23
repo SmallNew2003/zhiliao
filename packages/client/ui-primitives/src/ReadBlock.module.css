@@ -41,6 +41,23 @@
   gap: 12px;
 }
 
+.positionTrack {
+  position: relative;
+  width: 48px;
+  height: 4px;
+  background-color: var(--dsw-alias-border-l2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.positionThumb {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: var(--dsw-alias-label-tertiary);
+  border-radius: 2px;
+}
+
 .count {
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xs-13);

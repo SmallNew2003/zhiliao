@@ -110,3 +110,42 @@
   font: var(--dsw-font-markdown-code-block);
   color: var(--dsw-alias-label-tertiary);
 }
+
+.matchHighlight {
+  background-color: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-label-primary);
+  border-radius: 2px;
+}
+
+.clickableLine {
+  cursor: pointer;
+}
+
+.clickableLine:hover {
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+
+.clickablePath {
+  cursor: pointer;
+}
+
+.clickablePath:hover {
+  color: var(--dsw-alias-link);
+  text-decoration: underline;
+}
+
+.openIcon {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.openIcon:hover {
+  color: var(--dsw-alias-label-primary);
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}

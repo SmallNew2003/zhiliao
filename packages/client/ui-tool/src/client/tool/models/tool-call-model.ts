@@ -113,6 +113,8 @@ export interface ToolRowModel {
   /** Structured Auto-review denial identity; null for every ordinary result. */
   autoReviewDenial: AutoReviewDenial | null
   state: ToolRowState
+  /** Elapsed duration in milliseconds from call to result; null when callTime is unknown or running. */
+  durationMs: number | null
 }
 
 function deriveAutoReviewDenial(block: ToolCallBlock): AutoReviewDenial | null {
@@ -256,6 +258,9 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   const output = done ? (resultText(block) || null) : null
   const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
   const bodyRaw = argsRaw === '' ? null : argsRaw
+  const durationMs = done && typeof block.callTime === 'number' && block.time >= block.callTime
+    ? block.time - block.callTime
+    : null
   return {
     variant,
     titleKey: toolTitleKey ?? VARIANT_TITLE_KEYS[variant],
@@ -266,5 +271,6 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     errorSummary,
     autoReviewDenial: deriveAutoReviewDenial(block),
     state,
+    durationMs,
   }
 }

@@ -375,6 +375,34 @@ describe('TerminalBlock copy', () => {
     expect(screen.getByRole('button', { name: '复制' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '复制成功' })).toBeNull()
   })
+
+  it('copies the command when copyCommand is supplied and clicked', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const command = 'pnpm test --filter client'
+    render(
+      <LocalizedTerminalBlock
+        command={command}
+        labels={{ ...terminalBlockLabels, copyCommand: '复制命令', copiedCommand: '已复制' }}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '复制命令' }))
+    expect(writeText).toHaveBeenCalledWith(command)
+    expect(await screen.findByRole('button', { name: '已复制' })).toBeTruthy()
+  })
+
+  it('falls back to copy.copied when copiedCommand is omitted', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    render(
+      <LocalizedTerminalBlock
+        command="npm run build"
+        labels={{ ...terminalBlockLabels, copyCommand: '复制命令', copiedCommand: undefined }}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '复制命令' }))
+    expect(await screen.findByRole('button', { name: '复制成功' })).toBeTruthy()
+  })
 })
 
 describe('writeClipboard', () => {

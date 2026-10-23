@@ -133,6 +133,16 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
+.actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  background-color: var(--dsw-alias-markdown-code-block);
+}
+
 .copyButton {
   flex: none;
   position: sticky;

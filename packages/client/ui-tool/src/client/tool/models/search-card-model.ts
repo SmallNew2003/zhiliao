@@ -92,7 +92,10 @@ export function searchCardModel(block: ToolCallBlock): SearchCardModel | null {
   if (tool === 'grep') {
     if (meta.shape !== 'matches') return null
     const files = searchFiles(meta.files)
-    return files === null ? null : { recovery, card: { kind: 'matches', files, ...common } }
+    const call = parsedToolCall(block)
+    const pattern = call?.args.pattern
+    const query = typeof pattern === 'string' && pattern !== '' ? pattern : undefined
+    return files === null ? null : { recovery, card: { kind: 'matches', files, query, ...common } }
   }
   if (meta.shape !== 'paths' || !Array.isArray(meta.paths)) return null
   if (!meta.paths.every((path): path is string => typeof path === 'string')) return null

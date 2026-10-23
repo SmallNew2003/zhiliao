@@ -107,6 +107,10 @@ export function ReadBlock({
   // A read is a window when its returned lines are fewer than the file's total;
   // the note states that so a reader is not misled that the file ends here.
   const windowed = lines.length < totalLines
+  const startLine = lines[0]?.number ?? 1
+  const endLine = lines[lines.length - 1]?.number ?? lines.length
+  const startPercent = totalLines > 0 ? Math.max(0, Math.min(100, ((startLine - 1) / totalLines) * 100)) : 0
+  const endPercent = totalLines > 0 ? Math.max(0, Math.min(100, (endLine / totalLines) * 100)) : 0
 
   const rows = (slice: readonly (readonly [ReadBlockLine, readonly HighlightSpan[] | undefined])[]) =>
     slice.map(([line, spans]) => (
@@ -125,7 +129,15 @@ export function ReadBlock({
         <div className={css.label}>{label ?? ''}</div>
         <div className={css.action}>
           {windowed && (
-            <span className={css.count}>{labels.window(lines.length, totalLines)}</span>
+            <>
+              <div className={css.positionTrack} aria-hidden>
+                <div
+                  className={css.positionThumb}
+                  style={{ left: `${startPercent}%`, width: `${Math.max(4, endPercent - startPercent)}%` }}
+                />
+              </div>
+              <span className={css.count}>{labels.window(lines.length, totalLines)}</span>
+            </>
           )}
           <span className={css.lang}>{lang ?? ''}</span>
           {/* Empty files omit Copy to avoid replacing the clipboard with an empty string. */}

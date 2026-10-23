@@ -167,11 +167,11 @@ describe('chat row diff body', () => {
     expect(CHAT_DIFF_MAX_LINES).toBeLessThan(16)
     const view = render(<GenericToolCard {...ownerProps(settled())} />)
     // Collapsed: the summary row (path) only, no diff body.
-    expect(view.queryByText('hello fixture')).toBeNull()
+    expect(view.queryByText((_, el) => el?.tagName === 'DIV' && el.textContent === 'hello fixture')).toBeNull()
     // The path link is not the expand control; the leading toggle is.
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
-    expect(view.getByText('hello fixture')).toBeTruthy()
+    expect(view.getByText((_, el) => el?.tagName === 'DIV' && el.textContent === 'hello fixture')).toBeTruthy()
   })
 
   it('a running diff call expands to its intended change', () => {
@@ -220,10 +220,10 @@ describe('FileMutationRow diff card', () => {
     const view = render(<FileMutationRow {...rowProps(settled())} />)
     // The diff card is collapsed by default — not in the DOM until expanded.
     expect(view.container.querySelector('[data-diff]')).toBeNull()
-    expect(view.queryByText('hello fixture')).toBeNull()
+    expect(view.queryByText((_, el) => el?.tagName === 'DIV' && el.textContent === 'hello fixture')).toBeNull()
     toggleRow(view)
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
-    expect(view.getByText('hello fixture')).toBeTruthy()
+    expect(view.getByText((_, el) => el?.tagName === 'DIV' && el.textContent === 'hello fixture')).toBeTruthy()
     expect(view.getByText('复制')).toBeTruthy()
   })
 
