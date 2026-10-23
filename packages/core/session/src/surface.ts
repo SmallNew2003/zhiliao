@@ -9,7 +9,7 @@
  */
 
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
-import type { Message } from '@deepseek-ai/dsh-llm'
+import type { Message, UserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionLogOffset, SessionSeq } from './types.ts'
 import { KNOWN_SESSION_EVENT_TYPES, MESSAGE_PROJECTION_EVENT_TYPES } from './known-event-types.ts'
 import type {
@@ -54,6 +54,37 @@ const SURFACE_EVENT_TYPES = new Set<string>([
   'assistant/message',
   'tool/result',
 ])
+
+type HumanInputEvent = SessionEvent<'user/message' | 'user/message-edit'>
+
+function isHumanInputEvent(event: SessionEvent): event is HumanInputEvent {
+  return event.type === 'user/message-edit'
+    || (event.type === 'user/message' && event.data.source.kind === 'user')
+}
+
+/**
+ * Read the latest human-authored input and its durable edit identity.
+ *
+ * Older loops re-emitted an edited message as `user/message` after its
+ * `user/message-edit`; that copy shares the edited message identity and does
+ * not start a newer input generation.
+ * @param events - historical event prefix to scan.
+ * @returns the latest input sequence and message content, or undefined when none exists.
+ */
+export function latestHumanInput(
+  events: readonly SessionEvent[],
+): { readonly seq: SessionSeq; readonly message: UserMessage } | undefined {
+  const index = events.findLastIndex(isHumanInputEvent)
+  if (index === -1) return undefined
+  const event = events[index]
+  if (event === undefined || !isHumanInputEvent(event)) return undefined
+  if (event.type === 'user/message-edit') return { seq: event.seq, message: event.data.message }
+  const edit = events.slice(0, index).findLast((candidate): candidate is SessionEvent<'user/message-edit'> =>
+    candidate.type === 'user/message-edit' && candidate.data.message.id === event.data.id)
+  return edit === undefined
+    ? { seq: event.seq, message: event.data }
+    : { seq: edit.seq, message: edit.data.message }
+}
 
 /**
  * Whether an event type can join the model-visible surface.
@@ -487,8 +518,7 @@ function planSurfaceEvent(
     }
     const original = target.type === 'user/message' ? target.data : target.data.message
     if (original.source.kind !== 'user') throw new Error('user/message-admit target must be a human-authored input')
-    const latest = events.slice(0, event.seq - baseSeq).findLast(candidate =>
-      (candidate.type === 'user/message' && candidate.data.source.kind === 'user') || candidate.type === 'user/message-edit')
+    const latest = latestHumanInput(events.slice(0, event.seq - baseSeq))
     if (latest?.seq !== targetSeq) throw new Error('user/message-admit target must be the latest human input')
     const mask = (value: Message) => ({ ...value, content: value.content.map(block => block.type === 'text' ? { ...block, text: null } : block) })
     if (!isDeepEqualJson(mask(original), mask(message))) {
@@ -511,9 +541,7 @@ function planSurfaceEvent(
     }
     const previousEvents = events.slice(0, event.seq)
     const target = previousEvents[targetSeq]
-    const latest = previousEvents.findLast(candidate =>
-      (candidate.type === 'user/message' && candidate.data.source.kind === 'user')
-      || candidate.type === 'user/message-edit')
+    const latest = latestHumanInput(previousEvents)
     if (target?.type !== 'user/message' && target?.type !== 'user/message-edit') {
       throw new Error('user/message-edit target must be a user message')
     }
