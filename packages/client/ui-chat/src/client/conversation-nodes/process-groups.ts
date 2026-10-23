@@ -67,6 +67,53 @@ function summary(nodes: readonly ChatNode[]): ProcessGroupSummary {
   }
 }
 
+function nodeStartTime(node: ChatNode): number | undefined {
+  if (node.kind === 'tool-call') {
+    const root = node.data.root
+    if ('callTime' in root && typeof root.callTime === 'number') {
+      return root.callTime
+    }
+    if ('time' in root && typeof root.time === 'number') {
+      return root.time
+    }
+  }
+  if (typeof (node.data as { time?: unknown })?.time === 'number') {
+    return (node.data as { time: number }).time
+  }
+  if (typeof (node.data as { current?: { time?: unknown } })?.current?.time === 'number') {
+    return (node.data as { current: { time: number } }).current.time
+  }
+  if (node.location.kind === 'step' && typeof node.location.step.start?.time === 'number') {
+    return node.location.step.start.time
+  }
+  if (node.location.kind === 'turn' && typeof node.location.turn.start?.time === 'number') {
+    return node.location.turn.start.time
+  }
+  return undefined
+}
+
+function groupStartTime(nodes: readonly ChatNode[]): number | undefined {
+  let earliest: number | undefined
+  for (const node of nodes) {
+    const time = nodeStartTime(node)
+    if (time !== undefined && (earliest === undefined || time < earliest)) {
+      earliest = time
+    }
+  }
+  return earliest
+}
+
+function resolveGroupStartTime(
+  pendingNodes: readonly ChatNode[],
+  reusable?: ProcessGroup,
+): number | undefined {
+  const computed = groupStartTime(pendingNodes)
+  if (reusable?.startTime !== undefined && computed !== undefined) {
+    return Math.min(reusable.startTime, computed)
+  }
+  return reusable?.startTime ?? computed
+}
+
 function closedTurn(timeline: ConversationTimelineSnapshot, turn: number | undefined): boolean {
   return turn === undefined || timeline.turns.get(turn)?.status === 'closed'
 }
@@ -113,11 +160,13 @@ export function projectProcessGroups(
       && containsMembers(pending, candidate.members))
     const key = reusable?.key ?? processGroupKey(first)
     retained.add(key)
+    const startTime = resolveGroupStartTime(pendingNodes, reusable)
     groups.set(key, {
       key,
       turn: pendingTurn,
       members: pending,
       closed,
+      ...startTime === undefined ? {} : { startTime },
       summary: summary(pendingNodes),
     })
     layout.push({ kind: 'group', key, groupKey: key })

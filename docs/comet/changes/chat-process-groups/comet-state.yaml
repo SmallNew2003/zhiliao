@@ -1,11 +1,11 @@
 schema: comet.native.v4
 name: chat-process-groups
 language: zh-CN
-phase: verify
+phase: shape
 status: await-user
-state_version: 20
+state_version: 22
 brief: brief.md
-shape_confirmation_hash: 26918e9ebfae654c277fa42920f8d715f42410d9854680be7aae7e013ff35cbe
+shape_confirmation_hash: f3bf8092d4be99f7a981035ed2ade797b9ab20c2d69aff4aae81f059be4962b6
 spec_changes:
   - capability: chat-process-groups
     operation: create
@@ -17,432 +17,177 @@ workspace:
   finish: null
 loop:
   stage: await-user
-  goal_cycle: 3
-  iteration: 2
-  attempt: 1
+  goal_cycle: 4
+  iteration: 0
+  attempt: 0
   retry_epoch: 0
-  failed_iteration_count: 1
+  failed_iteration_count: 0
   no_progress_count: 0
   execution_failure_count: 0
   previous_unresolved_ids: []
-  next_action: confirm-skill-coordinated-pass
+  next_action: confirm-shape
 acceptance:
   - id: A1
     source: brief.md
     text: 在一个已完成轮次中渲染“执行组、Assistant 正文、执行组、Assistant
       正文、最终回答”时，会话顺序与日志一致；两段正文保持可见，两个执行组各自可展开，已完成组默认收起。
-    result: passed
-    reason:
-      text: 执行组、正文和最终回答顺序正确，完成组默认收起且可独立展开。
-      truncated: false
+    result: pending
+    reason: null
   - id: A2
     source: brief.md
     text: 在一个运行中的轮次中，当前执行组默认展开并显示运行状态与经过时间；上一条正文出现后，前一个执行组默认收起，组内最新过程仍可辨认。
-    result: passed
-    reason:
-      text: 运行组默认展开并显示当前活动与 elapsed，后续正文出现时前一组关闭并默认收起。
-      truncated: false
+    result: pending
+    reason: null
   - id: A3
     source: specs/chat-process-groups/spec.md
     text: Assistant 正文分隔执行组 - **WHEN** 一个轮次包含“过程内容、可见 Assistant 正文、过程内容、可见 Assistant
       正文、最终回答” - **THEN** 两段可见正文都留在执行组之外并保持原顺序 - **AND** 每段连续过程内容分别形成一个执行组 -
       **AND** 首个正文之前的独立过程内容也可以形成执行组
-    result: passed
-    reason:
-      text: 连续过程按正文和轮次边界形成独立执行组，首个正文前过程也可成组。
-      truncated: false
+    result: pending
+    reason: null
   - id: A4
     source: specs/chat-process-groups/spec.md
     text: 单个 Assistant Node 按内容分拆 - **WHEN** 一个 Assistant Node 同时包含非空推理块和可见回复块 -
       **THEN** 推理块进入所在执行组 - **AND** 可见回复块留在执行组之外 - **AND** 同一内容块不会重复渲染
-    result: passed
-    reason:
-      text: 同一 Assistant Node 的 reasoning 与 response seat 正确分离，无重复渲染。
-      truncated: false
+    result: pending
+    reason: null
   - id: A5
     source: specs/chat-process-groups/spec.md
     text: 独立行不进入执行组 - **WHEN** 轮次中出现用户消息、steering、系统提示词、错误、最大 token 提示或轮次尾部 -
       **THEN** 该行保持独立并按原顺序渲染 - **AND** 它成为相邻执行组之间的边界
-    result: passed
-    reason:
-      text: 用户、steering、系统提示词、错误、最大 token 与 turn-tail 均保持独立并成为边界。
-      truncated: false
+    result: pending
+    reason: null
   - id: A6
     source: specs/chat-process-groups/spec.md
     text: 运行中的组默认展开 - **WHEN** 执行组仍处于运行中 - **THEN** 组默认展开 - **AND**
-      标题显示当前活动状态和该轮已经过时间 - **AND** 进行中的思考或工具行显示运行状态
-    result: passed
-    reason:
-      text: 运行组显示本地化活动与轮次耗时，组内运行状态保持可见。
-      truncated: false
+      标题显示当前活动状态和该执行组已经过时间 - **AND** 进行中的思考或工具行显示运行状态
+    result: pending
+    reason: null
   - id: A7
     source: specs/chat-process-groups/spec.md
     text: 已完成组显示摘要并默认收起 - **WHEN** 后续可见 Assistant 正文出现或轮次结束关闭执行组 - **THEN** 组默认收起 -
       **AND** 仅含思考的组显示“分析请求” - **AND** 含工具调用的组根据组内实际动作生成简短摘要 - **AND**
       存在失败调用时追加“部分操作失败”
-    result: passed
-    reason:
-      text: 完成组默认收起；仅有思考时显示分析请求，失败时追加部分操作失败；call=null 的历史截断工具仍归类为调用工具并保留失败状态。
-      truncated: false
+    result: pending
+    reason: null
   - id: A8
     source: specs/chat-process-groups/spec.md
-    text: 完成摘要只描述动作类型 - **WHEN** 一个已完成执行组包含一种或多种工具动作 - **THEN**
-      组标题最多描述两类主要动作，例如“读取文件、运行命令” - **AND** 标题不显示任何调用次数 - **AND**
+    text: 完成摘要只描述动作类型 - **WHEN** 一个已完成执行组包含一种或多种工具动作，且这些调用不是全部来自同一个 MCP server -
+      **THEN** 组标题最多描述两类主要动作，例如“读取文件、运行命令” - **AND** 标题不显示任何调用次数 - **AND**
       动作类型以执行组内去重后的工具调用归类 - **AND** 存在超过两类动作时在描述后追加“等操作”
-    result: passed
-    reason:
-      text: 工具动作按 callId 去重并按类型聚合，标题最多展示两类、不显示次数，超过两类追加等操作。
-      truncated: false
+    result: pending
+    reason: null
   - id: A9
     source: specs/chat-process-groups/spec.md
     text: 展开组限高并内部滚动 - **WHEN** 用户展开一个执行组 - **THEN** 组内过程区域最大高度为 `min(400px, 50vh)`
       - **AND** 内容超出高度时在执行组内部滚动 - **AND** 可继续向上或向下滚动时对应边缘显示渐隐提示
-    result: passed
-    reason:
-      text: 展开组正文限高 min(400px, 50vh)、内部滚动并显示上下边缘渐隐。
-      truncated: false
+    result: pending
+    reason: null
   - id: A10
     source: specs/chat-process-groups/spec.md
     text: 组内过程保持紧凑且可独立展开 - **WHEN** 执行组展开并包含多条思考或工具行 - **THEN** 每行保持现有紧凑摘要形态 -
-      **AND** 已完成、失败和进行中状态可区分 - **AND** 思考行和工具行仍可各自展开详情
-    result: passed
-    reason:
-      text: 组内保留现有推理、工具和重试行渲染器及其独立折叠与状态。
-      truncated: false
+      **AND** 连续同名工具调用可以收进二级分组 - **AND** 已完成、失败和进行中状态可区分 - **AND**
+      思考行和工具行仍可各自展开详情
+    result: pending
+    reason: null
   - id: A11
     source: specs/chat-process-groups/spec.md
     text: 组标题支持键盘和指针操作 - **WHEN** 用户点击执行组标题或聚焦后按 Enter 或 Space - **THEN** 执行组切换展开状态
       - **AND** 标题暴露 `aria-expanded` - **AND** 展开前的焦点停留在标题上
-    result: passed
-    reason:
-      text: 标题按钮支持指针与 Enter/Space，暴露 aria-expanded/aria-controls 并保护焦点。
-      truncated: false
+    result: pending
+    reason: null
   - id: A12
     source: specs/chat-process-groups/spec.md
     text: 页内查找揭示隐藏过程 - **WHEN** 浏览器页内查找命中已收起执行组内的文字 - **THEN** 对应执行组自动展开并显示命中内容
-    result: passed
-    reason:
-      text: hidden=until-found 与 beforematch 揭示机制有效。
-      truncated: false
+    result: pending
+    reason: null
   - id: A13
     source: specs/chat-process-groups/spec.md
     text: Compact 使用执行组 - **WHEN** 会话展示设置为 `Compact` - **THEN** 符合条件的连续过程内容使用执行组 -
       **AND** 运行中组展开、已完成组收起
-    result: passed
-    reason:
-      text: Compact 使用执行组布局，运行组展开、完成组收起。
-      truncated: false
+    result: pending
+    reason: null
   - id: A14
     source: specs/chat-process-groups/spec.md
     text: Normal 保持平铺 - **WHEN** 会话展示设置为 `Normal` - **THEN** 过程行按现有平铺方式显示 - **AND**
-      不显示执行组标题或组级限高
-    result: passed
-    reason:
-      text: Normal 保持原始平铺，不显示组标题或组级限高。
-      truncated: false
+      不显示执行组标题、二级工具分组或组级限高 - **AND** 工具行仍使用与 `Compact` 相同的可读 MCP 名称和完成时文案
+    result: pending
+    reason: null
   - id: A15
     source: specs/chat-process-groups/spec.md
-    text: 流式追加与历史分页保持顺序 - **WHEN** 执行组内容流式增长、轮次完成或历史分页改变已加载窗口 - **THEN** 既有成员保持稳定
-      key 和相对顺序 - **AND** 用户手动展开状态仅在对应组仍存在时保留 - **AND** 不因重新渲染改变工具或思考节点已选择的状态
-    result: passed
-    reason:
-      text: 组 key 与成员 seat 在流式、完成和历史分页中保持稳定，手动展开状态可保留。
-      truncated: false
+    text: 流式追加与历史分页保持顺序 - **WHEN** 执行组内容流式增长、轮次完成或历史分页改变已加载窗口 - **THEN**
+      既有成员和二级分组保持稳定 key 和相对顺序 - **AND** 用户手动展开状态仅在对应组或二级分组仍存在时保留 - **AND**
+      不因重新渲染改变工具或思考节点已选择的状态
+    result: pending
+    reason: null
   - id: A16
     source: specs/chat-process-groups/spec.md
-    text: 执行组文案来自本地化字典 - **WHEN** 执行组显示运行状态、完成摘要或失败状态 - **THEN** 文案来自 `ui-chat`
-      的本地化字典 - **AND** 中文与英文均覆盖全部新增键
-    result: passed
-    reason:
-      text: 动作摘要、等操作、失败状态及运行文案均由 ui-chat zh/en locale 提供。
-      truncated: false
+    text: 执行组文案来自本地化字典 - **WHEN** 执行组显示运行状态、完成摘要、失败状态或二级分组标题 - **THEN** 执行组文案来自
+      `ui-chat` 的本地化字典 - **AND** 工具行文案来自 `ui-tool` 使用的会话本地化字典 - **AND**
+      中文与英文均覆盖全部新增键
+    result: pending
+    reason: null
   - id: A17
     source: specs/chat-process-groups/spec.md
-    text: 运行状态不依赖颜色单独表达 - **WHEN** 执行组或组内行处于运行中 - **THEN** 同时提供文本或状态语义 - **AND** 动画在
-      `prefers-reduced-motion` 下停止
-    result: passed
-    reason:
-      text: 运行状态有文本语义，并在 prefers-reduced-motion 下停止动画与 transition。
-      truncated: false
-builder_handoff:
-  candidate_id: cc9d99f9-3d51-4fc9-b8f6-1148fbc3e309
-  identity_provider: skill-coordinated
-  builder_execution_ref: skill-coordinated:builder:482a1745-08e6-4bb0-9f74-f1e2f34fcf0f
-  iteration: 2
-  summary:
-    text: 完成态执行组标题使用去重后的动作类型生成简短描述，最多两类且不显示次数；仅有思考时显示“分析请求”，超过两类追加“等操作”，失败追加“部分操作失败”。同时修复独立验收发现的历史截断边界：ToolResultNode.call=null
-      时仍归类为“调用工具”并保留失败状态，新增对应回归测试。
-    truncated: false
-  addressed_acceptance_ids:
-    - A1
-    - A2
-    - A3
-    - A4
-    - A5
-    - A6
-    - A7
-    - A8
-    - A9
-    - A10
-    - A11
-    - A12
-    - A13
-    - A14
-    - A15
-    - A16
-    - A17
-  checks:
-    - name:
-        text: pnpm vitest run --coverage
-          --coverage.include='packages/client/ui-chat/src/**'
-          packages/client/ui-chat/tests
-        truncated: false
-      result: passed
-      note:
-        text: 31 个测试文件、367 项测试通过；Statements/Branches/Functions/Lines 均为 100%
-        truncated: false
-    - name:
-        text: pnpm run typecheck
-        truncated: false
-      result: passed
-      note:
-        text: Host build 与 client TypeScript project references 均通过
-        truncated: false
-    - name:
-        text: pnpm exec oxlint --config .oxlintrc.json <changed-files>
-        truncated: false
-      result: passed
-      note:
-        text: 标题投影、契约、本地化与相关测试通过 lint
-        truncated: false
-    - name:
-        text: pnpm run verify-client-ui-i18n
-        truncated: false
-      result: passed
-      note:
-        text: 699 个 Client UI source file 使用 locale-owned copy
-        truncated: false
-    - name:
-        text: pnpm run build:lib:client
-        truncated: false
-      result: passed
-      note:
-        text: Client TypeScript 与 tsdown 实际构建通过
-        truncated: false
-    - name:
-        text: pnpm run verify-package-readme-summaries
-        truncated: false
-      result: passed
-      note:
-        text: 346 个英文 package README Summary 均在 100 词内
-        truncated: false
-    - name:
-        text: pnpm run verify-translation-pairing packages/client/ui-chat/README.md
-        truncated: false
-      result: passed
-      note:
-        text: ui-chat README 中英文配对一致
-        truncated: false
-    - name:
-        text: git diff --check
-        truncated: false
-      result: passed
-      note:
-        text: 无空白或行尾错误
-        truncated: false
-    - name:
-        text: pnpm run test:docs
-        truncated: false
-      result: failed
-      note:
-        text: 全量 doc-quick 仍受既有 docs/comet 双语配对缺口与顶层 spec 缺失 spec.zh.md 的断链影响；本次 ui-chat
-          README Summary 与命名配对专项门禁通过。
-        truncated: false
-  checks_truncated: false
-  known_limits:
-    - text: 未执行真实模型流桌面手工预览；组件行为、完整聚焦测试、Client 构建与 Web 预览已验证。
-      truncated: false
-    - text: 统一测试树 codex/local-testbed 仍在处理 message-edit-resend 合并冲突，本次功能尚未并入测试树。
-      truncated: false
-    - text: 仓库存量 docs/comet 文档双语配对和断链问题使全量 test:docs 仍为红；本次未扩大范围修复这些既有文档债务。
-      truncated: false
-  known_limits_truncated: false
-  review: null
-  submitted_at: 2026-10-22T08:29:42.311Z
-blockers:
-  - owner: user
-    reason:
-      text: The generic Skill bridge cannot prove an independent Verifier execution;
-        user confirmation is required before Archive.
-      truncated: false
-    acceptance_ids: []
-    resolution_action: await-user
-verification:
-  candidate_id: cc9d99f9-3d51-4fc9-b8f6-1148fbc3e309
-  identity_provider: skill-coordinated
-  verifier_execution_ref: skill-coordinated:verifier:78ee8a06-cfbc-48ec-b7a0-c1a0b04fece9
-  iteration: 2
-  attempt: 1
-  assurance: skill-coordinated
-  verdict: pass
-  checks:
-    - id: typecheck
-      name:
-        text: Repository typecheck
-        truncated: false
-      argv_display:
-        - text: run
-          truncated: false
-        - text: typecheck
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 12651
-    - id: ui-chat-tests
-      name:
-        text: ui-chat focused tests
-        truncated: false
-      argv_display:
-        - text: vitest
-          truncated: false
-        - text: run
-          truncated: false
-        - text: packages/client/ui-chat/tests
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 6233
-    - id: ui-chat-coverage
-      name:
-        text: ui-chat 100 percent coverage
-        truncated: false
-      argv_display:
-        - text: vitest
-          truncated: false
-        - text: run
-          truncated: false
-        - text: --coverage
-          truncated: false
-        - text: --coverage.include=packages/client/ui-chat/src/**
-          truncated: false
-        - text: packages/client/ui-chat/tests
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 8612
-    - id: ui-chat-lint
-      name:
-        text: ui-chat changed-file lint
-        truncated: false
-      argv_display:
-        - text: exec
-          truncated: false
-        - text: oxlint
-          truncated: false
-        - text: --config
-          truncated: false
-        - text: .oxlintrc.json
-          truncated: false
-        - text: packages/client/ui-chat/src/client/contract/process-groups.ts
-          truncated: false
-        - text: packages/client/ui-chat/src/client/conversation-nodes/process-groups.ts
-          truncated: false
-        - text: packages/client/ui-chat/src/client/chat/process-group-title.ts
-          truncated: false
-        - text: packages/client/ui-chat/src/client/chat/ProcessGroupSeat.tsx
-          truncated: false
-        - text: packages/client/ui-chat/tests/process-groups.client.spec.ts
-          truncated: false
-        - text: packages/client/ui-user-questions/tests/plan-review-panel.client.spec.tsx
-          truncated: false
-        - text: packages/client/ui-user-questions/tests/user-questions-composer.client.spec.tsx
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 2698
-    - id: client-ui-i18n
-      name:
-        text: Client UI locale ownership
-        truncated: false
-      argv_display:
-        - text: run
-          truncated: false
-        - text: verify-client-ui-i18n
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 2432
-    - id: client-build
-      name:
-        text: Client implementation build
-        truncated: false
-      argv_display:
-        - text: run
-          truncated: false
-        - text: build:lib:client
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 5042
-    - id: readme-summary
-      name:
-        text: Package README summary budget
-        truncated: false
-      argv_display:
-        - text: run
-          truncated: false
-        - text: verify-package-readme-summaries
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 2179
-    - id: readme-pairing
-      name:
-        text: ui-chat README bilingual pairing
-        truncated: false
-      argv_display:
-        - text: run
-          truncated: false
-        - text: verify-translation-pairing
-          truncated: false
-        - text: packages/client/ui-chat/README.md
-          truncated: false
-      argv_truncated: false
-      cwd_ref: .
-      status: passed
-      exit_code: 0
-      duration_ms: 1352
-  summary:
-    text: 17 项验收全部通过。上一轮 A7、A8 已实际修复：call=null
-      的历史截断工具仍归类为调用工具并保留失败状态；完成标题满足最多两类去重动作、不显示次数、超过两类追加等操作、仅思考显示分析请求、失败追加部分操作失败。未发现
-      Session、模型输入、SDK 或持久化变化。
-    truncated: false
-  risks:
-    - text: 未执行真实模型流的桌面或浏览器手工预览；页内查找、滚动渐隐、计时与真实布局组合目前只有组件测试和静态 CSS 证据。
-      truncated: false
-    - text: 全量 pnpm run test:docs 仍因既有 docs/comet 双语配对和断链债务失败；本次 ui-chat README
-        专项门禁通过。
-      truncated: false
-    - text: 统一测试树 codex/local-testbed 尚在处理另一合并冲突，本功能尚未并入该树。
-      truncated: false
-    - text: 完成动作同次数时沿用组内首次出现顺序；当前 Spec 未规定其他平局优先级。
-      truncated: false
-  risks_truncated: false
-  completed_at: 2026-10-22T08:46:29.953Z
+    text: 运行状态不依赖颜色单独表达 - **WHEN** 执行组、二级分组或组内行处于运行中 - **THEN** 同时提供文本或状态语义 -
+      **AND** 动画在 `prefers-reduced-motion` 下停止
+    result: pending
+    reason: null
+  - id: A18
+    source: specs/chat-process-groups/spec.md
+    text: 完成组标题标识 MCP 集成 - **WHEN** 一个已完成执行组的所有工具调用都来自同一个 MCP server - **THEN**
+      组标题显示“已使用 {server} 集成” - **AND** 运行中的同一组显示“正在使用 {server} 集成”与该执行组已经过时间 -
+      **AND** 混合来源或非 MCP 的组沿用动作类型摘要 - **AND** 顶层标题仍不显示调用次数 - **AND**
+      存在失败调用时仍追加“部分操作失败”
+    result: pending
+    reason: null
+  - id: A19
+    source: specs/chat-process-groups/spec.md
+    text: 工具行隐藏 MCP 原始前缀 - **WHEN** `Compact` 或 `Normal` 模式渲染
+      `mcp__<server>__<tool>` 调用 - **THEN** 行摘要显示可读工具名和参数摘要，不显示
+      `mcp__<server>__` 前缀 - **AND** 无法解析的名称至少移除 `mcp__` 前缀后原样显示 - **AND**
+      工具行的展开体、错误摘要和状态语义保持不变
+    result: pending
+    reason: null
+  - id: A20
+    source: specs/chat-process-groups/spec.md
+    text: 组内连续同名工具调用形成二级分组 - **WHEN** 展开的执行组内出现至少 2 次连续、同 wire name、无 PTC 子调用的根工具调用
+      - **THEN** 这些调用被包在一个二级披露中 - **AND** 二级标题显示可读工具名与“{count} 次调用” - **AND** 少于
+      2 次、不同工具、PTC 子调用、推理、重试或非工具行打断分组 - **AND** 顶层标题不显示该次数
+    result: pending
+    reason: null
+  - id: A21
+    source: specs/chat-process-groups/spec.md
+    text: 二级分组的展开与页内查找 - **WHEN** 用户点击二级标题，或聚焦后按 Enter 或 Space - **THEN**
+      二级分组切换展开状态并保留成员挂载 - **AND** 手动展开状态仅在该二级分组仍存在时保留 - **AND**
+      页内查找命中折叠的二级内容时，外层执行组与二级分组都展开 - **AND** 二级分组内的工具行仍可独立展开
+    result: pending
+    reason: null
+  - id: A22
+    source: specs/chat-process-groups/spec.md
+    text: 完成时行文案 - **WHEN** 工具行已结算（成功、失败或停止） - **THEN**
+      标题使用完成时，例如读取→已读取、搜索→已搜索、命令→已运行、写入→已写入、编辑→已编辑、代码→已运行代码、网页→已访问网页、通用工具→已调用 -
+      **AND** 运行中的行使用对应的进行时标题 - **AND** 句子行不显示圆点分隔符，标题与摘要之间使用单个空格 - **AND**
+      错误和停止行继续显示失败摘要与状态语义
+    result: pending
+    reason: null
+  - id: A23
+    source: specs/chat-process-groups/spec.md
+    text: 搜索行的作用域文案 - **WHEN** `grep` 调用带有 `path` 参数 - **THEN** 结算后的标题显示“已在 {path}
+      中搜索”，运行中显示“正在 {path} 中搜索” - **AND** 摘要为引号包裹的 pattern - **WHEN** 搜索调用没有
+      `path` 参数 - **THEN** 标题显示“已搜索”或“正在搜索” - **AND** 摘要为引号包裹的 pattern
+    result: pending
+    reason: null
+  - id: A24
+    source: specs/chat-process-groups/spec.md
+    text: 展开箭头位于标题右侧 - **WHEN** 执行组或二级分组渲染披露标题 - **THEN** 箭头位于标签右侧 - **AND**
+      不再使用左侧带边框的箭头容器 - **AND** 标题保留 `aria-expanded`、`aria-controls` 与点击后的焦点 -
+      **AND** 运行中的箭头动画在 `prefers-reduced-motion` 下停止
+    result: pending
+    reason: null
+builder_handoff: null
+blockers: []
+verification: null
 history:
   - goal_cycle: 1
     iteration: 0
@@ -510,6 +255,16 @@ history:
         Session、模型输入、SDK 或持久化变化。
       truncated: false
     completed_at: 2026-10-22T08:46:29.953Z
+  - goal_cycle: 3
+    iteration: 2
+    attempt: 1
+    outcome: recovery
+    unresolved_ids: []
+    summary:
+      text: 用户选择继续优化：新增 MCP 集成/工具名展示、组内同名工具二级分组（带调用次数）与逐行完成时文案，需更新 brief/spec 后重新确认
+        Shape。
+      truncated: false
+    completed_at: 2026-10-23T06:19:25.039Z
 history_overflow:
   dropped_entries: 0
   first_dropped_at: null
@@ -520,7 +275,7 @@ history_overflow:
     blocked: 0
     execution-error: 0
     recovery: 0
-verification_result: pass
-verification_report: verification.md
+verification_result: pending
+verification_report: null
 archived: false
 created_at: 2026-10-22T03:10:41.924Z

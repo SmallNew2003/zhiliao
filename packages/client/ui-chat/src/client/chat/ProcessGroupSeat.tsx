@@ -55,9 +55,13 @@ export const ProcessGroupSeat = memo(function ProcessGroupSeat({
 }: ProcessGroupSeatProps) {
   const group = useChat(snapshot => snapshot.processGroups.get(groupKey))
   const storedOpen = seatProps.useStore(state => state.processGroups.find(entry => entry.key === groupKey)?.open)
-  const startTime = useChat(snapshot => group?.turn === undefined
-    ? undefined
-    : snapshot.legacy.turnTimings.get(group.turn)?.startTime)
+  const startTime = useChat((snapshot) => {
+    const currentGroup = snapshot.processGroups.get(groupKey)
+    if (currentGroup?.startTime !== undefined) return currentGroup.startTime
+    return currentGroup?.turn === undefined
+      ? undefined
+      : snapshot.legacy.turnTimings.get(currentGroup.turn)?.startTime
+  })
   const [open, setOpen] = useState(() => storedOpen ?? group?.closed === false)
   const previousClosed = useRef(group?.closed)
   useEffect(() => {
