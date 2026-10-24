@@ -14,17 +14,17 @@
 import { memo, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { IncrementalMarkdownParser } from './incremental.ts'
+import { IncrementalMarkdownParser, positionMarkdownBlock } from './incremental.ts'
 import { parseGfm, parseGfmWithMath } from './parse.ts'
 import {
   collectReferenceTargets, createReferenceTargets, renderBlocks, renderFootnoteSection,
   wrapBlockChildren,
 } from './render.tsx'
-import type { MarkdownFileMentions, MarkdownLabels, MarkdownPathImages, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
+import type { MarkdownCodeBlockRenderer, MarkdownFileMentions, MarkdownLabels, MarkdownPathImages, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
 import 'katex/dist/katex.min.css'
 import css from './MarkdownText.module.css'
 
-export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownPathImages } from './render.tsx'
+export type { MarkdownCodeBlock, MarkdownCodeBlockRenderer, MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownPathImages } from './render.tsx'
 
 /** One settled full render: parse with math, resolve references, append the footnote section. */
 function renderSettled(
@@ -32,12 +32,14 @@ function renderSettled(
   labels: MarkdownLabels,
   fileMentions: MarkdownFileMentions | undefined,
   pathImages: MarkdownPathImages | undefined,
+  renderCodeBlock: MarkdownCodeBlockRenderer | undefined,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
   collectReferenceTargets(root.children, targets)
   const context: MarkdownRenderContext = {
     streaming: false,
+    renderCodeBlock,
     labels,
     fileMentions,
     pathImages,
@@ -46,11 +48,7 @@ function renderSettled(
     footnoteCounts: new Map(),
   }
   const blocks = wrapBlockChildren(
-    renderBlocks(root.children.map((node, index) => ({
-      node,
-      /* v8 ignore next -- parseFull uses parseGfm, which stamps every top-level node. */
-      key: node.position?.start.offset ?? -(index + 1),
-    })), context),
+    renderBlocks(root.children.map((node, index) => positionMarkdownBlock(node, text, 0, index)), context),
     false,
   )
   const section = renderFootnoteSection(context)
@@ -74,8 +72,11 @@ class StreamingRenderer {
   private lastText: string | null = null
   private lastRendered: ReactNode[] = []
 
-  /** @param labels - Localized Markdown chrome baked into cached elements; the owner replaces the renderer when it changes. */
-  constructor(private readonly labels: MarkdownLabels) {}
+  /**
+   * @param labels - Localized chrome cached in frozen elements.
+   * @param renderCodeBlock - Pure fence override cached in frozen elements.
+   */
+  constructor(private readonly labels: MarkdownLabels, private readonly renderCodeBlock: MarkdownCodeBlockRenderer | undefined) {}
 
   /**
    * Render the current accumulated text. Idempotent per text value, so React
@@ -107,6 +108,7 @@ class StreamingRenderer {
     if (newlyFrozen.length > 0) {
       const frozenContext: MarkdownRenderContext = {
         streaming: true,
+        renderCodeBlock: this.renderCodeBlock,
         labels: this.labels,
         fileMentions: undefined,
         pathImages: undefined,
@@ -126,6 +128,7 @@ class StreamingRenderer {
     }
     const tailContext: MarkdownRenderContext = {
       streaming: true,
+      renderCodeBlock: this.renderCodeBlock,
       labels: this.labels,
       fileMentions: undefined,
       pathImages: undefined,
@@ -167,33 +170,40 @@ class StreamingRenderer {
  * `body` variant uses the full document typography.
  * The provider's `openFile` enables local Markdown links in settled messages,
  * including `#L24` and `#L24-L30` destinations (ranges open at their first line).
+ * `renderCodeBlock` optionally replaces top-level fenced code using parsed
+ * language, metadata, explicit closure, and source-offset identity. Nested and
+ * indented code retain ordinary rendering. Keep the callback reference stable
+ * while streaming; changing it rebuilds frozen presentation.
  * @returns A GFM document with TeX math rendered through KaTeX; raw HTML and
  * unsafe protocols are disabled. Local links without an opener remain text;
  * absolute HTTP(S) images render directly.
  */
 export const MarkdownText = memo(function MarkdownText({
-  text, streaming = false, labels, fileMentions, pathImages, variant = 'body',
+  text, streaming = false, labels, fileMentions, pathImages, renderCodeBlock, variant = 'body',
 }: {
   text: string
   streaming?: boolean
   labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
   pathImages?: MarkdownPathImages | undefined
+  renderCodeBlock?: MarkdownCodeBlockRenderer | undefined
   variant?: 'body' | 'compact'
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownLabels>(labels)
+  const streamCodeRendererRef = useRef(renderCodeBlock)
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, labels, fileMentions, pathImages)
+      return renderSettled(text, labels, fileMentions, pathImages, renderCodeBlock)
     }
-    if (streamRef.current === null || streamLabelsRef.current !== labels) {
-      streamRef.current = new StreamingRenderer(labels)
+    if (streamRef.current === null || streamLabelsRef.current !== labels || streamCodeRendererRef.current !== renderCodeBlock) {
+      streamRef.current = new StreamingRenderer(labels, renderCodeBlock)
       streamLabelsRef.current = labels
+      streamCodeRendererRef.current = renderCodeBlock
     }
     return streamRef.current.render(text)
-  }, [text, streaming, labels, fileMentions, pathImages])
+  }, [text, streaming, labels, fileMentions, pathImages, renderCodeBlock])
   return <div className={clsx(css.markdown, variant === 'compact' && css.compact)}
     data-markdown-variant={variant === 'compact' ? variant : undefined}>{children}</div>
 })

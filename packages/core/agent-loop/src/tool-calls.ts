@@ -6,13 +6,13 @@
  * and drains started calls.
  *
  * Abort records synthetic error results for skipped calls so replay stays
- * valid. A terminal scheduler failure preserves already-recorded `tool/call`
- * events without fabricating results.
+ * valid. An internal scheduler failure drains started calls, records
+ * synthetic error results for uncommitted calls, and surfaces the failure.
  * @module dsh-agent-loop/tool-calls
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { createToolResultMessage, type ToolCallBlock } from '@deepseek-ai/dsh-llm'
+import { createToolResultMessage, errorChain, type ToolCallBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 import { TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, type ToolExecutionInput, type ToolExecutionMode, type ToolExecutionResult, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
@@ -232,6 +232,11 @@ async function runGroup(
   } catch (error: unknown) {
     schedulerFailure ??= { error }
     await Promise.allSettled(inFlight.values())
+    const message = errorChain(schedulerFailure.error)
+    for (let i = committed; i < group.length; i++) {
+      // oxlint-disable-next-line typescript/no-non-null-assertion -- bounded index
+      appendFailedToolCall(session, turn, step, group[i]!.block, callSeqs[i], message)
+    }
     throw schedulerFailure.error
   }
 
@@ -244,6 +249,26 @@ async function runGroup(
   /* v8 ignore next -- unreachable: a non-aborted group commits every started call */
   if (committed !== started) throw new Error('tool-call scheduler: uncommitted settled calls')
   return { consumed: started, aborted: false, concluded }
+}
+
+/** Append the durable call/result pair for a model call failed during scheduler execution. */
+function appendFailedToolCall(
+  session: Session,
+  turn: number,
+  step: number,
+  block: ToolCallBlock,
+  existingCallSeq: SessionSeq | undefined,
+  errorMessage: string,
+): void {
+  const callSeq = existingCallSeq ?? appendToolCall(session, turn, step, block)
+  appendToolResult(session, turn, step, block, {
+    content: [{ type: 'text', text: `Error: tool execution failed (${errorMessage})` }],
+    isError: true,
+    error: {
+      message: errorMessage,
+      info: { name: 'ToolExecutionError', code: 'TOOL_EXECUTION_FAILED' },
+    },
+  }, callSeq)
 }
 
 /** Append the durable call/result pair for a model call skipped after cancellation. */

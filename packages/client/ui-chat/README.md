@@ -33,6 +33,8 @@ Chat supplies file and HTTP(S) navigation through one `MarkdownDelegateProvider`
 
 HTTP(S) links in Assistant Markdown open a new right-Sidebar Browser tab on ordinary clicks when that type is registered, or the system browser otherwise; modified clicks retain the native external-link behavior. Sent file references and skills confirmed by the message’s logged invocation also open in the right Sidebar. File paths use the viewed Session; skill names resolve through its current input-trigger source. Both use the prose file-link dotted underline on hover or focus. Sessions, directories, and command labels remain non-navigating references.
 
+The assistant-step renderer owns the session-scoped `conversation.chat.codeBlock` chain. Providers receive `ChatCodeBlockOwnerProps.block` with the primitive's parsed source and explicit closure data, and use a pure selector to accept a fence. The first accepting provider renders; no provider, all-decline, or provider disposal restores ordinary code. Only top-level fences in Assistant text reach this slot; reasoning and other message renderers keep their own Markdown presentation. Provider UI crosses plugin packages through the slot, while the pure Markdown callback remains internal to the assistant renderer.
+
 <a id="system-prompt-row"></a>
 ## System prompt row
 

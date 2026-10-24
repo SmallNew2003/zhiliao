@@ -33,6 +33,8 @@ Chat 在节点列表外通过一个 `MarkdownDelegateProvider` 提供文件及 H
 
 Assistant Markdown 中的 HTTP(S) 链接在普通点击时会在该类型已注册时打开新的右侧 Sidebar Browser tab，否则改用系统浏览器；带修饰键的点击保留原生外部链接行为。已发送的文件引用及消息日志确认调用的 skill 也可在右侧栏打开预览。文件路径使用当前查看的 Session；skill 名称由该 Session 当前的输入触发源解析。两者悬停或聚焦时均使用正文文件链接的虚线下划线。会话、目录和命令标签仍只作为引用展示。
 
+assistant-step 渲染器拥有 session 作用域的 `conversation.chat.codeBlock` chain。提供方通过 `ChatCodeBlockOwnerProps.block` 接收原语解析后的源码及显式闭合数据，并用纯 selector 决定是否接收围栏。首个接收的提供方负责渲染；无提供方、全部拒绝或提供方卸载时恢复普通代码。只有 Assistant 正文中的顶层围栏会到达该 slot；reasoning 及其他消息渲染器保留自己的 Markdown 展示。提供方 UI 通过 slot 跨插件组合，纯 Markdown 回调则留在 assistant 渲染器内部。
+
 <a id="system-prompt-row"></a>
 ## 系统提示词行
 

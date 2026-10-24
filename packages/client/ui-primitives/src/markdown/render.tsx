@@ -44,6 +44,30 @@ export interface MarkdownLabels {
   footnotes: string
 }
 
+/** Source and lifecycle data for one parser-confirmed top-level Markdown fence. */
+export interface MarkdownCodeBlock {
+  /** Parsed code content without the renderer's synthetic trailing newline. */
+  readonly code: string
+  /** Authored fence language, without highlighting normalization. */
+  readonly language: string | undefined
+  /** Parsed fence metadata after the language; no preview-policy normalization. */
+  readonly meta: string | undefined
+  /** Whether the source includes an explicit matching closing delimiter. */
+  readonly closed: boolean
+  /** UTF-16 start offset in this Markdown document, stable across append-only updates. */
+  readonly sourceOffset: number
+  /** Whether the containing Markdown document is still streaming. */
+  readonly streaming: boolean
+}
+
+/**
+ * Pure presentation override for a top-level fence; return fallback to retain ordinary rendering.
+ * @param block - Authored code and parser-confirmed lifecycle data.
+ * @param fallback - Existing source-code or math presentation.
+ * @returns Presentation retained under the fence's source-offset key.
+ */
+export type MarkdownCodeBlockRenderer = (block: MarkdownCodeBlock, fallback: ReactNode) => ReactNode
+
 function sanitizeUrl(url: string): string {
   try {
     switch (new URL(url).protocol) {
@@ -178,6 +202,8 @@ export interface MarkdownFileMentions {
 export interface MarkdownRenderContext {
   /** Streaming arm: fences highlight incrementally as they grow; TeX (including ```math fences) stays literal until the settled pass. */
   readonly streaming: boolean
+  /** Optional pure override for parser-confirmed top-level fences. */
+  readonly renderCodeBlock?: MarkdownCodeBlockRenderer | undefined
   /** Localized fence copy-button labels. */
   readonly labels: MarkdownLabels
   /** Inside a blockquote's children: tables there always fill the quote's width. */
@@ -209,7 +235,18 @@ export function renderBlocks(
   context: MarkdownRenderContext,
 ): ReactNode[] {
   return blocks
-    .map(block => renderNode(block.node, block.key, context))
+    .map((block) => {
+      const fallback = renderNode(block.node, block.key, context)
+      if (block.node.type !== 'code' || block.fence === undefined || context.renderCodeBlock === undefined) return fallback
+      return <Fragment key={block.key}>{context.renderCodeBlock({
+        code: block.node.value,
+        language: block.node.lang ?? undefined,
+        meta: block.node.meta ?? undefined,
+        closed: block.fence.closed,
+        sourceOffset: block.key,
+        streaming: context.streaming,
+      }, fallback)}</Fragment>
+    })
     .filter(element => element !== null)
 }
 

@@ -469,6 +469,32 @@ export interface Config {
 
 Source: [`packages/client/ui-sidebar-documentpreview/src/config.ts:5`](../packages/client/ui-sidebar-documentpreview/src/config.ts)
 
+<a id="deepseek-aidsh-client-ui-visualizations"></a>
+
+## `@deepseek-ai/dsh-client-ui-visualizations`
+
+Requires: `webServer` · `systemPrompt` · `skills` · `tools`
+
+```ts config-catalog
+/** Resolved limits shared by Host index injection and browser rendering. */
+export interface Config {
+  /** Maximum UTF-8 bytes of one authored source. */
+  maxSourceBytes: number
+  /** Maximum decoded bytes of one requested download. */
+  maxExportBytes: number
+  /** Maximum active iframe documents across this Client registration. */
+  maxActiveFrames: number
+  /** Minimum iframe height in CSS pixels. */
+  minHeight: number
+  /** Maximum iframe height in CSS pixels; larger content scrolls inside. */
+  maxHeight: number
+  /** Readiness and export-response deadline in milliseconds. */
+  readinessTimeoutMs: number
+}
+```
+
+Source: [`packages/client/ui-visualizations/src/config.ts:5`](../packages/client/ui-visualizations/src/config.ts)
+
 <a id="deepseek-aidsh-compaction-basic"></a>
 
 ## `@deepseek-ai/dsh-compaction-basic`
@@ -2913,7 +2939,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:248`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:249`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 

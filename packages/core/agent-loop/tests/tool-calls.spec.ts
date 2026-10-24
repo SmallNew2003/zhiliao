@@ -702,6 +702,9 @@ describe('tool-call scheduler: failure quiescence', () => {
     expect(events(agent).findLast(event => event.type === 'turn/end')).toMatchObject({
       data: { reason: { kind: 'error', error: { message: schedulerError.message, code: 'UNKNOWN' } } },
     })
+    const toolResults = events(agent).filter(event => event.type === 'tool/result')
+    expect(toolResults.map(e => e.data.message.source.callId)).toEqual(['c1', 'c2', 'c3'])
+    expect(toolResults.every(e => e.data.message.content[0]?.type === 'tool-result' && e.data.message.content[0].isError)).toBe(true)
   })
 })
 

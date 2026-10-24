@@ -1,11 +1,15 @@
 import { memo, useCallback, useMemo } from 'react'
+import type { MarkdownCodeBlockRenderer } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ChatNodeViewProps, TurnTailOwnerProps } from '../contract/slots.ts'
 import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 
+type AssistantNodeViewProps = ChatNodeViewProps<'assistant-step'> & PropsRenderSlots<'conversation.chat.codeBlock'>
+
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
-  node, useTurnData, turnProcess, openFile, renderMessageImages, fileMentions, t,
-}: ChatNodeViewProps<'assistant-step'>) {
+  node, useTurnData, turnProcess, openFile, renderMessageImages, fileMentions, renderSlotChain, t,
+}: AssistantNodeViewProps) {
   const data = node.data
   const turn = node.location.kind === 'turn' || node.location.kind === 'step'
     ? node.location.turn
@@ -26,12 +30,17 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     && turnProcess.spec.inlineReasoning
     && !turnProcess.open
   const revealProcess = useCallback(() => { turnProcess?.setOpen(true) }, [turnProcess])
+  const renderCodeBlock = useCallback<MarkdownCodeBlockRenderer>(
+    (block, fallback) => renderSlotChain('conversation.chat.codeBlock', { block }, { fallback }),
+    [renderSlotChain],
+  )
   return (
     <AssistantMarkdown
       blocks={data.blocks}
       streaming={data.status === 'running'}
       interrupted={data.status === 'interrupted'}
       renderMessageImages={renderMessageImages}
+      renderCodeBlock={renderCodeBlock}
       reasoningHidden={reasoningHidden}
       revealProcess={revealProcess}
       mentions={mentions}

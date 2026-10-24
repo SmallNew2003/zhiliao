@@ -65,6 +65,8 @@ dsh --profile web --no-open --port 8080
 
 每个浏览器会话都从随发行版交付的 preset（默认 `standard`）组合自己的 agent，而不是共享一套进程级工具集。你可以更改默认 preset，或在 `$DSH_HOME/.agent-presets` 下添加自己的 preset。
 
+Web 插件列表包含[内联可视化](../../client/ui-visualizations/README.zh.md)，用于交互式 HTML 面板、ECharts 图表和 Mermaid 图示。创作指导取决于每个代理可见的技能加载器；没有该工具的预设不会收到加载指令。预览输入仅在本地临时保留。
+
 -----
 
 <a id="understand-the-implementation"></a>

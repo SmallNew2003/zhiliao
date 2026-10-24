@@ -137,6 +137,7 @@ root
 │     │  └─ conversation.view
 │     │     ├─ conversation.chat.node
 │     │     │  ├─ conversation.chat.assistant-actions
+│     │     │  ├─ conversation.chat.codeBlock
 │     │     │  ├─ conversation.chat.commandview
 │     │     │  ├─ conversation.chat.turnTail
 │     │     │  └─ tool.call.toolview
