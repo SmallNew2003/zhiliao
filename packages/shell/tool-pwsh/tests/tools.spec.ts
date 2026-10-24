@@ -110,6 +110,8 @@ function fakeProcess(delta = 'bg-ok\n'): ShellProcess {
       consumed = true
       return { delta, lossy: false }
     },
+    terminate: async () => {},
+    waitForExit: async () => {},
     kill: () => false,
   }
 }
@@ -124,6 +126,8 @@ function killableProcess(): ShellProcess {
     signal: null,
     done,
     readOutput: () => ({ delta: '', lossy: false }),
+    terminate: async () => {},
+    waitForExit: async () => {},
     kill: () => {
       if (proc.status !== 'running') return false
       proc.status = 'killed'
@@ -1078,6 +1082,8 @@ describe('processOutcome', () => {
       signal: null,
       done: Promise.resolve(),
       readOutput: () => ({ delta: '', lossy: false }),
+      terminate: async () => {},
+      waitForExit: async () => {},
       kill: () => false,
       ...over,
     }

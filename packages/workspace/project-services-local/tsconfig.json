@@ -1,0 +1,39 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/cosmokit"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../project-services"
+    },
+    {
+      "path": "../workspace"
+    },
+    {
+      "path": "../../util/brand"
+    },
+    {
+      "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../storage/storage-domain"
+    },
+    {
+      "path": "../../shell/shell"
+    }
+  ]
+}

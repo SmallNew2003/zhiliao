@@ -75,6 +75,8 @@ When a settings provider is composed, this executor registers the capability's s
 
 -----
 
+`prepare(spec)` resolves an exact background launch without creating a process. Its `PreparedShellLaunch.start(hostSignal)` applies the supplied published lifetime instead of preparation cancellation; providers without preparation support reject. `ShellProcess.terminate()` awaits complete owned-range termination even after `done`, while `waitForExit()` observes range quiescence independently. `kill()` and `done` retain their direct-command semantics. Optional `ownsProcess(pid)` is read-only membership evidence, never permission to signal an external PID. `captureRangeOutput: true` preserves collection through range exit and a bounded final drain; default collection still ends at direct completion. `supportsPosixCommandSyntax` is true only for providers that accept POSIX argv quoting.
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 

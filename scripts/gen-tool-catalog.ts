@@ -74,6 +74,8 @@ import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
 import WorkflowEngine from '@deepseek-ai/dsh-workflow'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
+import type ProjectServiceRuntime from '@deepseek-ai/dsh-project-services'
+import * as ToolProjectServices from '@deepseek-ai/dsh-tool-project-services'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
 import { githubSlug } from './verify-md-links.ts'
 
@@ -474,6 +476,22 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-project-services',
+    dir: 'tool-project-services',
+    source: 'packages/workspace/tool-project-services/src/index.ts',
+    requires: ['ctx.tools', 'ctx.projectServices', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // The tools read ctx.projectServices only at execution time, so the schema
+      // harvest satisfies the inject with an inert seam marker; registration
+      // itself never calls the runtime.
+      ctx.provide('projectServices', {} as ProjectServiceRuntime)
+      await ctx.plugin(ToolProjectServices)
+    },
+    note:
+      'The three tools stay pending until a project-services runtime provides `ctx.projectServices`; the base bundle mounts them beside `@deepseek-ai/dsh-project-services-local`. Mutating calls honor `approvalPolicy` (default `ask`), which routes through the host approval seam when one is mounted — `never` rejects every mutating call without asking anyone. Listing filters, page caps, and the 16 KiB log cap run inside the tools, so provider cursors stay out of the schema.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

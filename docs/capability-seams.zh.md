@@ -116,6 +116,16 @@ flowchart LR
   pkg_command_feedback["command-feedback"]
   svc_sessionFeedback["ctx.sessionFeedback<br/>Session-level feedback recorder"]
   svc_workspaceRegistry["ctx.workspaceRegistry<br/>Workspace entity registry"]
+  pkg_project_services["project-services"]
+  svc_projectServices["ctx.projectServices<br/>Project service inventory, logs, and control"]
+  pkg_project_services_local["project-services-local"]
+  pkg_project_services_docker["project-services-docker"]
+  pkg_tool_project_services["tool-project-services"]
+  pkg_api_project_services_controller["api-project-services-controller"]
+  svc_nativeProjectServices["ctx.nativeProjectServices<br/>Native process provider"]
+  svc_dockerProjectServices["ctx.dockerProjectServices<br/>Docker and Compose container provider"]
+  svc_projectServicesController["ctx.projectServicesController<br/>Project service RPC controller"]
+  pkg_api_remotes["api-remotes"]
   svc_sessionQuery["ctx.sessionQuery<br/>Session reads, traces, filters, and search"]
   pkg_session_reference["session-reference"]
   pkg_tool_session_query["tool-session-query"]
@@ -261,6 +271,7 @@ flowchart LR
   pkg_agent_loop --> svc_agentLoop
   pkg_agent_presets --> svc_agentPresets
   pkg_api_gateway --> svc_typertGateway
+  pkg_api_project_services_controller --> svc_projectServicesController
   pkg_api_session_controller --> svc_sessionController
   pkg_api_session_controller --> svc_sessionFileReferences
   pkg_api_session_controller --> svc_sessionSkillCatalog
@@ -328,6 +339,11 @@ flowchart LR
   pkg_plan_mode --> svc_planMode
   pkg_plugin_manager --> svc_pluginManager
   pkg_plugin_package_inventory_deepseek --> svc_deepseekLlmApiExtensions
+  pkg_project_services --> svc_projectServices
+  pkg_project_services_docker --> svc_dockerProjectServices
+  pkg_project_services_docker --> svc_projectServices
+  pkg_project_services_local --> svc_nativeProjectServices
+  pkg_project_services_local --> svc_projectServices
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
@@ -425,6 +441,7 @@ flowchart LR
   svc_credentials --> pkg_llm_pi_ai
   svc_deepseekLlmApiExtensions --> pkg_llm_deepseek
   svc_directoryPicker --> pkg_api_workspace_controller
+  svc_dockerProjectServices --> pkg_tool_project_services
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_fileReferences --> pkg_api_session_controller
   svc_fileUploads --> pkg_api_session_controller
@@ -442,10 +459,14 @@ flowchart LR
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
   svc_mcpResources --> pkg_mcp_resources
+  svc_nativeProjectServices --> pkg_tool_project_services
   svc_officeToPdf --> pkg_client_ui_sidebar_documentpreview
   svc_pluginManager --> pkg_plugin_manager
   svc_pluginManager --> pkg_ui_settings_plugin_inventory
   svc_profileContext --> pkg_plugin_manager
+  svc_projectServices --> pkg_api_project_services_controller
+  svc_projectServices --> pkg_tool_project_services
+  svc_projectServicesController --> pkg_api_remotes
   svc_ptcRuntime --> pkg_tools
   svc_ptcRuntime --> pkg_workflow_ptc
   svc_sandbox --> pkg_bash_sandbox
@@ -578,6 +599,10 @@ flowchart LR
 | `ctx.messageFeedback` | `core` | [`message-feedback`](../packages/feedback/message-feedback) | - | - | - | 拥有权威 Session 日志中的逐 assistant 消息反馈、目标校验、逐条目 compare-and-set 及 Host 一元 Remote 契约。反馈不进入模型历史；日志导出遵循消费方策略。 |
 | `ctx.sessionFeedback` | `core` | [`command-feedback`](../packages/feedback/command-feedback) | - | - | - | 通过 Host 一元 Remote 契约在 live Session 上把一条带分类的 Session 级评价记录为仅写日志的 feedback/record 事件；/feedback 命令共用同一个生产方。 |
 | `ctx.workspaceRegistry` | `core` | [`workspace`](../packages/workspace/workspace) | - | [`api-workspace-controller`](../packages/api/workspace-controller), [`api-session-controller`](../packages/api/session-controller) | - | 通过领域设施拥有带 WorkspaceId 品牌类型的记录；稳定的 sessionIds 账户驱动 Host RPC 与 GUI 投影。 |
+| `ctx.projectServices` | `seam` | [`project-services`](../packages/workspace/project-services) | [`project-services-local`](../packages/workspace/project-services-local), [`project-services-docker`](../packages/workspace/project-services-docker) | [`tool-project-services`](../packages/workspace/tool-project-services), [`api-project-services-controller`](../packages/api/project-services-controller) | - | 一个运行时解析 Git 工作树所属项目，并把所有读取与控制调用分派给已注册的提供方；受管理的原生进程比启动它们的 Session 存活更久。 |
+| `ctx.nativeProjectServices` | `core` | [`project-services-local`](../packages/workspace/project-services-local) | - | [`tool-project-services`](../packages/workspace/tool-project-services) | - | 发现与项目关联的监听器并管理由 harness 启动的进程；外部监听器保持只读，因此绝不会向未绑定的 PID 发信号。 |
+| `ctx.dockerProjectServices` | `core` | [`project-services-docker`](../packages/workspace/project-services-docker) | - | [`tool-project-services`](../packages/workspace/tool-project-services) | - | 在变更类操作前校验守护进程身份并冻结 Compose 组成员；守护进程不可达时将容器表层标记为陈旧，而不是隐藏原生服务。 |
+| `ctx.projectServicesController` | `core` | [`api-project-services-controller`](../packages/api/project-services-controller) | - | [`api-remotes`](../packages/api/remotes) | - | 在与 Agent 工具相同的授权下，向浏览器面板发布清单、日志、控制与实时流。 |
 | `ctx.sessionQuery` | `seam` | [`session-query`](../packages/session-query/session-query) | [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | [`session-reference`](../packages/context/session-reference), [`tool-session-query`](../packages/session-query/tool-session-query) | - | 该接口提供精确读取、过滤和追踪；具体后端还提供全文协调、排序、摘要片段和游标世代，而模型消费方负责工作区权限与不含游标的渲染。 |
 | `ctx.fileReferences` | `seam` | [`file-reference`](../packages/context/file-reference) | [`file-reference-local`](../packages/context/file-reference-local) | [`api-session-controller`](../packages/api/session-controller) | - | 该接口返回 Agent cwd 内仅含路径的补全候选；提供方负责命名空间访问与排序，但不读取文件内容。 |
 | `ctx.sessionReferenceResolver` | `core` | [`session-reference`](../packages/context/session-reference) | - | - | - | 将当前表层中有界的对话快照投影为持久但不可信的消息上下文；Host 适配器负责提及语法。 |

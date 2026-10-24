@@ -23,6 +23,8 @@ shell 执行 seam 由 [dsh-shell](../../packages/shell/shell) 在 `ctx.shell` �
  */
 interface ShellExecRequest {
   command: string
+  /** Preserve captured output until owned-range exit; direct completion remains independent. */
+  captureRangeOutput?: true
   /** Working directory override (default: implementation-configured). */
   workdir?: string | undefined
   /** Timeout override in milliseconds (implementations cap it). */
@@ -73,6 +75,8 @@ interface ShellExecRequest {
  */
 interface ShellExecSpec {
   command: string
+  /** Preserve captured output until owned-range exit; direct completion remains independent. */
+  captureRangeOutput?: true
   workdir: string
   timeoutMs: number
   /**
@@ -164,6 +168,8 @@ interface ShellSandboxInfo {
 
 当受限模式没有可用后端时，`ctx.sandbox` 提供方会抛出、执行器会传播由[沙箱 seam](sandbox.zh.md)所有的 `SANDBOX_UNAVAILABLE` 错误码。选定的 runner 拒绝其 profile 时会触达同一个故障关闭的前台错误；已结束的后台任务则记录 `runnerFailed`。模型会在结果中收到拒绝/runner 事实，仅当拒绝标记指出生效模式时才得知该模式，并可通过 `sandbox_permissions` 加 `justification` 请求一次性、严格更宽松的重试；执行任何操作前，`ctx.approval` 必须批准该次确切调用。完整的策略与切换设计见[沙箱 Agent Note](../../.agents/notes/implemented/feature/2026-07-06-sandbox.zh.md)。
 
+`PreparedShellLaunch` 捕获无副作用的后台准备。其 `start(signal)` 在发布的 Host 生命周期下返回精确的已准备 shell 范围；提供方无法预检启动时，`ShellExecutor.prepare` 会拒绝。进程句柄将直接结果与所拥有范围的完全停稳保持为独立事实。
+
 ## 后台进程：`ShellProcess`
 
 `start()` 在异步启动准备完成后返回句柄；取消或准备失败会在发布前拒绝调用。该句柄没有 id 或 owner。`dsh-tool-bash` 将它适配为 `ctx.jobs.start()` 钩子；随后由通用运行时拥有任务标识与生命周期。`done` 会在底层进程结算时完成且绝不 reject；subprocess 提供方的 rejection 会生成状态为 `killed` 的进程，并把不声明阶段的错误写入 stderr。进程结算后仍可读取，并且沙箱事实会在 `done` 完成前写入。
@@ -200,6 +206,16 @@ interface ShellProcess {
    * (no-op); idempotent.
    */
   kill(): boolean
+  /** Terminate the owned range and await quiescence, including survivors after direct exit. */
+  terminate(): Promise<void>
+  /** Wait for owned range quiescence; rejects when range observation fails. */
+  waitForExit(): Promise<void>
+  /**
+   * Observe membership without granting signalling authority over the numeric id.
+   * @param pid - Currently observed local process id.
+   * @returns True for observed owned membership, false for absence, undefined when unsupported.
+   */
+  ownsProcess?(pid: number): Promise<boolean | undefined>
 }
 ```
 
@@ -268,6 +284,13 @@ abstract run(spec: ShellExecSpec): Promise<ShellRunResult>
  * @returns the live process handle after preparation; cancellation or setup failure rejects.
  */
 abstract start(spec: ShellExecSpec): Promise<ShellProcess>
+
+/**
+ * Prepare every launch prerequisite without creating a process.
+ * @param _spec - Resolved command and preparation cancellation.
+ * @returns Exact launch capability; unsupported providers reject.
+ */
+prepare(_spec: ShellExecSpec): Promise<PreparedShellLaunch>
 ```
 
 Source: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)

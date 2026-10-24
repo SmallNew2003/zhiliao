@@ -85,6 +85,10 @@ const output = handle.collected.stdout?.readFrom(0)
 
 -----
 
+`SubprocessHandle.ownsProcess(pid)` 是可选的只读成员观察。macOS 本地 fallback 将最新进程组观察与仍拥有的组比较；确认范围退出后返回 false，观察失败或不受支持时返回 undefined。其他本地平台返回 undefined；原生 containment 模式省略该能力。消费方必须在成员观察前后复核当前创建事实，保留不受支持的观察，绝不能用此查询授权向外部 PID 发信号。进程组和创建时间标签提供观察证据，而非原子的进程身份。
+
+收集模式可选择 `untilRangeExit: true`：`done` 保留直接命令时序，而读取方继续接收所拥有后代进程的输出。确认范围退出后，`graceMs` 限制最终管道排空；即使逃逸后代仍持有描述符，清理也会关闭并等待捕获管道。默认收集模式时序保持不变。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 

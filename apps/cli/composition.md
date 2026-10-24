@@ -146,6 +146,14 @@ flowchart LR
   cfg --> plugin_dsh_base_workflow_ptc
   plugin_dsh_base_tool_workflow["tool-workflow<br/>@deepseek-ai/dsh-tool-workflow"]
   cfg --> plugin_dsh_base_tool_workflow
+  plugin_dsh_base_project_services_local["project-services-local<br/>@deepseek-ai/dsh-project-services-local"]
+  cfg --> plugin_dsh_base_project_services_local
+  plugin_dsh_base_project_services_native["project-services-native<br/>@deepseek-ai/dsh-project-services-local/native"]
+  cfg --> plugin_dsh_base_project_services_native
+  plugin_dsh_base_project_services_docker["project-services-docker<br/>@deepseek-ai/dsh-project-services-docker"]
+  cfg --> plugin_dsh_base_project_services_docker
+  plugin_dsh_base_tool_project_services["tool-project-services<br/>@deepseek-ai/dsh-tool-project-services"]
+  cfg --> plugin_dsh_base_tool_project_services
   plugin_dsh_base_timeout_policy["timeout-policy<br/>@deepseek-ai/dsh-tool-call-timeout-policy"]
   cfg --> plugin_dsh_base_timeout_policy
   plugin_dsh_base_spill_local["spill-local<br/>@deepseek-ai/dsh-spill-local"]
@@ -259,6 +267,10 @@ flowchart LR
 | `ptc-runtime` | `@deepseek-ai/dsh-ptc-runtime-node` |
 | `workflow-ptc` | `@deepseek-ai/dsh-workflow-ptc` |
 | `tool-workflow` | `@deepseek-ai/dsh-tool-workflow` |
+| `project-services-local` | `@deepseek-ai/dsh-project-services-local` |
+| `project-services-native` | `@deepseek-ai/dsh-project-services-local/native` |
+| `project-services-docker` | `@deepseek-ai/dsh-project-services-docker` |
+| `tool-project-services` | `@deepseek-ai/dsh-tool-project-services` |
 | `timeout-policy` | `@deepseek-ai/dsh-tool-call-timeout-policy` |
 | `spill-local` | `@deepseek-ai/dsh-spill-local` |
 | `spill-policy` | `@deepseek-ai/dsh-spill-policy` |

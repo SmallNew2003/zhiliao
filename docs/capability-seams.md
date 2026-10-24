@@ -114,6 +114,16 @@ flowchart LR
   pkg_command_feedback["command-feedback"]
   svc_sessionFeedback["ctx.sessionFeedback<br/>Session-level feedback recorder"]
   svc_workspaceRegistry["ctx.workspaceRegistry<br/>Workspace entity registry"]
+  pkg_project_services["project-services"]
+  svc_projectServices["ctx.projectServices<br/>Project service inventory, logs, and control"]
+  pkg_project_services_local["project-services-local"]
+  pkg_project_services_docker["project-services-docker"]
+  pkg_tool_project_services["tool-project-services"]
+  pkg_api_project_services_controller["api-project-services-controller"]
+  svc_nativeProjectServices["ctx.nativeProjectServices<br/>Native process provider"]
+  svc_dockerProjectServices["ctx.dockerProjectServices<br/>Docker and Compose container provider"]
+  svc_projectServicesController["ctx.projectServicesController<br/>Project service RPC controller"]
+  pkg_api_remotes["api-remotes"]
   svc_sessionQuery["ctx.sessionQuery<br/>Session reads, traces, filters, and search"]
   pkg_session_reference["session-reference"]
   pkg_tool_session_query["tool-session-query"]
@@ -259,6 +269,7 @@ flowchart LR
   pkg_agent_loop --> svc_agentLoop
   pkg_agent_presets --> svc_agentPresets
   pkg_api_gateway --> svc_typertGateway
+  pkg_api_project_services_controller --> svc_projectServicesController
   pkg_api_session_controller --> svc_sessionController
   pkg_api_session_controller --> svc_sessionFileReferences
   pkg_api_session_controller --> svc_sessionSkillCatalog
@@ -326,6 +337,11 @@ flowchart LR
   pkg_plan_mode --> svc_planMode
   pkg_plugin_manager --> svc_pluginManager
   pkg_plugin_package_inventory_deepseek --> svc_deepseekLlmApiExtensions
+  pkg_project_services --> svc_projectServices
+  pkg_project_services_docker --> svc_dockerProjectServices
+  pkg_project_services_docker --> svc_projectServices
+  pkg_project_services_local --> svc_nativeProjectServices
+  pkg_project_services_local --> svc_projectServices
   pkg_ptc_runtime --> svc_ptcRuntime
   pkg_ptc_runtime_node --> svc_ptcRuntime
   pkg_pwsh_local --> svc_shell
@@ -423,6 +439,7 @@ flowchart LR
   svc_credentials --> pkg_llm_pi_ai
   svc_deepseekLlmApiExtensions --> pkg_llm_deepseek
   svc_directoryPicker --> pkg_api_workspace_controller
+  svc_dockerProjectServices --> pkg_tool_project_services
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_fileReferences --> pkg_api_session_controller
   svc_fileUploads --> pkg_api_session_controller
@@ -440,10 +457,14 @@ flowchart LR
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
   svc_mcpResources --> pkg_mcp_resources
+  svc_nativeProjectServices --> pkg_tool_project_services
   svc_officeToPdf --> pkg_client_ui_sidebar_documentpreview
   svc_pluginManager --> pkg_plugin_manager
   svc_pluginManager --> pkg_ui_settings_plugin_inventory
   svc_profileContext --> pkg_plugin_manager
+  svc_projectServices --> pkg_api_project_services_controller
+  svc_projectServices --> pkg_tool_project_services
+  svc_projectServicesController --> pkg_api_remotes
   svc_ptcRuntime --> pkg_tools
   svc_ptcRuntime --> pkg_workflow_ptc
   svc_sandbox --> pkg_bash_sandbox
@@ -576,6 +597,10 @@ flowchart LR
 | `ctx.messageFeedback` | `core` | [`message-feedback`](../packages/feedback/message-feedback) | - | - | - | Owns per-assistant-message feedback in the canonical Session log, target validation, per-item compare-and-set, and the Host unary Remote contract. Feedback stays outside model history; log export follows the consumer policy. |
 | `ctx.sessionFeedback` | `core` | [`command-feedback`](../packages/feedback/command-feedback) | - | - | - | Records one Session-level remark with its category as a log-only feedback/record event on a live Session through the Host unary Remote contract; the /feedback command shares the same producer. |
 | `ctx.workspaceRegistry` | `core` | [`workspace`](../packages/workspace/workspace) | - | [`api-workspace-controller`](../packages/api/workspace-controller), [`api-session-controller`](../packages/api/session-controller) | - | Owns WorkspaceId-branded records over the domain facility; stable sessionIds accounts drive Host RPC and GUI projections. |
+| `ctx.projectServices` | `seam` | [`project-services`](../packages/workspace/project-services) | [`project-services-local`](../packages/workspace/project-services-local), [`project-services-docker`](../packages/workspace/project-services-docker) | [`tool-project-services`](../packages/workspace/tool-project-services), [`api-project-services-controller`](../packages/api/project-services-controller) | - | One runtime resolves the Git worktree project and routes every read and control call through registered providers; managed native processes outlive the Session that started them. |
+| `ctx.nativeProjectServices` | `core` | [`project-services-local`](../packages/workspace/project-services-local) | - | [`tool-project-services`](../packages/workspace/tool-project-services) | - | Discovers project-associated listeners and manages harness-started processes; external listeners stay read-only so no unbound PID is ever signalled. |
+| `ctx.dockerProjectServices` | `core` | [`project-services-docker`](../packages/workspace/project-services-docker) | - | [`tool-project-services`](../packages/workspace/tool-project-services) | - | Validates daemon identity and freezes Compose group members before a mutating action; an unreachable daemon marks the container surface stale instead of hiding native services. |
+| `ctx.projectServicesController` | `core` | [`api-project-services-controller`](../packages/api/project-services-controller) | - | [`api-remotes`](../packages/api/remotes) | - | Publishes inventory, logs, control, and the live stream to the browser panel under the same authorization the Agent tools use. |
 | `ctx.sessionQuery` | `seam` | [`session-query`](../packages/session-query/session-query) | [`session-query-sqlite`](../packages/session-query/session-query-sqlite) | [`session-reference`](../packages/context/session-reference), [`tool-session-query`](../packages/session-query/tool-session-query) | - | The interface supplies exact reads, filters, and traces; its concrete backend adds full-text reconciliation, ranking, snippets, and cursor generations, while the model consumer owns workspace authority and cursor-free rendering. |
 | `ctx.fileReferences` | `seam` | [`file-reference`](../packages/context/file-reference) | [`file-reference-local`](../packages/context/file-reference-local) | [`api-session-controller`](../packages/api/session-controller) | - | The interface returns path-only completion candidates within an Agent cwd; providers own namespace access and ranking without reading file contents. |
 | `ctx.sessionReferenceResolver` | `core` | [`session-reference`](../packages/context/session-reference) | - | - | - | Projects bounded current-surface conversation snapshots into durable untrusted message context; host adapters own mention syntax. |
