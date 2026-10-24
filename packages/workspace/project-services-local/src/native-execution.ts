@@ -89,5 +89,6 @@ export async function resolveHumanLaunch(
   const spec = { argv: [shell, '-c', `exec ${nativeCommandText(captured)}`], cwd,
     stdio: { stdin: 'ignore' as const, stdout: { maxBytes: config.retainedOutputBytes, untilRangeExit: true as const },
       stderr: { maxBytes: config.retainedOutputBytes, untilRangeExit: true as const } }, graceMs: config.terminationGraceMs }
-  return { command: captured, cwd, start: async hostSignal => subprocessProcess(subprocess.spawn({ ...spec, signal: hostSignal })) }
+  return { command: captured, cwd,
+    start: hostSignal => Promise.resolve(subprocessProcess(subprocess.spawn({ ...spec, signal: hostSignal }))) }
 }

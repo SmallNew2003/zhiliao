@@ -14,17 +14,42 @@ import { projectServicesDomain } from './storage.ts'
 import { immutableFacts, ServiceTargetLocks } from './operations.ts'
 export { RetainedServiceLog } from './logs.ts'
 
-/** Deployment bounds shared with the provider plugins and their consumers. */
+/** Deployment bounds shared with the provider plugins and their consumers; every field is settable from cordis.yml. */
 export interface Config {
+  /** Interval in milliseconds between inventory change notifications while a feed subscription exists. */
   discoveryIntervalMs: number
+  /** Age in milliseconds after which a provider observation is reported stale with no actions. */
   freshnessMaxMs: number
+  /** Maximum service items in one inventory page; a caller-requested limit above it rejects. */
   pageMaxItems: number
+  /**
+   * Byte cap on captured stdout and stderr retained per managed service range; the native
+   * provider applies the identically named bound from its own configuration.
+   */
   retainedOutputBytes: number
+  /** Default and maximum byte size of one log page; a caller-requested cap above it rejects. */
   agentLogMaxBytes: number
+  /**
+   * Grace period in milliseconds a managed process may take to exit before forced termination;
+   * the Git resolver applies it as the subprocess grace of each bounded Git call.
+   */
   terminationGraceMs: number
+  /**
+   * Time in milliseconds a control request waits for its published operation to settle before
+   * returning the current inventory; the operation continues independently.
+   */
   operationWaitMs: number
+  /**
+   * Deadline in milliseconds for one provider inspection or Git resolver call; expiry fails the
+   * scan and retains the previous observation as stale.
+   */
   scanTimeoutMs: number
+  /** Byte cap on stdout and stderr captured from one Git resolver subprocess call. */
   scanMaxBytes: number
+  /**
+   * Capacity of retained request and operation records; at capacity new control requests reject
+   * and the oldest settled records are evicted.
+   */
   operationMaxRecords: number
 }
 const positive = () => z.number().min(1).max(2147483647).step(1)
@@ -68,7 +93,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     })
   }
 
-  registerProvider(provider: ProjectServiceProvider): () => void {
+  registerProvider(provider: ProjectServiceProvider): () => Promise<void> {
     if (this.providers.has(provider.id)) throw new Error(`Duplicate project service provider: ${provider.id}`)
     return this.ctx.effect(() => {
       this.providers.set(provider.id, provider)
@@ -170,10 +195,16 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       if (this.requests.size >= this.config.operationMaxRecords) throw new Error('Project service operation capacity reached')
       const published = this.publish(access, context, request, signal)
       this.active.add(published)
-      void published.then(() => this.active.delete(published), () => this.active.delete(published))
       entry = { fingerprint, published, settled: false }
       this.requests.set(key, entry)
       const current = entry
+      void published.then(() => this.active.delete(published), () => {
+        this.active.delete(published)
+        // A failure before publication creates no operation, so the same
+        // fingerprint stays free to retry instead of awaiting a promise that is
+        // already rejected; only a published operation keeps the key idempotent.
+        if (this.requests.get(key) === current) this.requests.delete(key)
+      })
       void published.then(result => result.done, () => {}).then(() => { current.settled = true })
     }
     const published = await entry.published
@@ -225,8 +256,10 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
     try {
       yield { kind: 'baseline', snapshot: await this.list(access, request, signal) }
       while (!signal.aborted && !this.host.signal.aborted) {
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- changed() (a closure) sets it.
         if (!dirty) await new Promise<void>((resolve) => { wake = resolve })
         wake = undefined
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- the signal can abort while the wait is awaited.
         if (signal.aborted || this.host.signal.aborted) break
         dirty = false
         yield { kind: 'updated', snapshot: await this.list(access, request, signal) }
@@ -321,7 +354,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       ? [...items, ...groups, ...context.definitions].find(item => item.id === request.targetId)
       : undefined
     if ('targetId' in request && target?.revision !== request.expectedRevision) throw new Error('Service target revision changed')
-    if (target !== undefined && 'stale' in target && target.stale === true) throw new Error('Service observation is stale')
+    if (target !== undefined && 'stale' in target && target.stale) throw new Error('Service observation is stale')
     const definition = target !== undefined && !('providerId' in target) ? target : undefined
     const provider = target !== undefined && 'providerId' in target
       ? this.providers.get(target.providerId)
@@ -398,7 +431,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       if ('targetId' in request) {
         const current = [...scan.items, ...scan.groups, ...fresh.definitions].find(item => item.id === request.targetId)
         if (current?.revision !== request.expectedRevision) throw new Error('Service target revision changed')
-        if ('stale' in current && current.stale === true) throw new Error('Service observation is stale')
+        if ('stale' in current && current.stale) throw new Error('Service observation is stale')
         if ('targetIds' in current && JSON.stringify(current.targetIds) !== JSON.stringify(requestedIds)) {
           throw new Error('Service group membership changed')
         }
@@ -437,7 +470,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
         targetIds, state: 'running', outcomes: [],
       }
       const controller = new AbortController()
-      const abort = () => controller.abort(this.host.signal.reason)
+      const abort = () => { controller.abort(this.host.signal.reason) }
       this.host.signal.addEventListener('abort', abort, { once: true })
       this.operations.set(operation.id, operation)
       this.changed()
@@ -460,7 +493,7 @@ export class LocalProjectServiceRuntime extends ProjectServiceRuntime {
       }
     })
     this.active.add(work)
-    void work.then(() => { this.active.delete(work) }, (error) => { this.active.delete(work); reject(error) })
+    void work.then(() => { this.active.delete(work) }, (error: unknown) => { this.active.delete(work); reject(error) })
     return result
   }
 

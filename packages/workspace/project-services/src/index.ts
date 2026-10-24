@@ -49,6 +49,6 @@ export abstract class ProjectServiceRuntime extends Service {
    * @param provider - Host contribution.
    * @returns Effect-owned removal.
    */
-  abstract registerProvider(provider: ProjectServiceProvider): () => void
+  abstract registerProvider(provider: ProjectServiceProvider): () => Promise<void>
 }
 export default ProjectServiceRuntime

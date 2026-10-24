@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 使用此包可以为人工调用方和智能体提供统一的项目服务 API，同时保留各自独立的权限。使用方可请求清单、独立日志分页、控制操作和实时快照。运行时实现和具体提供方是必要前提；本包不启动进程或容器。
 
@@ -17,6 +17,7 @@ kind: "package-reference"
 - [实现](#implementation)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 <a id="use-this-package"></a>
 ## 使用此包
@@ -65,3 +66,14 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 
 - 此包不提供提供方、传输验证、UI 或模型工具。使用方必须构造受信权限并验证 JSON 请求。提供方必须遵守取消信号并等待托管进程范围终止；直接子进程退出并不意味着整个范围已静止。
+
+<a id="dev-note"></a>
+
+### 开发备注
+
+<details>
+<summary>维护者工作上下文 — 点击展开</summary>
+
+本包只提供类型：共享的服务定义、品牌化标识以及请求与视图契约，因此没有自己的运行时测试。其契约经由提供方与消费方包覆盖，例如 `pnpm exec vitest run packages/workspace/project-services-local`。
+
+</details>

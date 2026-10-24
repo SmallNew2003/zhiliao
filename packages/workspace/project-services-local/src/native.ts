@@ -82,7 +82,7 @@ export class NativeServiceProvider extends Service implements ProjectServiceProv
         await instance.process.terminate(); await instance.settled
       }))
       const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-      if (failures.length > 0) throw new AggregateError(failures.map(result => result.reason), 'Native range termination failed')
+      if (failures.length > 0) throw new AggregateError(failures.map((result): unknown => result.reason), 'Native range termination failed')
     })
   }
   /**
@@ -267,7 +267,7 @@ export class NativeServiceProvider extends Service implements ProjectServiceProv
       item: { id, providerId: this.id, projectId: definition.projectId, checkoutId: checkout.id, definitionId: definition.id,
         revision: revision(), name: definition.name, kind: 'native', state: 'running', ownership: 'managed', actions: ['stop', 'restart'], command: definition.command },
       rangeExited: false, observationFailed: false, lossy: false,
-      timer: setInterval(() => this.capture(instance), this.config.captureIntervalMs),
+      timer: setInterval(() => { this.capture(instance) }, this.config.captureIntervalMs),
       direct: Promise.resolve(), settled: Promise.resolve(),
     }
     this.instances.set(id, instance)
@@ -288,6 +288,8 @@ export class NativeServiceProvider extends Service implements ProjectServiceProv
       this.capture(instance); clearInterval(instance.timer); this.pruneHistory(); this.changed()
       throw error
     })
+    // The range-exit rejection is already recorded on the instance by the
+    // observer above; suppressing it here only prevents an unhandled rejection.
     void instance.settled.catch(() => {})
     this.changed()
   }
@@ -309,6 +311,7 @@ export class NativeServiceProvider extends Service implements ProjectServiceProv
    * @param signal - Read cancellation.
    * @returns Managed output or an explicit external-log limitation.
    */
+  // oxlint-disable-next-line typescript/require-await -- retained-log reads stay synchronous; async keeps the Promise return type
   async logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage> {
     signal.throwIfAborted()
     const instance = this.instances.get(target.id)

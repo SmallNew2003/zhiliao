@@ -17,6 +17,7 @@ Use this package to group local Git worktrees, save service launch definitions, 
 - [Implementation](#implementation)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 <a id="use-this-package"></a>
 ## Use this package
@@ -73,3 +74,14 @@ No direct request-prefix changes or cache invalidations.
 <a id="known-limitations-and-deferred-work"></a>
 
 - The runtime resolves only local paths and requires Git to distinguish repositories. Concrete native and Docker providers are separate contributions. Inventory pages bound service items; definitions, groups and retained operations remain separate collections. Host-local locking cannot prevent external process or Docker changes. Full Loader, tool snapshot and product acceptance belong to the provider and consumer compositions.
+
+<a id="dev-note"></a>
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+Run the runtime spec with `pnpm exec vitest run packages/workspace/project-services-local`; it covers project resolution, native discovery and lifecycle, retained logs, and the read and authorization filtering against a fake subprocess and needs no Host process.
+
+</details>

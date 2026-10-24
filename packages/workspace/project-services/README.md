@@ -17,6 +17,7 @@ Use this package to give human and agent callers one project service API while r
 - [Implementation](#implementation)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
 <a id="use-this-package"></a>
 ## Use this package
@@ -65,3 +66,14 @@ No direct request-prefix changes or cache invalidations.
 <a id="known-limitations-and-deferred-work"></a>
 
 - This package supplies no providers, transport validation, UI, or model tools. Consumers must construct trusted authority and validate JSON requests. Providers must honor cancellation and await managed-range termination; a direct child exit does not establish range quiescence.
+
+<a id="dev-note"></a>
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+This package is type-only: it ships the shared service definitions, branded identifiers, and request and view contracts, so it carries no runtime spec of its own. Its contracts are exercised through the provider and consumer packages, for example `pnpm exec vitest run packages/workspace/project-services-local`.
+
+</details>

@@ -44,12 +44,12 @@ export class RetainedServiceLog {
     const text = this.bytes.subarray(offset - retainedStart).toString('utf8')
     const page = (count: number): ServiceLogPage => {
       // Slice only at Unicode code-point boundaries before deriving the byte cursor.
-      const value = [...text].slice(0, count).join('')
+      const value = Array.from(text).slice(0, count).join('')
       const next = offset + Buffer.byteLength(value)
       return { chunks: value === '' ? [] : [{ targetId: this.targetId, stream: 'combined', text: value }], nextCursor: brandString<ServiceCursor>(String(next)), truncated: gap || next < this.end, gap }
     }
     if (Buffer.byteLength(JSON.stringify(page(0))) > maxBytes) throw new Error('Service log response limit cannot hold metadata')
-    let low = 0, high = [...text].length
+    let low = 0, high = Array.from(text).length
     while (low < high) {
       const middle = Math.ceil((low + high) / 2)
       if (Buffer.byteLength(JSON.stringify(page(middle))) <= maxBytes) low = middle

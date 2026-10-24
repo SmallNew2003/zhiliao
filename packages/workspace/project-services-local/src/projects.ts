@@ -7,7 +7,7 @@ import { stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { realpathNormalize } from '@deepseek-ai/dsh-workspace'
-import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import type { SubprocessOutputReader, SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { ServiceAccess, ServiceCheckout, ServiceProject, ServiceProjectId, ServiceCheckoutId } from '@deepseek-ai/dsh-project-services'
 
 /** Explicit resource bounds for local Git inspection. */
@@ -86,9 +86,8 @@ export class ProjectResolver {
     })
     const outcome = await handle.done
     combined.throwIfAborted()
-    const { stdout, stderr } = handle.collected
-    if (stdout === undefined || stderr === undefined) throw new Error('Git subprocess did not provide collected output')
-    const output = stdout.readFrom(0), error = stderr.readFrom(0)
+    const output = (handle.collected.stdout as SubprocessOutputReader).readFrom(0),
+      error = (handle.collected.stderr as SubprocessOutputReader).readFrom(0)
     if (output.lossy || error.lossy) throw new Error('Git inspection exceeded its output limit')
     return { exitCode: outcome.exitCode, text: output.text, error: error.text }
   }

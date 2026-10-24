@@ -1,19 +1,27 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ProjectServiceProvider, ServiceItem, ServiceRequestId, ServiceTargetId, ServiceProviderId, ServiceRevision } from '@deepseek-ai/dsh-project-services'
-import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { accessFor, git, harness, signal } from './helpers.ts'
+import type { Config as RuntimeConfig } from '../src/index.ts'
 
 const cleanup: (() => Promise<unknown>)[] = []
 afterEach(async () => { for (const dispose of cleanup.splice(0).reverse()) await dispose() })
-async function fixture() {
+async function fixture(config?: Partial<RuntimeConfig>) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'service-projects-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
-  const h = await harness()
+  const h = await harness(undefined, config)
   cleanup.push(() => h.dispose())
   return { ...h, root }
+}
+async function repository(root: string, ctx: Parameters<typeof git>[0], name: string) {
+  const main = join(root, name)
+  await mkdir(main)
+  await git(ctx, main, 'init')
+  await git(ctx, main, 'commit', '--allow-empty', '-m', 'initial')
+  return main
 }
 it('groups an external worktree with its common repository but excludes an independent clone', async () => {
   const { root, ctx, runtime } = await fixture()
@@ -98,4 +106,125 @@ it('keeps a managed target readable and stoppable after its linked checkout disa
   }
   await runtime.control(access, { requestId: brandString<ServiceRequestId>('stop'), action: 'stop', targetId: target.id, expectedRevision: target.revision }, signal())
   expect(stopped).toBe(true)
+})
+
+it('拒绝把文件当作项目工作目录', async () => {
+  const { root, runtime } = await fixture()
+  const file = join(root, 'not-a-directory')
+  await writeFile(file, 'placeholder')
+  await expect(runtime.list(accessFor(file), {}, signal())).rejects.toThrow('Project cwd is not a directory')
+})
+
+it('在 git 探测返回其他错误时向上报告失败', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const repo = await repository(root, ctx, 'corrupt')
+  await rm(join(repo, '.git'), { recursive: true, force: true })
+  await writeFile(join(repo, '.git'), 'not-a-gitfile')
+  await expect(runtime.list(accessFor(repo), {}, signal())).rejects.toThrow('Git project inspection failed')
+})
+
+it('在 git 工作树清单失败时向上报告失败', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main')
+  const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
+  const refused = (reason: string) => ({
+    stdin: undefined, stdout: undefined, stderr: undefined, control: undefined,
+    collected: {
+      stdout: { readFrom: () => ({ text: '', nextOffset: 0, lossy: false }) },
+      stderr: { readFrom: () => ({ text: reason, nextOffset: reason.length, lossy: false }) },
+    },
+    done: Promise.resolve({ exitCode: 128, signal: null }), terminate: () => {}, waitForExit: async () => true,
+  })
+  const spy = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(spec =>
+    spec.argv.includes('worktree') ? refused('worktree listing refused') : spawn(spec))
+  cleanup.push(async () => { spy.mockRestore() })
+  await expect(runtime.list(accessFor(main), {}, signal())).rejects.toThrow('Git worktree inspection failed')
+})
+
+it('在 git 公共目录查询失败时向上报告失败', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main')
+  const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
+  const spy = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation(spec =>
+    spec.argv.includes('--git-common-dir') ? {
+      stdin: undefined, stdout: undefined, stderr: undefined, control: undefined,
+      collected: {
+        stdout: { readFrom: () => ({ text: '', nextOffset: 0, lossy: false }) },
+        stderr: { readFrom: () => ({ text: 'common directory refused', nextOffset: 30, lossy: false }) },
+      },
+      done: Promise.resolve({ exitCode: 128, signal: null }), terminate: () => {}, waitForExit: async () => true,
+    } : spawn(spec))
+  cleanup.push(async () => { spy.mockRestore() })
+  await expect(runtime.list(accessFor(main), {}, signal())).rejects.toThrow('Git common directory inspection failed')
+})
+
+it('在 git 输出超过字节上限时向上报告失败', async () => {
+  const { root, ctx, runtime } = await fixture({ scanMaxBytes: 8 })
+  const main = await repository(root, ctx, 'main')
+  await expect(runtime.list(accessFor(main), {}, signal())).rejects.toThrow('Git inspection exceeded its output limit')
+})
+
+it('跳过已删除但仍留在清单中的工作树', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), linked = join(root, 'linked')
+  await git(ctx, main, 'worktree', 'add', '-b', 'linked', linked)
+  await rm(linked, { recursive: true, force: true })
+  const inventory = await runtime.list(accessFor(main), {}, signal())
+  expect(inventory.checkouts.map(item => item.path)).toEqual([main])
+})
+
+it('在工作树路径无法解析时向上报告失败', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), linked = join(root, 'linked')
+  await git(ctx, main, 'worktree', 'add', '-b', 'linked', linked)
+  await rm(linked, { recursive: true, force: true })
+  await symlink(linked, linked)
+  await expect(runtime.list(accessFor(main), {}, signal())).rejects.toThrow(/ELOOP|too many levels/)
+})
+
+it('跳过清单中已变成文件的工作树路径', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), linked = join(root, 'linked')
+  await git(ctx, main, 'worktree', 'add', '-b', 'linked', linked)
+  await rm(linked, { recursive: true, force: true })
+  await writeFile(linked, 'not a directory')
+  const inventory = await runtime.list(accessFor(main), {}, signal())
+  expect(inventory.checkouts.map(item => item.path)).toEqual([main])
+})
+
+it('跳过清单中 git 探测失败的工作树', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), linked = join(root, 'linked')
+  await git(ctx, main, 'worktree', 'add', '-b', 'linked', linked)
+  await writeFile(join(linked, '.git'), 'not-a-gitfile')
+  const inventory = await runtime.list(accessFor(main), {}, signal())
+  expect(inventory.checkouts.map(item => item.path)).toEqual([main])
+})
+
+it('跳过属于其他仓库的工作树条目', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), other = await repository(root, ctx, 'other'), otherLinked = join(root, 'other-linked')
+  await git(ctx, other, 'worktree', 'add', '-b', 'other-linked', otherLinked)
+  await mkdir(join(main, '.git', 'worktrees', 'foreign'), { recursive: true })
+  await writeFile(join(main, '.git', 'worktrees', 'foreign', 'gitdir'), `${otherLinked}/.git\n`)
+  const inventory = await runtime.list(accessFor(main), {}, signal())
+  expect(inventory.checkouts.map(item => item.path)).toEqual([main])
+})
+
+it('跳过顶层目录与清单路径不一致的工作树条目', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), plain = join(main, 'plain')
+  await mkdir(plain)
+  await mkdir(join(main, '.git', 'worktrees', 'plain'), { recursive: true })
+  await writeFile(join(main, '.git', 'worktrees', 'plain', 'gitdir'), `${plain}/.git\n`)
+  const inventory = await runtime.list(accessFor(main), {}, signal())
+  expect(inventory.checkouts.map(item => item.path)).toEqual([main])
+})
+
+it('在当前检出不在工作树清单中时向上报告失败', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main'), linked = join(root, 'linked')
+  await git(ctx, main, 'worktree', 'add', '-b', 'linked', linked)
+  await writeFile(join(main, '.git', 'worktrees', 'linked', 'gitdir'), `${join(root, 'absent')}/.git\n`)
+  await expect(runtime.list(accessFor(linked), {}, signal())).rejects.toThrow('absent from Git worktree inventory')
 })

@@ -1,18 +1,18 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtemp, realpath, rm, writeFile, unlink, mkdir } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile, unlink, mkdir, rename, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { connect } from 'node:net'
 import { afterEach, expect, it, vi } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ServiceRequestId, ServiceItem } from '@deepseek-ai/dsh-project-services'
+import type { ServiceRequestId, ServiceItem, ServiceCheckoutId, ServiceProjectId, ServiceRevision, ServiceTargetId, ServiceNativeExecution, ServiceNativeLifetime, ServiceNativeProcess } from '@deepseek-ai/dsh-project-services'
 import NativeServiceProvider, { createShellServiceExecution } from '../src/native.ts'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
 import SandboxBashExecutor from '@deepseek-ai/dsh-bash-sandbox'
 import { SandboxProvider } from '@deepseek-ai/dsh-sandbox'
 import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { NativeDiscovery } from '../src/native-discovery.ts'
+import { NativeDiscovery, type NativeListener } from '../src/native-discovery.ts'
 import { harness, accessFor, signal, git } from './helpers.ts'
 
 // Native lifecycle cases pay for multiple bounded lsof/ps scans and Host teardown.
@@ -24,7 +24,16 @@ async function fixture() {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'native-service-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const h = await harness(); cleanup.push(() => h.ctx.fiber.dispose())
-  const native = await h.ctx.plugin(NativeServiceProvider, { terminationGraceMs: 50, captureIntervalMs: 10 })
+  const native = await h.ctx.plugin(NativeServiceProvider, {
+    shellPath: '/bin/bash',
+    retainedOutputBytes: 1048576,
+    terminationGraceMs: 50,
+    scanTimeoutMs: 10000,
+    scanMaxBytes: 1048576,
+    processInspectionMax: 200,
+    captureIntervalMs: 10,
+    historyMaxInstances: 200,
+  })
   cleanup.push(() => native.dispose())
   const access = accessFor(root)
   const baseline = await h.runtime.list(access, {}, signal())
@@ -199,7 +208,7 @@ it.skipIf(process.platform !== 'darwin')('serializes concurrent stop and restart
   const stopped = h.control(target, 'stop')
   await approved.promise
   const restarted = h.control(target, 'restart')
-  const observed = restarted.catch(error => error as Error)
+  const observed = restarted.catch((error: unknown) => error as Error)
   release.resolve(undefined)
   expect((await stopped).operation?.state).toBe('succeeded')
   expect(await observed).toBeInstanceOf(Error)
@@ -322,4 +331,326 @@ it('associates a same-project nested worktree with its most-specific checkout', 
   const checkout = inventory.checkouts.find(value => value.path.endsWith('nested-worktree'))!
   expect(inventory.items[0]?.checkoutId).toBe(checkout.id)
   expect(inventory.items[0]?.ports).toEqual([49123])
+})
+
+function fakeRange(overrides: Partial<ServiceNativeProcess> = {}) {
+  const exit = Promise.withResolvers<undefined>()
+  const process: ServiceNativeProcess = {
+    done: exit.promise.then(() => ({ exitCode: 0, signal: null })),
+    readOutput: () => ({ text: '', lossy: false }),
+    terminate: async () => { exit.resolve(undefined) },
+    waitForExit: async () => { await exit.promise },
+    ...overrides,
+  }
+  return { process, settle: () => { exit.resolve(undefined) } }
+}
+function agentExecution(lifetime: ServiceNativeLifetime, process: ServiceNativeProcess): ServiceNativeExecution {
+  return { lifetime, resolve: async (command, cwd) => ({ command: { argv: [...command.argv] }, cwd, start: async () => process }) }
+}
+function mockScan(listeners: NativeListener[]): void {
+  const spy = vi.spyOn(NativeDiscovery.prototype, 'scan').mockResolvedValue(listeners)
+  cleanup.push(async () => { spy.mockRestore() })
+}
+function providerContext(h: Awaited<ReturnType<typeof fixture>>, overrides: Record<string, unknown> = {}) {
+  return { project: h.baseline.project, checkouts: h.baseline.checkouts, definitions: [], associations: [], ...overrides }
+}
+
+it('拒绝相对路径的人工 shell 配置', async () => {
+  const h = await harness()
+  cleanup.push(h.dispose)
+  await expect(h.ctx.plugin(NativeServiceProvider, {
+    shellPath: 'bash', retainedOutputBytes: 1048576, terminationGraceMs: 50, scanTimeoutMs: 10000,
+    scanMaxBytes: 1048576, processInspectionMax: 200, captureIntervalMs: 10, historyMaxInstances: 200,
+  })).rejects.toThrow('absolute executable path')
+})
+
+it('在 Host 处置时等待进行中的共享扫描', async () => {
+  const h = await fixture()
+  const release = Promise.withResolvers<undefined>()
+  cleanup.push(async () => { release.resolve(undefined) })
+  const spy = vi.spyOn(NativeDiscovery.prototype, 'scan').mockImplementation(async () => { await release.promise; return [] })
+  cleanup.push(async () => { spy.mockRestore() })
+  const reading = h.ctx.nativeProjectServices.inspect(providerContext(h), signal())
+  const disposedReader = expect(reading).rejects.toThrow('Native service Host disposed')
+  let disposed = false
+  const closing = h.native.dispose().then(() => { disposed = true })
+  await new Promise<void>(resolve => setImmediate(resolve))
+  expect(disposed).toBe(false)
+  release.resolve(undefined)
+  await closing
+  expect(disposed).toBe(true)
+  await disposedReader
+})
+
+it('在范围终止失败时聚合报告 Host 处置错误', async () => {
+  const h = await fixture()
+  mockScan([])
+  const errors = vi.spyOn(h.ctx.logger, 'error')
+  cleanup.push(async () => { errors.mockRestore() })
+  const { process } = fakeRange({ terminate: async () => { throw new Error('terminate refused') } })
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  expect((await h.start()).operation?.state).toBe('succeeded')
+  await h.native.dispose()
+  expect(errors).toHaveBeenCalledWith(expect.objectContaining({ message: 'Native range termination failed' }))
+})
+
+it('忽略没有工作目录的外部监听', async () => {
+  const h = await fixture()
+  mockScan([{ pid: 31, name: 'orphan', ports: [49123], started: 'fixture' }])
+  expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)
+})
+
+it('跳过工作目录已消失的外部监听', async () => {
+  const h = await fixture()
+  mockScan([{ pid: 31, name: 'gone', ports: [49123], cwd: join(h.root, 'absent'), started: 'fixture' }])
+  expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)
+})
+
+it('对同一范围观察到的多个端口去重排序', async () => {
+  const h = await fixture()
+  const { process } = fakeRange({ ownsProcess: async pid => pid === 31 })
+  mockScan([{ pid: 31, name: 'fixture', ports: [49124, 49123, 49123], cwd: h.root, started: 'fixture' }])
+  const current = vi.spyOn(NativeDiscovery.prototype, 'current').mockResolvedValue(true)
+  cleanup.push(async () => { current.mockRestore() })
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  await h.start()
+  const item = (await h.runtime.list(h.access, {}, signal())).items.findLast(value => value.ownership === 'managed')!
+  expect(item.ports).toEqual([49123, 49124])
+})
+
+it('把检出目录内普通子目录的监听归入该项目', async () => {
+  const h = await fixture()
+  const sub = join(h.root, 'sub')
+  await mkdir(sub)
+  mockScan([{ pid: 31, name: 'worker', ports: [49123], cwd: sub, started: 'fixture' }])
+  const item = (await h.runtime.list(h.access, {}, signal())).items[0]!
+  expect(item.ownership).toBe('external')
+  expect(item.checkoutId).toBe(h.baseline.checkouts[0]!.id)
+})
+
+it('在观测目录的组件不是目录时向上层报告失败', async () => {
+  const h = await fixture()
+  const file = join(h.root, 'not-a-dir')
+  await writeFile(file, 'placeholder')
+  mockScan([{ pid: 31, name: 'worker', ports: [49123], cwd: file, started: 'fixture' }])
+  await expect(h.ctx.nativeProjectServices.inspect(providerContext(h), signal())).rejects.toThrow(/not a directory|ENOTDIR/)
+})
+
+it('按持久定义的身份重新启动已停止的范围', async () => {
+  const h = await fixture()
+  mockScan([])
+  const first = fakeRange()
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, first.process)
+  await h.start()
+  await h.control(await h.item(), 'stop')
+  const definition = (await h.runtime.list(h.access, {}, signal())).definitions[0]!
+  const second = fakeRange()
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, second.process)
+  const result = await h.runtime.control(h.access, { requestId: requestId(), action: 'start', targetId: definition.id, expectedRevision: definition.revision }, signal())
+  expect(result.operation?.state).toBe('succeeded')
+  expect((await h.runtime.list(h.access, {}, signal())).items.filter(item => item.ownership === 'managed' && item.state === 'running')).toHaveLength(1)
+})
+
+it('拒绝属于其他项目的持久定义', async () => {
+  const h = await fixture()
+  const foreign = { id: brandString<ServiceTargetId>('native:foreign'), projectId: brandString<ServiceProjectId>('other-project'), checkoutId: h.baseline.checkouts[0]!.id, name: 'foreign', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  await expect(h.ctx.nativeProjectServices.prepare(providerContext(h, { definitions: [foreign] }),
+    { requestId: requestId(), action: 'start', targetId: foreign.id, expectedRevision: foreign.revision }, h.access, signal()))
+    .rejects.toThrow('another project')
+})
+
+it('拒绝解析不到检出目录的持久定义', async () => {
+  const h = await fixture()
+  const orphan = { id: brandString<ServiceTargetId>('native:orphan'), projectId: h.baseline.project.id, checkoutId: brandString<ServiceCheckoutId>('absent-checkout'), name: 'orphan', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  await expect(h.ctx.nativeProjectServices.prepare(providerContext(h, { definitions: [orphan] }),
+    { requestId: requestId(), action: 'start', targetId: orphan.id, expectedRevision: orphan.revision }, h.access, signal()))
+    .rejects.toThrow('Native checkout unavailable')
+})
+
+it('拒绝在缺失的检出目录上启动', async () => {
+  const h = await fixture()
+  const missing = { ...h.baseline.checkouts[0]!, availability: 'missing' as const }
+  const definition = { id: brandString<ServiceTargetId>('native:missing-checkout'), projectId: h.baseline.project.id, checkoutId: missing.id, name: 'gone', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  await expect(h.ctx.nativeProjectServices.prepare(providerContext(h, { checkouts: [missing], definitions: [definition] }),
+    { requestId: requestId(), action: 'start', targetId: definition.id, expectedRevision: definition.revision }, h.access, signal()))
+    .rejects.toThrow('Native checkout is missing')
+})
+
+it('拒绝把已停止范围的停止请求当作可用实例', async () => {
+  const h = await fixture()
+  const definition = { id: brandString<ServiceTargetId>('native:stopped'), projectId: h.baseline.project.id, checkoutId: h.baseline.checkouts[0]!.id, name: 'stopped', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  await expect(h.ctx.nativeProjectServices.prepare(providerContext(h, { definitions: [definition] }),
+    { requestId: requestId(), action: 'stop', targetId: definition.id, expectedRevision: definition.revision }, h.access, signal()))
+    .rejects.toThrow('Native managed instance unavailable')
+})
+
+it('拒绝解析出不同启动事实的代理适配器', async () => {
+  const h = await fixture()
+  mockScan([])
+  h.access.kind = 'agent'
+  const lifetime = h.ctx.nativeProjectServices.lifetime
+  h.access.nativeExecution = { lifetime, resolve: async (command, cwd) => ({ command, cwd: join(cwd, 'elsewhere'), start: async () => { throw new Error('must not start') } }) }
+  await expect(h.start()).rejects.toThrow('different launch facts')
+  h.access.nativeExecution = { lifetime, resolve: async (command, cwd) => ({ command: { argv: [command.argv[0]!] }, cwd, start: async () => { throw new Error('must not start') } }) }
+  await expect(h.start()).rejects.toThrow('different launch facts')
+})
+
+it('拒绝已被其他范围占用的启动身份', async () => {
+  const h = await fixture()
+  const pending = { id: brandString<ServiceTargetId>('native:pending'), projectId: h.baseline.project.id, checkoutId: h.baseline.checkouts[0]!.id, name: 'reserved', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  const prepared = await h.ctx.nativeProjectServices.prepare(providerContext(h, { pendingDefinition: pending }),
+    { requestId: requestId(), action: 'start', definition: { name: pending.name, checkoutId: pending.checkoutId, command: pending.command } }, h.access, signal())
+  const instances = Reflect.get(h.ctx.nativeProjectServices, 'instances') as Map<ServiceTargetId, unknown>
+  instances.set(prepared.description.nativeLaunch!.targetId!, {})
+  await expect(prepared.validate(signal())).rejects.toThrow('already claimed')
+})
+
+it('拒绝把未真正退出的范围当作已停止', async () => {
+  const h = await fixture()
+  const targetId = brandString<ServiceTargetId>('native:stuck')
+  const definition = { id: brandString<ServiceTargetId>('native:stuck-definition'), projectId: h.baseline.project.id, checkoutId: h.baseline.checkouts[0]!.id, name: 'stuck', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  const instances = Reflect.get(h.ctx.nativeProjectServices, 'instances') as Map<ServiceTargetId, unknown>
+  instances.set(targetId, {
+    definition, checkout: h.baseline.checkouts[0]!, item: { id: targetId, revision: brandString<ServiceRevision>('1') },
+    process: { terminate: async () => {} }, settled: Promise.resolve(), rangeExited: false, observationFailed: false,
+  })
+  const prepared = await h.ctx.nativeProjectServices.prepare(providerContext(h, { definitions: [definition] }),
+    { requestId: requestId(), action: 'stop', targetId, expectedRevision: brandString<ServiceRevision>('1') }, h.access, signal())
+  await expect(prepared.execute(signal())).rejects.toThrow('could not be observed')
+})
+
+it('在检出目录被替换为符号链接时中止已授权的操作', async () => {
+  const h = await fixture()
+  mockScan([])
+  const moved = `${h.root}-moved`
+  cleanup.push(async () => { await rm(moved, { recursive: true, force: true }) })
+  const entered = Promise.withResolvers<undefined>(), gate = Promise.withResolvers<undefined>()
+  cleanup.push(async () => { gate.resolve(undefined) })
+  h.access.authorize = async () => { entered.resolve(undefined); await gate.promise }
+  const started = h.start()
+  await entered.promise
+  await rename(h.root, moved)
+  await symlink(moved, h.root)
+  gate.resolve(undefined)
+  await expect(started).rejects.toThrow('Native checkout changed')
+  expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)
+})
+
+it('在进程提供者立即失败时记录范围观测失败', async () => {
+  const h = await fixture()
+  mockScan([])
+  const failed = Promise.reject(new Error('provider failed'))
+  void failed.catch(() => {})
+  const { process } = fakeRange({ done: failed, waitForExit: async () => { await failed } })
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  expect((await h.start()).operation?.state).toBe('succeeded')
+  const item = (await h.runtime.list(h.access, {}, signal())).items.findLast(value => value.ownership === 'managed')!
+  expect(item.state).toBe('unknown')
+  expect(item.detail).toContain('Native range observation failed')
+  await expect(h.runtime.control(h.access, { requestId: requestId(), action: 'stop', targetId: item.id, expectedRevision: item.revision }, signal()))
+    .rejects.toThrow('Native managed identity changed')
+})
+
+it('对外部监听明确报告输出未被捕获', async () => {
+  const h = await fixture()
+  mockScan([{ pid: 31, name: 'external', ports: [49123], cwd: h.root, started: 'fixture' }])
+  const item = (await h.runtime.list(h.access, {}, signal())).items[0]!
+  expect(item.ownership).toBe('external')
+  expect((await h.runtime.logs(h.access, { targetId: item.id }, signal())).unavailable).toContain('External native output')
+})
+
+it('在订阅者抛出异常时记录警告并继续通知其他订阅者', async () => {
+  const h = await fixture()
+  mockScan([])
+  const warn = vi.spyOn(h.ctx.logger, 'warn')
+  cleanup.push(async () => { warn.mockRestore() })
+  const notified: string[] = []
+  const remove = h.ctx.nativeProjectServices.subscribe(() => { throw new Error('listener failed') })
+  h.ctx.nativeProjectServices.subscribe(() => { notified.push('notified') })
+  const { process } = fakeRange()
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  await h.start()
+  remove()
+  expect(notified).toContain('notified')
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('Native service subscriber failed'))
+})
+
+it('在历史容量达到上限时驱逐最早停止的范围', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'native-history-')))
+  cleanup.push(() => rm(root, { recursive: true, force: true }))
+  const h = await harness()
+  cleanup.push(h.dispose)
+  const native = await h.ctx.plugin(NativeServiceProvider, {
+    shellPath: '/bin/bash', retainedOutputBytes: 1048576, terminationGraceMs: 50, scanTimeoutMs: 10000,
+    scanMaxBytes: 1048576, processInspectionMax: 200, captureIntervalMs: 10, historyMaxInstances: 1,
+  })
+  cleanup.push(() => native.dispose())
+  mockScan([])
+  const access = accessFor(root)
+  const baseline = await h.runtime.list(access, {}, signal())
+  const start = async (name: string) => {
+    const { process } = fakeRange()
+    access.kind = 'agent'
+    access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+    return await h.runtime.control(access, { action: 'start', requestId: requestId(), definition: { name, checkoutId: baseline.checkouts[0]!.id, command: { argv: ['node', 'server.js'] } } }, signal())
+  }
+  const stop = async (name: string) => {
+    const target = (await h.runtime.list(access, {}, signal())).items.findLast(item => item.ownership === 'managed' && item.name === name)!
+    return await h.runtime.control(access, { action: 'stop', requestId: requestId(), targetId: target.id, expectedRevision: target.revision }, signal())
+  }
+  await start('first')
+  const evicted = (await h.runtime.list(access, {}, signal())).items.find(item => item.name === 'first')!.id
+  await stop('first')
+  await start('second'); await stop('second')
+  await start('third')
+  const items = (await h.runtime.list(access, {}, signal())).items
+  expect(items.map(item => item.id)).not.toContain(evicted)
+  expect(items.map(item => item.name).sort()).toEqual(['second', 'third'])
+})
+
+it('在更新的扫描已接管时不清理旧扫描的进行中状态', async () => {
+  const h = await fixture()
+  const stale = Promise.withResolvers<NativeListener[]>()
+  const observed: NativeListener[] = [{ pid: 31, name: 'fixture', ports: [49123], cwd: h.root, started: 'fixture' }]
+  const scan = vi.spyOn(NativeDiscovery.prototype, 'scan')
+    .mockImplementationOnce(async () => stale.promise)
+    .mockImplementation(async () => observed)
+  cleanup.push(async () => { scan.mockRestore(); stale.resolve([]) })
+  const context = providerContext(h)
+  const reading = h.ctx.nativeProjectServices.inspect(context, signal())
+  Reflect.set(h.ctx.nativeProjectServices, 'inFlight', Promise.resolve(observed))
+  stale.resolve([])
+  expect((await reading).items).toHaveLength(0)
+  expect((await h.ctx.nativeProjectServices.inspect(context, signal())).items[0]?.ports).toEqual([49123])
+  expect(scan).toHaveBeenCalledTimes(1)
+})
+
+it('在启动失败且未获得进程时直接向上报告', async () => {
+  const h = await fixture()
+  mockScan([])
+  h.access.kind = 'agent'
+  h.access.nativeExecution = { lifetime: h.ctx.nativeProjectServices.lifetime, resolve: async (command, cwd) => ({ command: { argv: [...command.argv] }, cwd, start: async () => { throw new Error('launch refused') } }) }
+  const result = await h.start()
+  expect(result.operation).toBeUndefined()
+  expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)
+  const operations = Reflect.get(h.runtime, 'operations') as Map<string, { state: string; outcomes: { message?: string }[] }>
+  expect([...operations.values()][0]?.state).toBe('failed')
+  expect([...operations.values()][0]?.outcomes[0]?.message).toContain('launch refused')
+})
+
+it('拒绝在运行中的范围上再次启动', async () => {
+  const h = await fixture()
+  mockScan([])
+  const { process } = fakeRange()
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  await h.start()
+  const running = await h.item()
+  await expect(h.runtime.control(h.access, { requestId: requestId(), action: 'start', targetId: running.id, expectedRevision: running.revision }, signal()))
+    .rejects.toThrow('already running')
 })

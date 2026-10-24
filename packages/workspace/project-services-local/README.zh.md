@@ -7,7 +7,7 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## 摘要
+## 概述
 
 使用此包可以聚合本地 Git 工作树、保存服务启动定义，并通过统一的读取授权清单查看和控制服务。关联工作树共享 Git 公共目录；独立克隆和嵌套仓库仍是不同项目。提供方负责实际的原生进程或容器操作。本包需要本地文件系统访问、Git、子进程执行和存储域。
 
@@ -17,6 +17,7 @@ kind: "package-reference"
 - [实现](#implementation)
 - [模型体验](#model-experience)
 - [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 <a id="use-this-package"></a>
 ## 使用此包
@@ -73,3 +74,14 @@ kind: "package-reference"
 <a id="known-limitations-and-deferred-work"></a>
 
 - 运行时仅解析本地路径，并需要 Git 区分仓库。具体原生和 Docker 提供方通过独立贡献加载。清单分页限制服务项；定义、分组和保留操作属于独立集合。Host 本地锁无法防止外部进程或 Docker 变更。完整 Loader、工具快照和产品验收由提供方与使用方组合负责。
+
+<a id="dev-note"></a>
+
+### 开发备注
+
+<details>
+<summary>维护者工作上下文 — 点击展开</summary>
+
+使用 `pnpm exec vitest run packages/workspace/project-services-local` 运行运行时测试；它在 fake subprocess 上覆盖项目解析、原生发现与生命周期、日志留存与读取授权过滤，无需 Host 进程。
+
+</details>

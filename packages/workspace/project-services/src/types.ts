@@ -127,6 +127,11 @@ export interface ResolvedServiceOperation {
   }
   docker?: {
     context: string
+    /**
+     * Docker-owned identifiers, deliberately unbranded: they name resources in
+     * the external daemon rather than harness entities, are minted by the Docker
+     * CLI, and reach the model only inside an immutable operation description.
+     */
     daemonId: string
     containerIds: readonly string[]
   }

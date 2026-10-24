@@ -6,14 +6,14 @@ import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import type { ServiceAccess } from '@deepseek-ai/dsh-project-services'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
-import LocalProjectServiceRuntime from '../src/index.ts'
+import LocalProjectServiceRuntime, { type Config } from '../src/index.ts'
 
 export const signal = () => new AbortController().signal
 export const accessFor = (cwd: string): ServiceAccess => ({
   actorId: brandString<ServiceTypes.ServiceActorId>('actor'), kind: 'human', cwd, executionIdentity: brandString<ServiceTypes.ServiceExecutionIdentity>('local'),
   authorize: async () => {}, canRead: async () => true, revalidate: async () => {},
 })
-export async function harness(pool = new MemoryMediaPool()) {
+export async function harness(pool = new MemoryMediaPool(), config?: Partial<Config>) {
   const ctx = new Context()
   const storage = await ctx.plugin(Storage)
   ctx.effect(() => ctx.storage.backend.register('memory', new MemoryStorageBackend(pool)))
@@ -21,7 +21,7 @@ export async function harness(pool = new MemoryMediaPool()) {
   ctx.effect(() => () => facility.closeAll())
   ctx.provide('storageDomain', facility)
   const subprocess = await ctx.plugin(LocalSubprocessRuntime)
-  const runtimeFiber = await ctx.plugin(LocalProjectServiceRuntime)
+  const runtimeFiber = await ctx.plugin(LocalProjectServiceRuntime, config as Config | undefined)
   return { ctx, runtime: ctx.projectServices, pool, dispose: async () => {
     await runtimeFiber.dispose()
     await subprocess.dispose()
