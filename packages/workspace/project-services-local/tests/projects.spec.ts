@@ -158,6 +158,25 @@ it('在 git 公共目录查询失败时向上报告失败', async () => {
   await expect(runtime.list(accessFor(main), {}, signal())).rejects.toThrow('Git common directory inspection failed')
 })
 
+it('在项目检查子进程中清除环境里的 Git 变量', async () => {
+  const { root, ctx, runtime } = await fixture()
+  const main = await repository(root, ctx, 'main')
+  const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
+  const environments: Record<string, string | undefined>[] = []
+  const spy = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+    if (spec.argv.includes('rev-parse') && spec.env !== undefined) environments.push(spec.env)
+    return spawn(spec)
+  })
+  cleanup.push(async () => { spy.mockRestore() })
+  process.env.GIT_TEST_AMBIENT = 'ambient'
+  try {
+    await runtime.list(accessFor(main), {}, signal())
+  } finally { delete process.env.GIT_TEST_AMBIENT }
+  expect(environments.length).toBeGreaterThan(0)
+  expect(environments.every(env => env.GIT_TEST_AMBIENT === undefined)).toBe(true)
+  expect(environments[0]).toMatchObject({ LC_ALL: 'C', GIT_OPTIONAL_LOCKS: '0' })
+})
+
 it('在 git 输出超过字节上限时向上报告失败', async () => {
   const { root, ctx, runtime } = await fixture({ scanMaxBytes: 8 })
   const main = await repository(root, ctx, 'main')

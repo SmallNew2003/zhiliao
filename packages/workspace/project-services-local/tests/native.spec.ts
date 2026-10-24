@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { connect } from 'node:net'
 import { afterEach, expect, it, vi } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ServiceRequestId, ServiceItem, ServiceCheckoutId, ServiceProjectId, ServiceRevision, ServiceTargetId, ServiceNativeExecution, ServiceNativeLifetime, ServiceNativeProcess } from '@deepseek-ai/dsh-project-services'
+import type { ServiceRequestId, ServiceItem, ServiceCheckoutId, ServiceCursor, ServiceProjectId, ServiceRevision, ServiceTargetId, ServiceNativeExecution, ServiceNativeLifetime, ServiceNativeProcess } from '@deepseek-ai/dsh-project-services'
 import NativeServiceProvider, { createShellServiceExecution } from '../src/native.ts'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
 import SandboxBashExecutor from '@deepseek-ai/dsh-bash-sandbox'
@@ -131,8 +131,12 @@ it.skipIf(process.platform !== 'darwin')('retains stale managed rows and blocks 
   expect(await responds(port)).toBe(true)
 })
 
-it.skipIf(process.platform !== 'darwin')('rejects an adapter with a Session-owned lifetime before launch', { timeout: 90000 }, async () => {
+it('rejects an adapter with a Session-owned lifetime before launch', async () => {
   const h = await fixture()
+  // The rejection happens before any launch, so a stubbed observation keeps the
+  // case independent of the host process table and of concurrent suite load.
+  const scan = vi.spyOn(NativeDiscovery.prototype, 'scan').mockResolvedValue([])
+  cleanup.push(async () => { scan.mockRestore() })
   h.access.kind = 'agent'
   h.access.nativeExecution = { lifetime: { ...h.ctx.nativeProjectServices.lifetime, signal: signal() }, resolve: async () => { throw new Error('must not resolve') } }
   await expect(h.start()).rejects.toThrow('Host subprocess lifetime')
@@ -420,6 +424,37 @@ it('对同一范围观察到的多个端口去重排序', async () => {
   expect(item.ports).toEqual([49123, 49124])
 })
 
+it('在范围不归属该监听时把端口留给外部进程', async () => {
+  const h = await fixture()
+  const { process } = fakeRange({ ownsProcess: async () => false })
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  mockScan([{ pid: 31, name: 'fixture', ports: [49123], cwd: h.root, started: 'fixture' }])
+  await h.start()
+  const items = (await h.runtime.list(h.access, {}, signal())).items
+  expect(items.find(item => item.ownership === 'managed')?.ports ?? []).toEqual([])
+  expect(items.find(item => item.ownership === 'external')?.ports).toEqual([49123])
+})
+
+it('在范围退出后不再把原进程的监听归入该范围', async () => {
+  const h = await fixture()
+  const listeners: NativeListener[] = []
+  const scan = vi.spyOn(NativeDiscovery.prototype, 'scan').mockImplementation(async () => listeners)
+  cleanup.push(async () => { scan.mockRestore() })
+  const current = vi.spyOn(NativeDiscovery.prototype, 'current').mockResolvedValue(true)
+  cleanup.push(async () => { current.mockRestore() })
+  const { process } = fakeRange({ ownsProcess: async () => true })
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  await h.start()
+  await h.control(await h.item(), 'stop')
+  listeners.push({ pid: 31, name: 'fixture', ports: [49123], cwd: h.root, started: 'fixture' })
+  const items = (await h.runtime.list(h.access, {}, signal())).items
+  expect(items.find(item => item.ownership === 'managed')?.state).toBe('stopped')
+  expect(items.find(item => item.ownership === 'managed')?.ports ?? []).toEqual([])
+  expect(items.find(item => item.ownership === 'external')?.ports).toEqual([49123])
+})
+
 it('把检出目录内普通子目录的监听归入该项目', async () => {
   const h = await fixture()
   const sub = join(h.root, 'sub')
@@ -462,6 +497,13 @@ it('拒绝属于其他项目的持久定义', async () => {
     .rejects.toThrow('another project')
 })
 
+it('拒绝控制既非运行实例也无持久定义的目标', async () => {
+  const h = await fixture()
+  await expect(h.ctx.nativeProjectServices.prepare(providerContext(h),
+    { requestId: requestId(), action: 'stop', targetId: brandString<ServiceTargetId>('native:absent'), expectedRevision: brandString<ServiceRevision>('1') }, h.access, signal()))
+    .rejects.toThrow('External native lifecycle control is unavailable')
+})
+
 it('拒绝解析不到检出目录的持久定义', async () => {
   const h = await fixture()
   const orphan = { id: brandString<ServiceTargetId>('native:orphan'), projectId: h.baseline.project.id, checkoutId: brandString<ServiceCheckoutId>('absent-checkout'), name: 'orphan', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
@@ -496,6 +538,16 @@ it('拒绝解析出不同启动事实的代理适配器', async () => {
   await expect(h.start()).rejects.toThrow('different launch facts')
   h.access.nativeExecution = { lifetime, resolve: async (command, cwd) => ({ command: { argv: [command.argv[0]!] }, cwd, start: async () => { throw new Error('must not start') } }) }
   await expect(h.start()).rejects.toThrow('different launch facts')
+})
+
+it('拒绝使用其他 Host 生命周期的代理适配器', async () => {
+  const h = await fixture()
+  const definition = { id: brandString<ServiceTargetId>('native:agent'), projectId: h.baseline.project.id, checkoutId: h.baseline.checkouts[0]!.id, name: 'agent', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  h.access.kind = 'agent'
+  h.access.nativeExecution = { lifetime: { ...h.ctx.nativeProjectServices.lifetime, signal: signal() }, resolve: async () => { throw new Error('must not resolve') } }
+  await expect(h.ctx.nativeProjectServices.prepare(providerContext(h, { definitions: [definition] }),
+    { requestId: requestId(), action: 'start', targetId: definition.id, expectedRevision: definition.revision }, h.access, signal()))
+    .rejects.toThrow('Host subprocess lifetime')
 })
 
 it('拒绝已被其他范围占用的启动身份', async () => {
@@ -561,6 +613,49 @@ it('对外部监听明确报告输出未被捕获', async () => {
   const item = (await h.runtime.list(h.access, {}, signal())).items[0]!
   expect(item.ownership).toBe('external')
   expect((await h.runtime.logs(h.access, { targetId: item.id }, signal())).unavailable).toContain('External native output')
+})
+
+it('在读取托管范围日志时追加范围输出', async () => {
+  const h = await fixture()
+  mockScan([])
+  let delivered = false
+  const { process } = fakeRange({ readOutput: () => {
+    if (delivered) return { text: '', lossy: false }
+    delivered = true
+    return { text: 'fixture output', lossy: false }
+  } })
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  await h.start()
+  const target = await h.item()
+  const page = await h.runtime.logs(h.access, { targetId: target.id, maxBytes: 1024 }, signal())
+  expect(page.chunks.map(chunk => chunk.text).join('')).toBe('fixture output')
+  expect(page.gap).toBe(false)
+})
+
+it('在保留窗口丢弃旧字节后向日志读取方报告缺口', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'native-log-gap-')))
+  cleanup.push(() => rm(root, { recursive: true, force: true }))
+  const h = await harness()
+  cleanup.push(h.dispose)
+  const native = await h.ctx.plugin(NativeServiceProvider, {
+    shellPath: '/bin/bash', retainedOutputBytes: 8, terminationGraceMs: 50, scanTimeoutMs: 10000,
+    scanMaxBytes: 1048576, processInspectionMax: 200, captureIntervalMs: 60000, historyMaxInstances: 200,
+  })
+  cleanup.push(() => native.dispose())
+  mockScan([])
+  const access = accessFor(root)
+  const baseline = await h.runtime.list(access, {}, signal())
+  let delivered = 0
+  const { process } = fakeRange({ readOutput: () => delivered++ < 2 ? { text: 'abcdefgh', lossy: false } : { text: '', lossy: false } })
+  access.kind = 'agent'
+  access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, process)
+  await h.runtime.control(access, { action: 'start', requestId: requestId(), definition: { name: 'chatty', checkoutId: baseline.checkouts[0]!.id, command: { argv: ['node'] } } }, signal())
+  const target = (await h.runtime.list(access, {}, signal())).items.findLast(item => item.ownership === 'managed')!
+  const first = await h.runtime.logs(access, { targetId: target.id, maxBytes: 1024 }, signal())
+  expect(first.gap).toBe(false)
+  expect(first.chunks.map(chunk => chunk.text).join('')).toBe('abcdefgh')
+  expect((await h.runtime.logs(access, { targetId: target.id, maxBytes: 1024, cursor: brandString<ServiceCursor>('0') }, signal())).gap).toBe(true)
 })
 
 it('在订阅者抛出异常时记录警告并继续通知其他订阅者', async () => {
@@ -641,6 +736,26 @@ it('在启动失败且未获得进程时直接向上报告', async () => {
   const operations = Reflect.get(h.runtime, 'operations') as Map<string, { state: string; outcomes: { message?: string }[] }>
   expect([...operations.values()][0]?.state).toBe('failed')
   expect([...operations.values()][0]?.outcomes[0]?.message).toContain('launch refused')
+})
+
+it('在 Host 关闭后终止已获取的范围并放弃发布', async () => {
+  const h = await fixture()
+  mockScan([])
+  let terminated = false
+  const { process } = fakeRange({ terminate: async () => { terminated = true } })
+  const host = Reflect.get(h.ctx.nativeProjectServices, 'host') as AbortController
+  h.access.kind = 'agent'
+  h.access.nativeExecution = {
+    lifetime: h.ctx.nativeProjectServices.lifetime,
+    resolve: async (command, cwd) => ({ command: { argv: [...command.argv] }, cwd, start: async () => {
+      host.abort(new Error('Host closed during launch'))
+      return process
+    } }),
+  }
+  await h.runtime.control(h.access, { action: 'start', requestId: requestId(),
+    definition: { name: 'closed', checkoutId: h.baseline.checkouts[0]!.id, command: { argv: ['node'] } } }, signal())
+  expect(terminated).toBe(true)
+  expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)
 })
 
 it('拒绝在运行中的范围上再次启动', async () => {
