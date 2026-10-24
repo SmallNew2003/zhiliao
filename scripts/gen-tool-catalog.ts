@@ -491,7 +491,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolProjectServices)
     },
     note:
-      'The three tools stay pending until a project-services runtime provides `ctx.projectServices`; the base bundle mounts them beside `@deepseek-ai/dsh-project-services-local`. Mutating calls honor `approvalPolicy` (default `ask`), which routes through the host approval seam when one is mounted — `never` rejects every mutating call without asking anyone. Listing filters, page caps, and the 16 KiB log cap run inside the tools, so provider cursors stay out of the schema.',
+      'The three tools stay pending until a project-services runtime provides `ctx.projectServices`; the base bundle mounts them beside `@deepseek-ai/dsh-project-services-local`, and the shipped web composition moves that host-plane row onto the `standard` and `ptc` agent presets. Mutating calls honor `approvalPolicy` (default `ask`), which routes through the host approval seam when one is mounted — `never` rejects every mutating call without asking anyone. Listing filters, page caps, and the 16 KiB log cap run inside the tools, so provider cursors stay out of the schema.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',
