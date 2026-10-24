@@ -287,7 +287,7 @@ export class LocalBashExecutor extends ShellExecutor {
       dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
     }
     const resolved = [program, ...argv.slice(1)]
-    return { start: async signal => this.startArgv({ ...captured, signal }, resolved) }
+    return { start: signal => Promise.resolve(this.startArgv({ ...captured, signal }, resolved)) }
   }
 
   async start(spec: ShellExecSpec): Promise<ShellProcess> {

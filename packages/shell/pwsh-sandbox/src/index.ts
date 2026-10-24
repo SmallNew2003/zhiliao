@@ -150,6 +150,7 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
       env: spec.env === undefined ? undefined : { ...spec.env },
       dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
     }
+    // oxlint-disable-next-line typescript/require-await -- async keeps a spawn failure a rejection, not a synchronous throw
     return { start: async (signal) => {
       signal.throwIfAborted()
       const launchSpec = { ...captured, signal }
