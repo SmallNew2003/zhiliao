@@ -384,7 +384,7 @@ export type Config = LocalConfig
 
 Depends on: [`LocalConfig`](#deepseek-aidsh-bash-local)
 
-来源：[`packages/shell/bash-sandbox/src/index.ts:36`](../packages/shell/bash-sandbox/src/index.ts)
+来源：[`packages/shell/bash-sandbox/src/index.ts:37`](../packages/shell/bash-sandbox/src/index.ts)
 
 <a id="deepseek-aidsh-client-connection"></a>
 
