@@ -187,6 +187,50 @@ Host service backing the generated `ctx.remote.directoryPicker` namespace. The s
 
 Source: [`packages/api/workspace-controller/src/directory-picker.ts`](../../packages/api/workspace-controller/src/directory-picker.ts)
 
+<a id="ctxdockerprojectservices--dockerserviceprovider"></a>
+
+### `ctx.dockerProjectServices` — `DockerServiceProvider`
+
+Docker and Compose provider contribution; Host disposal preserves all running containers.
+
+```ts cordis-catalog
+/**
+ * Inspect Docker resources matching the project context without mutating lifecycle.
+ * @param context - Resolved project context.
+ * @param signal - Scan cancellation.
+ * @returns Snapshot of observed Docker items and Compose groups.
+ */
+async inspect(context: ServiceProviderContext, signal: AbortSignal): Promise<ServiceProviderSnapshot>
+
+/**
+ * Prepare a mutating operation on a container or Compose group.
+ * @param context - Project scope.
+ * @param request - Operation request.
+ * @param access - Caller authorization context.
+ * @param signal - Preparation cancellation.
+ * @returns Side-effect-free prepared operation.
+ */
+async prepare( context: ServiceProviderContext, request: ServiceControlRequest, access: ServiceAccess, signal: AbortSignal, ): Promise<PreparedServiceOperation>
+
+/**
+ * Fetch bounded logs for an observed Docker target.
+ * @param target - Observed Docker service item.
+ * @param request - Reader-local cursor and byte cap.
+ * @param signal - Read cancellation.
+ * @returns Log page.
+ */
+async logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>
+
+/**
+ * Subscribe to Docker state changes.
+ * @param changed - Change notification callback.
+ * @returns Disposer.
+ */
+subscribe(changed: () => void): () => void
+```
+
+Source: [`packages/workspace/project-services-docker/src/index.ts`](../../packages/workspace/project-services-docker/src/index.ts)
+
 <a id="ctxnativeprojectservices--nativeserviceprovider"></a>
 
 ### `ctx.nativeProjectServices` — `NativeServiceProvider`
@@ -279,10 +323,52 @@ abstract follow(access: ServiceAccess, request: ServiceListRequest, signal: Abor
  * @param provider - Host contribution.
  * @returns Effect-owned removal.
  */
-abstract registerProvider(provider: ProjectServiceProvider): () => void
+abstract registerProvider(provider: ProjectServiceProvider): () => Promise<void>
 ```
 
 Source: [`packages/workspace/project-services/src/index.ts`](../../packages/workspace/project-services/src/index.ts)
+
+<a id="ctxprojectservicescontroller--projectservicescontroller"></a>
+
+### `ctx.projectServicesController` — `ProjectServicesController`
+
+Host Remote service controller exposing project services endpoints.
+
+```ts cordis-catalog
+/**
+ * List current project services, checkouts, and provider status.
+ * @param request - Filter and paging options.
+ * @param signal - Cancellation signal.
+ * @returns Current service inventory view.
+ */
+@Remote('list') async list(request: ApiServiceListRequest, signal: AbortSignal): Promise<ApiServiceInventoryView>
+
+/**
+ * Read retained output logs for a service target.
+ * @param request - Target and pagination parameters.
+ * @param signal - Cancellation signal.
+ * @returns Log page view.
+ */
+@Remote('logs') async logs(request: ApiServiceLogsRequest, signal: AbortSignal): Promise<ApiServiceLogsView>
+
+/**
+ * Execute a service lifecycle action (start, stop, restart).
+ * @param request - Action, target, revision guard, and the caller identity the mutation runs under.
+ * @param signal - Cancellation signal.
+ * @returns Result of the executed operation.
+ */
+@Remote('control') async control(request: ApiServiceControlRequest, signal: AbortSignal): Promise<ApiServiceControlView>
+
+/**
+ * Subscribe to live service inventory changes and operations.
+ * @param request - Filter and paging options.
+ * @param signal - Cancellation signal.
+ * @returns Async stream of update frames.
+ */
+@Remote({ mode: 'stream' }) async *follow(request: ApiServiceListRequest, signal: AbortSignal): AsyncIterable<ApiServiceFeedFrameView>
+```
+
+Source: [`packages/api/project-services-controller/src/index.ts`](../../packages/api/project-services-controller/src/index.ts)
 
 <a id="ctxterminalcontroller--terminalcontroller"></a>
 

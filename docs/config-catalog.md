@@ -1914,6 +1914,103 @@ export interface Config {
 
 Source: [`packages/llm/plugin-package-inventory-deepseek/src/index.ts:32`](../packages/llm/plugin-package-inventory-deepseek/src/index.ts)
 
+<a id="deepseek-aidsh-project-services-docker"></a>
+
+## `@deepseek-ai/dsh-project-services-docker`
+
+Requires: `projectServices` · `subprocess`
+
+```ts config-catalog
+/** Docker provider configuration; every scalar field is a deployment-varying bound settable from cordis.yml. */
+export interface Config {
+  /** Docker context name passed as `--context` on every CLI call; an empty string uses the Docker CLI's default context. */
+  context: string
+  /** Docker CLI executable name or path spawned for every transport call. */
+  command: string
+  /** Grace period in milliseconds for `docker stop` and `docker restart`, rounded to whole seconds with a one-second floor. */
+  terminationGraceMs: number
+  /** Interval in milliseconds between change notifications while at least one subscriber exists. */
+  scanIntervalMs: number
+  /** Window in milliseconds a cached snapshot serves `inspect` before the provider re-queries the daemon. */
+  freshnessMaxMs: number
+  /** Deadline in milliseconds for one Docker CLI dispatch. */
+  scanTimeoutMs: number
+  /** Per-stream capture cap in bytes for one Docker CLI dispatch. */
+  scanMaxBytes: number
+  /** Maximum container ids passed to one `docker inspect` invocation. */
+  inspectBatchSize: number
+  /** Maximum `--tail` lines requested for one container log read. */
+  logTailMaxLines: number
+  /**
+   * Transport execution adapter replacing the default subprocess-backed Docker CLI executor; a
+   * runtime seam supplied by embedding code and tests, not a cordis.yml value.
+   */
+  executor: DockerCliExecutor | undefined
+}
+
+/** Transport execution adapter, allowing subprocess or mock dispatch. */
+export interface DockerCliExecutor {
+  /**
+   * Execute docker CLI with exact arguments and bounded cancellation.
+   * @param args - CLI arguments excluding context flag.
+   * @param signal - Execution cancellation.
+   * @returns Trimmed stdout and stderr strings.
+   */
+  exec(args: readonly string[], signal?: AbortSignal): Promise<{ stdout: string; stderr: string; exitCode: number }>
+}
+```
+
+Source: [`packages/workspace/project-services-docker/src/index.ts:32`](../packages/workspace/project-services-docker/src/index.ts)
+
+<a id="deepseek-aidsh-project-services-local"></a>
+
+## `@deepseek-ai/dsh-project-services-local`
+
+Requires: `subprocess` · `storageDomain`
+
+```ts config-catalog
+/** Deployment bounds shared with the provider plugins and their consumers; every field is settable from cordis.yml. */
+export interface Config {
+  /** Interval in milliseconds between inventory change notifications while a feed subscription exists. */
+  discoveryIntervalMs: number
+  /** Age in milliseconds after which a provider observation is reported stale with no actions. */
+  freshnessMaxMs: number
+  /** Maximum service items in one inventory page; a caller-requested limit above it rejects. */
+  pageMaxItems: number
+  /**
+   * Byte cap on captured stdout and stderr retained per managed service range; the native
+   * provider applies the identically named bound from its own configuration.
+   */
+  retainedOutputBytes: number
+  /** Default and maximum byte size of one log page; a caller-requested cap above it rejects. */
+  agentLogMaxBytes: number
+  /**
+   * Grace period in milliseconds a managed process may take to exit before forced termination;
+   * the Git resolver applies it as the subprocess grace of each bounded Git call.
+   */
+  terminationGraceMs: number
+  /**
+   * Time in milliseconds a control request waits for its published operation to settle before
+   * returning the current inventory; the operation continues independently.
+   */
+  operationWaitMs: number
+  /**
+   * Deadline in milliseconds for one provider inspection or Git resolver call; expiry fails the
+   * scan and retains the previous observation as stale.
+   */
+  scanTimeoutMs: number
+  /** Byte cap on stdout and stderr captured from one Git resolver subprocess call. */
+  scanMaxBytes: number
+  /**
+   * Capacity of retained request and operation records; at capacity new control requests reject
+   * and the oldest settled records are evicted.
+   */
+  operationMaxRecords: number
+}
+```
+
+Source: [`packages/workspace/project-services-local/src/index.ts:18`](../packages/workspace/project-services-local/src/index.ts)
+
 <a id="deepseek-aidsh-ptc-runtime-node"></a>
 
 ## `@deepseek-ai/dsh-ptc-runtime-node`
@@ -3193,6 +3290,35 @@ export interface Config {
 
 Source: [`packages/deliverables/tool-present/src/index.ts:15`](../packages/deliverables/tool-present/src/index.ts)
 
+<a id="deepseek-aidsh-tool-project-services"></a>
+
+## `@deepseek-ai/dsh-tool-project-services`
+
+Requires: `tools` · `projectServices` · `systemPrompt`
+
+```ts config-catalog
+/** Deployment policy and bounds for project service tools. */
+export interface Config {
+  /** Default log bytes read when max_bytes is omitted (default 16 KiB). */
+  defaultMaxLogBytes?: number
+  /** Hard cap on single log read bytes (default 16 KiB). */
+  maxLogBytesCap?: number
+  /** Default items per service list call (default 50). */
+  defaultPageLimit?: number
+  /** Maximum items per service list call (default 200). */
+  maxPageLimit?: number
+  /**
+   * Stance on mutating `service_control` operations (default `'ask'`):
+   * `'ask'` routes each operation through the host approval service, which
+   * fails closed when no answerer is composed; `'never'` rejects every
+   * mutating operation without asking anyone.
+   */
+  approvalPolicy?: 'ask' | 'never'
+}
+```
+
+Source: [`packages/workspace/tool-project-services/src/types.ts:8`](../packages/workspace/tool-project-services/src/types.ts)
+
 <a id="deepseek-aidsh-tool-pwsh"></a>
 
 ## `@deepseek-ai/dsh-tool-pwsh`
@@ -3772,6 +3898,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 
 - `@deepseek-ai/dsh-acp-app` — requires `cmdlineArgs` ([`packages/bundle/acp-app/src/index.ts`](../packages/bundle/acp-app/src/index.ts))
 - `@deepseek-ai/dsh-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
+- `@deepseek-ai/dsh-api-project-services-controller` — requires `typert` · `projectServices` ([`packages/api/project-services-controller/src/index.ts`](../packages/api/project-services-controller/src/index.ts))
 - `@deepseek-ai/dsh-api-remotes` — requires `typertGateway` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
 - `@deepseek-ai/dsh-api-workspace-controller` — requires `typert` · `workspaceRegistry` ([`packages/api/workspace-controller/src/index.ts`](../packages/api/workspace-controller/src/index.ts))
 - `@deepseek-ai/dsh-authorization` — requires `credentials` ([`packages/credentials/authorization/src/index.ts`](../packages/credentials/authorization/src/index.ts))
@@ -3801,6 +3928,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-plugin-manager` ([`packages/client/ui-plugin-manager/src/index.ts`](../packages/client/ui-plugin-manager/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-project-services` ([`packages/client/ui-project-services/src/index.ts`](../packages/client/ui-project-services/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-reference` ([`packages/client/ui-reference/src/index.ts`](../packages/client/ui-reference/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-renderer` ([`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-schedule` ([`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts))
@@ -3875,6 +4003,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@deepseek-ai/dsh-fs` — abstract `FileSystem` ([`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts))
 - `@deepseek-ai/dsh-host-directory-picker` — abstract `DirectoryPicker` ([`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts))
 - `@deepseek-ai/dsh-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
+- `@deepseek-ai/dsh-project-services` — abstract `ProjectServiceRuntime` ([`packages/workspace/project-services/src/index.ts`](../packages/workspace/project-services/src/index.ts))
 - `@deepseek-ai/dsh-ptc-runtime` — abstract `PtcRuntime` ([`packages/ptc-runtime/ptc-runtime/src/index.ts`](../packages/ptc-runtime/ptc-runtime/src/index.ts))
 - `@deepseek-ai/dsh-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
 - `@deepseek-ai/dsh-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))

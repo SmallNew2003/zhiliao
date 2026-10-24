@@ -916,6 +916,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'dockerProjectServices',
+    summary: 'Docker and Compose provider contribution; Host disposal preserves all running containers.',
+    description: 'Docker and Compose provider contribution; Host disposal preserves all running containers.',
+    methods: [
+      {
+        signature: 'async inspect(context: ServiceProviderContext, signal: AbortSignal): Promise<ServiceProviderSnapshot>',
+        description: 'Inspect Docker resources matching the project context without mutating lifecycle.',
+        parameters: [{ name: 'context', description: 'Resolved project context.' }, { name: 'signal', description: 'Scan cancellation.' }],
+        returns: 'Snapshot of observed Docker items and Compose groups.',
+      },
+      {
+        signature: 'async prepare( context: ServiceProviderContext, request: ServiceControlRequest, access: ServiceAccess, signal: AbortSignal, ): Promise<PreparedServiceOperation>',
+        description: 'Prepare a mutating operation on a container or Compose group.',
+        parameters: [{ name: 'context', description: 'Project scope.' }, { name: 'request', description: 'Operation request.' }, { name: 'access', description: 'Caller authorization context.' }, { name: 'signal', description: 'Preparation cancellation.' }],
+        returns: 'Side-effect-free prepared operation.',
+      },
+      {
+        signature: 'async logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>',
+        description: 'Fetch bounded logs for an observed Docker target.',
+        parameters: [{ name: 'target', description: 'Observed Docker service item.' }, { name: 'request', description: 'Reader-local cursor and byte cap.' }, { name: 'signal', description: 'Read cancellation.' }],
+        returns: 'Log page.',
+      },
+      {
+        signature: 'subscribe(changed: () => void): () => void',
+        description: 'Subscribe to Docker state changes.',
+        parameters: [{ name: 'changed', description: 'Change notification callback.' }],
+        returns: 'Disposer.',
+      },
+    ],
+  },
+  {
     key: 'fileReferences',
     summary: 'Host capability for cancellable file-reference discovery.',
     description: 'Host capability for cancellable file-reference discovery.',
@@ -1653,10 +1684,41 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Fresh baseline followed by ordered updates.',
       },
       {
-        signature: 'abstract registerProvider(provider: ProjectServiceProvider): () => void',
+        signature: 'abstract registerProvider(provider: ProjectServiceProvider): () => Promise<void>',
         description: 'Register one provider until its owning effect is disposed.',
         parameters: [{ name: 'provider', description: 'Host contribution.' }],
         returns: 'Effect-owned removal.',
+      },
+    ],
+  },
+  {
+    key: 'projectServicesController',
+    summary: 'Host Remote service controller exposing project services endpoints.',
+    description: 'Host Remote service controller exposing project services endpoints.',
+    methods: [
+      {
+        signature: '@Remote(\'list\') async list(request: ApiServiceListRequest, signal: AbortSignal): Promise<ApiServiceInventoryView>',
+        description: 'List current project services, checkouts, and provider status.',
+        parameters: [{ name: 'request', description: 'Filter and paging options.' }, { name: 'signal', description: 'Cancellation signal.' }],
+        returns: 'Current service inventory view.',
+      },
+      {
+        signature: '@Remote(\'logs\') async logs(request: ApiServiceLogsRequest, signal: AbortSignal): Promise<ApiServiceLogsView>',
+        description: 'Read retained output logs for a service target.',
+        parameters: [{ name: 'request', description: 'Target and pagination parameters.' }, { name: 'signal', description: 'Cancellation signal.' }],
+        returns: 'Log page view.',
+      },
+      {
+        signature: '@Remote(\'control\') async control(request: ApiServiceControlRequest, signal: AbortSignal): Promise<ApiServiceControlView>',
+        description: 'Execute a service lifecycle action (start, stop, restart).',
+        parameters: [{ name: 'request', description: 'Action, target, revision guard, and the caller identity the mutation runs under.' }, { name: 'signal', description: 'Cancellation signal.' }],
+        returns: 'Result of the executed operation.',
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) async *follow(request: ApiServiceListRequest, signal: AbortSignal): AsyncIterable<ApiServiceFeedFrameView>',
+        description: 'Subscribe to live service inventory changes and operations.',
+        parameters: [{ name: 'request', description: 'Filter and paging options.' }, { name: 'signal', description: 'Cancellation signal.' }],
+        returns: 'Async stream of update frames.',
       },
     ],
   },
@@ -4142,6 +4204,58 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ApiKeyRecord',
     declaration: 'export interface ApiKeyRecord {\n    readonly kind: \'api-key\';\n    readonly key?: string;\n    readonly env?: Readonly<Record<string, string>>;\n}',
+  },
+  {
+    name: 'ApiServiceCheckoutView',
+    declaration: 'export interface ApiServiceCheckoutView {\n    id: string;\n    path: string;\n    availability: \'present\' | \'missing\';\n}',
+  },
+  {
+    name: 'ApiServiceControlRequest',
+    declaration: 'export interface ApiServiceControlRequest {\n    cwd?: string;\n    requestId?: string;\n    caller?: string;\n    action: \'start\' | \'stop\' | \'restart\';\n    targetId?: string;\n    expectedRevision?: string;\n    definition?: ApiServiceLaunchDefinitionInput;\n}',
+  },
+  {
+    name: 'ApiServiceControlView',
+    declaration: 'export interface ApiServiceControlView {\n    operation?: {\n        id: string;\n        requestId: string;\n        actorId: string;\n        action: string;\n        targetIds: string[];\n        state: string;\n        outcomes: {\n            targetId: string;\n            state: string;\n        }[];\n    };\n    pending?: boolean;\n}',
+  },
+  {
+    name: 'ApiServiceFeedFrameView',
+    declaration: 'export interface ApiServiceFeedFrameView {\n    kind: \'baseline\' | \'updated\';\n    snapshot: ApiServiceInventoryView;\n}',
+  },
+  {
+    name: 'ApiServiceGroupView',
+    declaration: 'export interface ApiServiceGroupView {\n    id: string;\n    name: string;\n    checkoutId: string;\n    revision: string;\n    targetIds: string[];\n    stale?: boolean;\n}',
+  },
+  {
+    name: 'ApiServiceInventoryView',
+    declaration: 'export interface ApiServiceInventoryView {\n    project: {\n        id: string;\n        path: string;\n    };\n    checkouts: ApiServiceCheckoutView[];\n    items: ApiServiceItemView[];\n    groups: ApiServiceGroupView[];\n    providers: ApiServiceProviderView[];\n    revision: string;\n    nextCursor?: string;\n}',
+  },
+  {
+    name: 'ApiServiceItemView',
+    declaration: 'export interface ApiServiceItemView {\n    id: string;\n    providerId: string;\n    projectId: string;\n    checkoutId: string;\n    revision: string;\n    name: string;\n    kind: \'native\' | \'docker\';\n    state: \'running\' | \'stopped\' | \'starting\' | \'unknown\';\n    ownership: \'managed\' | \'external\';\n    actions: string[];\n    ports?: number[];\n    detail?: string;\n    stale?: boolean;\n}',
+  },
+  {
+    name: 'ApiServiceLaunchDefinitionInput',
+    declaration: 'export interface ApiServiceLaunchDefinitionInput {\n    name: string;\n    checkoutId: string;\n    command: string[];\n}',
+  },
+  {
+    name: 'ApiServiceListRequest',
+    declaration: 'export interface ApiServiceListRequest {\n    cwd?: string;\n    cursor?: string;\n    limit?: number;\n}',
+  },
+  {
+    name: 'ApiServiceLogChunkView',
+    declaration: 'export interface ApiServiceLogChunkView {\n    targetId: string;\n    stream: \'stdout\' | \'stderr\' | \'combined\';\n    text: string;\n}',
+  },
+  {
+    name: 'ApiServiceLogsRequest',
+    declaration: 'export interface ApiServiceLogsRequest {\n    cwd?: string;\n    targetId: string;\n    cursor?: string;\n    maxBytes?: number;\n}',
+  },
+  {
+    name: 'ApiServiceLogsView',
+    declaration: 'export interface ApiServiceLogsView {\n    chunks: ApiServiceLogChunkView[];\n    truncated: boolean;\n    gap: boolean;\n    nextCursor?: string;\n    unavailable?: string;\n}',
+  },
+  {
+    name: 'ApiServiceProviderView',
+    declaration: 'export interface ApiServiceProviderView {\n    id: string;\n    kind: \'native\' | \'docker\';\n    state: string;\n    observedAt: number;\n    reason?: string;\n}',
   },
   {
     name: 'ApiSessionAgentError',
