@@ -925,6 +925,18 @@ describe('mapStopReason / mapUsage', () => {
   })
 
   it.each([
+    // A gateway concurrency cap arrives without an HTTP status and clears
+    // when a slot frees, so it retries like any other rate limit.
+    'gateway_concurrency_limit: Concurrency limit exceeded for user, please retry later',
+    'concurrency limit exceeded',
+    'concurrency-limit reached, retry later',
+    'too many concurrent requests',
+  ])('maps gateway concurrency wording %j to a retryable RATE_LIMIT', (errorMessage) => {
+    expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
+      .toMatchObject({ kind: 'error', failure: { code: 'RATE_LIMIT' } })
+  })
+
+  it.each([
     'other side closed',
     'HTTP2 request did not get a response',
     'WebSocket closed unexpectedly',
