@@ -472,6 +472,12 @@
 - id: command-compact
   disabled: true
 
+# The `projectServices` runtime and its providers stay on the host plane; only
+# the model-facing tools move. This plugin registers three tools and a prompt
+# section and provides no service, so the host plane has no reader for it.
+- id: tool-project-services
+  disabled: true
+
 - id: tool-result-pruner
   disabled: true
 
