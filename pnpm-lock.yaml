@@ -12785,6 +12785,12 @@ importers:
       '@deepseek-ai/dsh-plugin-package-inventory-deepseek':
         specifier: workspace:^
         version: link:../../packages/llm/plugin-package-inventory-deepseek
+      '@deepseek-ai/dsh-project-services':
+        specifier: workspace:^
+        version: link:../../packages/workspace/project-services
+      '@deepseek-ai/dsh-project-services-local':
+        specifier: workspace:^
+        version: link:../../packages/workspace/project-services-local
       '@deepseek-ai/dsh-ptc-runtime':
         specifier: workspace:^
         version: link:../../packages/ptc-runtime/ptc-runtime
@@ -12869,6 +12875,12 @@ importers:
       '@deepseek-ai/dsh-spill':
         specifier: workspace:^
         version: link:../../packages/spill/spill
+      '@deepseek-ai/dsh-storage':
+        specifier: workspace:^
+        version: link:../../packages/storage/storage
+      '@deepseek-ai/dsh-storage-domain':
+        specifier: workspace:^
+        version: link:../../packages/storage/storage-domain
       '@deepseek-ai/dsh-subagent':
         specifier: workspace:^
         version: link:../../packages/subagent/subagent
@@ -12935,6 +12947,9 @@ importers:
       '@deepseek-ai/dsh-tool-present':
         specifier: workspace:^
         version: link:../../packages/deliverables/tool-present
+      '@deepseek-ai/dsh-tool-project-services':
+        specifier: workspace:^
+        version: link:../../packages/workspace/tool-project-services
       '@deepseek-ai/dsh-tool-pwsh':
         specifier: workspace:^
         version: link:../../packages/shell/tool-pwsh
