@@ -6,6 +6,7 @@
   - text: New Session
 - navigation "Global panels":
   - button "Plugins"
+  - button "Project Services"
 - text: Workspaces
 - button "Search sessions":
   - img
