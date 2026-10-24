@@ -329,6 +329,116 @@ class SendMessageArgs(TypedDict):
 class SendMessageOutput(TypedDict):
     messageId: str
 
+class ServiceControlArgsDefinition(TypedDict):
+    # Name to record for the launched service.
+    name: str
+    # Git checkout / worktree the service runs in.
+    checkout_id: str
+    # Exact executable and arguments to run.
+    command: list[str]
+
+class ServiceControlArgs(TypedDict):
+    # Lifecycle action to run; every action mutates the service.
+    action: Literal["start", "stop", "restart"]
+    # Existing service target ID to stop or restart.
+    target_id: NotRequired[str]
+    # Revision that `service_list` reported for `target_id`; a revision that no longer matches fails this call.
+    expected_revision: NotRequired[str]
+    # Launch a new service from this definition instead of acting on an existing target.
+    definition: NotRequired[ServiceControlArgsDefinition]
+    # Additional keys beyond those declared are allowed.
+
+class ServiceControlOutputOutcomes(TypedDict):
+    targetId: str
+    state: str
+    message: NotRequired[str]
+
+class ServiceControlOutput(TypedDict):
+    action: str
+    requestId: str
+    operationId: NotRequired[str]
+    state: Literal["running", "succeeded", "failed", "unknown"]
+    outcomes: list[ServiceControlOutputOutcomes]
+
+class ServiceListArgs(TypedDict):
+    # Filter services by Git checkout / worktree identifier.
+    checkout_id: NotRequired[str]
+    # Filter by service kind (native or docker).
+    kind: NotRequired[Literal["native", "docker"]]
+    # Filter by service state.
+    state: NotRequired[Literal["running", "stopped", "starting", "unknown"]]
+    # Pagination cursor from a previous listing.
+    cursor: NotRequired[str]
+    # Maximum number of items to return.
+    limit: NotRequired[float]
+    # Additional keys beyond those declared are allowed.
+
+class ServiceListOutputProject(TypedDict):
+    id: str
+    path: str
+
+class ServiceListOutputCheckouts(TypedDict):
+    id: str
+    path: str
+    availability: str
+
+class ServiceListOutputItems(TypedDict):
+    id: str
+    name: str
+    kind: Literal["native", "docker"]
+    state: Literal["running", "stopped", "starting", "unknown"]
+    ownership: Literal["managed", "external"]
+    checkoutId: str
+    revision: str
+    actions: list[str]
+    ports: NotRequired[list[int]]
+    detail: NotRequired[str]
+    stale: NotRequired[bool]
+
+class ServiceListOutputGroups(TypedDict):
+    id: str
+    name: str
+    checkoutId: str
+    revision: str
+    targetIds: list[str]
+    stale: NotRequired[bool]
+
+class ServiceListOutputProviders(TypedDict):
+    id: str
+    kind: str
+    state: str
+    reason: NotRequired[str]
+
+class ServiceListOutput(TypedDict):
+    project: ServiceListOutputProject
+    checkouts: list[ServiceListOutputCheckouts]
+    items: list[ServiceListOutputItems]
+    groups: list[ServiceListOutputGroups]
+    providers: list[ServiceListOutputProviders]
+    revision: str
+    nextCursor: NotRequired[str]
+
+class ServiceLogsArgs(TypedDict):
+    # Service target ID to read logs from.
+    target_id: str
+    # Log stream cursor from previous read.
+    cursor: NotRequired[str]
+    # Max bytes to read (capped at 16 KiB).
+    max_bytes: NotRequired[float]
+    # Additional keys beyond those declared are allowed.
+
+class ServiceLogsOutputChunks(TypedDict):
+    targetId: str
+    stream: str
+    text: str
+
+class ServiceLogsOutput(TypedDict):
+    chunks: list[ServiceLogsOutputChunks]
+    nextCursor: NotRequired[str]
+    truncated: bool
+    gap: bool
+    unavailable: NotRequired[str]
+
 class SkillArgs(TypedDict):
     # The exact skill name from the available skills list.
     name: str
@@ -536,6 +646,12 @@ class Tools(Protocol):
         """Read a PNG/JPEG/WebP/GIF file and return the image itself. A path without a file extension is accepted; the format is detected from the file content, so normalized attachment paths can be passed directly without copying or renaming. Harness validates and downscales large supported images before the next model request, so use this tool directly instead of installing image libraries or creating thumbnails merely to inspect an image. Independent files may be read concurrently in small batches. Requires the current model to accept image input."""
     async def send_message(self, args: SendMessageArgs) -> SendMessageOutput:
         """Send a message to a direct continuable child by its agent id. If you are a resident continuable child, you may also target your direct parent. If the target is still working, the message steers its nearest step; if it is idle, the message starts a turn. This call returns no answer from the agent — only confirmation that the message was delivered. A failure means the message was NOT delivered."""
+    async def service_control(self, args: ServiceControlArgs) -> ServiceControlOutput:
+        """Start, stop, or restart one project service. Every action mutates and is gated by one approval decision. Stop or restart an existing target by `target_id` plus the `expected_revision` that `service_list` reported for it — a revision that no longer matches fails the call instead of acting on a service you no longer see. Start a saved definition by `definition` alone."""
+    async def service_list(self, args: ServiceListArgs) -> ServiceListOutput:
+        """List the native processes and Docker containers this project and its Git worktrees run, with each target's state, ports, ownership, and revision. Call it before assuming a service is down or a port is free. Filter by checkout_id, kind, or state; follow nextCursor for later pages."""
+    async def service_logs(self, args: ServiceLogsArgs) -> ServiceLogsOutput:
+        """Read retained stdout and stderr for one project service target, at most 16 KiB per call. Follow nextCursor for more output. `truncated` marks a call that stopped at the byte cap, `gap` marks output the runtime already discarded, and `unavailable` names a target that keeps no output."""
     async def skill(self, args: SkillArgs) -> SkillOutput:
         """Load the full instructions for an available skill. Call this with the exact skill name from the session skill catalog before acting on a task that names or clearly matches that skill."""
     async def subagent(self, args: SubagentArgs) -> SubagentOutput1 | SubagentOutput2 | SubagentOutput3:
