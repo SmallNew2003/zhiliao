@@ -41,6 +41,20 @@ export function isDockerGroupId(targetId: ServiceTargetId): boolean {
 }
 
 /**
+ * Fail when the Docker daemon is no longer the one preparation verified, so a
+ * prepared operation never reaches containers belonging to another daemon.
+ * @param transport - Docker transport.
+ * @param initialDaemonId - Daemon id verified during preparation.
+ * @param signal - Cancellation.
+ */
+async function assertDaemonUnchanged(transport: DockerTransport, initialDaemonId: string, signal: AbortSignal): Promise<void> {
+  const currentDaemon = await transport.info(signal)
+  if (currentDaemon.id !== initialDaemonId) {
+    throw new Error(`Docker daemon changed: expected ${initialDaemonId}, got ${currentDaemon.id}`)
+  }
+}
+
+/**
  * Prepare a Docker container or Compose group lifecycle operation.
  * @param context - Project scope.
  * @param request - Mutating control request.
@@ -120,10 +134,7 @@ async function prepareSingleContainerOperation(
   return Promise.resolve({
     description,
     async validate(sig: AbortSignal): Promise<void> {
-      const currentDaemon = await transport.info(sig)
-      if (currentDaemon.id !== initialDaemonId) {
-        throw new Error(`Docker daemon changed: expected ${initialDaemonId}, got ${currentDaemon.id}`)
-      }
+      await assertDaemonUnchanged(transport, initialDaemonId, sig)
       const inspects = await transport.inspect([containerId], sig)
       const current = inspects[0]
       if (current === undefined) throw new Error(`Container no longer exists: ${containerId}`)
@@ -133,10 +144,7 @@ async function prepareSingleContainerOperation(
       }
     },
     async execute(sig: AbortSignal): Promise<ServiceExecutionResult> {
-      const currentDaemon = await transport.info(sig)
-      if (currentDaemon.id !== initialDaemonId) {
-        throw new Error(`Docker daemon changed: expected ${initialDaemonId}, got ${currentDaemon.id}`)
-      }
+      await assertDaemonUnchanged(transport, initialDaemonId, sig)
       try {
         if (action === 'start') {
           await transport.start(containerId, sig)
@@ -212,10 +220,7 @@ async function prepareGroupOperation(
   return Promise.resolve({
     description,
     async validate(sig: AbortSignal): Promise<void> {
-      const currentDaemon = await transport.info(sig)
-      if (currentDaemon.id !== initialDaemonId) {
-        throw new Error(`Docker daemon changed: expected ${initialDaemonId}, got ${currentDaemon.id}`)
-      }
+      await assertDaemonUnchanged(transport, initialDaemonId, sig)
       const inspects = await transport.inspect(frozenContainerIds, sig)
       if (inspects.length !== frozenContainerIds.length) {
         throw new Error(`Group members disappeared before operation in ${groupId}`)
@@ -228,10 +233,7 @@ async function prepareGroupOperation(
       }
     },
     async execute(sig: AbortSignal): Promise<ServiceExecutionResult> {
-      const currentDaemon = await transport.info(sig)
-      if (currentDaemon.id !== initialDaemonId) {
-        throw new Error(`Docker daemon changed: expected ${initialDaemonId}, got ${currentDaemon.id}`)
-      }
+      await assertDaemonUnchanged(transport, initialDaemonId, sig)
 
       const outcomes: ServiceTargetOutcome[] = []
 
