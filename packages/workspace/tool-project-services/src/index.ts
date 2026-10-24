@@ -19,6 +19,7 @@ import type {
   ServiceRevision,
   ServiceTargetId,
 } from '@deepseek-ai/dsh-project-services'
+import { serviceItemViewTail, serviceLogsView } from '@deepseek-ai/dsh-project-services'
 import { createShellServiceExecution } from '@deepseek-ai/dsh-project-services-local/native'
 // Type-only: merges the `ctx.approval` declaration so the opportunistic read
 // below resolves to the ApprovalService type, and names the closed outcome
@@ -326,10 +327,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         ownership: item.ownership,
         checkoutId: String(item.checkoutId),
         revision: String(item.revision),
-        actions: [...item.actions],
-        ...(item.ports !== undefined ? { ports: [...item.ports] } : {}),
-        ...(item.detail !== undefined ? { detail: item.detail } : {}),
-        ...(item.stale !== undefined ? { stale: item.stale } : {}),
+        ...serviceItemViewTail(item),
       }))
 
       const publicGroups: PublicServiceGroup[] = inv.groups.map(group => ({
@@ -425,17 +423,7 @@ export function apply(ctx: Context, config: Config = {}): void {
         exec.signal,
       )
 
-      const result: PublicServiceLogsResult = {
-        chunks: page.chunks.map(c => ({
-          targetId: String(c.targetId),
-          stream: c.stream,
-          text: c.text,
-        })),
-        truncated: page.truncated,
-        gap: page.gap,
-        ...(page.nextCursor !== undefined ? { nextCursor: String(page.nextCursor) } : {}),
-        ...(page.unavailable !== undefined ? { unavailable: page.unavailable } : {}),
-      }
+      const result: PublicServiceLogsResult = serviceLogsView(page)
       return result
     },
     presentCall: args => presentServiceCall(`Read logs for ${args.target_id}`, 'read', args.target_id),

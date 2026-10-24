@@ -5,6 +5,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { ProjectServiceProvider, ServiceAccess, ServiceControlRequest, ServiceControlResult, ServiceFeedFrame, ServiceInventory, ServiceListRequest, ServiceLogPage, ServiceLogsRequest } from './types.ts'
 export type * from './types.ts'
+export { serviceItemViewTail, serviceLogsView } from './views.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context { projectServices: ProjectServiceRuntime }

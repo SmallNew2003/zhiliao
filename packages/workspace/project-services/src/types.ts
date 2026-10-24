@@ -302,6 +302,34 @@ export interface ServiceLogPage {
   unavailable?: string
 }
 
+/** Item fields every public service view publishes identically. */
+export interface ServiceItemViewTail {
+  actions: string[]
+  ports?: number[]
+  detail?: string
+  stale?: boolean
+}
+
+/** One public log chunk with its source identity. */
+export interface ServiceLogChunkView {
+  targetId: string
+  stream: 'stdout' | 'stderr' | 'combined'
+  text: string
+}
+
+/**
+ * Public projection of one retained log page. Keys publish in a fixed order:
+ * `chunks`, `truncated`, `gap`, then the optional `nextCursor` and
+ * `unavailable`.
+ */
+export interface ServiceLogsView {
+  chunks: ServiceLogChunkView[]
+  truncated: boolean
+  gap: boolean
+  nextCursor?: string
+  unavailable?: string
+}
+
 /** Reconnect always starts with a fresh baseline. */
 export type ServiceFeedFrame = {
   kind: 'baseline' | 'updated'

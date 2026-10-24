@@ -15,11 +15,11 @@ import type {
   ServiceCursor,
   ServiceExecutionIdentity,
   ServiceInventory,
-  ServiceLogPage,
   ServiceRequestId,
   ServiceRevision,
   ServiceTargetId,
 } from '@deepseek-ai/dsh-project-services'
+import { serviceItemViewTail, serviceLogsView } from '@deepseek-ai/dsh-project-services'
 import type {
   ApiServiceCheckoutView,
   ApiServiceControlRequest,
@@ -75,10 +75,7 @@ function mapInventoryView(inventory: ServiceInventory): ApiServiceInventoryView 
     kind: item.kind,
     state: item.state,
     ownership: item.ownership,
-    actions: [...item.actions],
-    ...(item.ports !== undefined ? { ports: [...item.ports] } : {}),
-    ...(item.detail !== undefined ? { detail: item.detail } : {}),
-    ...(item.stale !== undefined ? { stale: item.stale } : {}),
+    ...serviceItemViewTail(item),
   }))
 
   const groups: ApiServiceGroupView[] = inventory.groups.map(group => ({
@@ -109,25 +106,6 @@ function mapInventoryView(inventory: ServiceInventory): ApiServiceInventoryView 
     providers,
     revision: String(inventory.revision),
     ...(inventory.nextCursor !== undefined ? { nextCursor: String(inventory.nextCursor) } : {}),
-  }
-}
-
-/**
- * Maps raw service log page into public view.
- * @param page - Domain log page.
- * @returns Wire log page.
- */
-function mapLogsView(page: ServiceLogPage): ApiServiceLogsView {
-  return {
-    chunks: page.chunks.map(chunk => ({
-      targetId: String(chunk.targetId),
-      stream: chunk.stream,
-      text: chunk.text,
-    })),
-    truncated: page.truncated,
-    gap: page.gap,
-    ...(page.nextCursor !== undefined ? { nextCursor: String(page.nextCursor) } : {}),
-    ...(page.unavailable !== undefined ? { unavailable: page.unavailable } : {}),
   }
 }
 
@@ -200,7 +178,7 @@ export class ProjectServicesController extends TypertRemoteService {
       },
       signal,
     )
-    return mapLogsView(page)
+    return serviceLogsView(page)
   }
 
   /**

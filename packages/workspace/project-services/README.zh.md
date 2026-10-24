@@ -74,6 +74,6 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包只提供类型：共享的服务定义、品牌化标识以及请求与视图契约，因此没有自己的运行时测试。其契约经由提供方与消费方包覆盖，例如 `pnpm exec vitest run packages/workspace/project-services-local`。
+本包只提供定义而非提供方：共享的服务定义、品牌化标识、请求与视图契约，以及消费方共用的公开投影。其契约经由提供方与消费方包覆盖，例如 `pnpm exec vitest run packages/workspace/project-services-local`。
 
 </details>

@@ -74,6 +74,6 @@ No direct request-prefix changes or cache invalidations.
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package is type-only: it ships the shared service definitions, branded identifiers, and request and view contracts, so it carries no runtime spec of its own. Its contracts are exercised through the provider and consumer packages, for example `pnpm exec vitest run packages/workspace/project-services-local`.
+This package ships definitions rather than providers: the shared service definitions, branded identifiers, request and view contracts, and the public projections its consumers share. Its contracts are exercised through the provider and consumer packages, for example `pnpm exec vitest run packages/workspace/project-services-local`.
 
 </details>
