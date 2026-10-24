@@ -19,6 +19,7 @@ import type {
 import type { ProjectServicesPanelProps } from './contract/slots.ts'
 import type { ProjectServicesKey } from './locales.ts'
 import css from './ProjectServicesPanel.module.css'
+import { ServiceCardActions } from './ServiceCardActions.tsx'
 
 /**
  * Map a service's reported state onto the state dot's vocabulary.
@@ -205,49 +206,13 @@ export function ProjectServicesPanel({
                     </div>
                   </div>
 
-                  <div className={css.cardRight}>
-                    {item.actions.includes('start') && item.state !== 'running' && (
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        disabled={pendingActions[item.id] !== undefined}
-                        onClick={() => { void control('start', item.id, item.revision) }}
-                        data-testid={`action-start-${item.id}`}
-                      >
-                        {t('action.start')}
-                      </Button>
-                    )}
-                    {item.actions.includes('stop') && item.state === 'running' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={pendingActions[item.id] !== undefined}
-                        onClick={() => { void control('stop', item.id, item.revision) }}
-                        data-testid={`action-stop-${item.id}`}
-                      >
-                        {t('action.stop')}
-                      </Button>
-                    )}
-                    {item.actions.includes('restart') && item.state === 'running' && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={pendingActions[item.id] !== undefined}
-                        onClick={() => { void control('restart', item.id, item.revision) }}
-                        data-testid={`action-restart-${item.id}`}
-                      >
-                        {t('action.restart')}
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => { openLogs(item.id) }}
-                      data-testid={`action-logs-${item.id}`}
-                    >
-                      {t('action.logs')}
-                    </Button>
-                  </div>
+                  <ServiceCardActions
+                    item={item}
+                    pendingActions={pendingActions}
+                    control={control}
+                    openLogs={openLogs}
+                    t={t}
+                  />
                 </div>
 
                 {/* Inline Logs Viewer */}
@@ -345,49 +310,13 @@ export function ProjectServicesPanel({
                       </div>
                     </div>
 
-                    <div className={css.cardRight}>
-                      {item.actions.includes('start') && item.state !== 'running' && (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          disabled={pendingActions[item.id] !== undefined}
-                          onClick={() => { void control('start', item.id, item.revision) }}
-                          data-testid={`action-start-${item.id}`}
-                        >
-                          {t('action.start')}
-                        </Button>
-                      )}
-                      {item.actions.includes('stop') && item.state === 'running' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={pendingActions[item.id] !== undefined}
-                          onClick={() => { void control('stop', item.id, item.revision) }}
-                          data-testid={`action-stop-${item.id}`}
-                        >
-                          {t('action.stop')}
-                        </Button>
-                      )}
-                      {item.actions.includes('restart') && item.state === 'running' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={pendingActions[item.id] !== undefined}
-                          onClick={() => { void control('restart', item.id, item.revision) }}
-                          data-testid={`action-restart-${item.id}`}
-                        >
-                          {t('action.restart')}
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => { openLogs(item.id) }}
-                        data-testid={`action-logs-${item.id}`}
-                      >
-                        {t('action.logs')}
-                      </Button>
-                    </div>
+                    <ServiceCardActions
+                      item={item}
+                      pendingActions={pendingActions}
+                      control={control}
+                      openLogs={openLogs}
+                      t={t}
+                    />
                   </div>
                 ))}
               </div>
@@ -418,49 +347,13 @@ export function ProjectServicesPanel({
                 </div>
               </div>
 
-              <div className={css.cardRight}>
-                {item.actions.includes('start') && item.state !== 'running' && (
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    disabled={pendingActions[item.id] !== undefined}
-                    onClick={() => { void control('start', item.id, item.revision) }}
-                    data-testid={`action-start-${item.id}`}
-                  >
-                    {t('action.start')}
-                  </Button>
-                )}
-                {item.actions.includes('stop') && item.state === 'running' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={pendingActions[item.id] !== undefined}
-                    onClick={() => { void control('stop', item.id, item.revision) }}
-                    data-testid={`action-stop-${item.id}`}
-                  >
-                    {t('action.stop')}
-                  </Button>
-                )}
-                {item.actions.includes('restart') && item.state === 'running' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={pendingActions[item.id] !== undefined}
-                    onClick={() => { void control('restart', item.id, item.revision) }}
-                    data-testid={`action-restart-${item.id}`}
-                  >
-                    {t('action.restart')}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => { openLogs(item.id) }}
-                  data-testid={`action-logs-${item.id}`}
-                >
-                  {t('action.logs')}
-                </Button>
-              </div>
+              <ServiceCardActions
+                item={item}
+                pendingActions={pendingActions}
+                control={control}
+                openLogs={openLogs}
+                t={t}
+              />
             </div>
           ))}
 
