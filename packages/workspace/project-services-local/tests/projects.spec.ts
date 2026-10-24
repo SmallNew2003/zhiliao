@@ -3,7 +3,7 @@ import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ProjectServiceProvider, ServiceItem, ServiceRequestId, ServiceTargetId, ServiceProviderId, ServiceRevision } from '@deepseek-ai/dsh-project-services'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { accessFor, git, harness, signal } from './helpers.ts'
 import type { Config as RuntimeConfig } from '../src/index.ts'
 
@@ -215,7 +215,21 @@ it('跳过清单中 git 探测失败的工作树', async () => {
   const { root, ctx, runtime } = await fixture()
   const main = await repository(root, ctx, 'main'), linked = join(root, 'linked')
   await git(ctx, main, 'worktree', 'add', '-b', 'linked', linked)
-  await writeFile(join(linked, '.git'), 'not-a-gitfile')
+  const spawn = ctx.subprocess.spawn.bind(ctx.subprocess)
+  const spy = vi.spyOn(ctx.subprocess, 'spawn').mockImplementation((spec) => {
+    if (basename(spec.cwd) === 'linked' && spec.argv.includes('--show-toplevel')) {
+      return {
+        done: Promise.resolve({ exitCode: 128, signal: null }),
+        collected: {
+          stdout: { readFrom: () => ({ text: '', nextOffset: 0, lossy: false }) },
+          stderr: { readFrom: () => ({ text: 'fatal: not a git repository', nextOffset: 0, lossy: false }) },
+        },
+        terminate: () => {}, waitForExit: async () => undefined,
+      } as unknown as ReturnType<typeof spawn>
+    }
+    return spawn(spec)
+  })
+  cleanup.push(async () => { spy.mockRestore() })
   const inventory = await runtime.list(accessFor(main), {}, signal())
   expect(inventory.checkouts.map(item => item.path)).toEqual([main])
 })

@@ -15,6 +15,26 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { NativeDiscovery, type NativeListener } from '../src/native-discovery.ts'
 import { harness, accessFor, signal, git } from './helpers.ts'
 
+// A path below a file answers ENOENT rather than ENOTDIR on Windows, so the
+// non-ENOENT branch of the nested-repository probe is reachable only through an
+// injected filesystem failure.
+const fsControl = vi.hoisted(() => ({
+  /** Absolute path whose nested-repository probe rejects. */
+  denyLstat: undefined as string | undefined,
+}))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    lstat: vi.fn((async (path: unknown, ...rest: never[]) => {
+      if (fsControl.denyLstat !== undefined && String(path) === join(fsControl.denyLstat, '.git')) {
+        throw Object.assign(new Error('EACCES: injected unreadable directory'), { code: 'EACCES' })
+      }
+      return (actual.lstat as (path: unknown, ...args: never[]) => Promise<unknown>)(path, ...rest)
+    }) as typeof actual.lstat),
+  }
+})
+
 // Native lifecycle cases pay for multiple bounded lsof/ps scans and Host teardown.
 // The 90-second unit subprocess lane budget also covers cleanup under worker contention.
 const cleanup: (() => Promise<unknown>)[] = []
@@ -465,12 +485,14 @@ it('把检出目录内普通子目录的监听归入该项目', async () => {
   expect(item.checkoutId).toBe(h.baseline.checkouts[0]!.id)
 })
 
-it('在观测目录的组件不是目录时向上层报告失败', async () => {
+it('在嵌套仓库探测遇到文件系统错误时向上层报告失败', async () => {
   const h = await fixture()
   const file = join(h.root, 'not-a-dir')
   await writeFile(file, 'placeholder')
+  fsControl.denyLstat = file
+  cleanup.push(async () => { fsControl.denyLstat = undefined })
   mockScan([{ pid: 31, name: 'worker', ports: [49123], cwd: file, started: 'fixture' }])
-  await expect(h.ctx.nativeProjectServices.inspect(providerContext(h), signal())).rejects.toThrow(/not a directory|ENOTDIR/)
+  await expect(h.ctx.nativeProjectServices.inspect(providerContext(h), signal())).rejects.toThrow('EACCES: injected unreadable directory')
 })
 
 it('按持久定义的身份重新启动已停止的范围', async () => {
@@ -553,6 +575,8 @@ it('拒绝使用其他 Host 生命周期的代理适配器', async () => {
 it('拒绝已被其他范围占用的启动身份', async () => {
   const h = await fixture()
   const pending = { id: brandString<ServiceTargetId>('native:pending'), projectId: h.baseline.project.id, checkoutId: h.baseline.checkouts[0]!.id, name: 'reserved', command: { argv: ['node'] }, revision: brandString<ServiceRevision>('1') }
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, fakeRange().process)
   const prepared = await h.ctx.nativeProjectServices.prepare(providerContext(h, { pendingDefinition: pending }),
     { requestId: requestId(), action: 'start', definition: { name: pending.name, checkoutId: pending.checkoutId, command: pending.command } }, h.access, signal())
   const instances = Reflect.get(h.ctx.nativeProjectServices, 'instances') as Map<ServiceTargetId, unknown>
@@ -582,10 +606,12 @@ it('在检出目录被替换为符号链接时中止已授权的操作', async (
   const entered = Promise.withResolvers<undefined>(), gate = Promise.withResolvers<undefined>()
   cleanup.push(async () => { gate.resolve(undefined) })
   h.access.authorize = async () => { entered.resolve(undefined); await gate.promise }
+  h.access.kind = 'agent'
+  h.access.nativeExecution = agentExecution(h.ctx.nativeProjectServices.lifetime, fakeRange().process)
   const started = h.start()
   await entered.promise
   await rename(h.root, moved)
-  await symlink(moved, h.root)
+  await symlink(moved, h.root, 'dir')
   gate.resolve(undefined)
   await expect(started).rejects.toThrow('Native checkout changed')
   expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)

@@ -1,4 +1,5 @@
 import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import LocalBashExecutor from '@deepseek-ai/dsh-bash-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
@@ -55,7 +56,7 @@ const humanConfig = { shellPath: '/bin/sh', retainedOutputBytes: 1024, terminati
 it('把检出目录内的相对可执行文件解析为绝对路径后授权人工启动', async () => {
   const { subprocess, spawned } = stubbedSubprocess('', '')
   const launch = await resolveHumanLaunch(subprocess, { argv: ['./dev.sh', '--flag'] }, '/tmp/project', humanConfig, new AbortController().signal)
-  expect(launch.command.argv).toEqual(['/tmp/project/dev.sh', '--flag'])
+  expect(launch.command.argv).toEqual([resolve('/tmp/project', './dev.sh'), '--flag'])
   expect(launch.cwd).toBe('/tmp/project')
   await launch.start(new AbortController().signal)
   expect(spawned[0]!.argv).toEqual(['/bin/sh', '-c', "exec '/tmp/project/dev.sh' '--flag'"])
@@ -127,10 +128,11 @@ it('在有范围归属的 shell 执行器上转交退出与归属事实', async 
   const subprocess = await ctx.plugin(LocalSubprocessRuntime)
   const executor = await ctx.plugin(LocalBashExecutor, { graceMs: 50 })
   const terminated: string[] = []
+  const waitForExit = vi.fn(async () => undefined)
   const shellProcess = {
     status: 'completed' as const, exitCode: 0, signal: null, done: Promise.resolve(),
     readOutput: () => ({ delta: 'shell output', lossy: false }),
-    kill: () => false, terminate: async () => { terminated.push('terminated') }, waitForExit: async () => {},
+    kill: () => false, terminate: async () => { terminated.push('terminated') }, waitForExit,
     ownsProcess: async (pid: number) => pid === 31,
   }
   const prepare = vi.spyOn(ctx.shell, 'prepare').mockResolvedValue({ start: async () => shellProcess })
@@ -141,6 +143,8 @@ it('在有范围归属的 shell 执行器上转交退出与归属事实', async 
     expect(await process.ownsProcess!(31)).toBe(true)
     await process.terminate()
     expect(terminated).toEqual(['terminated'])
+    await process.waitForExit()
+    expect(waitForExit).toHaveBeenCalledTimes(1)
   } finally {
     prepare.mockRestore()
     await executor.dispose()
