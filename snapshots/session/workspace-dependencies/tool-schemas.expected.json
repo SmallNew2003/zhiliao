@@ -285,6 +285,125 @@
       }
     },
     {
+      "name": "service_control",
+      "description": "Start, stop, or restart one project service. Every action mutates and is gated by one approval decision. Stop or restart an existing target by `target_id` plus the `expected_revision` that `service_list` reported for it — a revision that no longer matches fails the call instead of acting on a service you no longer see. Start a saved definition by `definition` alone.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Lifecycle action to run; every action mutates the service.",
+            "enum": [
+              "start",
+              "stop",
+              "restart"
+            ]
+          },
+          "target_id": {
+            "type": "string",
+            "description": "Existing service target ID to stop or restart."
+          },
+          "expected_revision": {
+            "type": "string",
+            "description": "Revision that `service_list` reported for `target_id`; a revision that no longer matches fails this call."
+          },
+          "definition": {
+            "type": "object",
+            "description": "Launch a new service from this definition instead of acting on an existing target.",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name to record for the launched service."
+              },
+              "checkout_id": {
+                "type": "string",
+                "description": "Git checkout / worktree the service runs in."
+              },
+              "command": {
+                "type": "array",
+                "description": "Exact executable and arguments to run.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "checkout_id",
+              "command"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    {
+      "name": "service_list",
+      "description": "List the native processes and Docker containers this project and its Git worktrees run, with each target's state, ports, ownership, and revision. Call it before assuming a service is down or a port is free. Filter by checkout_id, kind, or state; follow nextCursor for later pages.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "checkout_id": {
+            "type": "string",
+            "description": "Filter services by Git checkout / worktree identifier."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Filter by service kind (native or docker).",
+            "enum": [
+              "native",
+              "docker"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "Filter by service state.",
+            "enum": [
+              "running",
+              "stopped",
+              "starting",
+              "unknown"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor from a previous listing."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of items to return."
+          }
+        }
+      }
+    },
+    {
+      "name": "service_logs",
+      "description": "Read retained stdout and stderr for one project service target, at most 16 KiB per call. Follow nextCursor for more output. `truncated` marks a call that stopped at the byte cap, `gap` marks output the runtime already discarded, and `unavailable` names a target that keeps no output.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "description": "Service target ID to read logs from."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Log stream cursor from previous read."
+          },
+          "max_bytes": {
+            "type": "number",
+            "description": "Max bytes to read (capped at 16 KiB)."
+          }
+        },
+        "required": [
+          "target_id"
+        ]
+      }
+    },
+    {
       "name": "skill",
       "description": "Load the full instructions for an available skill. Call this with the exact skill name from the session skill catalog before acting on a task that names or clearly matches that skill.",
       "parameters": {
