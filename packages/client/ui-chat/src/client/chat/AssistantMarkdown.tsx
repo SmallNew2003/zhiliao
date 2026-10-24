@@ -24,6 +24,10 @@ import css from './AssistantMarkdown.module.css'
 export function localPathMediaUrl(protocol: string, origin: string, value: string, cwd?: string): string | undefined {
   if (protocol !== 'http:' && protocol !== 'https:') return undefined
   if (value.length === 0 || value.startsWith('//')) return undefined
+  /* URI scheme destinations (javascript:, data:, http:, even a Windows drive
+     letter's `C:`) are not Host-served workspace files; resolving them as
+     cwd-relative paths would turn an authored scheme into an API URL. */
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return undefined
   let targetPath = value
   if (!targetPath.startsWith('/')) {
     if (cwd === undefined || cwd === '') return undefined
@@ -31,16 +35,6 @@ export function localPathMediaUrl(protocol: string, origin: string, value: strin
   }
   if (!targetPath.startsWith('/') || targetPath.startsWith('//')) return undefined
   return `${origin}/api/file?path=${encodeURIComponent(targetPath)}`
-}
-
-/**
- * Strip unescaped pseudo-XML tool calls accidentally emitted in text streams by models.
- * @param text - markdown text from model chunk.
- * @returns sanitized text without pseudo tool-call XML blocks.
- */
-export function cleanModelPseudoToolCalls(text: string): string {
-  if (!text.includes('<tool_call>')) return text
-  return text.replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|<\/parameter>\s*(?:<\/parameter>\s*)*)(?:\n|$)/gi, '').trim()
 }
 
 /**
