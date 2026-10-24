@@ -34,6 +34,7 @@ export type {
   DshEnvironment,
   DshEnvironmentKey,
 } from './types.ts'
+export { captureLaunchSpec } from './launch.ts'
 export { parseExitStatus } from './render.ts'
 export type { ParsedExitStatus } from './render.ts'
 

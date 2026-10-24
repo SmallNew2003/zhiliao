@@ -11,7 +11,7 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { SHELL_SETTINGS_NAMESPACE, ShellExecutor } from '@deepseek-ai/dsh-shell'
+import { SHELL_SETTINGS_NAMESPACE, ShellExecutor, captureLaunchSpec } from '@deepseek-ai/dsh-shell'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult, CollectedOutput, PreparedShellLaunch } from '@deepseek-ai/dsh-shell'
 import type { SubprocessCollect, SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-settings'
@@ -280,12 +280,7 @@ export class LocalBashExecutor extends ShellExecutor {
     const argv = ['bash', '-c', spec.command]
     const program = await this.ctx.subprocess.resolveExecutable(argv[0] as string, spec.env, spec.signal)
     spec.signal?.throwIfAborted()
-    const captured = {
-      ...spec, signal: undefined,
-      sandboxPolicy: spec.sandboxPolicy === undefined ? undefined : { ...spec.sandboxPolicy },
-      env: spec.env === undefined ? undefined : { ...spec.env },
-      dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
-    }
+    const captured = captureLaunchSpec(spec)
     const resolved = [program, ...argv.slice(1)]
     return { start: signal => Promise.resolve(this.startArgv({ ...captured, signal }, resolved)) }
   }

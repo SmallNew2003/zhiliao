@@ -10,6 +10,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
+import { captureLaunchSpec } from '@deepseek-ai/dsh-shell'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult, PreparedShellLaunch } from '@deepseek-ai/dsh-shell'
 import { SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import type {
@@ -137,12 +138,7 @@ export class SandboxBashExecutor extends LocalBashExecutor {
     const confined = await this.confine(spec.command, { ...policy, mode }, spec.signal)
     spec.signal?.throwIfAborted()
     const argv = [...confined.argv]
-    const captured = {
-      ...spec, signal: undefined,
-      sandboxPolicy: spec.sandboxPolicy === undefined ? undefined : { ...spec.sandboxPolicy },
-      env: spec.env === undefined ? undefined : { ...spec.env },
-      dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
-    }
+    const captured = captureLaunchSpec(spec)
     // oxlint-disable-next-line typescript/require-await -- async keeps a spawn failure a rejection, not a synchronous throw
     return { start: async (signal) => {
       signal.throwIfAborted()
