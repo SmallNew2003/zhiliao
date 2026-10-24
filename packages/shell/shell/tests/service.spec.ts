@@ -83,6 +83,12 @@ describe('ShellExecutor service seam', () => {
     expect(ctx.shell.sandboxMode).toBeUndefined()
   })
 
+  it('reports no POSIX command-syntax support from the task-free base seam', async () => {
+    const ctx = new Context()
+    await ctx.plugin(StubExecutor)
+    expect(ctx.shell.supportsPosixCommandSyntax).toBe(false)
+  })
+
   it('loading a second implementation throws (one bash service per context — cordis standard)', async () => {
     const ctx = new Context()
     await ctx.plugin(StubExecutor)

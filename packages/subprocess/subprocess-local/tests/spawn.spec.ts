@@ -991,6 +991,92 @@ describe('coverage seams', () => {
     }
   })
 
+  it.skipIf(process.platform === 'win32').each(['stdout', 'stderr'] as const)(
+    'keeps collecting the %s stream that carries untilRangeExit past direct settlement',
+    async (rangeStream) => {
+      // A survivor inherits the leader's pipes and outlives it, so the range
+      // stays alive after direct settlement. Only the stream that asked for
+      // range output keeps collecting; the other is sealed when the direct
+      // child settles.
+      const survivorScript = [
+        "process.stdout.on('error', () => {})",
+        "process.stderr.on('error', () => {})",
+        'setTimeout(() => {',
+        "  process.stdout.write('survivor-out\\n')",
+        '  setTimeout(() => {',
+        "    process.stderr.write('survivor-err\\n')",
+        '    setTimeout(() => { process.exit(0) }, 50)',
+        '  }, 100)',
+        '}, 500)',
+      ].join('\n')
+      const pidFile = join(spillDir, `range-survivor-${rangeStream}-${Date.now()}.pid`)
+      const leaderScript = [
+        "const { spawn } = require('node:child_process')",
+        "const { writeFileSync } = require('node:fs')",
+        `const helper = spawn(process.execPath, ['-e', ${JSON.stringify(survivorScript)}], { stdio: ['ignore', 1, 2] })`,
+        `writeFileSync(${JSON.stringify(pidFile)}, String(helper.pid))`,
+        'helper.unref()',
+      ].join('\n')
+
+      const range = { maxBytes: 64_000, spill: { maxBytes: 64 * 1024 * 1024 }, untilRangeExit: true as const }
+      const plain = { maxBytes: 64_000, spill: { maxBytes: 64 * 1024 * 1024 } }
+      const running = spawnSubprocess({
+        argv: [process.execPath, '-e', leaderScript],
+        cwd: process.cwd(),
+        stdio: {
+          stdin: 'ignore',
+          stdout: rangeStream === 'stdout' ? range : plain,
+          stderr: rangeStream === 'stderr' ? range : plain,
+        },
+        graceMs: 150,
+      })
+      const survivor = await waitForPidFile(pidFile)
+      try {
+        await running.done
+        await running.waitForExit()
+        expect(running.collected.stdout!.readFrom(0).text).toBe(rangeStream === 'stdout' ? 'survivor-out\n' : '')
+        expect(running.collected.stderr!.readFrom(0).text).toBe(rangeStream === 'stderr' ? 'survivor-err\n' : '')
+      } finally {
+        try { process.kill(survivor, 'SIGKILL') } catch { /* the survivor already exited */ }
+        await waitGone(survivor)
+      }
+    },
+  )
+
+  it('answers process ownership from the owner until the managed range has exited', async () => {
+    const direct = Promise.withResolvers<{ exitCode: number; signal: null }>()
+    const stopped = Promise.withResolvers<undefined>()
+    const ownsProcess = vi.fn(async () => true)
+    const handle = bindManagedProcess(spec('true', {
+      stdio: { stdin: 'ignore', stdout: 'inherit', stderr: 'inherit' },
+    }), {
+      stdin: null,
+      stdout: null,
+      stderr: null,
+      direct: direct.promise,
+      owner: {
+        signal: vi.fn(),
+        waitForExit: () => stopped.promise,
+        terminateForHostExit: vi.fn(),
+        ownsProcess,
+      },
+    })
+
+    await expect(handle.ownsProcess!(4242)).resolves.toBe(true)
+    expect(ownsProcess).toHaveBeenCalledExactlyOnceWith(4242)
+
+    const waiting = handle.waitForExit()
+    stopped.resolve(undefined)
+    await expect(waiting).resolves.toBe(true)
+    direct.resolve({ exitCode: 0, signal: null })
+    await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null })
+
+    // Range exit is the permanent no-more-signals boundary: ownership stops
+    // being answered instead of consulting a stale owner.
+    await expect(handle.ownsProcess!(4242)).resolves.toBe(false)
+    expect(ownsProcess).toHaveBeenCalledOnce()
+  })
+
   it('contains a late wait rejection after an already-aborted observation', async () => {
     const pending = Promise.withResolvers<never>()
     await expect(waitWithAbort(pending.promise, AbortSignal.abort())).resolves.toBe(false)

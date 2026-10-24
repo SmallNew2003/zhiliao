@@ -335,6 +335,8 @@ export function bindManagedProcess(
         new Promise<void>((resolve) => { drainTimer = setTimeout(resolve, spec.graceMs) }),
       ])
     } finally {
+      /* v8 ignore next -- the drain timer is armed synchronously in the Promise
+         executor before the race is awaited, so it is always defined here. */
       if (drainTimer !== undefined) clearTimeout(drainTimer)
       stopCollectors('range')
       await Promise.all([stdoutThroughRange ? stdoutClosed : undefined, stderrThroughRange ? stderrClosed : undefined])

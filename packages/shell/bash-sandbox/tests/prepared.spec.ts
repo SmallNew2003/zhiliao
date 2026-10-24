@@ -41,3 +41,17 @@ it('starts the captured confined argv and refuses cancellation before launch', a
     await expect(prepared.start(cancelled.signal)).rejects.toThrow('cancelled')
   } finally { await ctx.fiber.dispose() }
 })
+
+it('prepares full access as the unconfined local launch without confining', async () => {
+  const ctx = await fixture(async () => { throw new Error('confinement must not run under full access') })
+  try {
+    const prepared = await ctx.shell.prepare(ctx.shell.resolve({
+      command: 'exit 99',
+      sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: process.cwd() },
+    }))
+    const proc = await prepared.start(new AbortController().signal)
+    await proc.done
+    expect(proc.exitCode).toBe(99)
+    expect(proc.sandbox).toBeUndefined()
+  } finally { await ctx.fiber.dispose() }
+})

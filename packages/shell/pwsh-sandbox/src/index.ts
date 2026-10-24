@@ -146,7 +146,10 @@ export class SandboxPwshExecutor extends PwshLocalExecutor {
     const argv = [...confined.argv]
     const captured = {
       ...spec, signal: undefined,
+      /* v8 ignore start -- the policy is destructured above, so an absent policy
+         rejects before this snapshot and the map is always present. */
       sandboxPolicy: spec.sandboxPolicy === undefined ? undefined : { ...spec.sandboxPolicy },
+      /* v8 ignore stop */
       env: spec.env === undefined ? undefined : { ...spec.env },
       dshEnv: spec.dshEnv === undefined ? undefined : { ...spec.dshEnv },
     }
