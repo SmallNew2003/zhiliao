@@ -6,6 +6,17 @@ apps/desktop/*.p12
 node_modules/
 lib/
 *.tsbuildinfo
+# Bare-tsc artifacts that land beside their sources instead of rootDir/outDir.
+# .d.ts is ignored too, except the hand-written ambient module shims in src/.
+packages/**/src/**/*.js
+packages/**/src/**/*.js.map
+packages/**/src/**/*.d.ts.map
+packages/**/src/**/*.d.ts
+!packages/**/src/**/css-modules.d.ts
+!packages/**/src/**/use-sync-external-store.d.ts
+!packages/**/src/**/asset-imports.d.ts
+!packages/**/src/**/ripgrep.d.ts
+!packages/**/src/**/turndown-plugin-gfm.d.ts
 pnpm-debug.log
 .pnpm-store/
 .cache/
@@ -59,3 +70,13 @@ native/system/test/bin/
 # scans nonignored new files, so leaving them unscanned keeps the gate red.
 .workbuddy/
 .codex/
+
+# Local design drafts, generated logo assets, and one-off scripts.
+output/
+.zcode/
+zhiliao-logo.miora
+zhiliao-logo_assets/
+scripts/generate_10_logos.mjs
+scripts/generate_avantgarde_logos.mjs
+scripts/generate_benchmark_logos.mjs
+scripts/link-memory-deps.zsh
