@@ -25,7 +25,7 @@ dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将
 <a id="use-this-package"></a>
 ## 使用本包
 
-侧边栏是导航外壳：用户看到品牌、启动新会话、折叠轨道并到达 Settings。功能插件填充它的席位——ui-workspace 填充 `sidebar.workspaces`，ui-settings 在 `sidebar.settings` 注册触发行与设置面板。
+侧边栏是导航外壳：用户看到品牌、启动新会话、折叠轨道并到达 Settings。功能插件填充它的席位——ui-workspace 填充 `sidebar.workspaces`，ui-settings 在 `sidebar.settings` 注册触发行；该控件打开它在主栏注册的设置页面。
 
 ### 品牌与 New Session
 
@@ -75,7 +75,7 @@ dsh Web 客户端的侧边栏让用户识别当前构建、启动新会话、将
 以下页面覆盖填充外壳席位的各个界面与组合模型。
 
 - [ui-workspace](../ui-workspace/README.zh.md)——渲染到 `sidebar.workspaces` 的 Workspace 与 Session 浏览器。
-- [ui-settings](../ui-settings/README.zh.md)——在 `sidebar.settings` 注册触发行与设置面板的设置领域底座。
+- [ui-settings](../ui-settings/README.zh.md)——在 `sidebar.settings` 注册触发行并在主栏承载设置页面的设置领域底座。
 - [ui-layout](../ui-layout/README.zh.md)——折叠所使用轨道与栏状态的布局 owner。
 - [ui-theme](../ui-theme/README.zh.md)——外壳所重新绑定的滚动条 token 间接层。
 - [slot 系统标准](../../../.agents/notes/implemented/architecture/2026-07-22-slot-type-chain-implementation.zh.md)——席位背后的组合模型。

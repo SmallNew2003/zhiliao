@@ -51,7 +51,7 @@ Shell 探测结果首先列出执行环境声明的默认 shell。仅当 provide
 <details>
 <summary>实现细节</summary>
 
-Host 通过 `ctx.subprocess.spawnTerminal` 创建 `TERM=xterm-256color` 的终端，不启动桌面终端应用。流式 UTF-8 解码保留跨块字符和开头的 BOM，并在 EOF 将不完整的尾部字节替换为替代字符。控制请求走 Gateway，`follow` 使用其复用的 Remote stream。Headless xterm 和序列化 addon 在此前输出写入后生成初始屏幕，后续增量携带单调序号。过慢的订阅者明确失败；重新连接恢复当前屏幕。
+Host 通过 `ctx.subprocess.spawnTerminal` 创建 `TERM=xterm-256color` 的终端，不启动桌面终端应用。流式 UTF-8 解码保留跨块字符和开头的 BOM，并在 EOF 将不完整的尾部字节替换为替代字符。控制请求走 Gateway，`follow` 使用其复用的 Remote stream。Headless xterm 和序列化 addon 在此前输出写入后生成初始屏幕，后续增量携带单调序号。初始屏幕附带程序已发送的 OSC 调色板序列，跟随屏幕一起回放，重建的浏览器视图因此保留程序设置的颜色。过慢的订阅者明确失败；重新连接恢复当前屏幕。
 
 最新连接持有输入和尺寸控制权。断开连接只释放输入权，不结束进程。显式关闭等待进程清理和最后输出；清理失败时保留资源以便重试。Session 记住已关闭的标识并拒绝迟到或重复的创建请求，包括关闭到达时仍在进行的创建。新终端使用新标识。取消创建且清理失败时，已分配的进程仍有所有者。Session owner 和 controller 卸载也会终止所拥有的进程。改变 Session 的沙箱模式时，用户终端继续以原有权限运行。控制权转移或进程退出后被拒绝的输入和尺寸请求保留输出连接并禁用输入，不重发被拒绝的输入。
 

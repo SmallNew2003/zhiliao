@@ -97,6 +97,13 @@ describe('deriveGroups', () => {
     expect(groups[0]!.sessions.map(session => session.id)).toEqual([sid('older'), sid('newer')])
   })
 
+  it('derives the full roster even for collapsed groups (the renderer hides collapsed bodies)', () => {
+    const sessions = list(summary('one', 3), summary('two', 2))
+    const groups = deriveGroups(sessions, [workspace('first', ['one', 'two'])], noArchive, noAttention, view())
+    expect(groups[0]!.expanded).toBe(false)
+    expect(groups[0]!.sessions.map(session => session.id)).toEqual([sid('one'), sid('two')])
+  })
+
   it('projects pending-interaction state into grouped and flat rows', () => {
     const awaiting = { ...summary('awaiting', 10), running: true }
     const sessions = list(awaiting)

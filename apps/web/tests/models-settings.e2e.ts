@@ -72,7 +72,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
   it('opens the add card over the dormant directory vocabulary', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-empty'))
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: '模型' }).click()
     await dialog.getByText('填入各提供方的 API 密钥即可使用其模型。').waitFor({ timeout: 10_000 })
@@ -91,13 +91,13 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     expect(options).toContain('minimax-cn')
     await pick.selectOption('minimax-cn')
     await dialog.getByRole('textbox', { name: 'API 密钥', exact: true }).waitFor({ timeout: 10_000 })
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(EMPTY_EXPECTED, snapshot, MODE)
   }, 60_000)
 
   it('refuses a key no HTTP header can carry before anything is written', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-illegal-key'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     const key = dialog.getByLabel('API 密钥')
     const save = dialog.getByRole('button', { name: '保存', exact: true })
 
@@ -117,7 +117,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('saves a blank key as a reference-free provider-native profile', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-native-auth'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
     const row = dialog.getByText('minimax-cn', { exact: true }).first()
     await row.waitFor({ timeout: 10_000 })
@@ -131,7 +131,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('describes reference-free deletion without claiming a credential exists', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-native-delete'))
-    const settingsDialog = page.getByRole('dialog', { name: '设置' })
+    const settingsDialog = page.getByRole('region', { name: '设置' })
     await settingsDialog.getByRole('button', { name: '删除 minimax-cn', exact: true }).click()
     const deleteDialog = page.getByRole('dialog', { name: '删除 minimax-cn？' })
     await deleteDialog.waitFor({ timeout: 10_000 })
@@ -146,7 +146,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('stores the key under the derived reference and keeps the route live', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-add'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 minimax-cn' }).click()
     await dialog.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-e2e-minimax')
     await dialog.getByRole('button', { name: '保存', exact: true }).click()
@@ -173,7 +173,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('applies a customized-settings field as a merge patch', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-customized'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 minimax-cn' }).click()
     await dialog.getByText('自定义设置').click()
     const url = dialog.getByLabel('API 地址')
@@ -187,14 +187,14 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
     expect(document).toContain('baseURL: https://gateway.minimax.example/v1')
     expect(document).toContain('apiKeyEnv: MINIMAX_CN_API_KEY')
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(CONFIGURED_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('filters the discovered model catalog and clears hidden selections', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-picker'))
-    const settingsDialog = page.getByRole('dialog', { name: '设置' })
+    const settingsDialog = page.getByRole('region', { name: '设置' })
     await settingsDialog.getByRole('button', { name: '编辑 minimax-cn' }).click()
     await settingsDialog.getByText('自定义设置').click()
     await settingsDialog.getByRole('button', { name: '获取可用模型' }).click()
@@ -238,7 +238,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('declares a route the adapter does not ship', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-declare'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     const declare = dialog.getByRole('button', { name: '添加自定义提供方' })
     await expect.poll(async () => declare.isEnabled(), { timeout: 10_000 }).toBe(true)
     await declare.click()
@@ -270,14 +270,14 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await expect.poll(async () => rowCard('Acme Gateway').getByText('自定义').count(), { timeout: 10_000 }).toBe(1)
     expect(await rowCard('minimax-cn').getByText('自定义').count()).toBe(0)
 
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DECLARED_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('reopens the name and protocol a declared route was created with', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-declared-identity'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 Acme Gateway (acme-gateway)' }).click()
     await dialog.getByText('自定义设置').click()
     // The create card asked this route for a name and a protocol because
@@ -291,7 +291,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await dialog.getByRole('button', { name: '模型选项 1' }).click()
     expect(await dialog.getByRole('group', { name: '输入类型 1' }).getByRole('checkbox', { name: '图片' }).isChecked()).toBe(true)
     await assertModelInputLayout(page, dialog)
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DECLARED_EDIT_EXPECTED, snapshot, MODE)
 
     await protocol.selectOption('anthropic-messages')
@@ -318,7 +318,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('saves image-only input and reopens the same selection', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-input-types'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 Acme 网关 (acme-gateway)' }).click()
     await dialog.getByText('自定义设置').click()
     await dialog.getByRole('button', { name: '模型选项 1' }).click()
@@ -349,7 +349,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
       op: 'set', path: ['providers', 'openai'],
       value: { models: [{ id: 'gpt-6-astra', name: 'GPT-6 Astra', contextWindow: 272000, maxTokens: 128000 }] },
     }])
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     const edit = dialog.getByRole('button', { name: '编辑 openai', exact: true })
     try {
       await edit.click()
@@ -361,7 +361,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
       expect(await types.getByRole('checkbox', { name: '文本', exact: true }).isChecked()).toBe(true)
       const before = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
       await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'catalog-inputs.expected.md'),
-        await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), MODE)
+        await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd), MODE)
       await dialog.getByRole('button', { name: '保存', exact: true }).click()
       await types.waitFor({ state: 'detached' })
       expect(await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')).toBe(before)
@@ -403,7 +403,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
   it('confirms an identified provider deletion before removing its profile and key', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-delete'))
     expect(await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')).not.toContain('openai:')
-    const settingsDialog = page.getByRole('dialog', { name: '设置' })
+    const settingsDialog = page.getByRole('region', { name: '设置' })
     await settingsDialog.getByRole('button', { name: '删除 minimax-cn', exact: true }).click()
     const deleteDialog = page.getByRole('dialog', { name: '删除 minimax-cn？' })
     await deleteDialog.waitFor({ timeout: 10_000 })

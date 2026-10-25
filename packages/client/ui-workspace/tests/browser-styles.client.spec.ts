@@ -72,8 +72,26 @@ describe('WorkspaceBrowser.module.css list', () => {
   it('keeps 2px between rows and 4px between workspace groups', () => {
     expect(declarations('.flatList > * + *')?.get('margin-top')).toBe('2px')
     expect(declarations(".searchTree > [role='treeitem'] + [role='treeitem']")?.get('margin-top')).toBe('2px')
-    expect(declarations('.groupSection > * + *')?.get('margin-top')).toBe('2px')
+    expect(declarations('.groupBodyInner > *')?.get('margin-top')).toBe('2px')
     expect(declarations('.groupSection + .groupSection')?.get('margin-top')).toBe('4px')
+  })
+
+  it('animates group bodies through a 0fr->1fr grid track with a delayed visibility hide', () => {
+    expect(declarations('.groupBody')?.get('display')).toBe('grid')
+    expect(declarations('.groupBody')?.get('grid-template-rows')).toBe('0fr')
+    expect(declarations('.groupBodyOpen')?.get('grid-template-rows')).toBe('1fr')
+    // The base transition is asserted on the raw text: this helper merges
+    // same-selector rules across media queries, so the reduce override
+    // (`transition: none`) would mask it in the declaration map.
+    expect(css).toContain('grid-template-rows var(--ds-transition-duration) var(--ds-ease-in-out)')
+    const inner = declarations('.groupBodyInner')
+    expect(inner?.get('min-height')).toBe('0')
+    expect(inner?.get('overflow')).toBe('hidden')
+    expect(inner?.get('visibility')).toBe('hidden')
+    // Same media-merge caveat as the track transition above.
+    expect(css).toContain('visibility 0s linear var(--ds-transition-duration)')
+    expect(declarations('.groupBodyOpen .groupBodyInner')?.get('visibility')).toBe('visible')
+    expect(declarations('.groupBodyInnerFree')?.get('overflow')).toBe('visible')
   })
 
   it('draws drag targets as a leading chevron joined to the insertion line', () => {
@@ -115,6 +133,41 @@ describe('WorkspaceBrowser.module.css list', () => {
     // mask the smooth declaration here.
     expect(rowDeclarations('.sessionRow .title')?.get('flex')).toBe('1')
     expect(rowDeclarations('.sessionRow:hover .title')?.get('text-overflow')).toBe('clip')
+  })
+
+  it('distinguishes the selected row with a leading brand bar beside the shared hover fill', () => {
+    const bar = rowDeclarations('.selectedBar')
+    expect(bar?.get('left')).toBe('0')
+    expect(bar?.get('width')).toBe('3px')
+    expect(bar?.get('background')).toBe('var(--dsw-alias-state-business-primary)')
+    expect(bar?.get('pointer-events')).toBe('none')
+  })
+
+  it('cross-fades the folder into the expand chevron in the project leading slot', () => {
+    expect(rowDeclarations('.lead')?.get('position')).toBe('relative')
+    expect(rowDeclarations('.leadIcon')?.get('position')).toBe('absolute')
+    expect(rowDeclarations('.chevron')?.get('opacity')).toBe('0')
+    expect(rowDeclarations('.projectRow:hover .chevron')?.get('opacity')).toBe('1')
+    expect(rowDeclarations('.projectRow:hover .folder')?.get('opacity')).toBe('0')
+  })
+
+  it('fades the trailing action overlay in over the seated timestamp', () => {
+    const actions = rowDeclarations('.rowActions')
+    expect(actions?.get('position')).toBe('absolute')
+    expect(actions?.get('opacity')).toBe('0')
+    expect(actions?.get('visibility')).toBe('hidden')
+    expect(rowDeclarations('.sessionRow:hover .time')?.get('opacity')).toBe('0')
+    expect(rowDeclarations('.sessionRow:hover .time')?.get('display')).toBeUndefined()
+    expect(rowDeclarations('.iconButton')?.get('width')).toBe('20px')
+    expect(rowDeclarations('.iconButton:hover')?.get('background'))
+      .toBe('var(--dsw-alias-interactive-bg-hover)')
+  })
+
+  it('rotates the overflow chevron with its aria-expanded state and fills on hover', () => {
+    expect(declarations(".sessionOverflowButton[aria-expanded='true'] .overflowChevron")?.get('transform'))
+      .toBe('rotate(180deg)')
+    expect(declarations('.sessionOverflowButton:hover')?.get('background'))
+      .toBe('var(--dsw-alias-interactive-bg-hover)')
   })
 
   it('pins both rail controls to the shared left anchor during the column slide', () => {

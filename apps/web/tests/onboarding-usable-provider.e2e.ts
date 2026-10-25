@@ -50,7 +50,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     await credentialStep.waitFor({ state: 'detached', timeout: 15_000 })
 
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: '设置' })
+    const settings = page.getByRole('region', { name: '设置' })
     await settings.waitFor({ timeout: 10_000 })
     // Dismissing the onboarding step leaves Settings closed, so enter the
     // Models section explicitly before exercising its normal cards.
@@ -78,7 +78,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
       { timeout: 10_000 },
     ).toBe(1)
     await settings.getByRole('button', { name: '编辑 DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
-    const dismissed = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const dismissed = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DISMISSED_EXPECTED, dismissed, MODE)
 
     expect(tripwire.warnings).toEqual([])
@@ -87,7 +87,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
 
   it('stops prompting for DeepSeek once the other provider can serve requests', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-other-provider'))
-    const settings = page.getByRole('dialog', { name: '设置' })
+    const settings = page.getByRole('region', { name: '设置' })
     await settings.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-e2e-minimax')
     await settings.getByRole('button', { name: '保存', exact: true }).click()
     await settings.getByText('已保存 minimax-cn。', { exact: true }).waitFor({ timeout: 15_000 })

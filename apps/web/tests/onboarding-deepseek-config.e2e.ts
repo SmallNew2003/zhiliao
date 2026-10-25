@@ -97,7 +97,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     // The ordinary Models surface reuses the refreshed join and exposes the
     // configured write-only placeholder without a reload.
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: '设置' })
+    const settings = page.getByRole('region', { name: '设置' })
     await settings.waitFor({ timeout: 10_000 })
     await settings.getByRole('button', { name: '模型' }).click()
     const deepSeekRow = settings.getByText('DeepSeek', { exact: true }).first()
@@ -197,7 +197,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     // Opened here rather than inherited: the credential test reloads the page
     // after configuring the key, so nothing carries an open dialog across.
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    const settings = page.getByRole('dialog', { name: '设置' })
+    const settings = page.getByRole('region', { name: '设置' })
     await settings.waitFor({ timeout: 10_000 })
     await settings.getByRole('button', { name: '模型' }).click()
     const deepSeek = settings.getByText('DeepSeek', { exact: true }).first()
@@ -211,7 +211,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await settings.getByRole('button', { name: '模型选项 1' }).click()
     expect(await settings.getByRole('group', { name: '输入类型 1' }).getByRole('checkbox', { name: '图片' }).isChecked()).toBe(true)
     await assertModelInputLayout(page, settings)
-    const defaultModels = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const defaultModels = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DEFAULT_MODELS_EXPECTED, defaultModels, MODE)
     await settings.getByLabel('显示名称 1').fill('Configured Flash')
     await settings.getByRole('group', { name: '输入类型 1' }).getByRole('checkbox', { name: '图片' }).uncheck()
@@ -247,7 +247,7 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
       () => settings.getByLabel('API 密钥', { exact: true }).getAttribute('placeholder'),
       { timeout: 10_000 },
     ).toBe('已配置——输入新值可替换')
-    const modelEditor = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const modelEditor = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MODELS_EXPECTED, modelEditor, MODE)
     await settings.getByRole('button', { name: '保存', exact: true }).click()
     await customModelId.waitFor({ state: 'detached', timeout: 15_000 })

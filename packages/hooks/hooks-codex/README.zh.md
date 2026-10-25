@@ -45,6 +45,7 @@ kind: "package-reference"
 | `configPath` | 必填 | Codex `hooks.json` 的路径 |
 | `model` | `''` | 写入每个 payload 的模型名称（Codex 在每个事件中都包含 `model`） |
 | `defaultTimeoutMs` | `600,000` | hook 未设置时的每 hook 超时（即 Codex 默认值） |
+| `exposeToolArguments` | `false` | 将原始工具参数复制到 `PreToolUse` 与 `PostToolUse` payload |
 | `stderrSummaryMaxChars` | `500` | 持久化 `hook/result` stderr 摘要的字符上限 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-hooks-codex)是每个受支持字段的穷尽式真源。
@@ -84,7 +85,7 @@ kind: "package-reference"
 
 ### 载荷与环境
 
-payload 采用 Codex 形状：snake_case，轮次事件带 `turn_id`，每个事件都带 `model` 与 `permission_mode: "default"`，stdin 写入时不带尾随换行符。工具调用的 payload 携带真实 `tool_name` 与 `tool_input: { command }` 形状（存在 `command` 参数时使用该值，否则使用 `''`），因此非 shell 工具参数不会被如实公开。基础 payload 携带 `session_id` 与 `transcript_path`；后者保留 Codex `string | null` 形状但始终为 `null`——持久化 seam 不暴露产物路径，且默认 zstd 压缩的会话日志无法被 hook 脚本读取。Codex 不进行命令替换，也不注入插件环境。
+payload 采用 Codex 形状：snake_case，轮次事件带 `turn_id`，每个事件都带 `model` 与 `permission_mode: "default"`，stdin 写入时不带尾随换行符。默认情况下，工具调用的 payload 携带真实 `tool_name` 与 `tool_input: { command }`（存在 `command` 参数时使用该值，否则使用 `''`），不公开非 shell 工具参数。设置 `exposeToolArguments: true` 后，bridge 会将原始参数复制到 `PreToolUse` 与 `PostToolUse` payload，且 `command` 保持字符串。基础 payload 携带 `session_id` 与 `transcript_path`；后者保留 Codex `string | null` 形状但始终为 `null`——持久化 seam 不暴露产物路径，且默认 zstd 压缩的会话日志无法被 hook 脚本读取。Codex 不进行命令替换，也不注入插件环境。
 
 ### Matcher subject 与串行执行
 
@@ -170,8 +171,8 @@ hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记�
 - **不支持的 hook 事件（Codex 当前 10 项中的 5 项）**——`PermissionRequest`、`PreCompact`、`PostCompact`、`SubagentStart` 与 `SubagentStop`。这些事件的配置会在解析期间静默丢弃。比较基线是 Codex [官方 hook 参考](https://learn.chatgpt.com/docs/hooks)。
 - **`SessionStart` 只支持部分功能**——支持纯 stdout 与 JSON `additionalContext`，但 hook 脱离运行，因此上下文可能错过第一个请求。
 - **`UserPromptSubmit` 只支持部分功能**——支持阻塞加纯 stdout 或 JSON 上下文，但不会强制执行通用 `systemMessage` 与 `{"continue": false}` 控制。
-- **`PreToolUse` 只支持部分功能**——支持阻塞，但会忽略 `additionalContext`、`permissionDecision: "allow"` 与 `updatedInput`。每个工具都表示为 `tool_input: { command }`，因此非 shell 工具参数不会被如实公开给 hook。
-- **`PostToolUse` 只支持部分功能**——支持阻塞反馈与 JSON `additionalContext`，但不会强制执行 `{"continue": false}`，非 shell 工具参数会缩减为 `{ command }`，结构化工具输出会在 `tool_response` 中展平为文本。
+- **`PreToolUse` 只支持部分功能**——支持阻塞，但会忽略 `additionalContext`、`permissionDecision: "allow"` 与 `updatedInput`。未开启 `exposeToolArguments` 时，不公开非 shell 工具参数。
+- **`PostToolUse` 只支持部分功能**——支持阻塞反馈与 JSON `additionalContext`，但不会强制执行 `{"continue": false}`，结构化工具输出会在 `tool_response` 中展平为文本。未开启 `exposeToolArguments` 时，不公开非 shell 工具参数。
 - **`Stop` 只支持部分功能**——阻塞会强制另一个模型轮次，但 `stop_hook_active` 始终为 `false`，`last_assistant_message` 始终为 `null`，且不会强制执行 `{"continue": false}`。因此，无条件阻塞 hook 会在每个步骤中强制 continuation，除非它自我限制。
 - **通用 payload 与输出字段只支持部分功能**——每个已映射事件都报告静态配置的 `model` 与 `permission_mode: "default"`，而非当前 Codex 运行时值，且 `transcript_path` 永不填充：它始终为 `null`，因为持久化 seam 不暴露产物路径，且默认 zstd 压缩的会话日志无法被 hook 脚本读取。`systemMessage` 会被记录 + 警告但不呈现，`{"continue": false}` 会被记录但不会应用 Codex 的事件特定停止行为。
 - **配置加载与执行只支持部分功能**——一个进程级 `configPath` 会在加载时解析；尚未实现 Codex 的活动用户层、项目层、会话层、系统／托管层与插件层、信任控制以及内联 `config.toml` hook 形态。只运行同步 `command` handler，`statusMessage` 与 `commandWindows` 等当前元数据会被忽略，匹配 handler 串行运行，而非使用 Codex 的并发启动语义。

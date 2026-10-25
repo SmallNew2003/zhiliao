@@ -22,6 +22,10 @@ export class BrowserTerminal {
   private closing: Promise<void> | undefined
   private retention: TerminalRetention | undefined
   private controller: { id: TerminalAttachmentId; follower: TerminalFollower } | undefined
+  /** OSC sequences a program used to retune the renderer palette, replayed after every snapshot. */
+  private palette: string | undefined
+  /** An OSC sequence still awaiting its terminator, held across output chunks. */
+  private pendingOsc: string | undefined
 
   /**
    * @param handle - allocated terminal process range.
@@ -82,7 +86,10 @@ export class BrowserTerminal {
       this.controller = { id, follower }
       this.info = { ...this.info, controllerId: id }
       this.broadcast({ type: 'state', info: this.info })
-      const snapshot: TerminalFrame = { type: 'snapshot', sequence: this.sequence, screen: this.serializer.serialize(), info: this.info }
+      const snapshot: TerminalFrame = {
+        type: 'snapshot', sequence: this.sequence, screen: this.serializer.serialize(),
+        ...(this.palette === undefined ? {} : { palette: this.palette }), info: this.info,
+      }
       this.followers.add(follower)
       return snapshot
     })
@@ -201,8 +208,49 @@ export class BrowserTerminal {
   private async output(data: string): Promise<void> {
     if (data.length === 0) return
     await this.enqueue(async () => {
+      this.capturePalette(data)
       await new Promise<void>((resolve) => { this.screen.write(data, resolve) })
       this.broadcast({ type: 'output', sequence: ++this.sequence, data })
     })
   }
+
+  /**
+   * Record the OSC sequences that retune a renderer's palette (colors 4/10/11/12
+   * and the 104-series resets): a rebuilt browser screen replays them after its
+   * snapshot, so program-set colors survive any detach.
+   * @param data - the next decoded output chunk.
+   */
+  private capturePalette(data: string): void {
+    const stream = this.pendingOsc === undefined ? data : this.pendingOsc + data
+    this.pendingOsc = undefined
+    let replay = this.palette ?? ''
+    let index = 0
+    while (index < stream.length) {
+      const start = stream.indexOf('\u001b]', index)
+      if (start === -1) break
+      const end = oscEnd(stream, start + 2)
+      if (end === undefined) {
+        // The sequence is still arriving; hold it alone so a terminator split
+        // across chunks is captured once complete.
+        this.pendingOsc = stream.slice(start)
+        break
+      }
+      const terminator = stream.startsWith('\u0007', end) ? 1 : 2
+      if (PALETTE_OSC.test(stream.slice(start + 2, end))) replay += stream.slice(start, end + terminator)
+      index = end + terminator
+    }
+    this.palette = replay === '' ? undefined : replay
+  }
 }
+
+/** The earlier of an OSC's two terminators (BEL or ST); undefined while it is still arriving. */
+function oscEnd(stream: string, from: number): number | undefined {
+  const bel = stream.indexOf('\u0007', from)
+  const st = stream.indexOf('\u001b\\', from)
+  if (bel === -1 && st === -1) return undefined
+  if (bel === -1) return st
+  return st === -1 || bel < st ? bel : st
+}
+
+/** OSC bodies that change how a renderer resolves colors (sets and their resets). */
+const PALETTE_OSC = /^(?:104|110|111|112|4|10|11|12)(?:;|$)/

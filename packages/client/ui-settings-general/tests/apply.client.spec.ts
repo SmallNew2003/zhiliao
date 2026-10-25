@@ -88,7 +88,7 @@ function setPageUrl(url: string): void {
 
 describe('ui-settings-general apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'layout', 'remote', 'remote.settings', 'settingsScope'])
   })
 
   it('fills the five seats of the shell it declares, with the locale-following General label', async ({ mock, start }) => {
@@ -197,13 +197,19 @@ describe('ui-settings-general apply', () => {
 
   it('re-registers after a Loader rebuild of the declaring chain (stale disposers must not block)', async ({ mock, start }) => {
     const { c, settings } = await client(mock, start)
-    const before = SEATS.map(([name]) => ownEntries(c, name)[0])
+    const [beforeTrigger, beforeHeader, beforeAction, beforeClose, beforeSection] = SEATS
+      .map(([name]) => ownEntries(c, name)[0])
     await c.reload(SIDEBAR)
     await c.flush()
     expectSeated(c)
-    SEATS.forEach(([name], index) => {
-      expect(ownEntries(c, name)[0]).not.toBe(before[index])
-    })
+    // The sidebar rebuild cascades only through the trigger's declaring
+    // chain; the page seats declare through the main entry, whose declarer
+    // (ui-layout) did not reload, and keep their entries.
+    expect(ownEntries(c, 'settings.trigger')[0]).not.toBe(beforeTrigger)
+    expect(ownEntries(c, 'settings.header')[0]).toBe(beforeHeader)
+    expect(ownEntries(c, 'settings.action')[0]).toBe(beforeAction)
+    expect(ownEntries(c, 'settings.close')[0]).toBe(beforeClose)
+    expect(ownEntries(c, 'settings.section')[0]).toBe(beforeSection)
     expect(c.ctx.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     expect(c.ctx.slots.entries('settings.general.item').filter(row => row.locale === NS)).toEqual([])
     // The recovered registrations still ride the locale path.

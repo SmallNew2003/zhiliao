@@ -28,10 +28,10 @@
   - img
   - img
   - text: Think The user wants me to ask them a checkpoint question first, then continue with whatever they interject. Let me do exactly that.
-- button "Ask question 1/1 answered":
+- button "Ask question 1/1 answered {{duration}}":
   - img
   - img
-  - text: Ask question 1/1 answered
+  - text: Ask question 1/1 answered {{duration}}
 - text: "Interjection: include the word BANANA in your final reply. {{clock}}"
 - button "Copy":
   - img

@@ -63,12 +63,12 @@ describe('workspace browser rows', () => {
       runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
     }
     const view = render(<SessionNodeItem node={idle} currentId={undefined} now={0} onOpen={vi.fn()}
-      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />)
+      onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />)
     const title = screen.getByText('Flat Session')
     expect(title.previousElementSibling).toBeNull()
 
     view.rerender(<SessionNodeItem node={{ ...idle, running: true }} currentId={undefined} now={0}
-      onOpen={vi.fn()} onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />)
+      onOpen={vi.fn()} onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />)
     expect(screen.getByText('Flat Session').previousElementSibling?.querySelector('[data-state="ongoing"]')).toBeTruthy()
   })
 
@@ -158,7 +158,7 @@ describe('workspace browser rows', () => {
     const onOpen = vi.fn()
     render(
       <SessionNodeItem node={node} currentId={node.id} now={0} onOpen={onOpen}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
     )
 
     const row = screen.getByRole('treeitem')
@@ -176,7 +176,7 @@ describe('workspace browser rows', () => {
     }
     render(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
     )
     const row = screen.getByRole('treeitem')
     const title = screen.getByText(node.title)
@@ -205,7 +205,7 @@ describe('workspace browser rows', () => {
     }
     render(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
     )
     const row = screen.getByRole('treeitem')
     const title = screen.getByText(node.title)
@@ -227,7 +227,7 @@ describe('workspace browser rows', () => {
     }
     const view = render(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
     )
 
     const assertIndicator = (): HTMLElement => {
@@ -246,7 +246,7 @@ describe('workspace browser rows', () => {
 
     view.rerender(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />,
     )
     assertIndicator()
   })
@@ -259,7 +259,7 @@ describe('workspace browser rows', () => {
           runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0, ...over,
         }}
         currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t}
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t}
       />,
     )
     const stateDot = (view: ReturnType<typeof renderRow>) =>
@@ -291,7 +291,7 @@ describe('workspace browser rows', () => {
         runningSubagentCount: 2, completed: false, hasActiveSchedule: false, updatedAt: 0,
       }
       render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       const row = screen.getByRole('treeitem')
       expect(row.querySelector('[data-state="ongoing"]')).not.toBeNull()
       expect(screen.getByText('2 个子代理运行中')).toBeTruthy()
@@ -313,7 +313,7 @@ describe('workspace browser rows', () => {
         runningSubagentCount: 1, completed: false, hasActiveSchedule: false, updatedAt: 0,
       }
       render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       const row = screen.getByRole('treeitem')
       expect(row.querySelectorAll('[data-state="ongoing"]')).toHaveLength(1)
       expect(screen.getByText('进行中')).toBeTruthy()
@@ -334,7 +334,7 @@ describe('workspace browser rows', () => {
       running: false, runningSubagentCount: 1, completed: false, hasActiveSchedule: false, updatedAt: 0,
     }
     render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
     const row = screen.getByRole('treeitem')
     expect(row.querySelector('[data-state="warning"]')).not.toBeNull()
     expect(row.querySelector('[data-state="ongoing"]')).toBeNull()
@@ -363,7 +363,7 @@ describe('workspace browser rows', () => {
     }
     render(<ProjectRowItem
       group={group} onToggle={onToggle} onCreate={vi.fn()}
-      actions={{ rename: onRename, delete: onDelete }} t={t}
+      actions={{ rename: onRename, renameCommit: vi.fn(), delete: onDelete }} t={t}
     />)
     fireEvent.click(screen.getByRole('button', { name: '工作区“Project”的操作' }))
     // Opening the menu neither toggles the group nor renames yet.
@@ -481,10 +481,13 @@ describe('workspace browser rows', () => {
         runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
       }
       render(<SessionNodeItem node={node} currentId={node.id} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
-      // The placeholder has no content yet: no row verbs, no "now" stamp.
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      // The placeholder has no content yet: no row verbs, no "now" stamp,
+      // and no in-place editor from a double-click.
       expect(screen.queryByRole('button', { name: /会话.*的操作/ })).toBeNull()
       expect(screen.queryByText('刚刚')).toBeNull()
+      fireEvent.doubleClick(screen.getByRole('treeitem').querySelector('span[class*="title"]')!)
+      expect(screen.queryByRole('textbox')).toBeNull()
       // The hover card keeps title + status but drops the timestamp line.
       const wrapper = screen.getByRole('treeitem').parentElement as HTMLElement
       fireEvent.pointerEnter(wrapper)
@@ -508,7 +511,7 @@ describe('workspace browser rows', () => {
       runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
     }
     render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
-      onRename={onRename} onFork={onFork} onArchive={onArchive} t={t} />)
+      onRename={onRename} onRenameCommit={vi.fn()} onFork={onFork} onArchive={onArchive} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: '会话“One”的操作' }))
     expect(onOpen).not.toHaveBeenCalled()
     // Archive is not destructive (log and accounting slot remain): no danger styling.
@@ -542,7 +545,7 @@ describe('workspace browser rows', () => {
         runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
       }
       render(<SessionNodeItem node={node} currentId={undefined} now={60_000} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       const wrapper = screen.getByRole('treeitem').parentElement as HTMLElement
       fireEvent.pointerEnter(wrapper)
       act(() => { vi.advanceTimersByTime(500) })
@@ -574,14 +577,14 @@ describe('workspace browser rows', () => {
         hasActiveSchedule: false, updatedAt: 0,
       }
       const view = render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       const row = screen.getByRole('treeitem')
       expect(row.querySelector('[data-state="warning"]')).toBeTruthy()
       expect(row.querySelector('[data-state="ongoing"]')).toBeNull()
       expect(screen.getByText(label)).toBeTruthy()
 
       view.rerender(<SessionNodeItem node={{ ...node, running: false }} currentId={undefined} now={0}
-        onOpen={vi.fn()} onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onOpen={vi.fn()} onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       expect(screen.getByRole('treeitem').querySelector('[data-state="warning"]')).toBeTruthy()
 
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
@@ -601,7 +604,7 @@ describe('workspace browser rows', () => {
         runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
       }
       render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
       expect(screen.getByText('空闲')).toBeTruthy()
@@ -619,7 +622,7 @@ describe('workspace browser rows', () => {
         runningSubagentCount: 0, completed: true, hasActiveSchedule: false, updatedAt: 0,
       }
       render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
       // Row's visually-hidden reminder label plus the hover card's status line.
@@ -637,7 +640,7 @@ describe('workspace browser rows', () => {
     const inactive = dragProps()
     const { rerender } = render(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} drag={inactive} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} drag={inactive} t={t} />,
     )
     const row = screen.getByRole('treeitem')
     stubRect(row)
@@ -655,7 +658,7 @@ describe('workspace browser rows', () => {
     const active = dragProps({ active: true, marker: 'before' })
     rerender(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} drag={active} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} drag={active} t={t} />,
     )
     stubRect(screen.getByRole('treeitem'))
     // Top half hovers/drops 'before'; bottom half 'after' (row mid = 117).
@@ -669,8 +672,145 @@ describe('workspace browser rows', () => {
     const after = dragProps({ active: true, marker: 'after' })
     rerender(
       <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} drag={after} t={t} />,
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} drag={after} t={t} />,
     )
     expect(screen.getByRole('treeitem').className).toMatch(/dropAfter/)
+  })
+
+  it('marks the selected session row with the leading brand bar', () => {
+    const node: SessionNode = {
+      id: sid('s1'), title: 'One', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
+    }
+    const { rerender } = render(
+      <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+    )
+    expect(screen.getByRole('treeitem').querySelector('[aria-hidden="true"]')).toBeNull()
+
+    rerender(
+      <SessionNodeItem node={node} currentId={node.id} now={0} onOpen={vi.fn()}
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+    )
+    const row = screen.getByRole('treeitem')
+    // The bar rides last (appending keeps earlier children's identities stable
+    // for dblclick) while painting at the row's leading edge.
+    expect(row.querySelector('[aria-hidden="true"]')).toBeTruthy()
+    expect(row.lastElementChild?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('double-clicking a session title edits in place: Enter commits, Escape cancels', () => {
+    const onRenameCommit = vi.fn()
+    const onOpen = vi.fn()
+    const node: SessionNode = {
+      id: sid('s1'), title: 'One', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
+    }
+    render(
+      <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
+        onRename={vi.fn()} onRenameCommit={onRenameCommit} onFork={vi.fn()} onArchive={vi.fn()} t={t} />,
+    )
+    fireEvent.doubleClick(screen.getByText('One'))
+    const input = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    expect(input.value).toBe('One')
+    // The editor replaces the title; opening stays bound to the row, not the editor.
+    expect(screen.queryByText('One')).toBeNull()
+    expect(onOpen).not.toHaveBeenCalled()
+    // Clicks and further double-clicks inside the editor stay there.
+    fireEvent.click(input)
+    fireEvent.doubleClick(input)
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: '重命名' })).toBe(input)
+
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(onRenameCommit).not.toHaveBeenCalled()
+    expect(screen.getByText('One')).toBeTruthy()
+
+    fireEvent.doubleClick(screen.getByText('One'))
+    const editor = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    // Enter during IME composition confirms the composition, not the rename.
+    fireEvent.compositionStart(editor)
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(onRenameCommit).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(editor)
+    fireEvent.change(editor, { target: { value: '  Renamed  ' } })
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(onRenameCommit).toHaveBeenCalledWith(node.id, 'Renamed')
+    expect(screen.getByText('One')).toBeTruthy()
+
+    // An emptied draft is a cancel, not a rename to nothing.
+    fireEvent.doubleClick(screen.getByText('One'))
+    const blank = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    fireEvent.change(blank, { target: { value: '   ' } })
+    fireEvent.keyDown(blank, { key: 'Enter' })
+    expect(onRenameCommit).toHaveBeenCalledOnce()
+
+    // Blur commits the sitting draft like Enter (the Finder convention).
+    fireEvent.doubleClick(screen.getByText('One'))
+    const blurred = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    fireEvent.change(blurred, { target: { value: 'Blurred' } })
+    fireEvent.blur(blurred)
+    expect(onRenameCommit).toHaveBeenLastCalledWith(node.id, 'Blurred')
+  })
+
+  it('suspends the drag affordance of an editable row', () => {
+    const node: SessionNode = {
+      id: sid('s1'), title: 'One', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, hasActiveSchedule: false, updatedAt: 0,
+    }
+    render(
+      <SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+        onRename={vi.fn()} onRenameCommit={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()}
+        drag={dragProps()} t={t} />,
+    )
+    expect(screen.getByRole('treeitem').getAttribute('draggable')).toBe('true')
+    fireEvent.doubleClick(screen.getByText('One'))
+    expect(screen.getByRole('treeitem').getAttribute('draggable')).toBe('false')
+  })
+
+  it('double-clicking a workspace title commits in place; the ungrouped bucket never edits', () => {
+    const renameCommit = vi.fn()
+    const group: GroupNode = {
+      key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
+      sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
+    }
+    render(<ProjectRowItem
+      group={group} onToggle={vi.fn()} onCreate={vi.fn()}
+      actions={{ rename: vi.fn(), renameCommit, delete: vi.fn() }} t={t}
+      drag={{ start: vi.fn(), end: vi.fn() }}
+    />)
+    const row = screen.getByRole('treeitem')
+    expect(row.getAttribute('draggable')).toBe('true')
+    fireEvent.doubleClick(screen.getByText('Project'))
+    const input = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    expect(input.value).toBe('Project')
+    // Editing suspends the drag affordance and swallows editor clicks.
+    expect(row.getAttribute('draggable')).toBe('false')
+    fireEvent.click(input)
+    fireEvent.doubleClick(input)
+
+    // Escape cancels without committing.
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(renameCommit).not.toHaveBeenCalled()
+    expect(screen.getByText('Project')).toBeTruthy()
+
+    fireEvent.doubleClick(screen.getByText('Project'))
+    const editor = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    fireEvent.compositionStart(editor)
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(renameCommit).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(editor)
+    fireEvent.change(editor, { target: { value: 'Renamed Project' } })
+    fireEvent.blur(editor)
+    expect(renameCommit).toHaveBeenCalledWith('Renamed Project')
+    expect(screen.getByText('Project')).toBeTruthy()
+
+    const bucket: GroupNode = {
+      key: '', workspaceId: undefined, cwd: undefined, createdAt: undefined, label: 'Ungrouped',
+      sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
+    }
+    render(<ProjectRowItem group={bucket} onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
+    fireEvent.doubleClick(screen.getByText('未分组'))
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 })

@@ -1138,6 +1138,63 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  it('hides materialized streaming nodes when an attempt settles without a committed message', () => {
+    const attemptId = LlmAttemptId('failed-live-attempt')
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+    ])
+    const chunk = { type: 'reasoning-delta' as const, index: 0, text: 'checking the proxy' }
+    value.append({
+      type: 'transient',
+      event: {
+        type: 'assistant/live-chunk',
+        seq: 2.5,
+        time: 1_700_000_000_003,
+        data: { attemptId, turn: 1, step: 1, chunk },
+      },
+    })
+    value.flush()
+    expect(node(snapshot(value), 'assistant-step')?.visibility).toBe('visible')
+
+    const stream = new AssistantStreamAccumulator()
+    stream.push({ time: 1_700_000_000_003, chunk })
+    const attemptEntry = at(3, 'assistant/attempt', {
+      turn: 1,
+      step: 1,
+      stream: stream.snapshot(),
+    })
+    value.settleAssistant(attemptId, {
+      type: 'event',
+      event: attemptEntry.event as SessionEvent<'assistant/attempt'>,
+    })
+    value.append(at(4, 'step/end', { turn: 1, step: 1 }))
+    value.append(at(5, 'turn/end', {
+      turn: 1,
+      reason: {
+        kind: 'error',
+        error: { message: 'upstream_error: Upstream request failed', code: 'PI_AI_ERROR' },
+      },
+    }))
+    value.flush()
+
+    const settled = snapshot(value)
+    const attempt = node(settled, 'assistant-step')
+    expect(attempt?.visibility).toBe('hidden')
+    expect(settled.order).not.toContain(attempt?.key)
+    expect(node(settled, 'turn-process')?.visibility).toBe('hidden')
+    expect(node(settled, 'turn-error')).toBeDefined()
+
+    value.append(at(6, 'turn/start', { turn: 2 }))
+    value.append(at(7, 'user/message', textMessage('user-2', 'clash was the problem'), {
+      surfaceOp: 'append',
+    }))
+    value.append(at(8, 'step/start', { turn: 2, step: 1 }))
+    value.flush()
+    const next = snapshot(value)
+    expect(next.order.map(key => next.nodes.get(key)?.kind)).toContain('user')
+  })
+
   it('keeps one keyed Tool node from running through settlement and replays nested dispatch after prepend', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

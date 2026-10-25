@@ -44,9 +44,9 @@ describe('web e2e: plugin manager', () => {
 
   /** Close any open settings dialog, so the sidebar and the main column are clickable. */
   async function closeSettings() {
-    if (await page.getByRole('dialog', { name: '设置' }).count() > 0) {
+    if (await page.getByRole('region', { name: '设置' }).count() > 0) {
       await page.keyboard.press('Escape')
-      await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
+      await expect.poll(() => page.getByRole('region', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
     }
   }
 
@@ -100,9 +100,9 @@ describe('web e2e: plugin manager', () => {
     expect(await panel.getByText('启用智能体团队协作与团队工具。').count()).toBe(1)
     try {
       await page.getByRole('button', { name: '设置', exact: true }).click()
-      await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '中文' }).click()
+      await page.getByRole('region', { name: '设置' }).getByRole('button', { name: '中文' }).click()
       await page.getByRole('menuitem', { name: 'English' }).click()
-      await page.getByRole('dialog', { name: 'Settings' }).waitFor()
+      await page.getByRole('region', { name: 'Settings' }).waitFor()
       await page.keyboard.press('Escape')
       await panel.getByRole('heading', { name: 'Agent Teams', exact: true }).waitFor()
       expect(await packageName.textContent()).toBe('@deepseek-ai/dsh-experimental-agent-team-profile')
@@ -119,12 +119,12 @@ describe('web e2e: plugin manager', () => {
       }
     } finally {
       if (await page.locator('html').getAttribute('lang') === 'en') {
-        if (await page.getByRole('dialog', { name: 'Settings' }).count() === 0) {
+        if (await page.getByRole('region', { name: 'Settings' }).count() === 0) {
           await page.getByRole('button', { name: 'Settings', exact: true }).click()
         }
-        await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'English' }).click()
+        await page.getByRole('region', { name: 'Settings' }).getByRole('button', { name: 'English' }).click()
         await page.getByRole('menuitem', { name: '中文' }).click()
-        await page.getByRole('dialog', { name: '设置' }).waitFor()
+        await page.getByRole('region', { name: '设置' }).waitFor()
       }
       await closeSettings()
     }

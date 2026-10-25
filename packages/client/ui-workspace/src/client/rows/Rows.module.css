@@ -1,5 +1,6 @@
 .projectRow,
 .sessionRow {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -9,6 +10,7 @@
   cursor: pointer;
   user-select: none;
   color: var(--dsw-alias-label-primary);
+  transition: background-color var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
 
 .projectRow:hover,
@@ -18,6 +20,29 @@
 
 .sessionRow.selected {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Selected marker: a 3px brand bar on the row's leading edge. A real element,
+   because the drop markers already own both row pseudos and must be able to
+   render on a selected row at the same time. */
+.selectedBar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  translate: 0 -50%;
+  border-radius: 2px;
+  background: var(--dsw-alias-state-business-primary);
+  animation: selected-bar-in var(--ds-transition-duration) var(--ds-ease-in-out);
+  pointer-events: none;
+}
+
+@keyframes selected-bar-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
 }
 
 .searchResultRow {
@@ -97,10 +122,6 @@
   box-sizing: border-box;
 }
 
-.projectRow .rowActions {
-  height: 20px;
-}
-
 /* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap. */
 .sessionRow {
   height: 32px;
@@ -119,7 +140,10 @@
 }
 
 @keyframes row-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
 }
 
 .slot {
@@ -145,11 +169,39 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+/* Project leading slot: folder and expand chevron stacked in one cell; row
+   hover (or an open row menu) cross-fades between them. */
+.lead {
+  position: relative;
+}
 
-/* Project leading slot: folder by default, expand arrow on row hover. */
-.projectRow .chevron { display: none; }
-.projectRow:hover .chevron { display: inline-flex; }
-.projectRow:hover .folder { display: none; }
+.leadIcon {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out),
+    transform var(--ds-transition-duration-fast) var(--ds-ease-in-out);
+}
+
+.chevron {
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+.projectRow:hover .chevron,
+.projectRow.menuOpen .chevron {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.projectRow:hover .folder,
+.projectRow.menuOpen .folder {
+  opacity: 0;
+  transform: scale(0.7);
+}
 
 /* Expand arrow (filled triangle): points right closed, rotates to point down open. */
 .arrow {
@@ -177,15 +229,19 @@
   line-height: 20px;
 }
 
-.renameInput {
+/* In-place rename editor replacing the row title (double-click): same field
+   language as the dialog inputs, sized to the 34/32px row cells. */
+.inlineRenameInput {
+  flex: 1;
   min-width: 0;
-  font-size: 14px;
-  line-height: 20px;
-  padding: 0 2px;
+  height: 22px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: 4px;
+  padding: 0 4px;
   background: var(--dsw-alias-button-elevated-fill);
   color: inherit;
+  font-size: 14px;
+  line-height: 20px;
   outline: none;
 }
 
@@ -222,6 +278,7 @@
   font-size: 12px;
   line-height: 20px;
   color: var(--dsw-alias-label-tertiary);
+  transition: opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
 
 .scheduleIndicator {
@@ -244,25 +301,50 @@
   flex: none;
 }
 
-/* Trailing action buttons surface on hover only (figma 27:4668 / 27:4656):
-   bare 16px glyphs, gap 12, tertiary grey. */
+/* Trailing action buttons surface on hover only (figma 27:4668 / 27:4656) as
+   a right-edge overlay: the faded timestamp keeps its seat, so the title's
+   width never changes while the buttons cross-fade in over it. */
 .rowActions {
-  flex: none;
-  display: none;
+  position: absolute;
+  top: 0;
+  right: 8px;
+  bottom: 0;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(2px);
+  transition:
+    opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out),
+    transform var(--ds-transition-duration-fast) var(--ds-ease-in-out),
+    visibility 0s linear var(--ds-transition-duration-fast);
+  pointer-events: none;
 }
 
 .projectRow:hover .rowActions,
 .sessionRow:hover .rowActions,
 .projectRow.menuOpen .rowActions,
 .sessionRow.menuOpen .rowActions {
-  display: inline-flex;
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  transition-delay: 0s;
+  pointer-events: auto;
+}
+
+/* An in-place rename owns the row's trailing cell: hover affordances stay off
+   so the editor keeps the full row width. */
+.projectRow.renaming .rowActions,
+.sessionRow.renaming .rowActions {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sessionRow:hover .time,
-.sessionRow.menuOpen .time {
-  display: none;
+.sessionRow.menuOpen .time,
+.sessionRow.renaming .time {
+  opacity: 0;
 }
 
 /* An open row menu pins the hover affordances (figma: the row keeps its
@@ -303,7 +385,12 @@
     linear-gradient(
       var(--dsw-alias-state-business-primary) 0 0
     ) 4px 5px / calc(100% - 4px) 2px no-repeat;
+  animation: marker-in var(--ds-transition-duration-fast) var(--ds-ease-in-out);
   pointer-events: none;
+}
+
+@keyframes marker-in {
+  from { opacity: 0; }
 }
 
 .sessionRow.dropBefore::before {
@@ -350,22 +437,27 @@
   color: #ADB2B8;
 }
 
+/* 20px hit area with a hover fill, matching the header icon-button language. */
 .iconButton {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   padding: 0;
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-tertiary);
+  transition:
+    background-color var(--ds-transition-duration-fast) var(--ds-ease-in-out),
+    color var(--ds-transition-duration-fast) var(--ds-ease-in-out);
 }
 
 .iconButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -377,9 +469,24 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sessionRow,
-  .arrow {
+  .arrow,
+  .selectedBar {
     animation: none;
     transition: none;
+  }
+
+  .leadIcon,
+  .rowActions,
+  .time,
+  .iconButton,
+  .projectRow,
+  .sessionRow {
+    transition: none;
+  }
+
+  .sessionRow.dropBefore::before,
+  .sessionRow.dropAfter::after {
+    animation: none;
   }
 
   /* The title reveal jumps to the far edge instead of gliding there. */

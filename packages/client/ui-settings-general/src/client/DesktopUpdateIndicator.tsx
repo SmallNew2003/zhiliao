@@ -3,7 +3,7 @@ import { IconDownloadOutline16, IconLoadingOutline16, Tooltip } from '@deepseek-
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './DesktopUpdateIndicator.module.css'
 import type { DesktopUpdateFailureKind, DesktopUpdatePresentation, DesktopUpdateView } from './desktop-update-bridge.ts'
-import type { SettingsRootInjected } from './shell-contract.ts'
+import type { SettingsTriggerInjected } from './shell-contract.ts'
 
 type SettingsTranslate = PropsLocale<'settings'>['t']
 
@@ -74,7 +74,7 @@ export function DesktopUpdateIndicator({ wide, hidden, t, view, onOpen }: {
 }
 
 type BadgeProps = PropsRuntime<'sidebar.toggle.badge'> & PropsLocale<'settings'>
-  & Pick<InjectFace<SettingsRootInjected>, 'useDesktopUpdate' | 'useConnectionState'>
+  & Pick<InjectFace<SettingsTriggerInjected>, 'useDesktopUpdate' | 'useConnectionState'>
 
 /**
  * @param props - Framework-bound carrier and connection state.

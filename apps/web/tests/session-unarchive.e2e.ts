@@ -106,7 +106,7 @@ describe('web e2e: archived sessions are restored from the Settings page', () =>
 
     // The Settings page lists the archived Session behind its own search box.
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.waitFor({ timeout: 10_000 })
     await dialog.getByRole('button', { name: 'Archived sessions' }).click()
     const search = dialog.getByRole('searchbox', { name: 'Search archived sessions' })

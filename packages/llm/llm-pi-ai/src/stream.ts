@@ -42,7 +42,11 @@ export function mapUsage(usage: PiUsage): TokenUsage {
 function classifyPiAiError(message: string): string {
   if (/\b(?:401|403)\b/.test(message)) return 'AUTH'
   if (isQuotaExceededError(message)) return QUOTA_EXCEEDED_CODE
-  if (/\b429\b|rate.?limit/i.test(message)) return 'RATE_LIMIT'
+  // Gateway concurrency caps reach pi-ai as plain text without an HTTP
+  // status (`gateway_concurrency_limit: Concurrency limit exceeded for
+  // user, please retry later`); the window frees on its own, so they are
+  // transient rate limits, not terminal failures.
+  if (/\b429\b|rate.?limit|concurrency[\s_-]?limit|too many (?:concurrent )?requests/i.test(message)) return 'RATE_LIMIT'
   // A rejected request body (gateway or provider size cap): resending the
   // same request cannot succeed, so it is invalid, not transient.
   if (/\b413\b|failed to buffer the request body:\s*length limit exceeded|payload too large|request body too large/i.test(message)) return 'INVALID_REQUEST'

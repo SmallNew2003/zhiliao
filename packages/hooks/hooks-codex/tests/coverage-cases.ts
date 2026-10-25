@@ -31,7 +31,7 @@ function hooks(d: string, h: unknown): string {
   writeFileSync(join(d, 'hooks.json'), JSON.stringify({ hooks: h })); return join(d, 'hooks.json')
 }
 
-type HarnessOpts = { stderrSummaryMaxChars?: number; sessionRoot?: string }
+type HarnessOpts = { exposeToolArguments?: boolean; stderrSummaryMaxChars?: number; sessionRoot?: string }
 async function harness(configPath: string, adapter: MockAdapter, opts: HarnessOpts = {}): Promise<Context> {
   const ctx = new Context()
   contexts.push(ctx)
@@ -590,6 +590,42 @@ export function defineCoverageCases(groups: CoverageGroup | readonly CoverageGro
       const payload = JSON.parse(readFileSync(cap, 'utf8')) as { tool_name: string; tool_input: { command: string } }
       expect(payload.tool_name).toBe('shell')
       expect(payload.tool_input.command).toBe('ls')
+    })
+
+    it('keeps non-shell tool arguments out of the default PreToolUse payload', async () => {
+      const d = dir()
+      const cap = join(d, 'payload')
+      hooks(d, { PreToolUse: [{ hooks: [{ type: 'command', command: sh(d, 'cap.sh', `#!/usr/bin/env bash\ncat > "${cap}"\nexit 0\n`) }] }] })
+      const adapter = new MockAdapter([toolCallResponse('c1', 'Write', { path: 'draft.md', content: 'body' }), textResponse('done')])
+      const ctx = await harness(join(d, 'hooks.json'), adapter)
+      ctx.tools.register(defineContentToolFixture({ name: 'Write', description: 'w', parameters: { path: { type: 'string' }, content: { type: 'string' } }, async execute() { return [{ type: 'text', text: 'ok' }] } }))
+      const agent = await ctx.agentLoop.create(SessionId('default-tool-input'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } })); await waitForIdle(ctx, agent)
+      expect((JSON.parse(readFileSync(cap, 'utf8')) as { tool_input: unknown }).tool_input).toEqual({ command: '' })
+    })
+
+    it('preserves tool arguments in the PreToolUse payload when enabled', async () => {
+      const d = dir()
+      const cap = join(d, 'payload')
+      hooks(d, { PreToolUse: [{ hooks: [{ type: 'command', command: sh(d, 'cap.sh', `#!/usr/bin/env bash\ncat > "${cap}"\nexit 0\n`) }] }] })
+      const adapter = new MockAdapter([toolCallResponse('c1', 'Write', { path: 'draft.md', content: 'body' }), textResponse('done')])
+      const ctx = await harness(join(d, 'hooks.json'), adapter, { exposeToolArguments: true })
+      ctx.tools.register(defineContentToolFixture({ name: 'Write', description: 'w', parameters: { path: { type: 'string' }, content: { type: 'string' } }, async execute() { return [{ type: 'text', text: 'ok' }] } }))
+      const agent = await ctx.agentLoop.create(SessionId('full-tool-input'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } })); await waitForIdle(ctx, agent)
+      expect((JSON.parse(readFileSync(cap, 'utf8')) as { tool_input: unknown }).tool_input).toEqual({ command: '', path: 'draft.md', content: 'body' })
+    })
+
+    it('preserves tool arguments in the PostToolUse payload when enabled', async () => {
+      const d = dir()
+      const cap = join(d, 'payload')
+      hooks(d, { PostToolUse: [{ hooks: [{ type: 'command', command: sh(d, 'cap.sh', `#!/usr/bin/env bash\ncat > "${cap}"\nexit 0\n`) }] }] })
+      const adapter = new MockAdapter([toolCallResponse('c1', 'Write', { path: 'draft.md', content: 'body' }), textResponse('done')])
+      const ctx = await harness(join(d, 'hooks.json'), adapter, { exposeToolArguments: true })
+      ctx.tools.register(defineContentToolFixture({ name: 'Write', description: 'w', parameters: { path: { type: 'string' }, content: { type: 'string' } }, async execute() { return [{ type: 'text', text: 'ok' }] } }))
+      const agent = await ctx.agentLoop.create(SessionId('full-post-tool-input'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } })); await waitForIdle(ctx, agent)
+      expect((JSON.parse(readFileSync(cap, 'utf8')) as { tool_input: unknown }).tool_input).toEqual({ command: '', path: 'draft.md', content: 'body' })
     })
 
     it('a Codex matcher on the REAL tool name fires (matcher subject === payload tool_name)', async () => {
