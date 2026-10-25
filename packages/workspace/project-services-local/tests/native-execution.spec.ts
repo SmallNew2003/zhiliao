@@ -55,11 +55,12 @@ const humanConfig = { shellPath: '/bin/sh', retainedOutputBytes: 1024, terminati
 
 it('把检出目录内的相对可执行文件解析为绝对路径后授权人工启动', async () => {
   const { subprocess, spawned } = stubbedSubprocess('', '')
+  const resolved = resolve('/tmp/project', './dev.sh')
   const launch = await resolveHumanLaunch(subprocess, { argv: ['./dev.sh', '--flag'] }, '/tmp/project', humanConfig, new AbortController().signal)
-  expect(launch.command.argv).toEqual([resolve('/tmp/project', './dev.sh'), '--flag'])
+  expect(launch.command.argv).toEqual([resolved, '--flag'])
   expect(launch.cwd).toBe('/tmp/project')
   await launch.start(new AbortController().signal)
-  expect(spawned[0]!.argv).toEqual(['/bin/sh', '-c', "exec '/tmp/project/dev.sh' '--flag'"])
+  expect(spawned[0]!.argv).toEqual([humanConfig.shellPath, '-c', `exec '${resolved}' '--flag'`])
 })
 
 it('在子进程没有标准错误输出时省略错误分隔段', async () => {

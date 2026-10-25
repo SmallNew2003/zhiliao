@@ -391,6 +391,7 @@ it('拒绝相对路径的人工 shell 配置', async () => {
 
 it('在人类发起路径上报告 shell 可执行文件解析失败', async () => {
   const h = await fixture()
+  mockScan([])
   const resolve = h.ctx.subprocess.resolveExecutable.bind(h.ctx.subprocess)
   const spy = vi.spyOn(h.ctx.subprocess, 'resolveExecutable').mockImplementation(async (request, env, sig) => {
     if (request === h.shellPath) throw new Error('injected resolve failure')
