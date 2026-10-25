@@ -5,6 +5,7 @@ import { isJsonValue, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import type {
   ChatConversationViewNode, ChatSnapshot, ConversationNode, RunningToolCall, ToolResultNode,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
+import { projectProcessGroups } from '@deepseek-ai/dsh-client-ui-chat/src/client/conversation-nodes/process-groups.ts'
 
 function jsonFixture(value: unknown): JsonValue {
   if (!isJsonValue(value)) throw new Error('tool event fixture must be lossless JSON')
@@ -29,6 +30,7 @@ export function toolChatSnapshot(
   }))
   const byKey = new Map(nodes.map(node => [node.key, node]))
   const empty: readonly string[] = []
+  const timeline = { turnOrder: [] as readonly number[], turns: new Map() }
   return {
     order: nodes.map(node => node.key),
     nodes: {
@@ -42,8 +44,8 @@ export function toolChatSnapshot(
       getStep: () => empty,
     },
     navigation: { items: () => [] },
-    processGroups: { layout: [], get: () => undefined },
-    timeline: { turnOrder: [], turns: new Map() },
+    processGroups: projectProcessGroups(nodes, timeline),
+    timeline,
     legacy: {
       nodes: settled,
       runningCalls: running,
