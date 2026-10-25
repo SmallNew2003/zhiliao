@@ -44,8 +44,9 @@ async function fixture() {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'native-service-')))
   cleanup.push(() => rm(root, { recursive: true, force: true }))
   const h = await harness(); cleanup.push(() => h.ctx.fiber.dispose())
+  const shellPath = '/bin/bash'
   const native = await h.ctx.plugin(NativeServiceProvider, {
-    shellPath: '/bin/bash',
+    shellPath,
     retainedOutputBytes: 1048576,
     terminationGraceMs: 50,
     scanTimeoutMs: 10000,
@@ -70,7 +71,7 @@ async function fixture() {
     return Number(/READY (\d+)/.exec(output)![1])
   }
   const control = async (target: ServiceItem, action: 'stop' | 'restart') => h.runtime.control(access, { action, targetId: target.id, expectedRevision: target.revision, requestId: requestId() }, signal())
-  return { ...h, native, root, access, baseline, command, start, item, ready, control }
+  return { ...h, native, root, access, baseline, command, start, item, ready, control, shellPath }
 }
 function responds(port: number) {
   return new Promise<boolean>((resolve) => {
@@ -386,6 +387,18 @@ it('拒绝相对路径的人工 shell 配置', async () => {
     shellPath: 'bash', retainedOutputBytes: 1048576, terminationGraceMs: 50, scanTimeoutMs: 10000,
     scanMaxBytes: 1048576, processInspectionMax: 200, captureIntervalMs: 10, historyMaxInstances: 200,
   })).rejects.toThrow('absolute executable path')
+})
+
+it('在人类发起路径上报告 shell 可执行文件解析失败', async () => {
+  const h = await fixture()
+  const resolve = h.ctx.subprocess.resolveExecutable.bind(h.ctx.subprocess)
+  const spy = vi.spyOn(h.ctx.subprocess, 'resolveExecutable').mockImplementation(async (request, env, sig) => {
+    if (request === h.shellPath) throw new Error('injected resolve failure')
+    return resolve(request, env, sig)
+  })
+  cleanup.push(async () => { spy.mockRestore() })
+  await expect(h.start()).rejects.toThrow('injected resolve failure')
+  expect((await h.runtime.list(h.access, {}, signal())).items).toHaveLength(0)
 })
 
 it('在 Host 处置时等待进行中的共享扫描', async () => {
