@@ -1,9 +1,9 @@
 // Web e2e scenario: hovering a sidebar session row reveals a title wider than
 // its cell. The jsdom lane pins only the scroll position the handler writes;
 // the assembled browser is where the title really clips, really reaches its own
-// hovered extent (the trailing relative-time cell yields to the row menu while
-// the pointer rests on the row, so the hovered cell is wider than the resting
-// one), and really returns to its start when the pointer leaves.
+// hovered extent (the cell keeps its width while hovered — the relative-time
+// label fades under the action overlay without yielding its seat), and really
+// returns to its start when the pointer leaves.
 //
 // Zero model calls: seeding one renamed session and hovering its row touches no
 // provider.
@@ -56,16 +56,23 @@ describe('web e2e: hovering a clipped session title scrolls it to its far edge',
     expect(await title.evaluate(el => getComputedStyle(el).scrollBehavior)).toBe('smooth')
 
     await row.hover()
+    // The clip arrives with :hover itself: assert it right at the landing,
+    // before the row's hover card (500 ms dwell) opens over the pointer and
+    // moves :hover off the row. On a loaded machine the card can win that
+    // race, so re-enter the row (a fresh dwell) and read again.
+    await expect.poll(async () => {
+      if (await title.evaluate(el => getComputedStyle(el).textOverflow) === 'clip') return true
+      await row.hover()
+      return false
+    }, { timeout: 10_000 }).toBe(true)
     // Poll against the live extent: the reveal must reach the far edge of the
-    // hovered cell (the wider one — the relative-time label yields to the row
-    // menu), whatever width the handler itself read.
+    // hovered cell. The cell's width is stable while hovered — the relative-
+    // time label fades out but keeps its seat under the action overlay — so
+    // the handler's own geometry already matches the extent it must reach.
     await expect.poll(
       async () => title.evaluate(el => el.scrollLeft >= el.scrollWidth - el.clientWidth - 1),
       { timeout: 10_000 },
     ).toBe(true)
-    // Scrolled to its end, the title must not paint the ellipsis over the
-    // characters the reveal reached.
-    expect(await title.evaluate(el => getComputedStyle(el).textOverflow)).toBe('clip')
 
     // Leaving returns in one step: a smooth return would still be travelling
     // inside this window, and it would carry the resting ellipsis back with it.

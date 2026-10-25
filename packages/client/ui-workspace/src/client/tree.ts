@@ -335,11 +335,11 @@ function sessionNode(
 /**
  * Derive the workspace browser groups with every session as a top-level row.
  *
- * Every group shows; sessions populate under expanded groups in the selected
- * local order. Blank sessions are excluded except for the selected
- * provisional New Session row; archived sessions are excluded everywhere.
- * Content search lives outside this derivation
- * (see {@link deriveSearchResults}).
+ * Every group shows with its full session roster — the renderer hides
+ * collapsed bodies (GroupBody), so the roster stays warm for the expand
+ * animation. Blank sessions are excluded except for the selected provisional
+ * New Session row; archived sessions are excluded everywhere. Content search
+ * lives outside this derivation (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`mainView` retention feeds containsCurrent).
  * @param workspaces - real Workspaces in Host group order with caller-projected Session order.
  * @param archivedSessionIds - registry-global archive set.
@@ -373,9 +373,7 @@ export function deriveGroups(
       sessionCount: g.sessions.length,
       expanded,
       containsCurrent: g.key === currentGroup,
-      sessions: expanded
-        ? g.sessions.map(session => sessionNode(session, descendants, statuses))
-        : [],
+      sessions: g.sessions.map(session => sessionNode(session, descendants, statuses)),
     })
   }
   return groups

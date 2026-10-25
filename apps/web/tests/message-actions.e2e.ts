@@ -369,6 +369,15 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
       () => page.locator('[role="treeitem"][aria-selected="true"]').textContent(),
       { timeout: 10_000 },
     ).toContain('Use the read tool twice (2)')
+    // Park the pointer off the rows and let the fork source row's action
+    // overlay finish cross-fading out: captured mid-transition it would still
+    // ride the snapshot.
+    await page.mouse.move(0, 0)
+    await expect.poll(
+      () => page.locator('[role="treeitem"]').nth(2)
+        .locator('button[aria-label^="Session actions for "]').isVisible(),
+      { timeout: 5_000 },
+    ).toBe(false)
     const tree = await captureStableAria(
       page,
       '[role="tree"][aria-label="Sessions"]',

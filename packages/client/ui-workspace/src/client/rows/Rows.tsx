@@ -3,8 +3,11 @@
  * all data and callbacks arrive via props. Hover swaps (folder->chevron,
  * time->ellipsis, action buttons) are CSS-only, and a session row's clipped
  * title is scrolled programmatically while the row is hovered. Row ... menus are
- * visual-only except workspace Rename/Delete and session Rename/Fork/Archive; the
- * session and workspace hover cards are suppressed while a menu is open.
+ * visual-only except workspace Rename/Delete and session Rename/Fork/Archive;
+ * the session and workspace hover cards are suppressed while a menu is open.
+ * Double-clicking a real row title swaps it for an in-place editor whose commit
+ * is delegated through the rename-commit callbacks; the editor keeps only local
+ * UI state, like the menu-open flags.
  */
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
@@ -26,6 +29,56 @@ type RowTranslate = WorkspaceBrowserProps['t']
 /** Row display title: blank rows show the localized New Session label. */
 function displayTitle(node: SessionNode, t: RowTranslate): string {
   return node.blank ? t('session.new') : node.title
+}
+
+/**
+ * In-place title editor a double-clicked row title swaps in: Enter or blur
+ * hands the trimmed draft to onCommit, Escape cancels through onCancel, and
+ * the commit channel itself decides whether an empty or unchanged draft is a
+ * cancel. Composition events gate Enter so an IME confirmation never commits
+ * mid-composition. Focus lands on mount because autofocus does not fire when
+ * the editor appears from a dblclick commit in a real browser.
+ */
+function InlineRenameEditor({
+  initialTitle, ariaLabel, onCommit, onCancel,
+}: {
+  /** The row title the editor opened with. */
+  initialTitle: string
+  ariaLabel: string
+  /** Receives the trimmed draft; an empty or unchanged draft cancels. */
+  onCommit: (trimmedDraft: string) => void
+  onCancel: () => void
+}) {
+  const [draft, setDraft] = useState(initialTitle)
+  const composingRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+  return (
+    <input
+      ref={inputRef}
+      className={css.inlineRenameInput}
+      value={draft}
+      aria-label={ariaLabel}
+      onFocus={(e) => { e.target.select() }}
+      onClick={(e) => { e.stopPropagation() }}
+      onDoubleClick={(e) => { e.stopPropagation() }}
+      onChange={(e) => { setDraft(e.target.value) }}
+      onCompositionStart={() => { composingRef.current = true }}
+      onCompositionEnd={() => { composingRef.current = false }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !composingRef.current) {
+          e.preventDefault()
+          onCommit(draft.trim())
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          onCancel()
+        }
+      }}
+      onBlur={() => { onCommit(draft.trim()) }}
+    />
+  )
 }
 
 /**
@@ -123,9 +176,10 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 
 /**
  * Project (workspace) header row: folder + title;
- * hover reveals the chevron and create button, and dwelling on a real
- * Workspace shows its hover card (the ungrouped bucket has none).
- * `containsCurrent` arrives on the node (derivation fact, no renderer scan).
+ * hover cross-fades the folder into the expand chevron and reveals the create
+ * button, and dwelling on a real Workspace shows its hover card (the ungrouped
+ * bucket has none). `containsCurrent` arrives on the node (derivation fact, no
+ * renderer scan).
  * @param props.group - derived group node.
  * @param props.containsCurrentDescendant - highlight an ancestor even when its subtree is collapsed.
  * @param props.onToggle - expand/collapse the group.
@@ -141,7 +195,12 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   onToggle: () => void
   onCreate: () => void
   /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
-  actions?: { rename: () => void; delete: () => void } | undefined
+  actions?: {
+    rename: () => void
+    delete: () => void
+    /** Commit an in-place rename (double-click) straight to the Workspace channel. */
+    renameCommit: (title: string) => void
+  } | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
@@ -153,34 +212,62 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutline16 />, danger: true },
   ]
   const ownRow = (
     <div
-      className={clsx(css.projectRow, menuOpen && css.menuOpen)}
+      className={clsx(css.projectRow, menuOpen && css.menuOpen, renaming && css.renaming)}
       role="treeitem"
       aria-expanded={row.expanded}
       onClick={onToggle}
-      draggable={drag !== undefined}
-      onDragStart={drag === undefined
+      draggable={drag !== undefined && !renaming}
+      onDragStart={drag === undefined || renaming
         ? undefined
         : (e) => {
           e.dataTransfer.effectAllowed = 'move'
           e.dataTransfer.setData('text/plain', row.key)
           drag.start()
         }}
-      onDragEnd={drag?.end}
+      onDragEnd={drag === undefined ? undefined : drag.end}
     >
-      <span className={clsx(css.slot, css.folder, active && css.folderActive)}>
-        {row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />}
-      </span>
-      <span className={clsx(css.slot, css.chevron)}>
-        <IconTriangleRightFill14 className={clsx(css.arrow, row.expanded && css.arrowOpen)} />
+      <span className={clsx(css.slot, css.lead, active && css.folderActive)}>
+        <span className={clsx(css.leadIcon, css.folder)}>
+          {row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />}
+        </span>
+        {/* The chevron mirrors the expansion state the treeitem already
+            exposes through aria-expanded, so it stays out of the
+            accessibility tree. */}
+        <span className={clsx(css.leadIcon, css.chevron)} aria-hidden="true">
+          <IconTriangleRightFill14 className={clsx(css.arrow, row.expanded && css.arrowOpen)} />
+        </span>
       </span>
       <span className={css.projectText}>
-        <span className={css.title}>{label}</span>
+        {renaming ? (
+          <InlineRenameEditor
+            initialTitle={label}
+            ariaLabel={t('rename')}
+            onCommit={(trimmed) => {
+              setRenaming(false)
+              /* v8 ignore next -- narrowing guard: the editor opens only through the double-click path, which requires actions. */
+              if (actions === undefined || trimmed === '' || trimmed === label) return
+              actions.renameCommit(trimmed)
+            }}
+            onCancel={() => { setRenaming(false) }}
+          />
+        ) : (
+          <span
+            className={css.title}
+            onDoubleClick={actions === undefined ? undefined : (e) => {
+              e.stopPropagation()
+              setRenaming(true)
+            }}
+          >
+            {label}
+          </span>
+        )}
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
@@ -206,7 +293,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
                 aria-label={t('actions.workspace.aria', { name: label })}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
               >
-                <IconEllipsisOutline16 />
+                <span className={css.rowActionGlyph} aria-hidden="true"><IconEllipsisOutline16 /></span>
               </button>
             )}
           />
@@ -233,7 +320,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
         createdAt={row.createdAt}
         t={t}
       />}
-      disabled={menuOpen}
+      disabled={menuOpen || renaming}
       copyText={row.cwd}
       copyLabel={t('copy')}
       copiedLabel={t('hover.copied')}
@@ -390,11 +477,14 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
 /**
  * One top-level 34px session row: status dot (pending user interaction outranks
  * own or descendant activity), title, relative time, and the row actions menu.
+ * The selected row carries a leading brand bar so it stays distinguishable from
+ * a merely hovered row.
  * @param props.node - derived session node.
  * @param props.currentId - selected session id (row highlight).
  * @param props.now - epoch ms for relative-time formatting.
  * @param props.onOpen - open a session by id.
  * @param props.onRename - open the session rename dialog (id + current title).
+ * @param props.onRenameCommit - commit an in-place rename (double-click) straight to the session channel.
  * @param props.onFork - fork a session at its last completed turn.
  * @param props.onArchive - archive a session by id.
  * @param props.onReveal - scroll this row into view after search navigation, then acknowledge it.
@@ -404,7 +494,7 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @returns the session row.
  */
 export function SessionNodeItem({
-  node, currentId, now, onOpen, onRename, onFork, onArchive, onReveal, drag, flat = false, t,
+  node, currentId, now, onOpen, onRename, onRenameCommit, onFork, onArchive, onReveal, drag, flat = false, t,
 }: {
   node: SessionNode
   currentId: string | undefined
@@ -412,6 +502,8 @@ export function SessionNodeItem({
   onOpen: (id: SessionNode['id']) => void
   /** Open the browser-owned session rename dialog (row menu action). */
   onRename: (id: SessionNode['id'], currentTitle: string) => void
+  /** Commit an in-place rename (double-click) straight to the session channel. */
+  onRenameCommit: (id: SessionNode['id'], title: string) => void
   /** Fork a session at its last completed turn (row menu action). */
   onFork: (id: SessionNode['id']) => void
   /** Archive this session (row menu action; commits without a dialog). */
@@ -432,6 +524,7 @@ export function SessionNodeItem({
   const showStatus = primaryStatus.state !== 'done' || row.completed
   const draggable = drag !== undefined && !row.blank
   const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -453,7 +546,7 @@ export function SessionNodeItem({
     <div
       ref={rowRef}
       className={clsx(
-        css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
+        css.sessionRow, selected && css.selected, menuOpen && css.menuOpen, renaming && css.renaming,
         flat && !showStatus && css.flatSessionRowWithoutStatus,
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
@@ -462,8 +555,8 @@ export function SessionNodeItem({
       onClick={() => { onOpen(node.id) }}
       onPointerEnter={() => { revealClippedTitle(titleRef.current, true) }}
       onPointerLeave={() => { revealClippedTitle(titleRef.current, false) }}
-      draggable={draggable}
-      onDragStart={drag === undefined || row.blank
+      draggable={draggable && !renaming}
+      onDragStart={drag === undefined || row.blank || renaming
         ? undefined
         : (e) => {
           e.dataTransfer.effectAllowed = 'move'
@@ -495,7 +588,29 @@ export function SessionNodeItem({
           {showStatus && <SessionStatusDots statuses={statuses} />}
         </span>
       )}
-      <span ref={titleRef} className={css.title}>{title}</span>
+      {renaming ? (
+        <InlineRenameEditor
+          initialTitle={row.title}
+          ariaLabel={t('rename')}
+          onCommit={(trimmed) => {
+            setRenaming(false)
+            if (trimmed === '' || trimmed === row.title) return
+            onRenameCommit(node.id, trimmed)
+          }}
+          onCancel={() => { setRenaming(false) }}
+        />
+      ) : (
+        <span
+          ref={titleRef}
+          className={css.title}
+          onDoubleClick={row.blank ? undefined : (e) => {
+            e.stopPropagation()
+            setRenaming(true)
+          }}
+        >
+          {title}
+        </span>
+      )}
       {row.hasActiveSchedule && <ActiveScheduleIndicator t={t} />}
       {/* A blank New Session row is a provisional placeholder: nothing has
           happened in it yet, so a "now" timestamp and the row verbs
@@ -523,19 +638,24 @@ export function SessionNodeItem({
                 aria-label={t('actions.session.aria', { name: title })}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
               >
-                <IconEllipsisOutline16 />
+                <span className={css.rowActionGlyph} aria-hidden="true"><IconEllipsisOutline16 /></span>
               </button>
             )}
           />
         </span>
       )}
+      {/* The selected marker rides last and positions absolutely at the row's
+          leading edge: appending (instead of prepending) keeps every earlier
+          child's DOM identity stable, so a double-click's two clicks land on
+          the same title element and its dblclick reaches the span. */}
+      {selected && <span className={css.selectedBar} aria-hidden="true" />}
     </div>
   )
   return (
     <HoverCard
       anchor={ownRow}
       content={<SessionHoverContent node={node} now={now} t={t} />}
-      disabled={menuOpen || drag?.active === true}
+      disabled={menuOpen || renaming || drag?.active === true}
       copyText={row.blank ? undefined : row.title}
       copyLabel={t('copy')}
       copiedLabel={t('hover.copied')}

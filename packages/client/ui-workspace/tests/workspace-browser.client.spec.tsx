@@ -73,6 +73,17 @@ function hook<T>(snapshot: T) {
   return function select<S>(selector: (state: T) => S): S { return selector(snapshot) }
 }
 
+/**
+ * Collapsed group bodies stay mounted for the expand animation but carry
+ * aria-hidden, so user-visible presence is asserted through this filter
+ * instead of a raw queryByText.
+ */
+function queryVisibleText(text: string): HTMLElement | null {
+  const visible = screen.queryAllByText(text)
+    .filter(node => node.closest('[aria-hidden="true"]') === null)
+  return visible[0] ?? null
+}
+
 /** jsdom lacks DragEvent — the fireEvent fallback drops clientY, so pin it on the built event. */
 function fireDrag(row: HTMLElement, kind: 'dragOver' | 'drop', clientY: number): void {
   const event = kind === 'dragOver' ? createEvent.dragOver(row) : createEvent.drop(row)
@@ -396,7 +407,7 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByText('工作区')).toBeTruthy()
     expect(screen.getByText('alpha')).toBeTruthy()
     // Sessions hidden while their group is folded.
-    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(queryVisibleText('alpha-s')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
@@ -447,16 +458,16 @@ describe('WorkspaceBrowser', () => {
     expect(b.store.getSnapshot().groupBy).toBe('workspace-tree')
     expect(within(parentSection()).getByText('Child')).toBeTruthy()
     fireEvent.click(screen.getByText('Projects'))
-    expect(screen.queryByText('Child')).toBeNull()
+    expect(queryVisibleText('Child')).toBeNull()
     choose('按工作区')
     expect(screen.getByText('Child')).toBeTruthy()
     expect(within(parentSection()).queryByText('Child')).toBeNull()
     choose('按工作区树')
-    expect(screen.queryByText('Child')).toBeNull()
+    expect(queryVisibleText('Child')).toBeNull()
     b.view.unmount()
     const restored = mount({ useWorkspaces: workspaces, useSessions: sessions })
     expect(restored.store.getSnapshot().groupBy).toBe('workspace-tree')
-    expect(screen.queryByText('Child')).toBeNull()
+    expect(queryVisibleText('Child')).toBeNull()
     fireEvent.click(screen.getByText('Projects'))
     expect(within(parentSection()).getByText('Child')).toBeTruthy()
     choose('单列表')
@@ -529,7 +540,68 @@ describe('WorkspaceBrowser', () => {
     expect(open).toHaveBeenCalledWith(sid('alpha-s'))
     // Collapse hides the row again.
     fireEvent.click(screen.getByText('alpha'))
-    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(queryVisibleText('alpha-s')).toBeNull()
+  })
+
+  it('settles the group clip only for the body track transition itself', () => {
+    mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    const body = screen.getByText('alpha').closest('[class*="groupSection"]')
+      ?.querySelector('[aria-hidden="false"]') as HTMLElement
+    expect(body).toBeTruthy()
+    const inner = body.firstElementChild as HTMLElement
+    // Only the grid track transition lifts the clip; others leave it on.
+    fireEvent.transitionEnd(body, { propertyName: 'opacity' })
+    expect(inner.className).not.toMatch(/groupBodyInnerFree/)
+    // A child transition bubbling through (target mismatch) is ignored too.
+    fireEvent.transitionEnd(inner, { propertyName: 'grid-template-rows', bubbles: true })
+    expect(inner.className).not.toMatch(/groupBodyInnerFree/)
+    fireEvent.transitionEnd(body, { propertyName: 'grid-template-rows' })
+    expect(inner.className).toMatch(/groupBodyInnerFree/)
+  })
+
+  it('commits an in-place session rename straight to the rename channel', () => {
+    const b = mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.doubleClick(screen.getByText('alpha-s'))
+    const editor = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    fireEvent.change(editor, { target: { value: 'Renamed session' } })
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(b.props.renameSession).toHaveBeenCalledWith(sid('alpha-s'), 'Renamed session')
+    expect(b.props.open).not.toHaveBeenCalled()
+  })
+
+  it('commits an in-place workspace rename and hands a conflict to the dialog', () => {
+    const b = mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1)])),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['alpha-s']),
+        workspace('beta', []),
+      ])),
+    })
+    // A distinct title commits straight through.
+    fireEvent.doubleClick(screen.getByText('alpha'))
+    const editor = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    fireEvent.change(editor, { target: { value: 'gamma' } })
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(b.props.renameWorkspace).toHaveBeenCalledWith(wid('alpha'), 'gamma')
+
+    // A conflicting title opens the dialog pre-filled with the attempt and
+    // its conflict message instead of committing.
+    fireEvent.doubleClick(screen.getByText('beta'))
+    const conflict = screen.getByRole('textbox', { name: '重命名' }) as HTMLInputElement
+    fireEvent.change(conflict, { target: { value: 'alpha' } })
+    fireEvent.keyDown(conflict, { key: 'Enter' })
+    expect(b.props.renameWorkspace).toHaveBeenCalledOnce()
+    const dialogInput = screen.getByRole('dialog').querySelector('input') as HTMLInputElement
+    expect(dialogInput.value).toBe('alpha')
+    expect(screen.getByText('已存在名为“alpha”的工作区。')).toBeTruthy()
   })
 
   it('shows five sessions by default and clears transient show-all when the Workspace collapses', () => {
@@ -737,7 +809,7 @@ describe('WorkspaceBrowser', () => {
     startSession.mockImplementation(() => {
       expect(b.store.getSnapshot().groupExpansion).toEqual({ alpha: true })
     })
-    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(queryVisibleText('alpha-s')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '在“alpha”中新建会话' }))
     expect(b.store.getSnapshot().groupExpansion).toEqual({ alpha: true })
     expect(screen.getByText('alpha-s')).toBeTruthy()
@@ -770,7 +842,7 @@ describe('WorkspaceBrowser', () => {
     rerender(b, { useSessions: hook({ ...first, main: sid('b') }) })
     expect(screen.getByText('b')).toBeTruthy()
     fireEvent.click(screen.getByText('alpha'))
-    expect(screen.queryByText('b')).toBeNull()
+    expect(queryVisibleText('b')).toBeNull()
   })
 
   it('shows only the current blank session as the localized New Session, excluded from search', () => {
@@ -1743,10 +1815,10 @@ describe('Workspace tree grouping', () => {
   it('restores collapsed ancestors and keeps the flat view independent', () => {
     const b = mount({ useWorkspaces: hook(workspaceState([root, team, child])) })
     fireEvent.click(screen.getByText('Projects'))
-    expect(screen.queryByText('Team')).toBeNull()
+    expect(queryVisibleText('Team')).toBeNull()
     b.view.unmount()
     const restored = mount({ useWorkspaces: b.props.useWorkspaces })
-    expect(screen.queryByText('Child')).toBeNull()
+    expect(queryVisibleText('Child')).toBeNull()
     fireEvent.click(screen.getByText('Projects'))
     expect(screen.getByText('Child')).toBeTruthy()
     act(() => { restored.store.actions.setGroupBy('flat') })
@@ -1807,7 +1879,7 @@ describe('Workspace tree grouping', () => {
     rerender(b, {
       useSessions: hook(sessionState([summary('child-session', 1)], { main: sid('child-session') })),
     })
-    expect(screen.queryByText('Child')).toBeNull()
+    expect(queryVisibleText('Child')).toBeNull()
     expect(b.store.getSnapshot().groupExpansion.root).toBe(false)
     expect(section('Projects').querySelector('[class*="folderActive"]')).not.toBeNull()
   })

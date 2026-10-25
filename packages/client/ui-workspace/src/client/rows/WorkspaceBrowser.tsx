@@ -12,7 +12,8 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconCloseFill14, IconPersonalizationOutline16,
+  Button, IconChevronDownOutline14, IconCloseFill14, IconFolderClose16,
+  IconLoadingOutline16, IconPersonalizationOutline16,
   IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -94,6 +95,35 @@ function useNativeDragAcceptance(active: boolean): void {
       document.removeEventListener('drop', acceptDrop)
     }
   }, [active])
+}
+
+/**
+ * Collapsible group body: the grid track animates the section's height
+ * (0fr closed, 1fr open) while the inner clip carries `overflow: hidden`.
+ * Rows stay mounted while collapsed — `visibility` (delayed to match the
+ * track transition) keeps them unseen and out of the tab order, and
+ * `aria-hidden` keeps them out of the accessibility tree. The clip lifts only
+ * once the track has settled open (`settled`), so the rows' negative-offset
+ * drag markers are not cut at the body's inner edges at rest; jsdom never
+ * fires the transition, so the clip simply stays on there.
+ */
+function GroupBody({ expanded, children }: { expanded: boolean; children: ReactNode }) {
+  const [settled, setSettled] = useState(expanded)
+  return (
+    <div
+      className={clsx(css.groupBody, expanded && css.groupBodyOpen)}
+      aria-hidden={!expanded}
+      onTransitionEnd={(e) => {
+        // Nested GroupBodies bubble their own track transitions through here.
+        if (e.target !== e.currentTarget || e.propertyName !== 'grid-template-rows') return
+        setSettled(expanded)
+      }}
+    >
+      <div className={clsx(css.groupBodyInner, expanded && settled && css.groupBodyInnerFree)}>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 /** Grouping and ordering menu; own open state so it resets with the wide chrome. */
@@ -198,6 +228,10 @@ type SessionTreeProps = Pick<
   onDeleteRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
   /** Open the browser-owned session rename dialog. */
   onSessionRename: (sessionId: SessionNode['id'], currentTitle: string) => void
+  /** Commit an in-place workspace rename (double-click) straight to the channel. */
+  onWorkspaceRenameCommit: (workspaceId: WorkspaceId, title: string) => void
+  /** Commit an in-place session rename (double-click) straight to the channel. */
+  onSessionRenameCommit: (sessionId: SessionNode['id'], title: string) => void
   /** Archive a session (row menu action; the row disappears on the state echo). */
   onSessionArchive: (sessionId: SessionNode['id']) => void
   /** One Session chosen from search that must be exposed and scrolled into view. */
@@ -212,6 +246,7 @@ function SessionTree({
   archivedSessionIds,
   workspaceReady, usePanelInfo,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
+  onWorkspaceRenameCommit, onSessionRenameCommit,
   insertWorkspaceBefore,
   nestWorkspaces, groupExpansion, setGroupExpanded,
   setSessionOrder, home, t,
@@ -404,6 +439,8 @@ function SessionTree({
       : (half: 'before' | 'after') => {
         commitWorkspaceDrag(workspaceDrag, { id: workspaceId, half })
       }
+    const renderedSessions = sessionsExpanded ? group.sessions : collapsed.rows
+    const hasBody = children.length > 0 || renderedSessions.length > 0
     return (
     // Group section: header, descendant Workspaces, and own Session rows. The
     // inter-group breathing room is the section's own margin
@@ -466,81 +503,93 @@ function SessionTree({
             ? undefined
             : {
               rename: () => {
-              /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                 if (group.workspaceId !== undefined) onRenameRequest(group.workspaceId, group.label)
               },
               delete: () => {
-              /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
                 if (group.workspaceId !== undefined) onDeleteRequest(group.workspaceId, group.label)
+              },
+              renameCommit: (title) => {
+                /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
+                if (group.workspaceId !== undefined) onWorkspaceRenameCommit(group.workspaceId, title)
               },
             }}
         />
-        {group.expanded && children.length > 0 && (
-          <div role="group">
-            {children.map(child => renderGroup(child, depth + 1))}
-          </div>
-        )}
-        {(sessionsExpanded
-          ? group.sessions
-          : collapsed.rows
-        ).map((node) => {
-        // Session drag never leaves its browser-local account.
-          const sameGroupDrag = drag !== null && drag.accountKey === group.key
-          const normalizeHalf = (half: 'before' | 'after'): 'before' | 'after' =>
-            node.blank ? 'after' : half
-          const dragProps = {
-            start: () => {
-              sessionDropCommitted.current = false
-              setDrag({ accountKey: group.key, sessionId: node.id, over: null })
-            },
-            active: sameGroupDrag,
-            marker: sameGroupDrag && drag.over?.id === node.id ? drag.over.half : null,
-            hover: (half: 'before' | 'after') => {
-            /* v8 ignore next -- narrowing guard: Rows gates hover on `active`, which is false while the drag state is null. */
-              setDrag(d => (d === null ? d : {
-                ...d, over: { id: node.id, half: normalizeHalf(half) },
-              }))
-            },
-            drop: (half: 'before' | 'after') => {
-            /* v8 ignore next -- narrowing guard: Rows gates drop on `active`, which is false while the drag state is null. */
-              if (drag === null) return
-              commitSessionDrag(drag, { id: node.id, half: normalizeHalf(half) })
-            },
-            end: () => {
-              if (drag?.over !== null && drag?.over !== undefined) commitSessionDrag(drag, drag.over)
-              else setDrag(null)
-              sessionDropCommitted.current = false
-            },
-          }
-          return (
-            <SessionNodeItem
-              key={node.id}
-              node={node}
-              currentId={current}
-              now={now}
-              onOpen={open}
-              onRename={onSessionRename}
-              onFork={forkSession}
-              onArchive={onSessionArchive}
-              onReveal={node.id === revealSessionId && group.key === revealGroup
-                ? () => { onSessionRevealed(node.id) }
-                : undefined}
-              drag={dragProps}
-              t={t}
-            />
-          )
-        })}
-        {collapsed.hiddenCount > 0 && (
-          <button
-            type="button"
-            className={css.sessionOverflowButton}
-            aria-expanded={sessionsExpanded}
-            onClick={() => { setExpandedSessionGroups(keys => toggled(keys, group.key)) }}
-          >
-            {sessionsExpanded
-              ? t('sessions.collapse')
-              : t('sessions.expand', { n: collapsed.hiddenCount })}
-          </button>
+        {hasBody && (
+          <GroupBody expanded={group.expanded}>
+            {children.length > 0 && (
+              <div role="group">
+                {children.map(child => renderGroup(child, depth + 1))}
+              </div>
+            )}
+            {renderedSessions.map((node) => {
+            // Session drag never leaves its browser-local account.
+              const sameGroupDrag = drag !== null && drag.accountKey === group.key
+              const normalizeHalf = (half: 'before' | 'after'): 'before' | 'after' =>
+                node.blank ? 'after' : half
+              const dragProps = {
+                start: () => {
+                  sessionDropCommitted.current = false
+                  setDrag({ accountKey: group.key, sessionId: node.id, over: null })
+                },
+                active: sameGroupDrag,
+                marker: sameGroupDrag && drag.over?.id === node.id ? drag.over.half : null,
+                hover: (half: 'before' | 'after') => {
+                /* v8 ignore next -- narrowing guard: Rows gates hover on `active`, which is false while the drag state is null. */
+                  setDrag(d => (d === null ? d : {
+                    ...d, over: { id: node.id, half: normalizeHalf(half) },
+                  }))
+                },
+                drop: (half: 'before' | 'after') => {
+                /* v8 ignore next -- narrowing guard: Rows gates drop on `active`, which is false while the drag state is null. */
+                  if (drag === null) return
+                  commitSessionDrag(drag, { id: node.id, half: normalizeHalf(half) })
+                },
+                end: () => {
+                  if (drag?.over !== null && drag?.over !== undefined) commitSessionDrag(drag, drag.over)
+                  else setDrag(null)
+                  sessionDropCommitted.current = false
+                },
+              }
+              return (
+                <SessionNodeItem
+                  key={node.id}
+                  node={node}
+                  currentId={current}
+                  now={now}
+                  onOpen={open}
+                  onRename={onSessionRename}
+                  onRenameCommit={onSessionRenameCommit}
+                  onFork={forkSession}
+                  onArchive={onSessionArchive}
+                  onReveal={node.id === revealSessionId && group.key === revealGroup && group.expanded
+                    ? () => { onSessionRevealed(node.id) }
+                    : undefined}
+                  drag={dragProps}
+                  t={t}
+                />
+              )
+            })}
+            {collapsed.hiddenCount > 0 && (
+              <button
+                type="button"
+                className={css.sessionOverflowButton}
+                aria-expanded={sessionsExpanded}
+                onClick={() => { setExpandedSessionGroups(keys => toggled(keys, group.key)) }}
+              >
+                {/* The button's text names the action; the chevron is decoration. */}
+                <span className={css.overflowGlyph} aria-hidden="true">
+                  <IconChevronDownOutline14
+                    className={clsx(css.overflowChevron, sessionsExpanded && css.overflowChevronOpen)}
+                  />
+                </span>
+                {sessionsExpanded
+                  ? t('sessions.collapse')
+                  : t('sessions.expand', { n: collapsed.hiddenCount })}
+              </button>
+            )}
+          </GroupBody>
         )}
       </div>
     )
@@ -555,7 +604,10 @@ function SessionTree({
         aria-label={t('section.sessions')}
       >
         {groups.length === 0 && (
-          <div className={css.empty}>{t('empty.none')}</div>
+          <div className={css.empty}>
+            <IconFolderClose16 size={22} className={css.emptyIcon} />
+            <span>{t('empty.none')}</span>
+          </div>
         )}
         {rootGroups.map(group => renderGroup(group, 0))}
       </div>
@@ -566,8 +618,8 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  list, sessionIds, useSessionStatus, open, forkSession, onSessionRename, onSessionArchive,
-  usePanelInfo, setSessionOrder,
+  list, sessionIds, useSessionStatus, open, forkSession, onSessionRename, onSessionRenameCommit,
+  onSessionArchive, usePanelInfo, setSessionOrder,
   revealSessionId, onSessionRevealed, t,
 }: Pick<
   SessionTreeProps,
@@ -575,6 +627,7 @@ function FlatList({
   | 'open'
   | 'forkSession'
   | 'onSessionRename'
+  | 'onSessionRenameCommit'
   | 'onSessionArchive'
   | 'usePanelInfo'
   | 'setSessionOrder'
@@ -619,7 +672,10 @@ function FlatList({
     <div className={clsx(css.treeBody, css.wide)}>
       <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
         {rows.length === 0 && (
-          <div className={css.empty}>{t('empty.none')}</div>
+          <div className={css.empty}>
+            <IconFolderClose16 size={22} className={css.emptyIcon} />
+            <span>{t('empty.none')}</span>
+          </div>
         )}
         {rows.map((node) => {
           const active = drag !== null
@@ -633,6 +689,7 @@ function FlatList({
               now={now}
               onOpen={open}
               onRename={onSessionRename}
+              onRenameCommit={onSessionRenameCommit}
               onFork={forkSession}
               onArchive={onSessionArchive}
               onReveal={node.id === revealSessionId
@@ -735,7 +792,10 @@ function SearchResults({
           ))}
         </div>
         {pending && (
-          <div className={css.searchStatus} role="status">{t('search.pending')}</div>
+          <div className={css.searchStatus} role="status">
+            <IconLoadingOutline16 className={css.searchSpinner} />
+            {t('search.pending')}
+          </div>
         )}
         {failed && (
           <div className={css.searchWarning} role="status">
@@ -1064,6 +1124,30 @@ export function WorkspaceBrowser({
     setSessionRenameError(null)
   }
 
+  // In-place (double-click) rename commits bypass the dialogs; rejections are
+  // non-fatal console diagnostics, the reorder/archive posture.
+  const commitSessionRenameInline = (sessionId: SessionNode['id'], title: string): void => {
+    renameSession(sessionId, title).catch((reason: unknown) => {
+      console.warn('session rename rejected:', reason)
+    })
+  }
+  // A conflicting workspace title cannot be committed inline: hand the attempt
+  // to the rename dialog with the draft pre-filled, so the conflict rule and
+  // its message surface with their full affordances.
+  const commitWorkspaceRenameInline = (workspaceId: WorkspaceId, title: string): void => {
+    if (workspaces.some(w => w.title === title)) {
+      const current = workspaces.find(w => w.workspaceId === workspaceId)
+      if (current === undefined) return
+      setRenameTarget({ workspaceId, currentTitle: current.title })
+      setRenameDraft(title)
+      setRenameError(null)
+      return
+    }
+    renameWorkspace(workspaceId, title).catch((reason: unknown) => {
+      console.warn('workspace rename rejected:', reason)
+    })
+  }
+
   // Archive is dialog-free: not destructive (the log and the accounting slot
   // remain), so the menu action commits directly; the row disappears when the
   // archive-set echo lands. Failures are non-fatal console diagnostics, the
@@ -1267,6 +1351,7 @@ export function WorkspaceBrowser({
                 useSessionStatus={useSessionStatus}
                 open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
+                onSessionRenameCommit={commitSessionRenameInline}
                 setSessionOrder={saveSessionOrder}
                 revealSessionId={revealSessionId}
                 onSessionRevealed={acknowledgeSessionReveal}
@@ -1279,7 +1364,9 @@ export function WorkspaceBrowser({
                 list={list}
                 useSessionStatus={useSessionStatus}
                 onSessionRename={onSessionRename}
+                onSessionRenameCommit={commitSessionRenameInline}
                 onSessionArchive={onSessionArchive}
+                onWorkspaceRenameCommit={commitWorkspaceRenameInline}
                 forkSession={forkSession}
                 workspaces={orderedWorkspaces}
                 ungroupedSessionIds={orderedUngroupedSessionIds}
