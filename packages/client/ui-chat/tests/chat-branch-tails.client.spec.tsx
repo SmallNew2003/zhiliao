@@ -1074,7 +1074,7 @@ describe('small branch tails', () => {
     // The untimed counts pill renders static, so the usage pill is the only button.
     const [usagePill] = [...view.getAllByRole('button')] as [HTMLElement]
     expect(view.getByText('1 轮 1 步').closest('button')).toBeNull()
-    expect(usagePill.textContent).toBe('10 tok')
+    expect(usagePill.textContent).toBe('Token 用量')
     // Pure output accounting still reaches the usage pill's click-open dialog rows.
     fireEvent.click(usagePill)
     const dialog = view.getByRole('dialog')

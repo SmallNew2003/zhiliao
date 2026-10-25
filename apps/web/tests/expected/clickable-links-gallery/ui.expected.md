@@ -201,6 +201,6 @@
   - text: DeepSeek-V4-Flash
   - img
 - button "Send message" [disabled]
-- button "1 turns 2 steps":
+- button "Session statistics · Model time {{duration}}":
   - img
-  - text: 1 turns 2 steps
+  - text: Model time {{duration}}

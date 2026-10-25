@@ -33,6 +33,7 @@
   - text: streaming-fence-highlight-test/streaming-fence
   - img
 - button "Stop generating"
+- button "Send message" [disabled]
 
 ---
 

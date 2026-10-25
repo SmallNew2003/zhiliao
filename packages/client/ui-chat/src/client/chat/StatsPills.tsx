@@ -1,9 +1,5 @@
-// Session stats under the composer, split into two icon pills: a gauge pill
-// (turn/step counts + output speed) opening the time-and-speed dialog, and a
-// database pill (total tokens + cache hit) opening the token-usage dialog.
-// Settled-node identity prevents stream-delta updates from rerendering the row.
-// Mounted on 'conversation.composer.dock' so it sticks with the composer in the
-// active conversation scrollport (see ConversationRoot data-conversation-scroll).
+// Compact model duration and token-usage entry points beneath the composer.
+// Detail panels read whole-session projections, with window timing as fallback.
 
 import { memo, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -17,7 +13,7 @@ import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { formatTokensPerSecond } from './message-chrome.ts'
 import { assistantStepReading } from '../contract/turn-metrics.ts'
-import { formatCacheHitPercent, formatExactTokens, formatTokens } from './token-format.ts'
+import { formatCacheHitPercent, formatExactTokens } from './token-format.ts'
 import { MEASURE_STYLE, useStatDialog } from './stat-dialog.ts'
 import css from './StatsPills.module.css'
 import dialogCss from './stat-dialog.module.css'
@@ -142,22 +138,10 @@ function TimePill({ stats, t, dialog }: {
 }) {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog(dialog)
   const counts = t('stats.counts', { turns: stats.turns, steps: stats.steps })
-  const tps = stats.decodeMs > 0
-    ? t('message.tokensPerSecond', {
-      tps: formatTokensPerSecond(stats.decodeTokens / (stats.decodeMs / 1_000)),
-    })
-    : null
-  const label = (
-    <span className={css.label}>
-      {counts}
-      {tps !== null && (
-        <>
-          <span className={css.sep} aria-hidden>·</span>
-          {tps}
-        </>
-      )}
-    </span>
-  )
+  const timeLabel = stats.llmMs > 0
+    ? t('stats.modelTime', { duration: formatDuration(stats.llmMs, t) })
+    : counts
+  const label = <span className={css.label}>{timeLabel}</span>
   // A window without one timed figure has no dialog rows to show, so the pill
   // stays a plain reading instead of a button opening an empty dialog.
   if (stats.llmMs <= 0 && stats.toolMs <= 0 && stats.ttftSteps <= 0 && stats.decodeMs <= 0) {
@@ -177,7 +161,7 @@ function TimePill({ stats, t, dialog }: {
         className={css.pill}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={tps === null ? counts : `${counts} · ${tps}`}
+        aria-label={`${t('stats.dialog.title')} · ${timeLabel}`}
         onClick={() => { setOpen(!open) }}
       >
         <IconGaugeOutline16 />
@@ -199,6 +183,8 @@ function TimePill({ stats, t, dialog }: {
           </div>
           <div className={dialogCss.titleRule} aria-hidden />
           <dl className={dialogCss.details} data-session-stats-details>
+            <dt>{t('stats.dialog.activity')}</dt>
+            <dd>{counts}</dd>
             {stats.llmMs > 0 && (
               <>
                 <dt>{t('stats.dialog.llmTime')}</dt>
@@ -241,9 +227,7 @@ function UsagePill({ usage, t, dialog }: {
   const { open, setOpen, rootRef, panelRef, pos } = useStatDialog(dialog)
   // Same aggregate as the Turn pill's totalTokens: every prompt-side billing bucket plus output.
   const total = billedInputTokens(usage) + usage.outputTokens
-  const totalText = t('message.turnUsage.count', { count: formatTokens(total, t) })
   const cacheHit = cacheHitPercent(usage)
-  const cacheHitText = cacheHit !== null ? t('stats.cacheHit', { percent: cacheHit }) : null
   return (
     <span ref={rootRef} className={css.anchor}>
       <button
@@ -251,19 +235,11 @@ function UsagePill({ usage, t, dialog }: {
         className={css.pill}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={cacheHitText === null ? totalText : `${totalText} · ${cacheHitText}`}
+        aria-label={t('stats.dialog.usageTitle')}
         onClick={() => { setOpen(!open) }}
       >
         <IconDatabaseOutline16 />
-        <span className={css.label}>
-          {totalText}
-          {cacheHitText !== null && (
-            <>
-              <span className={css.sep} aria-hidden>·</span>
-              {cacheHitText}
-            </>
-          )}
-        </span>
+        <span className={css.label}>{t('stats.dialog.usageTitle')}</span>
       </button>
       {open && createPortal(
         <div

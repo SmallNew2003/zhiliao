@@ -39,7 +39,7 @@ describe.skipIf(webSnapshotMode() === 'record')('web e2e: context details placem
         const trigger = page.getByRole('button', { name: /% of context used$/ })
         await trigger.waitFor()
         expect(await trigger.textContent()).toMatch(/^\d+%$/)
-        expect(await page.getByRole('button', { name: /tok · Cache hit/ }).count()).toBe(withStats ? 1 : 0)
+        expect(await page.getByRole('button', { name: 'Token usage' }).count()).toBe(withStats ? 1 : 0)
         expect(await card.evaluate((element) => {
           const dock = element.nextElementSibling!
           return {

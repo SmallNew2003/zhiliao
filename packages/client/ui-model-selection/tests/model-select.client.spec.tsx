@@ -55,6 +55,16 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
 afterEach(cleanup)
 
 describe('ModelSelect reasoning effort', () => {
+  it('opens available models directly when the current route is unavailable', () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state({ current: { provider: 'missing-provider', model: 'old-model' }, routable: false }))
+    render(<ModelSelect
+      locked={false} available directory={directory} load={() => {}}
+      select={async () => ({ ok: true, value: undefined })} t={t}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: '选择模型' }))
+    expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+  })
+
   it('renders effort names without descriptions and submits the effort as part of the session selection', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
     const select = vi.fn(async (selection: ModelSelection) => {

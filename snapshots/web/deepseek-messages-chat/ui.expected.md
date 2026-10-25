@@ -48,10 +48,10 @@
   - text: DeepSeek-V4-Flash high
   - img
 - button "发送消息" [disabled]
-- button "1 轮 1 步 · {{throughput}} tok/s":
+- button "会话统计 · 模型用时 {{duration}}":
   - img
-  - text: 1 轮 1 步{{throughput}} tok/s
-- button "8.2K tok · 缓存命中 16%":
+  - text: 模型用时 {{duration}}
+- button "Token 用量":
   - img
-  - text: 8.2K tok缓存命中 16%
+  - text: Token 用量
 - button "上下文已用 1%": 1%

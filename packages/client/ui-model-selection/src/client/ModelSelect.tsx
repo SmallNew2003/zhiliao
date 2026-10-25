@@ -190,7 +190,8 @@ export function ModelSelect(
   if (!available) return null
 
   const show = (): void => {
-    setPane('root')
+    setPane(state.routable === false ? 'model' : 'root')
+    if (state.routable === false) paneFocus.current = 'drill'
     setOpen(true)
     reload()
   }
@@ -316,14 +317,16 @@ export function ModelSelect(
   }
 
   const waiting = state.current === null && state.status === 'loading'
-  const modelLabel = waiting
-    ? t('trigger.loading')
-    : currentChoice?.model.name
+  const modelLabel = state.routable === false
+    ? t('trigger.fallback')
+    : waiting
+      ? t('trigger.loading')
+      : currentChoice?.model.name
       ?? (state.current === null ? t('trigger.fallback') : `${state.current.provider}/${state.current.model}`)
   const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
   const triggerAria = waiting
     ? t('trigger.loading')
-    : state.current === null
+    : state.current === null || state.routable === false
       ? t('trigger.selectAria')
       : effortLabel === undefined
         ? t('trigger.aria', { model: modelLabel })
@@ -340,7 +343,7 @@ export function ModelSelect(
       <button
         ref={triggerRef}
         type="button"
-        className={css.trigger}
+        className={clsx(css.trigger, state.routable === false && css.recovery)}
         aria-label={triggerAria}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -357,7 +360,7 @@ export function ModelSelect(
       >
         <IconDataOutline16 className={css.triggerIcon} size={16} />
         <span className={css.triggerLabel}>{modelLabel}</span>
-        {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
+        {state.routable !== false && effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
       </button>
 

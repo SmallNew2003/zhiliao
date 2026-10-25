@@ -291,3 +291,9 @@
   flex: 0 0 auto;
   color: var(--dsw-alias-label-tertiary);
 }
+
+.trigger.recovery {
+  background: var(--dsw-alias-button-elevated-fill);
+  color: var(--dsw-alias-state-business-primary);
+  padding: 0 10px;
+}
