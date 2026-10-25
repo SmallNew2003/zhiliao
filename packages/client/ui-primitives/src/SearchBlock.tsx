@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { headTailCap } from './head-tail-cap.ts'
 import { IconInspectOutline12 } from './icons/index.tsx'
@@ -264,45 +264,52 @@ export function SearchBlock(props: SearchBlockProps) {
   // hidden middle.
   const tail = tailHeader === undefined ? naturalTail : naturalTail.slice(1)
 
+  const lineChrome = {
+    className: clsx(css.line, props.onOpenPath && css.clickableLine),
+    role: props.onOpenPath ? 'button' : undefined,
+    tabIndex: props.onOpenPath ? 0 : undefined,
+  } as const
+  const activateOnEnterOrSpace = (activate: () => void) => (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      activate()
+    }
+  }
+
   const renderRow = (row: SearchRow): ReactNode => {
     if (row.type === 'path') {
+      const openPath = () => { props.onOpenPath?.(row.path) }
       return (
-        <div
-          className={clsx(css.line, props.onOpenPath && css.clickableLine)}
-          role={props.onOpenPath ? 'button' : undefined}
-          tabIndex={props.onOpenPath ? 0 : undefined}
-          onClick={props.onOpenPath ? () => { props.onOpenPath?.(row.path) } : undefined}
-          onKeyDown={props.onOpenPath ? (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              props.onOpenPath?.(row.path)
-            }
-          } : undefined}
-        >
+        <div {...lineChrome} onClick={props.onOpenPath ? openPath : undefined} onKeyDown={props.onOpenPath ? activateOnEnterOrSpace(openPath) : undefined}>
           {highlightQuery(row.path, props.query)}
         </div>
       )
     }
     if (row.type === 'match') {
+      const openMatch = () => { props.onOpenPath?.(row.filePath, row.lineNumber) }
       return (
-        <div
-          className={clsx(css.line, props.onOpenPath && css.clickableLine)}
-          role={props.onOpenPath ? 'button' : undefined}
-          tabIndex={props.onOpenPath ? 0 : undefined}
-          onClick={props.onOpenPath ? () => { props.onOpenPath?.(row.filePath, row.lineNumber) } : undefined}
-          onKeyDown={props.onOpenPath ? (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              props.onOpenPath?.(row.filePath, row.lineNumber)
-            }
-          } : undefined}
-        >
+        <div {...lineChrome} onClick={props.onOpenPath ? openMatch : undefined} onKeyDown={props.onOpenPath ? activateOnEnterOrSpace(openMatch) : undefined}>
           <span className={css.lineNumber}>{row.lineNumber}: </span>
           {highlightQuery(row.line, props.query)}
         </div>
       )
     }
     if (props.onOpenPath) {
+      const openPathChrome = {
+        role: 'button' as const,
+        tabIndex: 0,
+        onClick: (event: MouseEvent) => {
+          event.stopPropagation()
+          props.onOpenPath?.(row.path)
+        },
+        onKeyDown: (event: KeyboardEvent) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            event.stopPropagation()
+            props.onOpenPath?.(row.path)
+          }
+        },
+      }
       return (
         <div
           className={css.fileHeader}
@@ -317,41 +324,10 @@ export function SearchBlock(props: SearchBlockProps) {
             }
           }}
         >
-          <span
-            role="button"
-            tabIndex={0}
-            className={clsx(css.filePath, css.clickablePath)}
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onOpenPath?.(row.path)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                event.stopPropagation()
-                props.onOpenPath?.(row.path)
-              }
-            }}
-          >
+          <span {...openPathChrome} className={clsx(css.filePath, css.clickablePath)}>
             {row.path}
           </span>
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label={row.path}
-            className={css.openIcon}
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onOpenPath?.(row.path)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                event.stopPropagation()
-                props.onOpenPath?.(row.path)
-              }
-            }}
-          >
+          <span {...openPathChrome} aria-label={row.path} className={css.openIcon}>
             <IconInspectOutline12 />
           </span>
           <span className={css.fileCount}>{row.count}</span>
