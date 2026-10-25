@@ -278,8 +278,15 @@ export const turnProcessDefinition: ConversationNodeDefinition<TurnProcessState>
   buildViewNode: (context) => {
     const turn = turnLocation(context)
     const data = turn?.data.get('turn-process')
-    if (turn === undefined || data === undefined) return null
     const current = context.current.get('chat') as ChatNode | null | undefined
+    if (turn === undefined) return null
+    if (data === undefined) {
+      // Retired live chunks can remove the only process evidence after the
+      // node was materialized; keep its key hidden instead of withdrawing it.
+      return current?.kind === 'turn-process'
+        ? chatNode(context, 'turn-process', current.anchorSeq, current.data, { visibility: 'hidden' })
+        : null
+    }
     const state = context.state
     if (current?.kind === 'turn-process'
       && state !== undefined
