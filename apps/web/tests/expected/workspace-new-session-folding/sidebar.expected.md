@@ -2,8 +2,7 @@
   - treeitem "{{workspace}} Workspace actions for {{workspace}} New session in {{workspace}}" [expanded]:
     - img
     - text: {{workspace}}
-    - button "Workspace actions for {{workspace}}":
-      - img
+    - button "Workspace actions for {{workspace}}"
     - button "New session in {{workspace}}":
       - img
   - treeitem "New Session" [selected]

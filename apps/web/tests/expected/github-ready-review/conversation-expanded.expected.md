@@ -1,11 +1,13 @@
 - tree "Sessions":
-  - treeitem "{{workspace}}" [expanded]:
+  - treeitem "{{workspace}} Workspace actions for {{workspace}} New session in {{workspace}}" [expanded]:
     - img
     - text: {{workspace}}
-  - treeitem "Review deepseek-ai/deepseek-harness#314 Session actions for Review deepseek-ai/deepseek-harness#314" [selected]:
-    - text: Review deepseek-ai/deepseek-harness#314
-    - button "Session actions for Review deepseek-ai/deepseek-harness#314":
+    - button "Workspace actions for {{workspace}}"
+    - button "New session in {{workspace}}":
       - img
+  - treeitem "Review deepseek-ai/deepseek-harness#314 now Session actions for Review deepseek-ai/deepseek-harness#314" [selected]:
+    - text: Review deepseek-ai/deepseek-harness#314 now
+    - button "Session actions for Review deepseek-ai/deepseek-harness#314"
 
 ---
 

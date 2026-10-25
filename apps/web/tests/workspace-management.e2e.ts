@@ -728,7 +728,13 @@ describe('web e2e: workspace management (create / rename / grouping / hover affo
     await section.getByText('project-two', { exact: true }).waitFor()
     await parent.click()
     expect(await parent.locator('[class*="folderActive"]').count()).toBe(1)
-    expect(await section.getByText('project-two', { exact: true }).count()).toBe(0)
+    // A collapsed group keeps its rows mounted but hidden: the body leaves the
+    // visible layout, the accessibility tree, and the tab order while the track
+    // animates shut, so the row is hidden rather than detached.
+    await expect.poll(
+      async () => section.getByText('project-two', { exact: true }).first().isVisible(),
+      { timeout: 5_000 },
+    ).toBe(false)
     const warningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
     await parent.waitFor()
