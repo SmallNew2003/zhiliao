@@ -82,10 +82,10 @@ function nodeStartTime(node: ChatNode): number | undefined {
       return root.time
     }
   }
-  if (typeof (node.data as { time?: unknown })?.time === 'number') {
+  if (typeof (node.data as { time?: unknown }).time === 'number') {
     return (node.data as { time: number }).time
   }
-  if (typeof (node.data as { current?: { time?: unknown } })?.current?.time === 'number') {
+  if (typeof (node.data as { current?: { time?: unknown } }).current?.time === 'number') {
     return (node.data as { current: { time: number } }).current.time
   }
   if (node.location.kind === 'step' && typeof node.location.step.start?.time === 'number') {
@@ -137,6 +137,7 @@ function nodeSeat(node: ChatNode): ProcessGroupSeat {
  * Project visible Chat Nodes into process groups and standalone renderer seats.
  * @param nodes - visible Chat Nodes in presentation order.
  * @param timeline - current Turn and Step lifecycle.
+ * @param previous - prior group projection whose keys reusable groups retain.
  * @returns ordered seats and keyed group data.
  */
 export function projectProcessGroups(
