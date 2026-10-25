@@ -156,6 +156,21 @@ describe('chat flow font-size axis', () => {
     expect(css).toContain('):focus-within .actions')
   })
 
+  it('process groups cap their body and stop the running animation when motion is reduced', () => {
+    const css = read('ProcessGroupSeat.module.css')
+    expect(declarationsFrom(css, '.header')).toEqual(expect.arrayContaining([
+      'font-size: var(--dsh-content-font-size, 14px)',
+      'line-height: calc(24px + var(--dsh-content-font-delta, 0px))',
+    ]))
+    expect(declarationsFrom(css, '.body')).toEqual(expect.arrayContaining([
+      'max-height: min(400px, 50vh)',
+      'overflow-y: auto',
+      'border-left: 1px solid var(--dsw-alias-border-l2)',
+    ]))
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*animation: none/)
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*transition: none/)
+  })
+
   it('the interrupted-turn tag stays fixed like the dense token variants', () => {
     // 11px would fall to an illegible 9px at the 12px floor; the tag is
     // exempt from the axis the same way small/code tokens are.

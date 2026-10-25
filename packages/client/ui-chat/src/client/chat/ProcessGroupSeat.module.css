@@ -1,0 +1,157 @@
+.root {
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  text-align: left;
+  cursor: pointer;
+}
+
+.header:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.chevronBox {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-base);
+}
+
+.root[data-running] .chevronBox {
+  animation: process-group-breathe 1.8s ease-in-out infinite;
+}
+
+.chevron {
+  transform: rotate(-90deg);
+  transition: transform 100ms ease;
+}
+
+.header[aria-expanded="true"] .chevron {
+  transform: rotate(0deg);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.root[data-failed] .chevronBox {
+  border-color: var(--dsw-alias-state-error-border, rgba(239, 68, 68, 0.4));
+  color: var(--dsw-alias-state-error-primary, #ef4444);
+}
+
+.failedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-error-bg, rgba(239, 68, 68, 0.12));
+  color: var(--dsw-alias-state-error-primary, #ef4444);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  margin-left: 6px;
+}
+
+.failedDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.body {
+  max-height: min(400px, 50vh);
+  margin: 6px 0 0 9px;
+  padding: 4px 14px 6px 15px;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1)) transparent;
+}
+
+.body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.body::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.body::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: var(--dsh-scrollbar-thumb, var(--dsw-alias-scrollbar-bg-l1));
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--dsh-scrollbar-thumb-hover, var(--dsw-alias-scrollbar-hover-l1));
+}
+
+.members {
+  --dsh-chat-flow-gap: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.members > :not([hidden]):not(:empty) ~ :not([hidden]):not(:empty) {
+  margin-top: var(--dsh-chat-flow-gap);
+}
+
+.fadeTop {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+}
+
+.fadeBottom {
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.fadeTop.fadeBottom {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+@keyframes process-group-breathe {
+  50% { border-color: var(--dsw-alias-label-tertiary); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-running] .chevronBox {
+    animation: none;
+  }
+
+  .chevron {
+    transition: none;
+  }
+}

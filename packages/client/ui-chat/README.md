@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use this package to render a browser chat from recorded Session conversations, including historical images, localized actions, and restored scroll position. Compact display folds completed-turn process rows while keeping the final answer and independently useful context visible; packed historical Assistant runs remain collapsed. Local transcript and steering submissions appear immediately, remain in their original surface, and disappear atomically when authoritative Session records arrive, while queued submissions stay outside Chat. The package does not assemble or modify model requests.
+Use this package to render a browser chat from recorded Session conversations, including historical images, localized actions, and restored scroll position. Compact display groups consecutive process rows between visible Assistant responses, keeps running work open, and folds completed groups into summaries; packed historical Assistant runs remain collapsed. Local transcript and steering submissions appear immediately, disappear atomically when authoritative Session records arrive, and queued submissions stay outside Chat. The package does not assemble or modify model requests.
 
 File-mention providers receive the viewed Session ID with the closing-turn owner, so links into inherited history can address the fork itself.
 
@@ -18,7 +18,7 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 - [System prompt row](#system-prompt-row)
 - [Turn token usage](#turn-token-usage)
 - [Completed-turn footer](#completed-turn-footer)
-- [Turn Process Folding](#turn-process-folding)
+- [Process groups](#turn-process-folding)
 - [Scroll ownership](#scroll-ownership)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -53,11 +53,11 @@ The completed-turn action footer starts 20px below the preceding prose or extens
 -----
 
 <a id="turn-process-folding"></a>
-## Turn Process Folding
+## Process groups
 
-Each reasoning row starts collapsed, including during streaming and in reasoning-only replies. Clicking the row opens or closes its complete Markdown; incoming answer text, Tool calls, and stream completion preserve that choice. Expanded reasoning uses compact secondary typography: headings add bold weight without changing text size, line height, or color. The collapsed summary stays on one line, follows the latest reasoning line while streaming, and shows the first line after settlement.
+Settings → General exposes a persisted, localized `Normal` / `Compact` conversation-display preference in the `ui-chat` namespace; `Compact` is the default. Compact groups each consecutive run of Context injection, reasoning, Tool rows, and Retry rows between visible Assistant responses. A visible Assistant response or `turn/end` closes the current group. System prompt, User, steering, error, max-token, and turn-tail rows remain independent. Normal leaves process rows flat and renders no group headers.
 
-Settings → General exposes a persisted, localized `Normal` / `Compact` conversation-display preference in the `ui-chat` namespace; `Compact` is the default. Normal leaves process rows visible and renders no Turn-process control. In Compact mode, the System prompt remains independently visible before the opening User throughout the Turn. Context injection, reasoning, Assistant material, Tool rows, and Retry rows remain expanded while a Turn is open. At `turn/end`, its latest Step becomes the final-answer boundary only when it contains non-blank text, an image, or an unknown visible block—and no Tool-call block; preceding Context injection, reasoning, earlier Assistant material, Tool rows, and Retry rows then collapse by default. The control reports Turn-wide durable counts for non-subagent Tool calls, reply-bearing Assistant messages before the final answer, and subagent delegation calls; zero-valued segments are omitted, the Tool and subagent figures are mutually exclusive, and neither System prompt nor Context injection contributes a count. When all three counts are zero, the process still folds and the control reads `Thought for a while`. When expanded, a full-width divider below the summary separates it from the process rows. User and steering messages, System prompt, error, max-token, and turn-tail rows stay outside, and a closed Turn with no final answer keeps all process evidence visible. A newly available process control is inserted without changing the relative order of existing rows: opening human input precedes the control and process rows from their first projection, while System prompt remains above that input. While older history remains available through Load earlier, process controls stay absent and no members are hidden; once history is complete, every eligible closed Turn uses the collapsed default immediately. Stable Chat Node Seats keep every renderer mounted, hidden members add no flow spacing, and a closed control sits 8px above its answer only when no independent input intervenes. Completion collapse does not depend on tail-follow position, so a reader above the tail may see the transcript reflow. An automatic collapse that would hide keyboard focus keeps the group open and leaves focus in place; a manual close focuses the process control before hiding its members. The session-scoped store records only manually expanded Turn-and-answer-Step generations; a different answer generation starts collapsed.
+A running group starts expanded and its header names the current activity and elapsed Turn time. A completed group starts collapsed; its header summarizes up to two main action types without displaying counts, such as `Read files, ran commands`, and a reasoning-only group reads `Analyze request`. Failures append `Some actions failed`. Expanding a group caps its body at `min(400px, 50vh)`, scrolls it independently, and fades the edge in the remaining scroll direction. Child reasoning and Tool rows keep their own disclosures. Closed bodies use `hidden="until-found"`, so browser find opens the group that contains the match. The session-scoped store records explicit group expansion choices; a manual choice survives streaming, history paging, and Chat view remounts. Group keys and member seats survive running-to-settled and running-to-closed transitions without remounting Tool renderers. Switching between Compact and Normal changes presentation only; it does not add a Session event or model input.
 
 -----
 

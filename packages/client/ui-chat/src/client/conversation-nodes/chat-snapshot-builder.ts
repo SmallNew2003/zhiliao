@@ -10,10 +10,12 @@ import type {
   ChatLocationNodeIndex, ChatNodeProcessSource, ChatNodeSource, ChatNodeStore, ChatSnapshot,
   ChatTurnNavigationIndex, ChatTurnProcessPresentation, LegacyConversationSlice, TurnNavigationItem,
 } from '../contract/snapshot.ts'
+import type { ChatProcessGroups } from '../contract/process-groups.ts'
 import { TURN_PROCESS_INDEPENDENT_KINDS } from '../contract/turn-process.ts'
 import { sessionRecallLabels, skillInvocationName } from './event-projection.ts'
 import { sameTurnNavigationItem, turnNavigationItem } from './turn-navigation.ts'
 import { ChatTurnProcessProjector } from './turn-process-presentation.ts'
+import { projectProcessGroups } from './process-groups.ts'
 
 const EMPTY_KEYS: readonly string[] = []
 const EMPTY_TURNS: readonly number[] = []
@@ -294,6 +296,13 @@ function locationCoordinates(location: ConversationLocation): { turn?: number; s
   if (location.kind === 'step') return { turn: location.turn.turn, step: location.step.step }
   if (location.kind === 'turn') return { turn: location.turn.turn }
   return {}
+}
+
+function orderedNodes(order: readonly string[], store: ChatNodeStore): ChatConversationViewNode[] {
+  return order.flatMap((key) => {
+    const node = store.get(key)
+    return node === undefined ? [] : [node]
+  })
 }
 
 function locationTurnStatus(location: ConversationLocation): string | undefined {
@@ -965,6 +974,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   private readonly referenceLabels = new ReferenceLabelProjector()
   private readonly skillNames = new SkillNameProjector()
   private order: readonly string[] = EMPTY_KEYS
+  private processGroups: ChatProcessGroups = { layout: EMPTY_LIST, get: () => undefined }
   /** Last published timeline: a Turn boundary can land without a new node. */
   private timeline: ConversationTimelineSnapshot | null = null
   readonly empty: ChatSnapshot
@@ -982,6 +992,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
     this.store.replaceProcesses(this.order, this.locations)
+    this.processGroups = projectProcessGroups(orderedNodes(this.order, this.store), input.timeline, this.processGroups)
     this.navigation.rebuild(input.timeline, this.locations, this.store)
     this.timeline = input.timeline
     const snapshot = this.snapshot(input.timeline, this.legacy.replace(nodes, input.timeline))
@@ -1021,6 +1032,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     }
     this.locations.touch(contentOnly)
     this.store.updateProcesses(processTurns, this.locations)
+    this.processGroups = projectProcessGroups(orderedNodes(this.order, this.store), input.timeline, this.processGroups)
     if (structural || input.timeline !== this.timeline) {
       this.navigation.rebuild(input.timeline, this.locations, this.store)
     } else {
@@ -1041,6 +1053,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
       nodes: this.store,
       locations: this.locations,
       navigation: this.navigation,
+      processGroups: this.processGroups,
       timeline,
       legacy,
     }
