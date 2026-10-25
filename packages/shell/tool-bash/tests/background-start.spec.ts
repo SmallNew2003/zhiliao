@@ -14,6 +14,7 @@ function processHandle() {
   })
   const process: ShellProcess = {
     status: 'running', exitCode: null, signal: null, done: exited.promise,
+    terminate: async () => { exited.resolve(undefined); await exited.promise }, waitForExit: async () => { await exited.promise },
     readOutput: () => ({ delta: 'output', lossy: false }), kill,
   }
   onTestFinished(() => { exited.resolve(undefined) })

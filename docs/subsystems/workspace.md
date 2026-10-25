@@ -125,6 +125,10 @@ Sessions get their cwd at create time from whoever creates them, not from this r
 
 [`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
 
+## Native project services
+
+`ServiceNativeLifetime` binds a native adapter to the Host abort signal and subprocess service realm. `ServiceNativeExecution.resolve(command, cwd, signal)` preflights the sandboxed shell and returns exact `ServiceNativeLaunch` facts plus its `start(hostSignal)` capability. The resulting `ServiceNativeProcess` separates direct exit facts, consuming output and owned-range quiescence. `ResolvedServiceOperation.nativeLaunch.targetId` identifies a fresh reserved range; restart also authorizes and locks the current range identity. These capabilities remain in the Host process; wire requests cannot carry them. See [project-service API](../../packages/workspace/project-services/README.md) and [native provider](../../packages/workspace/project-services-local/README.md).
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -182,6 +186,189 @@ Host service backing the generated `ctx.remote.directoryPicker` namespace. The s
 ```
 
 Source: [`packages/api/workspace-controller/src/directory-picker.ts`](../../packages/api/workspace-controller/src/directory-picker.ts)
+
+<a id="ctxdockerprojectservices--dockerserviceprovider"></a>
+
+### `ctx.dockerProjectServices` — `DockerServiceProvider`
+
+Docker and Compose provider contribution; Host disposal preserves all running containers.
+
+```ts cordis-catalog
+/**
+ * Inspect Docker resources matching the project context without mutating lifecycle.
+ * @param context - Resolved project context.
+ * @param signal - Scan cancellation.
+ * @returns Snapshot of observed Docker items and Compose groups.
+ */
+async inspect(context: ServiceProviderContext, signal: AbortSignal): Promise<ServiceProviderSnapshot>
+
+/**
+ * Prepare a mutating operation on a container or Compose group.
+ * @param context - Project scope.
+ * @param request - Operation request.
+ * @param access - Caller authorization context.
+ * @param signal - Preparation cancellation.
+ * @returns Side-effect-free prepared operation.
+ */
+async prepare( context: ServiceProviderContext, request: ServiceControlRequest, access: ServiceAccess, signal: AbortSignal, ): Promise<PreparedServiceOperation>
+
+/**
+ * Fetch bounded logs for an observed Docker target.
+ * @param target - Observed Docker service item.
+ * @param request - Reader-local cursor and byte cap.
+ * @param signal - Read cancellation.
+ * @returns Log page.
+ */
+async logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>
+
+/**
+ * Subscribe to Docker state changes.
+ * @param changed - Change notification callback.
+ * @returns Disposer.
+ */
+subscribe(changed: () => void): () => void
+```
+
+Source: [`packages/workspace/project-services-docker/src/index.ts`](../../packages/workspace/project-services-docker/src/index.ts)
+
+<a id="ctxnativeprojectservices--nativeserviceprovider"></a>
+
+### `ctx.nativeProjectServices` — `NativeServiceProvider`
+
+Native contribution; Session disposal cannot dispose its Host-owned process ranges.
+
+```ts cordis-catalog
+/**
+ * Observe managed ranges and project-associated external TCP listeners.
+ * @param context - Current project and checkout facts.
+ * @param signal - Scan cancellation.
+ * @returns Listener rows; external processes remain read-only.
+ */
+async inspect(context: ServiceProviderContext, signal: AbortSignal): Promise<ServiceProviderSnapshot>
+
+/**
+ * Resolve both restart phases and reserve the exact managed identity before authorization.
+ * @param context - Current project, captured checkouts and definitions.
+ * @param request - Requested action.
+ * @param access - Trusted human or agent authority.
+ * @param signal - Prepublication cancellation.
+ * @returns Side-effect-free operation.
+ */
+async prepare( context: ServiceProviderContext, request: ServiceControlRequest, access: ServiceAccess, signal: AbortSignal, ): Promise<PreparedServiceOperation>
+
+/**
+ * Read independently retained output from a managed instance.
+ * @param target - Read-authorized service row.
+ * @param request - Cursor and complete JSON byte limit.
+ * @param signal - Read cancellation.
+ * @returns Managed output or an explicit external-log limitation.
+ */
+async logs(target: ServiceItem, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>
+
+/**
+ * Subscribe to committed lifecycle changes.
+ * @param changed - Host consumer callback.
+ * @returns Effect-owned unsubscribe.
+ */
+subscribe(changed: () => void): () => void
+```
+
+Source: [`packages/workspace/project-services-local/src/native.ts`](../../packages/workspace/project-services-local/src/native.ts)
+
+<a id="ctxprojectservices--projectserviceruntime-abstract-seam"></a>
+
+### `ctx.projectServices` — `ProjectServiceRuntime` (abstract seam)
+
+Shared Host service; providers and consumers use the same authorization and revisions.
+
+```ts cordis-catalog
+/**
+ * Return a fresh read-authorized project snapshot.
+ * @param access - Trusted caller.
+ * @param request - Paging options.
+ * @param signal - Cancellation.
+ * @returns Read-filtered inventory.
+ */
+abstract list(access: ServiceAccess, request: ServiceListRequest, signal: AbortSignal): Promise<ServiceInventory>
+
+/**
+ * Read retained output without consuming another reader’s position.
+ * @param access - Trusted caller.
+ * @param request - Independent reader.
+ * @param signal - Cancellation.
+ * @returns Bounded authorized output.
+ */
+abstract logs(access: ServiceAccess, request: ServiceLogsRequest, signal: AbortSignal): Promise<ServiceLogPage>
+
+/**
+ * Authorize and publish one idempotent operation.
+ * @param access - Trusted caller.
+ * @param request - Idempotent operation.
+ * @param signal - Initiator cancellation before publication.
+ * @returns Read-filtered operation status.
+ */
+abstract control(access: ServiceAccess, request: ServiceControlRequest, signal: AbortSignal): Promise<ServiceControlResult>
+
+/**
+ * Subscribe to fresh baselines and ordered inventory updates.
+ * @param access - Trusted caller.
+ * @param request - Snapshot options.
+ * @param signal - Subscription cancellation.
+ * @returns Fresh baseline followed by ordered updates.
+ */
+abstract follow(access: ServiceAccess, request: ServiceListRequest, signal: AbortSignal): AsyncIterable<ServiceFeedFrame>
+
+/**
+ * Register one provider until its owning effect is disposed.
+ * @param provider - Host contribution.
+ * @returns Effect-owned removal.
+ */
+abstract registerProvider(provider: ProjectServiceProvider): () => Promise<void>
+```
+
+Source: [`packages/workspace/project-services/src/index.ts`](../../packages/workspace/project-services/src/index.ts)
+
+<a id="ctxprojectservicescontroller--projectservicescontroller"></a>
+
+### `ctx.projectServicesController` — `ProjectServicesController`
+
+Host Remote service controller exposing project services endpoints.
+
+```ts cordis-catalog
+/**
+ * List current project services, checkouts, and provider status.
+ * @param request - Filter and paging options.
+ * @param signal - Cancellation signal.
+ * @returns Current service inventory view.
+ */
+@Remote('list') async list(request: ApiServiceListRequest, signal: AbortSignal): Promise<ApiServiceInventoryView>
+
+/**
+ * Read retained output logs for a service target.
+ * @param request - Target and pagination parameters.
+ * @param signal - Cancellation signal.
+ * @returns Log page view.
+ */
+@Remote('logs') async logs(request: ApiServiceLogsRequest, signal: AbortSignal): Promise<ApiServiceLogsView>
+
+/**
+ * Execute a service lifecycle action (start, stop, restart).
+ * @param request - Action, target, revision guard, and the caller identity the mutation runs under.
+ * @param signal - Cancellation signal.
+ * @returns Result of the executed operation.
+ */
+@Remote('control') async control(request: ApiServiceControlRequest, signal: AbortSignal): Promise<ApiServiceControlView>
+
+/**
+ * Subscribe to live service inventory changes and operations.
+ * @param request - Filter and paging options.
+ * @param signal - Cancellation signal.
+ * @returns Async stream of update frames.
+ */
+@Remote({ mode: 'stream' }) async *follow(request: ApiServiceListRequest, signal: AbortSignal): AsyncIterable<ApiServiceFeedFrameView>
+```
+
+Source: [`packages/api/project-services-controller/src/index.ts`](../../packages/api/project-services-controller/src/index.ts)
 
 <a id="ctxterminalcontroller--terminalcontroller"></a>
 

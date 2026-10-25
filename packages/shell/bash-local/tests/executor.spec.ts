@@ -293,6 +293,51 @@ describe('LocalBashExecutor.start (background process handles)', () => {
     expect(proc.signal).toBe('SIGTERM')
   })
 
+  it('publishes the provider process-ownership probe on the background handle', async () => {
+    const { ctx, bash } = await setup()
+    const emptyReader: SubprocessOutputReader = {
+      readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }),
+    }
+    const ownsProcess = vi.fn(async () => true)
+    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+      control: undefined,
+      stdin: undefined,
+      stdout: undefined,
+      stderr: undefined,
+      collected: { stdout: emptyReader, stderr: emptyReader },
+      done: Promise.resolve({ exitCode: 0, signal: null }),
+      terminate: vi.fn(),
+      waitForExit: async () => true,
+      ownsProcess,
+    } satisfies SubprocessHandle)
+
+    const proc = await bash.start(bash.resolve({ command: 'true' }))
+    await proc.done
+    expect(await proc.ownsProcess!(4242)).toBe(true)
+    expect(ownsProcess).toHaveBeenCalledExactlyOnceWith(4242)
+  })
+
+  it('leaves process ownership absent when the provider cannot observe it', async () => {
+    const { ctx, bash } = await setup()
+    const emptyReader: SubprocessOutputReader = {
+      readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }),
+    }
+    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+      control: undefined,
+      stdin: undefined,
+      stdout: undefined,
+      stderr: undefined,
+      collected: { stdout: emptyReader, stderr: emptyReader },
+      done: Promise.resolve({ exitCode: 0, signal: null }),
+      terminate: vi.fn(),
+      waitForExit: async () => true,
+    } satisfies SubprocessHandle)
+
+    const proc = await bash.start(bash.resolve({ command: 'true' }))
+    await proc.done
+    expect('ownsProcess' in proc).toBe(false)
+  })
+
   it('reports both unread stderr and an asynchronous provider rejection exactly once', async () => {
     const { ctx, bash } = await setup()
     const emptyReader: SubprocessOutputReader = {

@@ -258,6 +258,12 @@
     fetch: true
     searchTimeoutMs: 60000
 
+# The `projectServices` runtime and its providers stay in the host composition;
+# only the model-facing tools are per-session. These three register into the host
+# `tools` registry and provide nothing, so they need no realm.
+- id: tool-project-services
+  name: '@deepseek-ai/dsh-tool-project-services'
+
 - id: present
   name: '@deepseek-ai/dsh-tool-present'
 

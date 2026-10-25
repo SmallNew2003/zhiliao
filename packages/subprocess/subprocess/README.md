@@ -85,6 +85,10 @@ An executable that cannot be resolved fails loudly with a stable error. A spawn 
 
 -----
 
+`SubprocessHandle.ownsProcess(pid)` is optional read-only membership observation. The macOS local fallback compares a fresh process-group observation with its still-owned group; confirmed range exit returns false and failed or unsupported observation returns undefined. Other local platforms return undefined; native containment modes omit the capability. Consumers must bracket membership with their own current creation observations, preserve unsupported observations, and never use this query to authorize external PID signalling. Process groups and creation labels provide observational evidence rather than atomic process identity.
+
+Collect mode can opt into `untilRangeExit: true`: `done` retains direct-command timing while readers continue receiving owned descendant output. After confirmed range exit, `graceMs` bounds the final pipe drain; cleanup closes and awaits captured pipes even when escaped descendants still hold descriptors. Default collect-mode timing is unchanged.
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 

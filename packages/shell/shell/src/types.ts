@@ -37,6 +37,8 @@ export interface ShellSandboxInfo {
  */
 export interface ShellExecRequest {
   command: string
+  /** Preserve captured output until owned-range exit; direct completion remains independent. */
+  captureRangeOutput?: true
   /** Working directory override (default: implementation-configured). */
   workdir?: string | undefined
   /** Timeout override in milliseconds (implementations cap it). */
@@ -85,6 +87,8 @@ export interface ShellExecRequest {
  */
 export interface ShellExecSpec {
   command: string
+  /** Preserve captured output until owned-range exit; direct completion remains independent. */
+  captureRangeOutput?: true
   workdir: string
   timeoutMs: number
   /**
@@ -183,4 +187,24 @@ export interface ShellProcess {
    * (no-op); idempotent.
    */
   kill(): boolean
+  /** Terminate the owned range and await quiescence, including survivors after direct exit. */
+  terminate(): Promise<void>
+  /** Wait for owned range quiescence; rejects when range observation fails. */
+  waitForExit(): Promise<void>
+  /**
+   * Observe membership without granting signalling authority over the numeric id.
+   * @param pid - Currently observed local process id.
+   * @returns True for observed owned membership, false for absence, undefined when unsupported.
+   */
+  ownsProcess?(pid: number): Promise<boolean | undefined>
+}
+
+/** Side-effect-free resolved background launch owned by its shell provider. */
+export interface PreparedShellLaunch {
+  /**
+   * Launch the exact prepared command, replacing preparation cancellation with Host cancellation.
+   * @param signal - Published process lifetime.
+   * @returns The provider-owned process range.
+   */
+  start(signal: AbortSignal): Promise<ShellProcess>
 }

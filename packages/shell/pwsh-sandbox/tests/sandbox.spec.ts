@@ -14,10 +14,11 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { SandboxProvider, SandboxUnavailableError } from '@deepseek-ai/dsh-sandbox'
 import type { ConfinedArgv, RunnerFailureRule, SandboxExecutionPolicy, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
-import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
+import { ENCODING_PREAMBLE, resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
+import type { SubprocessHandle, SubprocessOutputReader, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { SandboxPwshExecutor } from '../src/index.ts'
 import { classifyRunnerFailure, isRunnerSpawnFailure, matchesSignature } from '../src/helpers.ts'
 
@@ -39,6 +40,35 @@ interface ConfineCall {
 /** A passthrough wrap: the caller's argv unchanged, asserted full — commands run unconfined, deterministically. */
 const passthrough = (argv: readonly string[]): ConfinedArgv =>
   ({ argv: [...argv], enforcement: 'full', denialSignatures: ['access is denied', 'access to the path'], runnerFailureRules: [] })
+
+/**
+ * A subprocess service that records spawn specs and settles instantly, so
+ * preparation is observable without a real pwsh on the host.
+ */
+function recordingSubprocessRuntime(launched: SubprocessSpawnSpec[]): new (ctx: Context) => Service {
+  return class extends Service {
+    constructor(ctx: Context) {
+      super(ctx, 'subprocess')
+    }
+
+    async resolveExecutable(command: string): Promise<string> { return command }
+
+    spawn(spec: SubprocessSpawnSpec): SubprocessHandle {
+      launched.push(spec)
+      const reader: SubprocessOutputReader = { readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }) }
+      return {
+        control: undefined,
+        stdin: undefined,
+        stdout: undefined,
+        stderr: undefined,
+        collected: { stdout: reader, stderr: reader },
+        done: Promise.resolve({ exitCode: 0, signal: null }),
+        terminate: () => {},
+        waitForExit: async () => true,
+      }
+    }
+  }
+}
 
 /** A subprocess service whose spawn() throws SYNCHRONOUSLY — the paths the async service never produces. */
 function throwingSubprocessRuntime(error: unknown): new (ctx: Context) => Service {
@@ -170,6 +200,46 @@ describe('SandboxPwshExecutor asynchronous confinement', () => {
       await expect(passthroughError.executor.start(passthroughError.executor.resolve({ command: 'echo never', sandboxPolicy: RO })))
         .rejects.toThrow('sync-emfile-start')
     } finally { await Promise.all(contexts.map(ctx => ctx.fiber.dispose())) }
+  })
+
+  it('prepares full access as the unconfined local launch without confining', async () => {
+    const launched: SubprocessSpawnSpec[] = []
+    const { ctx, executor, calls } = await setup(
+      async () => { throw new Error('confinement must not run under full access') },
+      recordingSubprocessRuntime(launched),
+    )
+    try {
+      const prepared = await executor.prepare(executor.resolve({
+        command: 'Write-Output hi',
+        sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: spillDir },
+      }))
+      const proc = await prepared.start(new AbortController().signal)
+      await proc.done
+      expect(calls).toHaveLength(0)
+      expect(launched).toHaveLength(1)
+      expect(launched[0]!.argv.slice(1)).toEqual(['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `${ENCODING_PREAMBLE}Write-Output hi`])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it('snapshots the resolved command and environment maps into the prepared launch', async () => {
+    const launched: SubprocessSpawnSpec[] = []
+    const { ctx, executor, calls } = await setup(() => passthrough(['pwsh']), recordingSubprocessRuntime(launched))
+    try {
+      const spec = executor.resolve({
+        command: 'Write-Output hi',
+        env: { EXTRA: '1' },
+        dshEnv: { DSH_SEAM_VAR: 'dsh-ok' },
+      })
+      const prepared = await executor.prepare(spec)
+      ;(spec.env as Record<string, string>).EXTRA = 'mutated'
+      ;(spec.dshEnv as Record<string, string>).DSH_SEAM_VAR = 'mutated'
+      const proc = await prepared.start(new AbortController().signal)
+      await proc.done
+      expect(calls).toHaveLength(1)
+      expect(calls[0]!.argv.slice(1)).toEqual(['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `${ENCODING_PREAMBLE}Write-Output hi`])
+      expect(launched).toHaveLength(1)
+      expect(launched[0]!.env).toMatchObject({ EXTRA: '1', DSH_SEAM_VAR: 'dsh-ok' })
+    } finally { await ctx.fiber.dispose() }
   })
 
   it('preserves cancellation when a pending subprocess launch later rejects', async () => {

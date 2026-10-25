@@ -13,9 +13,9 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { afterAll, afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { PwshLocalExecutor, ENCODING_PREAMBLE, candidatePwshPaths, resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
+import { ENV_OVERRIDES, PwshLocalExecutor, ENCODING_PREAMBLE, candidatePwshPaths, resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import SubprocessRuntime from '@deepseek-ai/dsh-subprocess'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessOutputReader, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
@@ -230,6 +230,87 @@ describe('spawn construction (pure, every platform)', () => {
     expect(argv[5]).toBe(`${ENCODING_PREAMBLE}Write-Output 你好`)
     expect(ENCODING_PREAMBLE).toContain('[Console]::OutputEncoding')
     expect(ENCODING_PREAMBLE).toContain('$OutputEncoding')
+  })
+
+  it('carries captureRangeOutput into both collected stream dispositions', async () => {
+    const ctx = createContext()
+    const subprocess = new CapturingSubprocessRuntime(ctx)
+    await ctx.plugin(PwshLocalExecutor)
+    const spec = ctx.shell.resolve({ command: 'Write-Output hi', captureRangeOutput: true })
+    expect(spec.captureRangeOutput).toBe(true)
+    await ctx.shell.run(spec)
+    expect(subprocess.specs).toHaveLength(1)
+    expect(subprocess.specs[0]!.stdio.stdout).toMatchObject({ untilRangeExit: true })
+    expect(subprocess.specs[0]!.stdio.stderr).toMatchObject({ untilRangeExit: true })
+  })
+
+  it('resolves the pwsh executable and publishes the prepared argv', async () => {
+    const ctx = createContext()
+    const subprocess = new CapturingSubprocessRuntime(ctx)
+    await ctx.plugin(PwshLocalExecutor)
+    const prepared = await ctx.shell.prepare(ctx.shell.resolve({
+      command: 'Write-Output hi',
+      env: { EXTRA: '1' },
+      dshEnv: { DSH_SEAM_VAR: 'dsh-ok' },
+      sandboxPolicy: { mode: 'workspace-write', workspaceRoot: '/work' },
+    }))
+    await prepared.start(new AbortController().signal)
+    expect(subprocess.specs).toHaveLength(1)
+    const { argv, env } = subprocess.specs[0]!
+    expect(argv.slice(0, 5)).toEqual([expect.any(String), '-NoLogo', '-NoProfile', '-NonInteractive', '-Command'])
+    expect(argv[5]).toBe(`${ENCODING_PREAMBLE}Write-Output hi`)
+    expect(env).toMatchObject({ EXTRA: '1', DSH_SEAM_VAR: 'dsh-ok' })
+  })
+
+  it('refuses preparation once the caller has cancelled', async () => {
+    const ctx = createContext()
+    new CapturingSubprocessRuntime(ctx)
+    await ctx.plugin(PwshLocalExecutor)
+    const cancelled = new AbortController()
+    cancelled.abort(new Error('preparation cancelled'))
+    await expect(ctx.shell.prepare(ctx.shell.resolve({ command: 'Write-Output hi', signal: cancelled.signal })))
+      .rejects.toThrow('preparation cancelled')
+  })
+
+  it('launches a prepared command that carries only the terminal environment overrides', async () => {
+    const ctx = createContext()
+    const subprocess = new CapturingSubprocessRuntime(ctx)
+    await ctx.plugin(PwshLocalExecutor)
+    const prepared = await ctx.shell.prepare(ctx.shell.resolve({ command: 'Write-Output hi' }))
+    const proc = await prepared.start(new AbortController().signal)
+    await proc.done
+    expect(subprocess.specs).toHaveLength(1)
+    expect(subprocess.specs[0]!.env).toEqual({ ...ENV_OVERRIDES })
+  })
+
+  it('forwards terminate, waitForExit, and the provider ownership probe to the background handle', async () => {
+    const ctx = createContext()
+    new CapturingSubprocessRuntime(ctx)
+    await ctx.plugin(PwshLocalExecutor)
+    const terminate = vi.fn()
+    const waitForExit = vi.fn(async () => true)
+    const ownsProcess = vi.fn(async () => true)
+    const reader: SubprocessOutputReader = { readFrom: () => ({ text: '', lossy: false, nextOffset: 0 }) }
+    vi.spyOn(ctx.subprocess, 'spawn').mockReturnValue({
+      control: undefined,
+      stdin: undefined,
+      stdout: undefined,
+      stderr: undefined,
+      collected: { stdout: reader, stderr: reader },
+      done: Promise.resolve({ exitCode: 0, signal: null }),
+      terminate,
+      waitForExit,
+      ownsProcess,
+    } satisfies SubprocessHandle)
+
+    const proc = await ctx.shell.start(ctx.shell.resolve({ command: 'Write-Output hi' }))
+    await proc.done
+    await proc.terminate()
+    await proc.waitForExit()
+    expect(await proc.ownsProcess!(4242)).toBe(true)
+    expect(terminate).toHaveBeenCalledOnce()
+    expect(waitForExit).toHaveBeenCalledTimes(2)
+    expect(ownsProcess).toHaveBeenCalledExactlyOnceWith(4242)
   })
 
   it('reports both unread stderr and an asynchronous provider rejection exactly once', async () => {

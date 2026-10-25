@@ -38,6 +38,7 @@
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list` | `ctx.tools`、`ctx.sessions`、Session 持久化、未来创建的 live 根 Agent | `tool/call`、`schedule/change create or delete`、`tool/result` | - | 仅在选择启用的 Schedule 插件加载后创建的 live 根 Agent scope 内注册。版本 1 接受 after_seconds、显式绝对 at 和有界固定速率 every_seconds，并披露 session-local 交付；管理读取与变更必须通过共享的 Session 持久化 barrier。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
+| `@deepseek-ai/dsh-tool-project-services` | `service_control`、`service_list`、`service_logs` | `ctx.tools`、`ctx.projectServices`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | 这三个工具要等项目服务运行时提供 `ctx.projectServices` 才会激活；base bundle 把它们与 `@deepseek-ai/dsh-project-services-local` 一起挂载，出厂 web 组合则把该宿主层行改挂到 `standard` 与 `ptc` 两个 agent preset 上。修改类调用遵循 `approvalPolicy`（默认 `ask`），挂载主机审批接缝时由其决定——`never` 不经询问即拒绝所有修改类调用。列表过滤、分页上限与 16 KiB 日志上限都在工具内部执行，因此提供方游标不进 schema。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
@@ -1511,6 +1512,146 @@ create、edit、pause 和 resume 要求直接来自人类的根权限；complete
 来源：[`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/index.ts)
 
 lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。
+
+<a id="deepseek-aidsh-tool-project-services"></a>
+
+## `@deepseek-ai/dsh-tool-project-services`
+
+### `service_control`
+
+启动、停止或重启一个项目服务。每个操作都会造成变更，并由一次批准决定把关。停止或重启既有目标时，使用 `target_id` 加上 `service_list` 为其报告的 `expected_revision`——修订号不再匹配时调用会失败，而不会作用于一个你已看不到的服务。仅凭 `definition` 即可启动已保存的服务定义。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "description": "Lifecycle action to run; every action mutates the service.",
+      "enum": [
+        "start",
+        "stop",
+        "restart"
+      ]
+    },
+    "target_id": {
+      "type": "string",
+      "description": "Existing service target ID to stop or restart."
+    },
+    "expected_revision": {
+      "type": "string",
+      "description": "Revision that `service_list` reported for `target_id`; a revision that no longer matches fails this call."
+    },
+    "definition": {
+      "type": "object",
+      "description": "Launch a new service from this definition instead of acting on an existing target.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name to record for the launched service."
+        },
+        "checkout_id": {
+          "type": "string",
+          "description": "Git checkout / worktree the service runs in."
+        },
+        "command": {
+          "type": "array",
+          "description": "Exact executable and arguments to run.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "checkout_id",
+        "command"
+      ]
+    }
+  },
+  "required": [
+    "action"
+  ]
+}
+```
+
+来源：[`packages/workspace/tool-project-services/src/index.ts`](../packages/workspace/tool-project-services/src/index.ts)
+
+### `service_list`
+
+列出本项目及其 Git worktree 运行的原生进程与 Docker 容器，包含每个目标的状态、端口、归属与修订号。在断定某个服务已停止或某个端口空闲之前，先调用它。可按 checkout_id、kind 或 state 过滤；后续页面跟随 nextCursor。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "checkout_id": {
+      "type": "string",
+      "description": "Filter services by Git checkout / worktree identifier."
+    },
+    "kind": {
+      "type": "string",
+      "description": "Filter by service kind (native or docker).",
+      "enum": [
+        "native",
+        "docker"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "description": "Filter by service state.",
+      "enum": [
+        "running",
+        "stopped",
+        "starting",
+        "unknown"
+      ]
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Pagination cursor from a previous listing."
+    },
+    "limit": {
+      "type": "number",
+      "description": "Maximum number of items to return."
+    }
+  }
+}
+```
+
+来源：[`packages/workspace/tool-project-services/src/index.ts`](../packages/workspace/tool-project-services/src/index.ts)
+
+### `service_logs`
+
+读取一个项目服务目标保留的 stdout 与 stderr，每次调用最多 16 KiB。更多输出跟随 nextCursor。`truncated` 标记因达到字节上限而停止的调用，`gap` 标记运行时已丢弃的输出，`unavailable` 指名不保留任何输出的目标。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "target_id": {
+      "type": "string",
+      "description": "Service target ID to read logs from."
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Log stream cursor from previous read."
+    },
+    "max_bytes": {
+      "type": "number",
+      "description": "Max bytes to read (capped at 16 KiB)."
+    }
+  },
+  "required": [
+    "target_id"
+  ]
+}
+```
+
+来源：[`packages/workspace/tool-project-services/src/index.ts`](../packages/workspace/tool-project-services/src/index.ts)
+
+这三个工具要等项目服务运行时提供 `ctx.projectServices` 才会激活；base bundle 把它们与 `@deepseek-ai/dsh-project-services-local` 一起挂载，出厂 web 组合则把该宿主层行改挂到 `standard` 与 `ptc` 两个 agent preset 上。修改类调用遵循 `approvalPolicy`（默认 `ask`），挂载主机审批接缝时由其决定——`never` 不经询问即拒绝所有修改类调用。列表过滤、分页上限与 16 KiB 日志上限都在工具内部执行，因此提供方游标不进 schema。
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

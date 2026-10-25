@@ -23,6 +23,8 @@ The seam separates the **model-/plugin-facing request** (optional `workdir`/`tim
  */
 interface ShellExecRequest {
   command: string
+  /** Preserve captured output until owned-range exit; direct completion remains independent. */
+  captureRangeOutput?: true
   /** Working directory override (default: implementation-configured). */
   workdir?: string | undefined
   /** Timeout override in milliseconds (implementations cap it). */
@@ -73,6 +75,8 @@ interface ShellExecRequest {
  */
 interface ShellExecSpec {
   command: string
+  /** Preserve captured output until owned-range exit; direct completion remains independent. */
+  captureRangeOutput?: true
   workdir: string
   timeoutMs: number
   /**
@@ -164,6 +168,8 @@ interface ShellSandboxInfo {
 
 The `SANDBOX_UNAVAILABLE` error code (owned by the [sandbox seam](sandbox.md)) is what the `ctx.sandbox` provider throws — and the executor propagates — when a confined mode has no usable backend. A selected runner refusing its profile reaches the same fail-closed foreground error; a settled background job records `runnerFailed`. The model receives denial/runner facts in results, learns the effective mode only when a denial marker names it, and can request a one-shot strictly wider retry through `sandbox_permissions` plus `justification`; `ctx.approval` must grant that exact call before anything executes. The complete policy and switching design is the [sandbox Agent Note](../../.agents/notes/implemented/feature/2026-07-06-sandbox.md).
 
+`PreparedShellLaunch` captures side-effect-free background preparation. Its `start(signal)` returns the exact prepared shell range under a published Host lifetime; `ShellExecutor.prepare` rejects when a provider cannot preflight its launch. The process handle keeps direct outcome and owned-range quiescence independent.
+
 ## Background processes: `ShellProcess`
 
 `start()` resolves with a handle after asynchronous launch preparation; cancellation or preparation failure rejects before publication. The handle has no id or owner. `dsh-tool-bash` adapts it into `ctx.jobs.start()` hooks; the generic runtime then owns job identity and lifecycle. `done` resolves when the underlying process settles and never rejects; a subprocess provider rejection becomes a `killed` process with a stage-neutral error on stderr. Reads remain valid after settlement, and sandbox facts are stamped before `done` resolves.
@@ -200,6 +206,16 @@ interface ShellProcess {
    * (no-op); idempotent.
    */
   kill(): boolean
+  /** Terminate the owned range and await quiescence, including survivors after direct exit. */
+  terminate(): Promise<void>
+  /** Wait for owned range quiescence; rejects when range observation fails. */
+  waitForExit(): Promise<void>
+  /**
+   * Observe membership without granting signalling authority over the numeric id.
+   * @param pid - Currently observed local process id.
+   * @returns True for observed owned membership, false for absence, undefined when unsupported.
+   */
+  ownsProcess?(pid: number): Promise<boolean | undefined>
 }
 ```
 
@@ -268,6 +284,13 @@ abstract run(spec: ShellExecSpec): Promise<ShellRunResult>
  * @returns the live process handle after preparation; cancellation or setup failure rejects.
  */
 abstract start(spec: ShellExecSpec): Promise<ShellProcess>
+
+/**
+ * Prepare every launch prerequisite without creating a process.
+ * @param _spec - Resolved command and preparation cancellation.
+ * @returns Exact launch capability; unsupported providers reject.
+ */
+prepare(_spec: ShellExecSpec): Promise<PreparedShellLaunch>
 ```
 
 Source: [`packages/shell/shell/src/index.ts`](../../packages/shell/shell/src/index.ts)

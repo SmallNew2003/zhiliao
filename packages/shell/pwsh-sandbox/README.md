@@ -65,6 +65,8 @@ If no runner can enforce a confined mode, the foreground call fails with `SANDBO
 
 -----
 
+`prepare(spec)` resolves confinement before creating any process. The returned launch captures the exact confined argv and settlement classifiers, and `start(hostSignal)` uses those facts without resolving confinement again. Cancellation before launch rejects. Callers can preflight a replacement while keeping its current service alive; policy revalidation and authorization remain the caller's responsibility.
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 

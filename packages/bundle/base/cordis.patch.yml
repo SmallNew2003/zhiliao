@@ -384,6 +384,26 @@
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
 
+    # Project services: one shared runtime over the Git worktree project, its
+    # native process provider, and the Docker/Compose provider. The runtime
+    # package root contributes only LocalProjectServiceRuntime, so the native
+    # provider joins from its /native sub-path; both register through the
+    # runtime's effect-owned registry, so a deployment whose Docker daemon is
+    # unreachable reports the container surface stale instead of hiding the
+    # native services.
+    - id: project-services-local
+      name: '@deepseek-ai/dsh-project-services-local'
+
+    - id: project-services-native
+      name: '@deepseek-ai/dsh-project-services-local/native'
+
+    - id: project-services-docker
+      name: '@deepseek-ai/dsh-project-services-docker'
+
+    # Model-facing service tools: discovery, logs, and approval-gated control.
+    - id: tool-project-services
+      name: '@deepseek-ai/dsh-tool-project-services'
+
     - id: timeout-policy
       name: '@deepseek-ai/dsh-tool-call-timeout-policy'
 

@@ -118,6 +118,14 @@
     - id: workspace-controller
       name: '@deepseek-ai/dsh-api-workspace-controller'
 
+    # Project service inventory, logs, and control over Typert Remote. The
+    # browser panel reads the stream; mutating calls run under the operator's
+    # human authority and name the caller that asked, without the Agent tools'
+    # approval seam, so access policy belongs to the composition that mounts
+    # this row.
+    - id: project-services-controller
+      name: '@deepseek-ai/dsh-api-project-services-controller'
+
     - id: cordis-host-runner
       name: '@deepseek-ai/dsh-cordis-host-runner'
 
@@ -304,6 +312,11 @@
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
 
+    # Project services panel: native processes and Docker containers across the
+    # project's Git worktrees, with per-target retained logs.
+    - id: ui-project-services
+      name: '@deepseek-ai/dsh-client-ui-project-services'
+
     # Durable workflow lifecycle as an independent Chat node after the
     # existing generic workflow tool row.
     - id: ui-workflow-run
@@ -457,6 +470,12 @@
   disabled: true
 
 - id: command-compact
+  disabled: true
+
+# The `projectServices` runtime and its providers stay on the host plane; only
+# the model-facing tools move. This plugin registers three tools and a prompt
+# section and provides no service, so the host plane has no reader for it.
+- id: tool-project-services
   disabled: true
 
 - id: tool-result-pruner

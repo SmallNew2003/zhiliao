@@ -34,6 +34,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`, `schedule_delete`, `schedule_list` | `ctx.tools`, `ctx.sessions`, `Session persistence`, `a future live root Agent` | `tool/call`, `schedule/change create or delete`, `tool/result` | - | Registered only inside live root Agent scopes created after the opt-in Schedule plugin loads. Version 1 accepts after_seconds, explicit absolute at, and bounded fixed-rate every_seconds, and discloses session-local delivery; management reads and mutations require the shared Session persistence barrier. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
+| `@deepseek-ai/dsh-tool-project-services` | `service_control`, `service_list`, `service_logs` | `ctx.tools`, `ctx.projectServices`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The three tools stay pending until a project-services runtime provides `ctx.projectServices`; the base bundle mounts them beside `@deepseek-ai/dsh-project-services-local`, and the shipped web composition moves that host-plane row onto the `standard` and `ptc` agent presets. Mutating calls honor `approvalPolicy` (default `ask`), which routes through the host approval seam when one is mounted — `never` rejects every mutating call without asking anyone. Listing filters, page caps, and the 16 KiB log cap run inside the tools, so provider cursors stay out of the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
@@ -1505,6 +1506,146 @@ Query a language server for precise code navigation. operation is one of goToDef
 Source: [`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/index.ts)
 
 The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.
+
+<a id="deepseek-aidsh-tool-project-services"></a>
+
+## `@deepseek-ai/dsh-tool-project-services`
+
+### `service_control`
+
+Start, stop, or restart one project service. Every action mutates and is gated by one approval decision. Stop or restart an existing target by `target_id` plus the `expected_revision` that `service_list` reported for it — a revision that no longer matches fails the call instead of acting on a service you no longer see. Start a saved definition by `definition` alone.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "description": "Lifecycle action to run; every action mutates the service.",
+      "enum": [
+        "start",
+        "stop",
+        "restart"
+      ]
+    },
+    "target_id": {
+      "type": "string",
+      "description": "Existing service target ID to stop or restart."
+    },
+    "expected_revision": {
+      "type": "string",
+      "description": "Revision that `service_list` reported for `target_id`; a revision that no longer matches fails this call."
+    },
+    "definition": {
+      "type": "object",
+      "description": "Launch a new service from this definition instead of acting on an existing target.",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name to record for the launched service."
+        },
+        "checkout_id": {
+          "type": "string",
+          "description": "Git checkout / worktree the service runs in."
+        },
+        "command": {
+          "type": "array",
+          "description": "Exact executable and arguments to run.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "checkout_id",
+        "command"
+      ]
+    }
+  },
+  "required": [
+    "action"
+  ]
+}
+```
+
+Source: [`packages/workspace/tool-project-services/src/index.ts`](../packages/workspace/tool-project-services/src/index.ts)
+
+### `service_list`
+
+List the native processes and Docker containers this project and its Git worktrees run, with each target's state, ports, ownership, and revision. Call it before assuming a service is down or a port is free. Filter by checkout_id, kind, or state; follow nextCursor for later pages.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "checkout_id": {
+      "type": "string",
+      "description": "Filter services by Git checkout / worktree identifier."
+    },
+    "kind": {
+      "type": "string",
+      "description": "Filter by service kind (native or docker).",
+      "enum": [
+        "native",
+        "docker"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "description": "Filter by service state.",
+      "enum": [
+        "running",
+        "stopped",
+        "starting",
+        "unknown"
+      ]
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Pagination cursor from a previous listing."
+    },
+    "limit": {
+      "type": "number",
+      "description": "Maximum number of items to return."
+    }
+  }
+}
+```
+
+Source: [`packages/workspace/tool-project-services/src/index.ts`](../packages/workspace/tool-project-services/src/index.ts)
+
+### `service_logs`
+
+Read retained stdout and stderr for one project service target, at most 16 KiB per call. Follow nextCursor for more output. `truncated` marks a call that stopped at the byte cap, `gap` marks output the runtime already discarded, and `unavailable` names a target that keeps no output.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "target_id": {
+      "type": "string",
+      "description": "Service target ID to read logs from."
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Log stream cursor from previous read."
+    },
+    "max_bytes": {
+      "type": "number",
+      "description": "Max bytes to read (capped at 16 KiB)."
+    }
+  },
+  "required": [
+    "target_id"
+  ]
+}
+```
+
+Source: [`packages/workspace/tool-project-services/src/index.ts`](../packages/workspace/tool-project-services/src/index.ts)
+
+The three tools stay pending until a project-services runtime provides `ctx.projectServices`; the base bundle mounts them beside `@deepseek-ai/dsh-project-services-local`, and the shipped web composition moves that host-plane row onto the `standard` and `ptc` agent presets. Mutating calls honor `approvalPolicy` (default `ask`), which routes through the host approval seam when one is mounted — `never` rejects every mutating call without asking anyone. Listing filters, page caps, and the 16 KiB log cap run inside the tools, so provider cursors stay out of the schema.
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 
