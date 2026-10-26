@@ -79,7 +79,7 @@ Once the Workspace list baseline is ready, browser-persisted expansion and manua
 
 ### Hover cards
 
-Workspace and Session hover cards copy the value their row clips: activating a Workspace card writes its full directory path, while activating a non-blank Session card writes its full display title. A provisional blank New Session card remains read-only because its localized label is a placeholder rather than session content.
+Workspace and Session hover cards copy the value their row clips: activating a Workspace card writes its full directory path, while activating a non-blank Session card writes its full display title. A Workspace card also carries the group size: the count of Sessions the Workspace directly contains. A provisional blank New Session card remains read-only because its localized label is a placeholder rather than session content.
 
 </details>
 

@@ -408,6 +408,27 @@ describe('workspace browser rows', () => {
     }
   })
 
+  it('workspace hover card carries the group size in both plural forms', async () => {
+    vi.useFakeTimers()
+    try {
+      for (const [sessionCount, label] of [[1, '1 个会话'], [4, '4 个会话']] as const) {
+        const group: GroupNode = {
+          key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
+          sessionCount, expanded: false, containsCurrent: false, sessions: [],
+        }
+        const view = render(<ProjectRowItem group={group} onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
+        fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
+        act(() => { vi.advanceTimersByTime(500) })
+        // The card is the only surface carrying the figure: the row keeps its
+        // trailing cell free, so the count appears exactly once.
+        expect(screen.getByText(label)).toBeTruthy()
+        view.unmount()
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('workspace hover card shows a POSIX home descendant as ~ and still copies the full path', async () => {
     vi.useFakeTimers()
     const writeText = vi.fn(async () => {})

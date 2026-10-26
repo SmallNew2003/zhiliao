@@ -65,6 +65,16 @@ function hoverTimeLabel(updatedAt: number, now: number, t: RowTranslate): string
 }
 
 /**
+ * Pluralized group size from the dictionary's count templates.
+ * @param sessionCount - visible sessions in the group.
+ * @param t - the browser root's locale seat.
+ * @returns the localized count label.
+ */
+function sessionCountLabel(sessionCount: number, t: RowTranslate): string {
+  return t(sessionCount === 1 ? 'sessions.count.one' : 'sessions.count.other', { n: sessionCount })
+}
+
+/**
  * Absolute creation time through the dictionary's date template (the message
  * clock pattern): `toLocaleString` would follow the browser language, not the
  * app locale, and produce mixed-language text after a switch.
@@ -76,9 +86,10 @@ function createdLabel(createdAt: number, t: RowTranslate): string {
   return t('hover.created', { time: `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}` })
 }
 
-/** Hover-card body: workspace title, display directory path, absolute creation time. */
-function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
+/** Hover-card body: workspace title, group size, display directory path, absolute creation time. */
+function WorkspaceHoverContent({ label, sessionCount, cwd, createdAt, t }: {
   label: string
+  sessionCount: number
   cwd: string | undefined
   createdAt: number
   t: RowTranslate
@@ -86,6 +97,7 @@ function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
   return (
     <div className={css.hoverContent}>
       <div className={css.hoverTitle}>{label}</div>
+      <div className={css.hoverTime}>{sessionCountLabel(sessionCount, t)}</div>
       <div className={css.hoverPath}>{cwd}</div>
       <div className={css.hoverTime}>{createdLabel(createdAt, t)}</div>
     </div>
@@ -229,6 +241,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       anchor={ownRow}
       content={<WorkspaceHoverContent
         label={row.label}
+        sessionCount={row.sessionCount}
         cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
         createdAt={row.createdAt}
         t={t}
