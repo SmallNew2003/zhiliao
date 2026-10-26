@@ -744,8 +744,10 @@ describe('web e2e: workspace management (create / rename / grouping / hover affo
     await page.getByRole('menuitem', { name: 'Workspace Tree', exact: true }).click()
     await section.getByText('project-two', { exact: true }).waitFor()
     await clickHoverAction(parent, 'New session in folder-group')
+    // The header row's label, not its text content: the row also names the
+    // directory it points at, which is an absolute path in the scaffold.
     await expect.poll(() => section.locator('[aria-selected="true"]').evaluate(row =>
-      row.closest('[class*="groupSection"]')?.querySelector('[role="treeitem"]')?.textContent,
+      row.closest('[class*="groupSection"]')?.querySelector('[role="treeitem"] [class*="title"]')?.textContent,
     ), { timeout: 10_000 }).toBe('folder-group')
     expect(parentWorkspace.sessionIds).toHaveLength(1)
     expect([...childWorkspace.sessionIds]).toEqual(childSessionIds)

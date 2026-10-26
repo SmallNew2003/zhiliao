@@ -11,3 +11,7 @@
   - menuitem "Last updated":
     - text: Last updated
     - img
+  - separator
+  - text: Expansion
+  - menuitem "Expand all"
+  - menuitem "Collapse all"
