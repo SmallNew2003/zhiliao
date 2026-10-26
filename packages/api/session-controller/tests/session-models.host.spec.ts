@@ -158,6 +158,58 @@ function currentSelection(ctx: Context, sessionId: SessionId) {
 }
 
 describe('Web session model selection', () => {
+  it('keeps context budgets session-local, persists defaults, and restores pending and used selections', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    const saved: unknown[] = []
+    const remote = createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      saveDefaultModelSelection: (selection) => { saved.push(selection); return Promise.resolve() },
+      cwd: '/tmp',
+    })
+    const otherSession = ctx.sessions.create()
+    const otherAgent = { ...agent, id: otherSession.id, session: otherSession } as Agent
+    await ctx.agents.register(otherAgent)
+    const pick = { provider: 'deepseek-official', model: 'deepseek-chat', reasoningEffort: 'high', contextWindow: 960_000 }
+    expect(expectValue(await remote.selectModel({ sessionId, ...pick })).selected).toEqual(pick)
+    expect(currentSelection(ctx, sessionId)).toEqual(pick)
+    expect(currentSelection(ctx, otherSession.id)).not.toHaveProperty('contextWindow')
+    expect(saved).toEqual([pick])
+    const controller = new ApiSessionAgentController(ctx)
+    expect(controller.selectionFor(agent).current).toEqual(pick)
+    agent.session.append('request/header', { header: { config: { ...pick, reasoningEffort: ReasoningEffortId('high') } }, reason: 'initial' })
+    expect(new ApiSessionAgentController(ctx).selectionFor(agent).current).toEqual(pick)
+    expect(ctx.sessionProjections.stateOf(agent.session, 'modelSelection')?.pending).toBeNull()
+    await ctx.fiber.dispose()
+  })
+
+  it.each([0, -1, 1.5])('rejects an invalid selected context budget %s without logging it', async (contextWindow) => {
+    const { ctx, agent, sessionId } = await harness()
+    const remote = createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    expect(await remote.selectModel({ sessionId, provider: 'deepseek-official', model: 'deepseek-chat', contextWindow }))
+      .toMatchObject({ ok: false, error: { code: 'session/model-unavailable' } })
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'model/selection')).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('projects configured adapter context capacity in the model catalog', async () => {
+    const { ctx } = await harness()
+    ctx.llm.registerAdapter(['capacity'], new class extends CatalogAdapter {
+      override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+        return Promise.resolve({ provider, id: model, name: model, context: { contextWindow: 320_000 } })
+      }
+    }('Capacity', [{ provider: 'capacity', id: 'm', name: 'M' }]))
+    createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    const catalog = await buildModelCatalog(ctx, { provider: 'deepseek-official', model: 'deepseek-chat' })
+    expect(catalog.groups.find(group => group.id === 'capacity')?.models[0]?.contextWindow).toBe(320_000)
+    await ctx.fiber.dispose()
+  })
+
   it('validates an ordered image batch before persisting any member', async () => {
     const { ctx, agent, sessionId } = await harness()
     const validateImage = vi.fn((_input: { data: Uint8Array }) => Promise.resolve())
@@ -407,7 +459,7 @@ describe('Web session model selection', () => {
       cwd: '/tmp',
     })
 
-    const catalog = await buildModelCatalog(ctx)
+    const catalog = await buildModelCatalog(ctx, { provider: 'deepseek-official', model: 'deepseek-chat' })
     expect(catalog.groups).toEqual(expect.arrayContaining([
       { id: 'plain', name: 'Plain', models: [{ id: 'plain-model', name: 'Plain Model' }] },
       {
@@ -619,7 +671,7 @@ describe('Web session model selection', () => {
     expectValue(await remote.selectModel(request({
       sessionId, provider: 'deepseek-official', model: 'unlisted-but-served',
     })))
-    const catalog = await buildModelCatalog(ctx)
+    const catalog = await buildModelCatalog(ctx, { provider: 'deepseek-official', model: 'deepseek-chat' })
     expect(catalog.routableProviders.includes(currentSelection(ctx, sessionId).provider)).toBe(true)
     expect(catalog.groups.flatMap(group => group.models.map(model => model.id)))
       .not.toContain('unlisted-but-served')
@@ -635,7 +687,7 @@ describe('Web session model selection', () => {
       cwd: '/tmp',
     })
 
-    const catalog = await buildModelCatalog(ctx)
+    const catalog = await buildModelCatalog(ctx, { provider: 'deepseek-official', model: 'deepseek-chat' })
     // Passed through rather than repaired: matching no group is precisely what
     // makes the composer seat prompt for a selection instead of naming a model
     // the deployment cannot reach.

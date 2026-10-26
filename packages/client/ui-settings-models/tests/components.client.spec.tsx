@@ -40,7 +40,7 @@ function expandRow(position: number): void {
 
 /** The capacity inputs of every open row, in row order. */
 function capacityInputs(label: string): HTMLInputElement[] {
-  return screen.getAllByLabelText<HTMLInputElement>(new RegExp(label))
+  return screen.getAllByRole<HTMLInputElement>('textbox', { name: new RegExp(label) })
 }
 
 const PiAiConfig = Schema.object({
@@ -781,6 +781,45 @@ describe('ModelsSection', () => {
     }
   })
 
+  it('shows the inherited DeepSeek capacity without changing the model draft', () => {
+    const onChange = vi.fn()
+    render(<DeepSeekModelsEditor
+      models={[{ id: 'preview' }]}
+      overridden={false}
+      defaultContextWindow={640_000}
+      defaultMaxTokens={undefined}
+      t={t}
+      disabled={false}
+      onChange={onChange}
+      onReset={vi.fn()}
+    />)
+    fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} 1`))
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: '640K' }).checked).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('saves DeepSeek presets and clears a custom capacity', async () => {
+    const { mutate } = await mountDeepSeekCard({
+      mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
+    })
+    fireEvent.click(screen.getByText(en.customized))
+    for (const position of [1, 2]) {
+      fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} ${String(position)}`))
+    }
+    fireEvent.click(within(screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })).getByRole('radio', { name: '320K' }))
+    fireEvent.change(screen.getByRole('textbox', { name: `${en.contextWindow} 2` }), { target: { value: '' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
+    const { contextWindow: _contextWindow, ...second } = DEFAULT_DEEPSEEK_MODELS[1] as Record<string, unknown>
+    expect(mutate.mock.calls[0]).toEqual([
+      'llm-deepseek',
+      [{ op: 'set', path: ['models'], value: [
+        { ...DEFAULT_DEEPSEEK_MODELS[0], contextWindow: 320_000 }, second,
+      ] }],
+      0,
+    ])
+  })
+
   it('accepts a suffixed context window and stores the plain count', async () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
@@ -1021,8 +1060,7 @@ describe('ModelsSection', () => {
     />)
     expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('')
     expandRow(1)
-    expect(screen.getByLabelText<HTMLInputElement>(`${en.contextWindow} 1`).placeholder)
-      .toBe(en.contextWindowPlaceholder)
+    expect(within(screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })).getAllByRole<HTMLInputElement>('radio').every(radio => radio.disabled)).toBe(true)
     expect(screen.getByLabelText<HTMLInputElement>(`${en.maxTokens} 1`).placeholder)
       .toBe(en.maxTokensPlaceholder)
   })

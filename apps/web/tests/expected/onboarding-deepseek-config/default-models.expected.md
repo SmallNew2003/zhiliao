@@ -43,11 +43,20 @@
           - textbox "显示名称 1":
             - /placeholder: 显示名称
             - text: DeepSeek-V41-Flash
-          - button "模型选项 1" [expanded]:
-            - img
           - button "删除模型 1":
             - img
-          - text: 上下文窗口
+          - radiogroup "上下文窗口档位 1":
+            - text: 上下文窗口 自定义 1M
+            - radio "320K"
+            - text: 320K
+            - radio "640K"
+            - text: 640K
+            - radio "960K"
+            - text: 960K
+          - button "高级设置 1" [expanded]:
+            - text: 高级设置
+            - img
+          - text: 自定义上下文窗口
           - textbox "上下文窗口 1":
             - /placeholder: 1M
             - text: 1M
@@ -66,9 +75,18 @@
           - textbox "显示名称 2":
             - /placeholder: 显示名称
             - text: DeepSeek-V4-Pro
-          - button "模型选项 2":
-            - img
           - button "删除模型 2":
+            - img
+          - radiogroup "上下文窗口档位 2":
+            - text: 上下文窗口 自定义 1M
+            - radio "320K"
+            - text: 320K
+            - radio "640K"
+            - text: 640K
+            - radio "960K"
+            - text: 960K
+          - button "高级设置 2":
+            - text: 高级设置
             - img
           - button "添加模型":
             - img

@@ -503,6 +503,23 @@ describe('pressure measurement and retention', () => {
     retainTokens: 180,
   }
 
+  it('uses the latest routed context budget without changing adapter capacity or another Session', async () => {
+    const ctx = createContext(1_000)
+    const compact = service({ auto: false, thresholdRatio: 0.5, retainRatio: 0.1 }, ctx)
+    const overridden = conversation(4)
+    overridden.append('request/header', {
+      header: { config: { provider: MODEL, model: MODEL, contextWindow: 10_000 } }, reason: 'change',
+    })
+    await expect(compactIfNeeded(compact, overridden)).resolves.toBeNull()
+    await expect(compactIfNeeded(compact, conversation(4))).resolves.not.toBeNull()
+    expect((await ctx.llm.resolveModelInfo(MODEL, MODEL)).context).toEqual({ contextWindow: 1_000 })
+    overridden.append('request/header', {
+      header: { config: { provider: MODEL, model: MODEL, contextWindow: 1_000 } }, reason: 'change',
+    })
+    await expect(compactIfNeeded(compact, overridden)).resolves.not.toBeNull()
+    await ctx.fiber.dispose()
+  })
+
   it('skips when no durable routed model exists instead of using AgentOptions fallback', async () => {
     const compact = service(compactConfig)
     const session = Session.create(SessionId('headerless'))

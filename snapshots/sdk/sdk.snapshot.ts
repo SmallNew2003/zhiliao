@@ -102,6 +102,10 @@ function dirOf(url: string): string {
 }
 
 interface SdkAssertions {
+  /** A second selection must fail preflight without an assistant attempt. */
+  contextBudgetShrink?: true
+  /** Selected budget required in durable selection, request config, and effective context. */
+  contextWindow?: number
   /** Additional profile patches applied after the shared composition. */
   patches?: readonly string[]
   /** Final response required from a completed turn before updating goldens. */
@@ -128,6 +132,15 @@ interface SdkAssertions {
 const SDK_ASSERTIONS: Readonly<Record<string, SdkAssertions>> = {
   'message-edit-resend': {
     patches: [fileURLToPath(new URL('./message-edit-resend/runtime.cordis.yml', import.meta.url))],
+  },
+  'context-window-shrink': {
+    contextBudgetShrink: true,
+    patches: [fileURLToPath(new URL('./context-window-shrink/runtime.cordis.yml', import.meta.url))],
+  },
+  'context-window': {
+    contextWindow: 640000,
+    patches: [fileURLToPath(new URL('./context-window/runtime.cordis.yml', import.meta.url))],
+    expectedFinalResponse: 'SDK snapshot OK',
   },
   'tool-error-details': {
     patches: [fileURLToPath(new URL('./tool-error-details/runtime.cordis.yml', import.meta.url))],
@@ -647,6 +660,12 @@ async function runScenario(scenario: CorpusScenario): Promise<{
             { data: { reason: { kind: 'completed' } } },
           ])
         }
+        if (assertions.contextWindow !== undefined) {
+          const header = result.events.find(event => event.type === 'request/header')
+          const context = result.events.find(event => event.type === 'request/context')
+          expect(header).toMatchObject({ data: { header: { config: { contextWindow: assertions.contextWindow } } } })
+          expect(context).toMatchObject({ data: { contextWindow: assertions.contextWindow } })
+        }
         if (scenario.manifest.environment?.DSH_SNAPSHOT_FEEDBACK === '1') {
           const feedback = result.events.filter(event => event.type.startsWith('feedback/'))
           expect(feedback.map(event => event.type)).toEqual([
@@ -867,6 +886,48 @@ describe('TypeScript SDK snapshots over the jsonrpc runtime', () => {
         const historyPath = join(scenario.dir, 'request-history.expected.json')
         if (refreshing) await writeFile(historyPath, JSON.stringify(histories, null, 2) + '\n')
         expect(histories).toEqual(JSON.parse(await readFile(historyPath, 'utf8')))
+      }
+      if (assertions.contextBudgetShrink === true) {
+        expect(results).toHaveLength(2)
+        const second = results[1]!
+        expect(second.events).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'model/selection', data: expect.objectContaining({ contextWindow: 8192 }) }),
+          expect.objectContaining({ type: 'turn/end', data: expect.objectContaining({
+            reason: expect.objectContaining({ kind: 'error', error: expect.objectContaining({ code: 'CONTEXT_BUDGET_EXCEEDED' }) }),
+          }) }),
+        ]))
+        expect(second.events.some(event => event.type === 'assistant/message' || event.type === 'assistant/attempt')).toBe(false)
+      }
+      if (assertions.contextWindow !== undefined) {
+        const budget = assertions.contextWindow
+        const parent = ordered[0]
+        if (parent === undefined) throw new Error(`${scenario.name}: no primary session log`)
+        const projections = [
+          results.flatMap(result => result.events),
+          notifications.filter(notification => notification.method === 'session.event')
+            .map(notification => notification.params.event),
+          records(parent.content),
+        ]
+        for (const events of projections) {
+          expect(events).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+              type: 'model/selection',
+              data: {
+                provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: budget,
+              },
+            }),
+            expect.objectContaining({
+              type: 'request/header',
+              data: expect.objectContaining({
+                header: expect.objectContaining({ config: expect.objectContaining({ contextWindow: budget }) }),
+              }),
+            }),
+            expect.objectContaining({
+              type: 'request/context',
+              data: expect.objectContaining({ contextWindow: budget }),
+            }),
+          ]))
+        }
       }
       if (scenario.name === 'subagent-activation-limit') {
         expect(ordered).toHaveLength(2)

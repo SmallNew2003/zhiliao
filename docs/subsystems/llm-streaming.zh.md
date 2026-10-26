@@ -589,6 +589,8 @@ interface GenerateOptions {
   /** Registered provider route selecting the adapter instance. */
   provider: string
   model: string
+  /** Positive integer context budget for this call; absent inherits adapter capacity. */
+  contextWindow?: number
   /** Adapter-owned reasoning effort selected for this exact model. */
   reasoningEffort?: ReasoningEffortId
   /**
@@ -736,6 +738,8 @@ interface LlmCallConfig {
   provider: string
   model: string
   reasoningEffort?: ReasoningEffortId
+  /** Positive integer context budget; absent inherits adapter capacity. */
+  contextWindow?: number
   temperature?: number
   maxTokens?: number
   stop?: string[]

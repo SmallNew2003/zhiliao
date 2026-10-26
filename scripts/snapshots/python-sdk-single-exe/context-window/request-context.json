@@ -1,0 +1,197 @@
+{
+  "events": [
+    {
+      "type": "model/selection",
+      "seq": 6,
+      "time": 0,
+      "data": {
+        "provider": "deepseek-official",
+        "model": "smoke-model",
+        "contextWindow": 640000
+      }
+    },
+    {
+      "type": "request/header",
+      "data": {
+        "header": {
+          "config": {
+            "provider": "deepseek-official",
+            "model": "smoke-model",
+            "contextWindow": 640000,
+            "maxTokens": 256000,
+            "reasoningEffort": "high"
+          },
+          "adapterDefaults": {
+            "reasoningEffort": true,
+            "maxTokens": true
+          },
+          "tools": [
+            "bash",
+            "create_goal",
+            "edit",
+            "exit_plan_mode",
+            "get_goal",
+            "glob",
+            "grep",
+            "interrupt_agent",
+            "job_kill",
+            "job_list",
+            "job_output",
+            "list_agents",
+            "read",
+            "read_image",
+            "send_message",
+            "skill",
+            "subagent",
+            "subagent_fork",
+            "todo_write",
+            "update_goal",
+            "web_fetch",
+            "web_search",
+            "workflow",
+            "write"
+          ]
+        },
+        "reason": "initial"
+      }
+    },
+    {
+      "type": "request/context",
+      "data": {
+        "provider": "deepseek-official",
+        "model": "smoke-model",
+        "contextWindow": 640000
+      }
+    }
+  ],
+  "notifications": [
+    {
+      "type": "model/selection",
+      "seq": 6,
+      "time": 0,
+      "data": {
+        "provider": "deepseek-official",
+        "model": "smoke-model",
+        "contextWindow": 640000
+      }
+    },
+    {
+      "type": "request/header",
+      "data": {
+        "header": {
+          "config": {
+            "provider": "deepseek-official",
+            "model": "smoke-model",
+            "contextWindow": 640000,
+            "maxTokens": 256000,
+            "reasoningEffort": "high"
+          },
+          "adapterDefaults": {
+            "reasoningEffort": true,
+            "maxTokens": true
+          },
+          "tools": [
+            "bash",
+            "create_goal",
+            "edit",
+            "exit_plan_mode",
+            "get_goal",
+            "glob",
+            "grep",
+            "interrupt_agent",
+            "job_kill",
+            "job_list",
+            "job_output",
+            "list_agents",
+            "read",
+            "read_image",
+            "send_message",
+            "skill",
+            "subagent",
+            "subagent_fork",
+            "todo_write",
+            "update_goal",
+            "web_fetch",
+            "web_search",
+            "workflow",
+            "write"
+          ]
+        },
+        "reason": "initial"
+      }
+    },
+    {
+      "type": "request/context",
+      "data": {
+        "provider": "deepseek-official",
+        "model": "smoke-model",
+        "contextWindow": 640000
+      }
+    }
+  ],
+  "persisted": [
+    {
+      "type": "model/selection",
+      "seq": 6,
+      "time": 0,
+      "data": {
+        "provider": "deepseek-official",
+        "model": "smoke-model",
+        "contextWindow": 640000
+      }
+    },
+    {
+      "type": "request/header",
+      "data": {
+        "header": {
+          "config": {
+            "provider": "deepseek-official",
+            "model": "smoke-model",
+            "contextWindow": 640000,
+            "maxTokens": 256000,
+            "reasoningEffort": "high"
+          },
+          "adapterDefaults": {
+            "reasoningEffort": true,
+            "maxTokens": true
+          },
+          "tools": [
+            "bash",
+            "create_goal",
+            "edit",
+            "exit_plan_mode",
+            "get_goal",
+            "glob",
+            "grep",
+            "interrupt_agent",
+            "job_kill",
+            "job_list",
+            "job_output",
+            "list_agents",
+            "read",
+            "read_image",
+            "send_message",
+            "skill",
+            "subagent",
+            "subagent_fork",
+            "todo_write",
+            "update_goal",
+            "web_fetch",
+            "web_search",
+            "workflow",
+            "write"
+          ]
+        },
+        "reason": "initial"
+      }
+    },
+    {
+      "type": "request/context",
+      "data": {
+        "provider": "deepseek-official",
+        "model": "smoke-model",
+        "contextWindow": 640000
+      }
+    }
+  ]
+}

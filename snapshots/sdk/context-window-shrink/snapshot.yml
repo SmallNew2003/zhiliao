@@ -1,0 +1,9 @@
+version: 1
+scenario: context-window-shrink
+profile: sdk
+composition: default
+recording: authored
+header:
+  class: context-window-shrink
+  pin: true
+  changes: 1

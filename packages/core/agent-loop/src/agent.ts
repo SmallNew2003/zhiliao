@@ -380,7 +380,21 @@ export class ReactLoopAgent implements Agent {
         }
       }
       firstAttempt = false
-      const request = this.buildRequest(config, preparedCall, assembly.tools, startsRequestSeries, signal)
+      let request = this.buildRequest(config, preparedCall, assembly.tools, startsRequestSeries, signal)
+      while (true) {
+        const generation = this.session.surface.contentGeneration
+        await this.dispatch.serial('agent/request-preflight', { request, turn, step, signal })
+        signal.throwIfAborted()
+        if (generation === this.session.surface.contentGeneration) break
+        const updates = this.systemPrompt.project(renderedPrompt, {
+          inHistory: preparedCall?.systemPromptUpdate === 'in-history',
+          startsSeries: true,
+        })
+        for (const { message, intent } of updates) {
+          this.session.append('system/message', { turn, step, message }, intent)
+        }
+        request = this.buildRequest(config, preparedCall, assembly.tools, false, signal)
+      }
       const live = new AssistantStreamAttempt(
         this.session.id,
         ++this.assistantAttemptCounter,

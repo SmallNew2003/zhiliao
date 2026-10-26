@@ -1,7 +1,7 @@
 /**
- * Composer model and reasoning-effort selection over the shared ModelDirectory.
+ * Composer model, reasoning-effort, and context-window selection over the shared ModelDirectory.
  * Provider-grouped models and the current model's advertised efforts share one
- * panel. Arrow keys traverse options; Tab selects, while Escape and Shift+Tab
+ * panel with context presets. Arrow keys traverse options; Tab selects, while Escape and Shift+Tab
  * close and restore the trigger. Catalog errors offer Retry in the panel;
  * rejected selections use the composer-anchored Toast.
  */
@@ -34,7 +34,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * Render the composer model seat.
  * @param props - owner share (locked) + injected face (shared directory
  * store/verbs) + the standard locale seat.
- * @returns the trigger and, while open, the combined model and effort menu.
+ * @returns the trigger and, while open, the combined model, effort, and context menu.
  */
 export function ModelSelect(
   { locked, available, directory, load, select, t }:
@@ -76,6 +76,7 @@ export function ModelSelect(
     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
+  const contextWindow = state.current?.contextWindow ?? currentChoice?.model.contextWindow
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortLabel = reasoning === undefined
     ? undefined
@@ -252,9 +253,27 @@ export function ModelSelect(
       provider: state.current.provider,
       model: state.current.model,
       ...effort === undefined ? {} : { reasoningEffort: effort },
+      ...state.current.contextWindow === undefined ? {} : { contextWindow: state.current.contextWindow },
     }
     lastActionRef.current = 'select'
     void select(selection).then(settleSelection)
+  }
+
+  const chooseContextWindow = (value: number): void => {
+    if (state.current === null) return
+    if (contextWindow === value) {
+      close(true)
+      return
+    }
+    lastActionRef.current = 'select'
+    const smaller = contextWindow !== undefined && value < contextWindow
+    void select({ ...state.current, contextWindow: value }).then((result) => {
+      settleSelection(result)
+      if (result?.ok === true && smaller && rootRef.current !== null) {
+        toastSeq.current += 1
+        setToast({ seq: toastSeq.current, text: t('context.smaller') })
+      }
+    })
   }
 
   const waiting = state.current === null && state.status === 'loading'
@@ -392,6 +411,33 @@ export function ModelSelect(
                       </span>
                     </button>
                   ))}
+              </div>
+            </section>
+          )}
+          {state.current !== null && (
+            <section role="group" aria-labelledby={`${id}-context`} className={css.efforts}>
+              <div className={css.contextTitle}>
+                <span id={`${id}-context`}>{t('menu.contextWindow')}</span>
+                <span>{t('context.current', { value: contextWindow === undefined ? t('context.unknown') : contextWindow.toLocaleString('en-US') })}</span>
+              </div>
+              <div className={css.effortOptions}>
+                {[320_000, 640_000, 960_000].map(value => (
+                  <button
+                    ref={itemRef()}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={contextWindow === value}
+                    className={clsx(css.option, css.effortOption, contextWindow === value && css.selected)}
+                    key={value}
+                    disabled={busy || locked}
+                    onClick={() => { chooseContextWindow(value) }}
+                  >
+                    <span className={css.optionCopy}>
+                      <span className={css.modelName}>{t('context.preset', { value: value / 1000 })}</span>
+                    </span>
+                    <span className={css.check}>{contextWindow === value ? <IconCheckOutline16 /> : null}</span>
+                  </button>
+                ))}
               </div>
             </section>
           )}

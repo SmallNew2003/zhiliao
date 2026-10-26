@@ -12,6 +12,7 @@ Use this package to render a browser chat from recorded Session conversations, i
 
 File-mention providers receive the viewed Session ID with the closing-turn owner, so links into inherited history can address the fork itself.
 
+
 ## Table of Contents
 
 - [Editing the latest input](#editing-the-latest-input)
@@ -66,6 +67,8 @@ The completed-turn action footer starts 20px below the preceding prose or extens
 Settings → General exposes a persisted, localized `Normal` / `Compact` conversation-display preference in the `ui-chat` namespace; `Compact` is the default. Compact groups each consecutive run of Context injection, reasoning, Tool rows, and Retry rows between visible Assistant responses. A visible Assistant response or `turn/end` closes the current group. System prompt, User, steering, error, max-token, and turn-tail rows remain independent. Normal leaves process rows flat and renders no group headers.
 
 A running group starts expanded and its header names the current activity and elapsed Turn time. A completed group starts collapsed; its header summarizes up to two main action types without displaying counts, such as `Read files, ran commands`, and a reasoning-only group reads `Analyze request`. Failures append `Some actions failed`. Expanding a group caps its body at `min(400px, 50vh)`, scrolls it independently, and fades the edge in the remaining scroll direction. Child reasoning and Tool rows keep their own disclosures. Closed bodies use `hidden="until-found"`, so browser find opens the group that contains the match. The session-scoped store records explicit group expansion choices; a manual choice survives streaming, history paging, and Chat view remounts. Group keys and member seats survive running-to-settled and running-to-closed transitions without remounting Tool renderers. Switching between Compact and Normal changes presentation only; it does not add a Session event or model input.
+
+When a selected context budget blocks dispatch, Chat shows localized guidance to retry, increase the window, or lower the output limit.
 
 -----
 

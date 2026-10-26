@@ -44,11 +44,20 @@
           - textbox "显示名称 1":
             - /placeholder: 显示名称
             - text: Private Preview
-          - button "模型选项 1" [expanded]:
-            - img
           - button "删除模型 1":
             - img
-          - text: 上下文窗口
+          - radiogroup "上下文窗口档位 1":
+            - text: 上下文窗口 自定义 131072
+            - radio "320K"
+            - text: 320K
+            - radio "640K"
+            - text: 640K
+            - radio "960K"
+            - text: 960K
+          - button "高级设置 1" [expanded]:
+            - text: 高级设置
+            - img
+          - text: 自定义上下文窗口
           - textbox "上下文窗口 1":
             - /placeholder: 1M
             - text: "131072"

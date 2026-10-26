@@ -46,6 +46,8 @@ Fork copies history through the selected completed turn, including its `turn/end
 
 Acceptance appends one durable `user/message-edit`, restores effective history preceding its target, and requests a response using the replacement input. Original events remain in the log. Preparation or model failure after acceptance retains the modified input. Callers reuse `requestId` after a lost response: a matching durable edit returns acceptance before busy or stale checks and starts no additional response. For earlier input, fork its completed turn and edit the latest input in that child; external side effects are not undone.
 
+Model selection persists a complete provider/model route, optional reasoning effort, and optional positive integer `contextWindow` budget in `model/selection`. The next prompt assembly captures that selection; a matching request header consumes it only when the route, effort, and budget all match, so a newer selection survives an older in-flight request. Resume restores a pending selection or the latest logged request selection. Accepted selections also save the default for future Sessions. Model catalog `contextWindow` values describe configured adapter capacity; Session selections override that budget without changing the catalog.
+
 A resume blocked by an existing write handle returns `session/writer-held` with the Session id; other resume failures retain `gateway/internal`.
 
 <a id="client-references"></a>

@@ -143,6 +143,7 @@ export class SessionCommandController {
           ...(request.reasoningEffort === undefined
             ? {}
             : { reasoningEffort: ReasoningEffortId(request.reasoningEffort) }),
+          ...(request.contextWindow === undefined ? {} : { contextWindow: request.contextWindow }),
         })
         const selected: AgentModelSelection = {
           provider: resolved.provider,
@@ -150,6 +151,7 @@ export class SessionCommandController {
           ...(resolved.reasoningEffort === undefined
             ? {}
             : { reasoningEffort: resolved.reasoningEffort }),
+          ...(resolved.contextWindow === undefined ? {} : { contextWindow: resolved.contextWindow }),
         }
         this.agents.selectForNextRequest(agent, selected)
         try {

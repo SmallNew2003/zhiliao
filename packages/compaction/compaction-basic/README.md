@@ -31,6 +31,8 @@ Mount this package to get automatic conversation condensation in a composition t
 
 With the default settings you get four behaviors: automatic condensation as the conversation grows toward the model's context limit; recovery after a confirmed context-overflow error, where the conversation condenses and the request retries; on-demand condensation through the `/compact` command; and — when the pruner is mounted — trimming of oversized tool outputs before condensation.
 
+An explicit request `contextWindow` is checked after the current input, system prompt, tools, and resolved envelope are logged, before ordinary model dispatch. The input allowance is the selected window minus resolved `maxTokens` when present; threshold and retention ratios apply to that allowance. Oversized requests are compressed within the configured retry bound. Failed compression, insufficient reduction, or unsummarizable input blocks dispatch with `CONTEXT_BUDGET_EXCEEDED`; select a larger window or reduce the input, system prompt, or tools to continue. With `auto: false`, oversized explicit-budget requests are blocked without automatic summarization. This check estimates provider tokenization, preserves completed durable replacements, and does not alter an active streaming request.
+
 ### Smallest working composition
 
 Mount session storage, token measurement, the optional pruner, this backend, and optionally the on-demand command:
@@ -111,7 +113,7 @@ The backend is built on four commitments:
 
 With `auto: true`, a serial `agent/pre-step` listener checks pressure before request derivation: it prices the latest durable routed request envelope through `ctx.tokenMeter`, and when pressure crosses the routed model's threshold it prunes, then summarizes the oldest balanced span while keeping a priced recent tail. Every selected range starts at the first surface node that is not a `system/message`, so a system prompt at surface node 0 is never shadowed; a later `system/message` appended by an in-history prompt update is ordinary history that the range may shadow, and the agent loop's projection then replaces node 0 with the current prompt when their text differs ([decision rule](../../core/agent-loop/README.md#understand-the-implementation)). The `agent/request-error` listener reacts to a provider-confirmed `CONTEXT_WINDOW_EXCEEDED`: it bypasses the normal threshold and retention policy, attempts one maximal balanced head reduction, and authorizes a retry only after the surface replacement generation advances. Cancellation stays authoritative throughout.
 
-Pressure policy resolves capacity from the adapter that owns the durable route. An adapter that returns no capacity for a valid dynamic route makes the manual pressure path throw a target-specific configuration error; the automatic listener warns once for that exact target and continues with full history.
+Pressure policy uses `resolveCallContext()` to apply the latest durable request header's optional `contextWindow` budget over the routed adapter capacity. An explicit budget does not mutate the adapter or other Sessions. A route with neither configured capacity nor an explicit budget makes the manual pressure path throw a target-specific configuration error; the automatic listener warns once for that exact target and continues with full history.
 
 ### Summarization mechanics
 
@@ -125,7 +127,7 @@ The transaction validates the surface span and the durable lock, appends `compac
 
 ### Config resolution
 
-`resolveConfig` validates and detaches the defaults, `resolveTargetPolicy` merges an exact provider/model override over them, and `resolveCompactSpec` scales the merged policy into concrete token budgets using the adapter-owned context capacity. Model discovery (`listModels()`) is never consulted for policy; only the durable route's capacity matters.
+`resolveConfig` validates and detaches the defaults, `resolveTargetPolicy` merges an exact provider/model override over them, and `resolveCompactSpec` scales the merged policy into concrete token budgets using the effective call context budget. Model discovery (`listModels()`) is never consulted for policy; only the durable route's capacity matters.
 
 ### Source map
 

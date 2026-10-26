@@ -296,6 +296,25 @@ describe('ApiSession model selection', () => {
     expect(() => agents.selectionFor(live)).toThrow('required modelSelection projection')
   })
 
+  it('keeps a newer window selection pending when an assembled window request lands', async () => {
+    const { ctx, agents } = await harness()
+    const live = agent(ctx, header('window-race'))
+    const first = { provider: 'fixture', model: 'fixture-model', contextWindow: 320_000 }
+    const newer = { ...first, contextWindow: 640_000 }
+    agents.selectForNextRequest(live, first)
+    const selection = agents.selectionFor(live)
+    selection.assembled = selection.current
+    agents.selectForNextRequest(live, newer)
+    live.session.append('request/header', { header: { config: first }, reason: 'initial' })
+    expect(agents.consumeSelection(live, first.provider, first.model, undefined, first.contextWindow)).toBe(false)
+    expect(selection.current).toEqual(newer)
+    expect(ctx.sessionProjections.stateOf(live.session, 'modelSelection')?.pending).toEqual(newer)
+    live.session.append('request/header', { header: { config: newer }, reason: 'change' })
+    expect(agents.consumeSelection(live, newer.provider, newer.model, undefined, newer.contextWindow)).toBe(true)
+    expect(selection.current).toEqual(newer)
+    expect(ctx.sessionProjections.stateOf(live.session, 'modelSelection')?.pending).toBeNull()
+  })
+
   it('reads a reasoning-free request and consumes only the exact pending selection', async () => {
     const { ctx, agents } = await harness()
     const logged = agent(ctx, header('logged-model'))
