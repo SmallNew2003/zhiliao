@@ -253,7 +253,7 @@ describe('web e2e: agent-preset selection', () => {
     await page.getByRole('button', { name: 'Standard mode', exact: true }).waitFor({ timeout: 10_000 })
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.getByRole('button', { name: 'Agent presets' }).click()
     const toggle = dialog.getByRole('switch', { name: 'Allow switching Agent modes' })
     await dialog.getByRole('button', { name: 'New task default: Standard mode' }).waitFor({ timeout: 10_000 })
@@ -353,7 +353,7 @@ describe('web e2e: agent-preset selection', () => {
     await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Settings' })
+    const dialog = page.getByRole('region', { name: 'Settings' })
     await dialog.getByRole('button', { name: 'Agent presets' }).click()
     await dialog.getByRole('button', { name: 'Set as default: Minimal mode' }).click()
     await dialog.getByRole('button', { name: 'New task default: Minimal mode' }).waitFor({ timeout: 10_000 })
@@ -370,7 +370,7 @@ describe('web e2e: agent-preset selection', () => {
     // The switch controls availability only: re-enabling restores the saved
     // default and aligns this same still-blank task with it.
     await page.getByRole('button', { name: 'Settings', exact: true }).click()
-    const reopened = page.getByRole('dialog', { name: 'Settings' })
+    const reopened = page.getByRole('region', { name: 'Settings' })
     await reopened.getByRole('button', { name: 'Agent presets' }).click()
     const reopenedToggle = reopened.getByRole('switch', { name: 'Allow switching Agent modes' })
     await reopenedToggle.click()

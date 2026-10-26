@@ -51,7 +51,7 @@ async function controlTransport(page: Page) {
 
 async function selectTerminalTheme(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const dialog = page.getByRole('region', { name: 'Settings' })
   const [response] = await Promise.all([
     page.waitForResponse(candidate => new URL(candidate.url()).pathname === '/api/settings/mutate' && candidate.request().method() === 'POST'),
     dialog.getByRole('button', { name, exact: true }).click(),

@@ -44,7 +44,7 @@ describe.skipIf(webSnapshotMode() === 'record')('web e2e: DeepSeek Messages opt-
     await onboarding.getByRole('button', { name: '保存并继续' }).click()
     await onboarding.waitFor({ state: 'detached' })
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '设置', exact: true })
+    const dialog = page.getByRole('region', { name: '设置', exact: true })
     await dialog.getByRole('button', { name: '模型', exact: true }).click()
     await dialog.getByText('DeepSeek', { exact: true }).waitFor()
     expect(await dialog.getByText('DeepSeek', { exact: true }).count()).toBe(1)
@@ -54,7 +54,7 @@ describe.skipIf(webSnapshotMode() === 'record')('web e2e: DeepSeek Messages opt-
     expect(await messages.getByLabel('API 地址', { exact: true }).getAttribute('placeholder'))
       .toBe('https://api.deepseek.com/anthropic')
     await compareOrRefreshGolden(join(EXPECTED, 'cards.expected.md'),
-      await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
+      await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd), webSnapshotMode())
     await messages.getByLabel('API 密钥', { exact: true }).fill('sk-e2e-messages')
     await messages.getByLabel('API 地址', { exact: true }).fill('https://messages.example/anthropic')
     expect(await messages.getByLabel('模型 ID 1').inputValue()).toBe('deepseek-flash')

@@ -37,7 +37,7 @@ describe('web e2e: repairs a stored provider after catalog drift', () => {
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '模型', exact: true }).click()
     await dialog.getByText(FAILURE, { exact: true }).waitFor()
   }, 120_000)
@@ -56,14 +56,14 @@ describe('web e2e: repairs a stored provider after catalog drift', () => {
 
   it('shows the failed provider beside healthy providers and keeps both add actions usable', async () => {
     onTestFailed(() => saveFailureShot(page, 'models-settings-recovery'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     expect(await dialog.getByRole('button', { name: '编辑 openrouter', exact: true }).count()).toBe(1)
     expect(await dialog.getByRole('button', { name: '编辑 zai', exact: true }).count()).toBe(1)
     expect(await dialog.getByRole('button', { name: '编辑 acme-gateway', exact: true }).count()).toBe(1)
     expect(await dialog.getByText(CUSTOM_FAILURE, { exact: true }).count()).toBe(1)
     expect(await dialog.getByRole('button', { name: '添加提供方', exact: true }).isEnabled()).toBe(true)
     expect(await dialog.getByRole('button', { name: '添加自定义提供方', exact: true }).isEnabled()).toBe(true)
-    await compareOrRefreshGolden(EXPECTED, await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
+    await compareOrRefreshGolden(EXPECTED, await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd), webSnapshotMode())
 
     await dialog.getByRole('button', { name: '添加提供方', exact: true }).click()
     await dialog.getByLabel('提供方', { exact: true }).selectOption('minimax-cn')
@@ -74,7 +74,7 @@ describe('web e2e: repairs a stored provider after catalog drift', () => {
   })
 
   it('rejects an invalid edit without persisting and accepts removal of the obsolete model', async () => {
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    const dialog = page.getByRole('region', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 openrouter', exact: true }).click()
     await dialog.getByText('自定义设置', { exact: true }).click()
     await dialog.getByLabel('API 地址', { exact: true }).fill('https://gateway.example/v1')

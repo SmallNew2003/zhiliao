@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
 /**
- * Settings shell registration inside the assembled web client: the shell
- * occupies the `sidebar.settings` hole ui-sidebar declares, its ledger
- * projections read the product's real sections, its connection control is the
- * roster's Connection, and it survives a Loader rebuild of the declarer.
+ * Settings shell registration inside the assembled web client: the trigger
+ * occupies the `sidebar.settings` hole ui-sidebar declares, the page holds
+ * the `settings` main key ui-layout declares, their ledger projections read
+ * the product's real sections, the connection control is the roster's
+ * Connection, and both survive a Loader rebuild of the declarer.
  */
 import { describe, expect, onTestFinished, vi } from 'vitest'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { createClientTest, type TestClient, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
 import { inject } from '../src/client/index.ts'
-import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
-import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+import type { SettingsPageInjected, SettingsTriggerInjected } from '../src/client/shell-contract.ts'
+import { SETTINGS_PANEL_ID } from '../src/client/shell-contract.ts'
+import { SettingsPage } from '../src/client/SettingsPage.tsx'
+import { SettingsTrigger } from '../src/client/SettingsTrigger.tsx'
 import type { DesktopUpdatePresentation } from '../src/client/desktop-update-bridge.ts'
 
 const SELF = '@deepseek-ai/dsh-client-ui-settings-general'
@@ -19,21 +22,30 @@ const it = createClientTest({ roster: webApp })
 /** The whole roster's first boot pays the cold module transform of every plugin package. */
 const COLD_BOOT_TIMEOUT_MS = 60_000
 
-function injectedOf(c: TestClient): SettingsRootInjected {
+function triggerInjectedOf(c: TestClient): SettingsTriggerInjected {
   const entry = c.ctx.slots.entries('sidebar.settings')[0]!
-  return (entry.inject as () => SettingsRootInjected)()
+  return (entry.inject as () => SettingsTriggerInjected)()
 }
 
-/** The shell's child declarations (chrome, actions, sections, and onboarding overlays). */
-const CHILD_SPECS = {
+function pageInjectedOf(c: TestClient): SettingsPageInjected {
+  const entry = c.ctx.slots.entries('main').find(entry => entry.options.key === SETTINGS_PANEL_ID)!
+  return (entry.inject as () => SettingsPageInjected)()
+}
+
+/** The trigger's child declarations (chrome seat and onboarding overlays). */
+const TRIGGER_CHILD_SPECS = {
   'settings.trigger': { kind: 'single', scope: 'root' },
+  'settings.onboarding': { kind: 'list', scope: 'root' },
+} as const
+/** The page's child declarations (title, actions, close, and sections). */
+const PAGE_CHILD_SPECS = {
   'settings.header': { kind: 'single', scope: 'root' },
   'settings.action': { kind: 'list', scope: 'root' },
   'settings.close': { kind: 'single', scope: 'root' },
   'settings.section': { kind: 'list', scope: 'root' },
-  'settings.onboarding': { kind: 'list', scope: 'root' },
 } as const
-const CHILD_NAMES = Object.keys(CHILD_SPECS) as Array<keyof typeof CHILD_SPECS>
+const TRIGGER_CHILD_NAMES = Object.keys(TRIGGER_CHILD_SPECS) as Array<keyof typeof TRIGGER_CHILD_SPECS>
+const PAGE_CHILD_NAMES = Object.keys(PAGE_CHILD_SPECS) as Array<keyof typeof PAGE_CHILD_SPECS>
 
 /**
  * Section ids the web-app roster registers, in nav order: this package, then
@@ -57,8 +69,8 @@ describe('ui-settings-general shell', () => {
     vi.stubGlobal('dshDesktop', { protocolVersion: 1, updates: { status: () => initial.promise, subscribe, open } })
     onTestFinished(() => { vi.unstubAllGlobals(); initial.resolve({ phase: 'idle' }) })
     const c = await start()
-    const row = injectedOf(c)
-    const badge = (c.ctx.slots.entries('sidebar.toggle.badge')[0]!.inject as () => Pick<SettingsRootInjected, 'hooks'>)()
+    const row = triggerInjectedOf(c)
+    const badge = (c.ctx.slots.entries('sidebar.toggle.badge')[0]!.inject as () => Pick<SettingsTriggerInjected, 'hooks'>)()
     expect(badge.hooks.desktopUpdate).toBe(row.hooks.desktopUpdate)
     expect(subscribe).toHaveBeenCalledOnce()
     const status = { phase: 'available' as const, version: '1.0.1' }
@@ -76,18 +88,21 @@ describe('ui-settings-general shell', () => {
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('declares its services', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'layout', 'remote', 'remote.settings', 'settingsScope'])
   })
 
-  it('occupies sidebar.settings, declared by ui-sidebar, and declares every child slot', async ({ start }) => {
+  it('occupies sidebar.settings and the settings main key, declaring every child slot', async ({ start }) => {
     const c = await start()
-    expect(c.ctx.slots.entries('sidebar.settings').map(entry => entry.component)).toEqual([SettingsRoot])
-    for (const name of CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(CHILD_SPECS[name])
+    expect(c.ctx.slots.entries('sidebar.settings').map(entry => entry.component)).toEqual([SettingsTrigger])
+    for (const name of TRIGGER_CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(TRIGGER_CHILD_SPECS[name])
+    const page = c.ctx.slots.entries('main').find(entry => entry.options.key === SETTINGS_PANEL_ID)
+    expect(page?.component).toBe(SettingsPage)
+    for (const name of PAGE_CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(PAGE_CHILD_SPECS[name])
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('projects the section ledger: product sections in order, defaults for bare rows, stable snapshots', async ({ start }) => {
     const c = await start()
-    const { sections } = injectedOf(c).hooks
+    const { sections } = pageInjectedOf(c).hooks
     const product = sections.getSnapshot()
     expect(product.map(row => row.id)).toEqual(PRODUCT_SECTIONS)
     expect(product[0]).toEqual({ id: 'general', order: 0, label: expect.any(String) as string })
@@ -111,7 +126,7 @@ describe('ui-settings-general shell', () => {
 
   it('projects the roster Connection control without copying its state; reconnect opens a new $events generation', async ({ start }) => {
     const c = await start()
-    const injected = injectedOf(c)
+    const injected = triggerInjectedOf(c)
     expect(injected.hooks.connectionState).toBe(c.connection.state)
     expect(injected.hooks.connectionState.getSnapshot()).toBe('connected')
     injected.reconnect()
@@ -119,9 +134,25 @@ describe('ui-settings-general shell', () => {
     await vi.waitFor(() => { expect(c.connection.state.getSnapshot()).toBe('connected') })
   })
 
+  it('navigates through ctx.layout: open, openSection, and close share the selection', async ({ start }) => {
+    const c = await start()
+    const trigger = triggerInjectedOf(c)
+    const page = pageInjectedOf(c)
+    expect(page.hooks.activeSection.getSnapshot()).toBeUndefined()
+    trigger.openSettings(null)
+    // Selection writes ride the shared store; layout selection is a no-throw
+    // write once the main key is registered.
+    page.selectSection('models')
+    expect(page.hooks.activeSection.getSnapshot()).toBe('models')
+    trigger.openSettingsSection('general', null)
+    expect(page.hooks.activeSection.getSnapshot()).toBe('general')
+    page.closeSettings()
+    expect(page.hooks.activeSection.getSnapshot()).toBeUndefined()
+  })
+
   it('projects onboarding entries into stable coordinator order', async ({ start }) => {
     const c = await start()
-    const { onboardingSteps } = injectedOf(c).hooks
+    const { onboardingSteps } = triggerInjectedOf(c).hooks
     expect(onboardingSteps.getSnapshot()).toEqual(PRODUCT_ONBOARDING)
     c.ctx.slots.register({ name: 'settings.onboarding', id: 'credential', order: 0 } as never, () => null)
     c.ctx.slots.register({ name: 'settings.onboarding', id: 'welcome', order: -100 } as never, () => null)
@@ -144,19 +175,27 @@ describe('ui-settings-general shell', () => {
   it('re-registers after the declarer reloads: the cascade removes the shell, the rebuilt declaration takes it back', async ({ start }) => {
     const c = await start()
     const before = c.ctx.slots.entries('sidebar.settings')[0]
+    const beforePage = c.ctx.slots.entries('main').find(entry => entry.options.key === SETTINGS_PANEL_ID)
     expect(before).toBeDefined()
+    expect(beforePage).toBeDefined()
     await c.reload(SIDEBAR)
     await c.flush()
-    expect(c.ctx.slots.entries('sidebar.settings').map(entry => entry.component)).toEqual([SettingsRoot])
+    expect(c.ctx.slots.entries('sidebar.settings').map(entry => entry.component)).toEqual([SettingsTrigger])
+    expect(c.ctx.slots.entries('main').find(entry => entry.options.key === SETTINGS_PANEL_ID)?.component)
+      .toBe(SettingsPage)
     expect(c.ctx.slots.entries('sidebar.settings')[0]).not.toBe(before)
-    for (const name of CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(CHILD_SPECS[name])
+    for (const name of TRIGGER_CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(TRIGGER_CHILD_SPECS[name])
+    for (const name of PAGE_CHILD_NAMES) expect(c.ctx.slots.spec(name)).toEqual(PAGE_CHILD_SPECS[name])
   })
 
-  it('unregisters the shell and collapses every child slot when its row unloads', async ({ start }) => {
+  it('unregisters the shell, the page, and every child slot when its row unloads', async ({ start }) => {
     const c = await start()
     await c.unload(SELF)
     await c.flush()
     expect(c.ctx.slots.entries('sidebar.settings')).toHaveLength(0)
-    for (const name of CHILD_NAMES) expect(c.ctx.slots.spec(name)).toBeUndefined()
+    expect(c.ctx.slots.entries('main').some(entry => entry.options.key === SETTINGS_PANEL_ID)).toBe(false)
+    for (const name of [...TRIGGER_CHILD_NAMES, ...PAGE_CHILD_NAMES]) {
+      expect(c.ctx.slots.spec(name)).toBeUndefined()
+    }
   })
 })

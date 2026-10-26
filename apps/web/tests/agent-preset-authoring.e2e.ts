@@ -41,7 +41,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
 
   /** The settings dialog, opened on the Agent-presets section. */
   function settingsDialog(): Locator {
-    return page.getByRole('dialog', { name: '设置' })
+    return page.getByRole('region', { name: '设置' })
   }
 
   beforeAll(async () => {
@@ -80,7 +80,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     // the snapshot cannot land between the section shell and its cards.
     await dialog.getByRole('button', { name: '查看: 标准模式', exact: true }).waitFor({ timeout: 10_000 })
 
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd)
 
     await compareOrRefreshGolden(SECTION_EXPECTED, snapshot, MODE)
     const toggle = dialog.getByRole('switch', { name: '允许切换agent模式' })
@@ -140,10 +140,9 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     // the completion of a copy, not a follow-up.
     await dialog.getByText('我的模式').first().waitFor({ timeout: 10_000 })
     await dialog.getByText('预设文件：').waitFor({ timeout: 10_000 })
-    // The copy dialog is detached, so the settings dialog is the only one
-    // left (it names itself via aria-labelledby, which a CSS attribute
-    // selector cannot address).
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd, {
+    // The copy dialog is detached, so only the settings page remains; the
+    // data attribute addresses it directly.
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd, {
       replacements: [[userRoot, '{{presetRoot}}']],
     })
     await compareOrRefreshGolden(CREATED_EXPECTED, snapshot, MODE)
@@ -194,7 +193,7 @@ describe('web e2e: agent-preset authoring is a host-side copy', () => {
     await dialog.getByRole('button', { name: 'Agent 预设' }).click()
     await dialog.getByText('加载失败').first().waitFor({ timeout: 10_000 })
 
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd, {
+    const snapshot = await captureStableAria(page, '[data-settings-page]', scaffold.workspaceCwd, {
       replacements: [[userRoot, '{{presetRoot}}']],
     })
     await compareOrRefreshGolden(DAMAGED_EXPECTED, snapshot, MODE)
