@@ -15,6 +15,35 @@ import {
   ConversationLocationIndex, type ConversationLocationDataChange,
 } from './location-index.ts'
 
+/** Event surface payload comparison reads. */
+interface EventPayload {
+  readonly type: string
+  readonly data: unknown
+}
+
+/** Stable JSON for event-payload comparison; key order carries no meaning. */
+function stablePayload(value: unknown): string {
+  if (value === undefined) return 'undefined'
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stablePayload).join(',')}]`
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, entry]) => entry !== undefined)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stablePayload(entry)}`).join(',')}}`
+}
+
+/**
+ * Whether two events carry the same payload. A live feed that reconnects
+ * re-delivers an already accepted start under a new seq; the seq and time
+ * differ while type and data stay identical, which is what this compares.
+ * @param left - accepted event.
+ * @param right - re-delivered event.
+ * @returns true when both describe the same occurrence.
+ */
+function sameEventPayload(left: EventPayload, right: EventPayload): boolean {
+  return left.type === right.type && stablePayload(left.data) === stablePayload(right.data)
+}
+
 interface Dependency {
   readonly kind: string
   readonly key: string | undefined
@@ -510,7 +539,13 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
     const key = conversationContextKey(definition.kind, id)
     let context = this.contexts.get(key)
     if (role === 'start' && context?.start !== undefined) {
-      throw new Error(`conversation Context ${key} received more than one start Match`)
+      // A re-delivered start (same payload, new seq) is ignored so one
+      // replayed event cannot freeze the snapshot subscriber; a differing
+      // payload is a Definition conflict and stays loud.
+      if (!sameEventPayload(context.start.event, input.event)) {
+        throw new Error(`conversation Context ${key} received more than one start Match`)
+      }
+      return 'none'
     }
     context ??= this.createContext(definition, id, key)
     const match = conversationMatch(
@@ -560,16 +595,22 @@ export class ConversationNodeAssembler implements ConversationViewSnapshotStore 
       context ??= this.createContext(first.definition, first.id, key)
       let discoveredStart: ConversationStartMatch | undefined
       const additions = entries
-        .map((entry) => {
+        .filter((entry) => {
           if (entry.definition !== context.definition || entry.id !== context.id) {
             throw new Error(`conversation Context ${key} received inconsistent Definition identity`)
           }
-          if (entry.match.role === 'start') {
-            if (discoveredStart !== undefined || context.start !== undefined) {
-              throw new Error(`conversation Context ${key} received more than one start Match`)
-            }
+          if (entry.match.role !== 'start') return true
+          if (discoveredStart === undefined && context.start === undefined) {
             discoveredStart = entry.match
+            return true
           }
+          // Same rule as acceptMatch: a re-delivered start (same payload, new
+          // seq) drops out of the batch; a differing payload stays a conflict.
+          const accepted = discoveredStart ?? context.start
+          if (accepted !== undefined && sameEventPayload(accepted.event, entry.match.event)) return false
+          throw new Error(`conversation Context ${key} received more than one start Match`)
+        })
+        .map((entry) => {
           const owners = this.contextsBySeq.get(entry.match.event.seq) ?? new Set<InternalContext>()
           owners.add(context)
           this.contextsBySeq.set(entry.match.event.seq, owners)

@@ -1539,4 +1539,54 @@ describe('ConversationNodeAssembler', () => {
     assembler.flush()
     expect([...testSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe(1)
   })
+
+  it('ignores a re-delivered start Match carrying the same event payload', () => {
+    const definition: ConversationNodeDefinition<number> = {
+      kind: 'single-start',
+      match: event => (event.type as string) === 'command/run' ? { id: 'one', role: 'start' } : null,
+      start: (_context, match) => match.event.seq,
+      update: context => context.state,
+      target: 'test',
+      buildViewNode: context => node(context, context.state),
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]),
+      new TestViewDefinitions([testView()]),
+    )
+    assembler.replaceWindow([
+      input(at(SessionSeq(1), 'command/run', { commandId: 'one', name: 'x' })),
+    ], false)
+    assembler.flush()
+    // The live feed re-delivers the same input-message start under a new seq
+    // (SSE reconnect replay). Identical payload: the re-delivery is ignored
+    // instead of poisoning the snapshot subscriber.
+    expect(() => assembler.append(
+      input(at(SessionSeq(2), 'command/run', { commandId: 'one', name: 'x' })),
+    )).not.toThrow()
+    assembler.flush()
+    expect([...testSnapshot(assembler)?.nodes.values() ?? []].length).toBe(1)
+    expect([...testSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe(1)
+  })
+
+  it('accepts a re-delivered start Match inside a replaced window', () => {
+    const definition: ConversationNodeDefinition<number> = {
+      kind: 'single-start',
+      match: event => (event.type as string) === 'command/run' ? { id: 'one', role: 'start' } : null,
+      start: (_context, match) => match.event.seq,
+      update: context => context.state,
+      target: 'test',
+      buildViewNode: context => node(context, context.state),
+    }
+    const assembler = new ConversationNodeAssembler(
+      new TestEventDefinitions([definition]),
+      new TestViewDefinitions([testView()]),
+    )
+    expect(() => assembler.replaceWindow([
+      input(at(SessionSeq(1), 'command/run', { commandId: 'one', name: 'x' })),
+      input(at(SessionSeq(2), 'command/run', { commandId: 'one', name: 'x' })),
+    ], false)).not.toThrow()
+    assembler.flush()
+    expect([...testSnapshot(assembler)?.nodes.values() ?? []].length).toBe(1)
+    expect([...testSnapshot(assembler)?.nodes.values() ?? []][0]?.data).toBe(1)
+  })
 })
