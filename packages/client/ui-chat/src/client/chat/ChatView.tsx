@@ -1,7 +1,7 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -131,9 +131,14 @@ function openFailureMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * Prompt-RPC identities already rendered by durable material: user/steering
- * node sources plus queue occurrences. A submission echo whose identity
- * appears here is hidden in the same render, so the echo→durable swap is
+ * Prompt-RPC identities already rendered by durable material that a local
+ * echo must yield to: user/steering node sources in the flow, plus next-step
+ * steering occurrences the flow tail's pending-steering seat renders. A
+ * next-turn queue row is deliberately excluded — a freshly submitted message
+ * is spliced into next-turn before its turn node exists and no flow seat
+ * renders that row, so hiding the echo on it would drop the bubble into the
+ * turn's loading signal until the turn node lands. An echo whose identity
+ * appears here is hidden in the same render, so the echo→durable swap stays
  * atomic — no duplicate, no gap — regardless of when the echo leaves the
  * session snapshot.
  */
@@ -151,7 +156,7 @@ function observedRpcIds(
       | undefined
     if (source?.kind === 'user' && typeof source.rpcId === 'string') observed.add(source.rpcId)
   }
-  for (const { source } of [...inbox?.['next-turn'] ?? [], ...inbox?.['next-step'] ?? []]) {
+  for (const { source } of inbox?.['next-step'] ?? []) {
     if (source.kind === 'user' && 'rpcId' in source) observed.add(source.rpcId)
   }
   return observed
@@ -203,12 +208,21 @@ function TurnStatus({ startTime, t }: {
 
 type ChatNodeListProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey'> & {
   readonly order: readonly string[]
+  /** Trailing rows rendered after the ordered nodes in the same flow layer as a
+   *  settled node (local submission echoes), so an echo hands off to its durable
+   *  node in place instead of jumping between the flow tail and the node list. */
+  readonly tail?: ReactNode
 }
 
-const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNodeListProps) {
-  return order.map(nodeKey => (
-    <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
-  ))
+const ChatNodeList = memo(function ChatNodeList({ order, tail, ...seatProps }: ChatNodeListProps) {
+  return (
+    <>
+      {order.map(nodeKey => (
+        <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
+      ))}
+      {tail}
+    </>
+  )
 })
 
 /**
@@ -785,6 +799,15 @@ export function ChatView({
           <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
             <ChatNodeList
               order={order}
+              tail={visibleSubmissions.map(submission => (
+                <div key={submission.requestId} className={css.flowItem}>
+                  <PendingSubmissionBubble
+                    submission={submission}
+                    renderMessageImages={renderMessageImages}
+                    t={t}
+                  />
+                </div>
+              ))}
               useChatNode={useChatNode}
               useChatNodeProcess={useChatNodeProcess}
               historyIncomplete={hasMore}
@@ -807,20 +830,16 @@ export function ChatView({
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+              wait, tool execution, streaming) so it never flickers per step. A
+              fresh local transcript echo also shows it in the same frame, so the
+              flow height is already settled when the echo lands and the
+              echo→durable hand-off does not grow a frame later and jolt the
+              follow-scroll. */}
+          {(running || visibleSubmissions.length > 0) && <TurnStatus startTime={runningTurnStart} t={t} />}
           {pendingSteering.map(item => (
             <PendingSteeringBubble
               key={item.id}
               content={item.content}
-              renderMessageImages={renderMessageImages}
-              t={t}
-            />
-          ))}
-          {visibleSubmissions.map(submission => (
-            <PendingSubmissionBubble
-              key={submission.requestId}
-              submission={submission}
               renderMessageImages={renderMessageImages}
               t={t}
             />
