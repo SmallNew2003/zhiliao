@@ -6,7 +6,8 @@
  * @module @deepseek-ai/dsh-token-meter/estimate
  */
 
-import type { ContentBlock, Message } from '@deepseek-ai/dsh-llm'
+import { MCP_TOOL_NAME_PREFIX } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, Message, ToolSchema } from '@deepseek-ai/dsh-llm'
 import type { EpochHeader } from '@deepseek-ai/dsh-session'
 
 /** Fixed text-density estimate used until exact tokenization is needed. */
@@ -102,4 +103,54 @@ export function estimateMessage(message: Message): number {
 export function estimateToolsTokens(header: EpochHeader | undefined): number {
   if (header?.tools === undefined || header.tools.length === 0) return 0
   return Math.ceil(JSON.stringify(header.tools).length / CHARS_PER_TOKEN) + BLOCK_OVERHEAD
+}
+
+/**
+ * Price one tool schema under the fixed heuristic: its JSON structure plus the
+ * framing overhead every priced structure carries.
+ * @param tool - tool schema to price without mutation.
+ * @returns heuristic tokens for the schema.
+ */
+function estimateToolSchema(tool: ToolSchema): number {
+  return BLOCK_OVERHEAD + Math.ceil(JSON.stringify(tool).length / CHARS_PER_TOKEN)
+}
+
+/**
+ * Price the harness's own tool schemas of a canonical request envelope.
+ *
+ * Classification reads the public-name prefix, the one origin marker a
+ * model-visible {@link ToolSchema} keeps: a tool a third-party plugin registers
+ * without a namespace carries no prefix and prices here.
+ *
+ * Priced per schema rather than as one envelope, so the two origin figures sum
+ * to exactly the tool total the composition serves; the whole-envelope price
+ * {@link estimateToolsTokens} reports differs by the array framing, and one
+ * tool prices identically under both.
+ *
+ * @param header - canonical envelope, or undefined before any request.
+ * @returns heuristic tokens of the harness's own tool schemas.
+ */
+export function estimateSystemToolTokens(header: EpochHeader | undefined): number {
+  let tokens = 0
+  for (const tool of header?.tools ?? []) {
+    if (!tool.name.startsWith(MCP_TOOL_NAME_PREFIX)) tokens += estimateToolSchema(tool)
+  }
+  return tokens
+}
+
+/**
+ * Price the MCP-bridged tool schemas of a canonical request envelope — the
+ * schemas a connected MCP server contributes under its `mcp__` namespace.
+ *
+ * The counterpart of {@link estimateSystemToolTokens}, priced the same way.
+ *
+ * @param header - canonical envelope, or undefined before any request.
+ * @returns heuristic tokens of the MCP-bridged tool schemas.
+ */
+export function estimateExternalToolTokens(header: EpochHeader | undefined): number {
+  let tokens = 0
+  for (const tool of header?.tools ?? []) {
+    if (tool.name.startsWith(MCP_TOOL_NAME_PREFIX)) tokens += estimateToolSchema(tool)
+  }
+  return tokens
 }

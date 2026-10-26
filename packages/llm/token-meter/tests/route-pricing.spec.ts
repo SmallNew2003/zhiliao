@@ -149,7 +149,13 @@ describe('request projection pricing', () => {
     expect(measurement.surfaceTokens).toBe(expectedNode)
     expect(measurement.totalTokens).toBe(expectedNode)
     const breakdown = ctx.sessionProjections.snapshot(session).values.contextBreakdown
-    expect(breakdown).toEqual({ systemTokens: 0, toolsTokens: 0, messageTokens: estimateMessage(message) })
+    expect(breakdown).toEqual({
+      systemTokens: 0,
+      toolsTokens: 0,
+      systemToolsTokens: 0,
+      externalToolsTokens: 0,
+      messageTokens: estimateMessage(message),
+    })
     expect(breakdown?.messageTokens).not.toBe(measurement.surfaceTokens)
   })
 

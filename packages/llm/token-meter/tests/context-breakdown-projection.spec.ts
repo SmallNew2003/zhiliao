@@ -1,5 +1,6 @@
-// contextBreakdown projection: heuristic system/tools/message composition,
-// plus the shared estimator's pricing branches.
+// contextBreakdown projection: heuristic system/tool/message composition —
+// the tool figure split into the harness's own schemas and the MCP-bridged
+// ones — plus the shared estimator's pricing branches.
 
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -14,8 +15,10 @@ import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import { contextBreakdownProjectionDefinition } from '../src/breakdown-projection.ts'
 import {
   estimateContent,
+  estimateExternalToolTokens,
   estimateMessage,
   estimateSystemMessage,
+  estimateSystemToolTokens,
   estimateToolsTokens,
 } from '../src/estimate.ts'
 
@@ -31,6 +34,19 @@ const TOOLS: ToolSchema[] = [{
   description: 'run a command',
   parameters: { type: 'object', properties: {} },
 }]
+
+const MCP_TOOLS: ToolSchema[] = [
+  {
+    name: 'mcp__memory__remember',
+    description: 'store a fact',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'mcp__github__create_issue',
+    description: 'open an issue',
+    parameters: { type: 'object', properties: { title: { type: 'string' } } },
+  },
+]
 
 async function harness(): Promise<{ ctx: Context; session: Session }> {
   const ctx = new Context()
@@ -126,7 +142,13 @@ describe('contextBreakdown session projection', () => {
   })
   it('serves zeros for an empty log', async () => {
     const { ctx, session } = await harness()
-    expect(projected(ctx, session)).toEqual({ systemTokens: 0, toolsTokens: 0, messageTokens: 0 })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: 0,
+      toolsTokens: 0,
+      systemToolsTokens: 0,
+      externalToolsTokens: 0,
+      messageTokens: 0,
+    })
   })
 
   it('prices the system node and the newest envelope last-wins and pushes no change for a restated envelope', async () => {
@@ -138,9 +160,15 @@ describe('contextBreakdown session projection', () => {
     })
     // 'You are terse.' prices to 8 (4 text + 4 role): the same figure the
     // request envelope's former system field priced to.
+    // The composition prices each schema on its own, so one unprefixed tool
+    // prices one token below the whole-envelope figure's array framing.
+    const toolTokens = estimateSystemToolTokens({ config: CONFIG, tools: TOOLS })
+    expect(toolTokens).toBe(estimateToolsTokens({ config: CONFIG, tools: TOOLS }) - 1)
     expect(projected(ctx, session)).toEqual({
       systemTokens: 8,
-      toolsTokens: estimateToolsTokens({ config: CONFIG, tools: TOOLS }),
+      toolsTokens: toolTokens,
+      systemToolsTokens: toolTokens,
+      externalToolsTokens: 0,
       messageTokens: 0,
     })
 
@@ -156,13 +184,48 @@ describe('contextBreakdown session projection', () => {
     // A tool-less envelope prices the tools figure back to zero and leaves
     // the system node's figure alone.
     session.append('request/header', { header: { config: CONFIG }, reason: 'change' })
-    expect(projected(ctx, session)).toEqual({ systemTokens: 8, toolsTokens: 0, messageTokens: 0 })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: 8, toolsTokens: 0, systemToolsTokens: 0, externalToolsTokens: 0, messageTokens: 0,
+    })
 
     // Replacing node 0 follows the new prompt; an empty prompt records none.
     const longer = replaceSystem(session, systemNode, 'You are terse and answer in one line.')
     expect(projected(ctx, session).systemTokens).toBe(Math.ceil('You are terse and answer in one line.'.length / 4) + 4)
     replaceSystem(session, longer, '')
-    expect(projected(ctx, session)).toEqual({ systemTokens: 0, toolsTokens: 0, messageTokens: 0 })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: 0, toolsTokens: 0, systemToolsTokens: 0, externalToolsTokens: 0, messageTokens: 0,
+    })
+  })
+
+  it('splits the tool figure into harness schemas and the MCP-bridged ones', async () => {
+    const { ctx, session } = await harness()
+    const mixed = { config: CONFIG, tools: [...TOOLS, ...MCP_TOOLS] }
+    session.append('request/header', { header: mixed, reason: 'initial' })
+    const external = estimateExternalToolTokens(mixed)
+    const system = estimateSystemToolTokens(mixed)
+    expect(external).toBeGreaterThan(0)
+    expect(system).toBeGreaterThan(0)
+    // The two figures partition the served total, so the panel's rows sum back
+    // to it instead of to a second, independently rounded figure.
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: 0,
+      toolsTokens: system + external,
+      systemToolsTokens: system,
+      externalToolsTokens: external,
+      messageTokens: 0,
+    })
+
+    // An MCP-only envelope leaves the harness's own figure at zero: no
+    // envelope-framing remainder is charged to it.
+    const externalOnly = { config: CONFIG, tools: MCP_TOOLS }
+    session.append('request/header', { header: externalOnly, reason: 'change' })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: 0,
+      toolsTokens: estimateExternalToolTokens(externalOnly),
+      systemToolsTokens: 0,
+      externalToolsTokens: estimateExternalToolTokens(externalOnly),
+      messageTokens: 0,
+    })
   })
 
   it('keeps the system node out of the message figure across appends and a system replacement', async () => {
@@ -227,7 +290,13 @@ describe('contextBreakdown session projection', () => {
       surfaceOp: { op: 'replace', startSeq: question, endSeq: newest },
       sourceEventSeqs: [question, newest],
     })
-    expect(projected(ctx, session)).toEqual({ systemTokens: 5, toolsTokens: 0, messageTokens: estimateMessage(summary) })
+    expect(projected(ctx, session)).toEqual({
+      systemTokens: 5,
+      toolsTokens: 0,
+      systemToolsTokens: 0,
+      externalToolsTokens: 0,
+      messageTokens: estimateMessage(summary),
+    })
     expect(projected(ctx, session).systemTokens + projected(ctx, session).messageTokens)
       .toBe(ctx.tokenMeter.measure(session).nodes.reduce((sum, node) => sum + node.heuristicTokens, 0))
   })
@@ -433,7 +502,7 @@ describe('contextBreakdown session projection', () => {
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
     const row = checkpoint['contextBreakdown']!
-    expect(row.ver).toBe(6)
+    expect(row.ver).toBe(7)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).contextBreakdown).toEqual(projected(ctx, session))
     const replacement = session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary' }], source: { kind: 'user' },
@@ -441,7 +510,9 @@ describe('contextBreakdown session projection', () => {
     const restored = ctx.sessionProjections.restore(
       checkpoint, [replacement], SessionLogOffset(replacement.seq), session.header, session.inheritedEventCount,
     )
-    expect(restored.snapshot.values.contextBreakdown).toEqual({ systemTokens: 5, toolsTokens: 0, messageTokens: 10 })
+    expect(restored.snapshot.values.contextBreakdown).toEqual({
+      systemTokens: 5, toolsTokens: 0, systemToolsTokens: 0, externalToolsTokens: 0, messageTokens: 10,
+    })
     const stale = { ...checkpoint, contextBreakdown: { ...row, ver: 2, val: { systemTokens: 1004, toolsTokens: 0, messageTokens: -989 } } }
     expect(ctx.sessionProjections.viewCheckpoint(stale).contextBreakdown).toBeUndefined()
     expect(ctx.sessionProjections.restoreFloor(stale)).toBe(0)
@@ -452,7 +523,7 @@ describe('contextBreakdown session projection', () => {
       stale, session.snapshotEvents(), SessionLogOffset(0), session.header, session.inheritedEventCount,
     )
     expect(replayed.snapshot.values.contextBreakdown).toEqual(projected(ctx, session))
-    expect(replayed.checkpoint['contextBreakdown']?.ver).toBe(6)
+    expect(replayed.checkpoint['contextBreakdown']?.ver).toBe(7)
     const invalid = {
       ...checkpoint,
       contextBreakdown: {
@@ -472,7 +543,11 @@ describe('contextBreakdown session projection', () => {
       session.append('request/header', { header: { config: CONFIG, tools: TOOLS }, reason: 'initial' })
       appendUser(session, 'abcd')
       const current = ctx.sessionProjections.checkpoint(session)
-      const staleValue = { systemTokens: 0, toolsTokens: estimateToolsTokens({ config: CONFIG, tools: TOOLS }), messageTokens: 17 }
+      const staleValue = {
+        systemTokens: 0,
+        toolsTokens: estimateSystemToolTokens({ config: CONFIG, tools: TOOLS }),
+        messageTokens: 17,
+      }
       const checkpoint = {
         ...current,
         contextBreakdown: { ver: 3, seq: SessionSeq(session.seq - 1), val: staleValue },
@@ -483,10 +558,18 @@ describe('contextBreakdown session projection', () => {
         checkpoint, session.snapshotEvents(), SessionLogOffset(0), session.header, session.inheritedEventCount,
       )
       expect(restored.snapshot.values.contextBreakdown).toEqual({
-        systemTokens: 8, toolsTokens: staleValue.toolsTokens, messageTokens: 9,
+        systemTokens: 8,
+        toolsTokens: staleValue.toolsTokens,
+        systemToolsTokens: staleValue.toolsTokens,
+        externalToolsTokens: 0,
+        messageTokens: 9,
       })
+      // The refold reads the per-schema price, not the stale envelope price.
+      expect(staleValue.toolsTokens).toBe(
+        estimateSystemToolTokens({ config: CONFIG, tools: TOOLS }),
+      )
       expect(restored.checkpoint).toEqual(current)
-      expect(restored.checkpoint['contextBreakdown']?.ver).toBe(6)
+      expect(restored.checkpoint['contextBreakdown']?.ver).toBe(7)
     } finally {
       await ctx.fiber.dispose()
     }
@@ -512,6 +595,8 @@ describe('contextBreakdown session projection', () => {
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).contextBreakdown).toEqual({
       systemTokens: 8,
       toolsTokens: 0,
+      systemToolsTokens: 0,
+      externalToolsTokens: 0,
       messageTokens: 9,
     })
   })
@@ -549,5 +634,23 @@ describe('shared estimator', () => {
     expect(estimateToolsTokens({ config: CONFIG, tools: [] })).toBe(0)
     expect(estimateToolsTokens({ config: CONFIG, tools: TOOLS }))
       .toBe(Math.ceil(JSON.stringify(TOOLS).length / 4) + 4)
+  })
+
+  it('prices tool schemas per origin and counts only the MCP-bridged ones as external', () => {
+    expect(estimateSystemToolTokens(undefined)).toBe(0)
+    expect(estimateExternalToolTokens(undefined)).toBe(0)
+    expect(estimateSystemToolTokens({ config: CONFIG })).toBe(0)
+    expect(estimateExternalToolTokens({ config: CONFIG })).toBe(0)
+    // The harness's own tools carry no namespace prefix.
+    expect(estimateExternalToolTokens({ config: CONFIG, tools: TOOLS })).toBe(0)
+    expect(estimateSystemToolTokens({ config: CONFIG, tools: TOOLS })).toBeGreaterThan(0)
+    // Each schema carries its own framing, so two MCP schemas price above the
+    // single-block whole-envelope figure.
+    expect(estimateExternalToolTokens({ config: CONFIG, tools: MCP_TOOLS })).toBe(
+      MCP_TOOLS.reduce((total, tool) => total + 4 + Math.ceil(JSON.stringify(tool).length / 4), 0),
+    )
+    // Neighbouring unprefixed tools do not move the external figure.
+    expect(estimateExternalToolTokens({ config: CONFIG, tools: [...TOOLS, ...MCP_TOOLS] }))
+      .toBe(estimateExternalToolTokens({ config: CONFIG, tools: MCP_TOOLS }))
   })
 })

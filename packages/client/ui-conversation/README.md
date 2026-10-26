@@ -38,7 +38,7 @@ Target packages declaration-merge their snapshot and Location data maps, then re
 
 The shared image slot props keep display choices separate from durable references: `thumbnail` requests a contained attachment-list thumbnail, while `compact` requests a cropped gallery tile. An optional per-image `label` supplies the accessible display name; loading and cache identity still use the original attachment reference. [ui-attachment](../ui-attachment/README.md) owns rendering and the lightbox.
 
-The context-occupancy button shows a ring and percentage below the input card, after the Session statistics. Clicking it opens the token breakdown in a panel kept inside the viewport, including when no statistics are shown; the button stays hidden until context usage and capacity are available.
+The context-occupancy button shows a ring and percentage below the input card, after the Session statistics. Clicking it opens the token breakdown in a panel kept inside the viewport, including when no statistics are shown; the button stays hidden until context usage and capacity are available. The panel lists the composition as the system prompt, the harness's own tools, the MCP-bridged tools, and messages: the MCP row appears only while a connected MCP server contributes tool schemas, and both tool rows read as one family in two weights of the same tint.
 
 The composer registers the File command action and owns its label, availability, and native file-dialog callback. Menu availability and invocation both consult the mounted composer's current attachment-intake policy. Unmounting or locking the composer disables that action; disposing the plugin removes its registration. The callback binding stays inside the input module.
 
