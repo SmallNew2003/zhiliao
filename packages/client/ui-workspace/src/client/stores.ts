@@ -37,6 +37,8 @@ type WorkspaceViewActions = {
     initialOrders: Readonly<Record<string, readonly string[]>>,
   ) => void
   setGroupExpanded: (draft: WorkspaceViewState, key: string, expanded: boolean) => void
+  /** Set one expansion state for every group key in `keys`. */
+  setGroupExpansion: (draft: WorkspaceViewState, keys: readonly string[], expanded: boolean) => void
   retainAccountKeys: (draft: WorkspaceViewState, workspaceKeys: readonly string[]) => void
   syncSessionOrders: (
     draft: WorkspaceViewState,
@@ -78,6 +80,9 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
         d.orderBy = mode
       },
       setGroupExpanded: (d, key: string, expanded: boolean) => { d.groupExpansion[key] = expanded },
+      setGroupExpansion: (d, keys: readonly string[], expanded: boolean) => {
+        for (const key of keys) d.groupExpansion[key] = expanded
+      },
       retainAccountKeys: (d, workspaceKeys: readonly string[]) => {
         const retained = new Set(workspaceKeys)
         d.groupExpansion = Object.fromEntries(

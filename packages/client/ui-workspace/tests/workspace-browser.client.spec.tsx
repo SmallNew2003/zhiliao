@@ -264,7 +264,7 @@ describe('WorkspaceBrowser', () => {
       })
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getByText('~/Documents/project')).toBeTruthy()
+      expect(screen.getAllByText('~/Documents/project')).toHaveLength(2)
     } finally {
       vi.useRealTimers()
     }
@@ -400,9 +400,9 @@ describe('WorkspaceBrowser', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新',
+      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '全部展开', '全部折叠',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -554,6 +554,136 @@ describe('WorkspaceBrowser', () => {
     expect(b.store.getSnapshot().groupExpansion).toEqual({ alpha: true })
     expect(screen.queryByText('session-6')).toBeNull()
     expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
+  })
+
+  it('folds and unfolds every group from the view options menu', () => {
+    const items = [summary('alpha-s', 2), summary('beta-s', 1)]
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['alpha-s']), workspace('beta', ['beta-s']),
+      ])),
+    })
+    // Neither group owns the selected Session, so both start folded.
+    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(screen.queryByText('beta-s')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '全部展开' }))
+    expect(b.store.getSnapshot().groupExpansion).toEqual({ '': true, alpha: true, beta: true })
+    expect(screen.getByText('alpha-s')).toBeTruthy()
+    expect(screen.getByText('beta-s')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '全部折叠' }))
+    expect(b.store.getSnapshot().groupExpansion).toEqual({ '': false, alpha: false, beta: false })
+    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(screen.queryByText('beta-s')).toBeNull()
+  })
+
+  it('hides the bulk expansion rows in the single-list view', () => {
+    mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    // The single list owns no groups, so a bulk gesture would act on nothing.
+    expect(screen.queryByRole('menuitem', { name: '全部展开' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '全部折叠' })).toBeNull()
+  })
+
+  it('moves the tree tab stop with the arrow keys and opens the focused session with Enter', () => {
+    const items = [summary('alpha-s', 2), summary('beta-s', 1)]
+    const b = mount({
+      useSessions: hook(sessionState(items, { main: sid('beta-s') })),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['alpha-s']), workspace('beta', ['beta-s']),
+      ])),
+    })
+    const rows = () => screen.getAllByRole('treeitem')
+    // The selected Session's row holds the tab stop, and its group is revealed.
+    // A roving stop is tabbable rather than focused: Tab (or a click) lands here.
+    expect(rows()).toHaveLength(3)
+    expect(rows()[2]?.getAttribute('tabindex')).toBe('0')
+    rows()[2]!.focus()
+    expect(document.activeElement).toBe(rows()[2])
+
+    fireEvent.keyDown(rows()[2]!, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(rows()[1])
+    expect(rows()[1]?.getAttribute('tabindex')).toBe('0')
+    fireEvent.keyDown(rows()[1]!, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(rows()[0])
+    // The top row has no neighbour above: the tree holds the stop.
+    fireEvent.keyDown(rows()[0]!, { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(rows()[0])
+
+    fireEvent.keyDown(rows()[0]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows()[1])
+    fireEvent.keyDown(rows()[1]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows()[2])
+
+    fireEvent.keyDown(rows()[0]!, { key: 'Home' })
+    expect(document.activeElement).toBe(rows()[0])
+    fireEvent.keyDown(rows()[0]!, { key: 'End' })
+    expect(document.activeElement).toBe(rows()[2])
+
+    fireEvent.keyDown(rows()[2]!, { key: 'Enter' })
+    expect(b.props.open).toHaveBeenCalledWith(sid('beta-s'))
+    fireEvent.keyDown(rows()[2]!, { key: ' ' })
+    expect(b.props.open).toHaveBeenCalledTimes(2)
+  })
+
+  it('folds and unfolds a Workspace row with the horizontal arrow keys', () => {
+    const items = [summary('alpha-s', 2), summary('beta-s', 1)]
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['alpha-s']), workspace('beta', ['beta-s']),
+      ])),
+    })
+    const header = () => screen.getAllByRole('treeitem')[0]!
+    expect(b.store.getSnapshot().groupExpansion).toEqual({})
+
+    fireEvent.keyDown(header(), { key: 'ArrowRight' })
+    expect(b.store.getSnapshot().groupExpansion.alpha).toBe(true)
+    expect(screen.getByText('alpha-s')).toBeTruthy()
+
+    fireEvent.keyDown(header(), { key: 'ArrowLeft' })
+    expect(b.store.getSnapshot().groupExpansion.alpha).toBe(false)
+    expect(screen.queryByText('alpha-s')).toBeNull()
+
+    // Right on an already open section steps into its first child instead.
+    fireEvent.keyDown(header(), { key: 'ArrowRight' })
+    expect(b.store.getSnapshot().groupExpansion.alpha).toBe(true)
+    const rows = screen.getAllByRole('treeitem')
+    fireEvent.keyDown(rows[0]!, { key: 'ArrowRight' })
+    expect(document.activeElement).toBe(rows[1])
+
+    // A Session row has no horizontal move.
+    fireEvent.keyDown(rows[1]!, { key: 'ArrowRight' })
+    fireEvent.keyDown(rows[1]!, { key: 'ArrowLeft' })
+    expect(b.store.getSnapshot().groupExpansion.alpha).toBe(true)
+
+    // Left on an already folded section folds nothing further.
+    fireEvent.keyDown(rows[0]!, { key: 'ArrowLeft' })
+    expect(b.store.getSnapshot().groupExpansion.alpha).toBe(false)
+    fireEvent.keyDown(rows[0]!, { key: 'ArrowLeft' })
+    expect(b.store.getSnapshot().groupExpansion.alpha).toBe(false)
+  })
+
+  it('leaves a row alone when the key comes from its own control', () => {
+    const items = [summary('alpha-s', 2)]
+    mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+    })
+    const row = screen.getAllByRole('treeitem')[0]!
+    row.focus()
+    fireEvent.keyDown(screen.getByRole('button', { name: '在“alpha”中新建会话' }), { key: 'ArrowDown' })
+    // The create button owns its own keys; the row must not move the tab stop.
+    expect(document.activeElement).toBe(row)
   })
 
   it('keeps the blank New Session outside the five-row folding quota', () => {
@@ -1795,7 +1925,8 @@ describe('Workspace tree grouping', () => {
     fireEvent.dragEnd(source)
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledExactlyOnceWith(root.workspaceId, undefined)
     rerender(b, { useWorkspaces: hook(workspaceState([team, child, other, outside, root])) })
-    expect(screen.getAllByRole('treeitem').map(row => row.textContent)).toEqual([
+    // Row labels in order; each real Workspace row also names its directory.
+    expect(screen.getAllByRole('treeitem').map(row => row.querySelector('[class*="title"]')?.textContent)).toEqual([
       'outside', 'Projects', 'Team', 'Child', 'other',
     ])
     expect(within(section('Team')).getByText('Child')).toBeTruthy()

@@ -100,7 +100,7 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.fade')?.get('height')).toBe('24px')
     expect(declarations('.sessionOverflowButton')?.get('height')).toBe('28px')
     expect(declarations('.searchExpanded')?.get('height')).toBe('30px')
-    expect(rowDeclarations('.projectRow')?.get('height')).toBe('34px')
+    expect(rowDeclarations('.projectRow')?.get('min-height')).toBe('34px')
     expect(rowDeclarations('.sessionRow')?.get('height')).toBe('32px')
     expect(rowDeclarations('.flatSessionRowWithoutStatus .title')?.get('margin-left')).toBe('0')
     expect(rowDeclarations('.searchResultRow')?.get('min-height')).toBe('48px')
@@ -115,6 +115,14 @@ describe('WorkspaceBrowser.module.css list', () => {
     // mask the smooth declaration here.
     expect(rowDeclarations('.sessionRow .title')?.get('flex')).toBe('1')
     expect(rowDeclarations('.sessionRow:hover .title')?.get('text-overflow')).toBe('clip')
+  })
+
+  it('wears the hover fill as the keyboard focus indication on both row kinds', () => {
+    for (const selector of ['.projectRow:focus-visible', '.sessionRow:focus-visible']) {
+      const rule = rowDeclarations(selector)
+      expect(rule?.get('background')).toBe('var(--dsw-alias-interactive-bg-hover)')
+      expect(rule?.get('outline')).toBe('none')
+    }
   })
 
   it('pins both rail controls to the shared left anchor during the column slide', () => {

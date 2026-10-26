@@ -6,7 +6,7 @@
  * visual-only except workspace Rename/Delete and session Rename/Fork/Archive; the
  * session and workspace hover cards are suppressed while a menu is open.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import clsx from 'clsx'
 import {
   HoverCard, IconAlarmClockOutline16, IconArchiveOutline20, IconBranchOutline16,
@@ -52,6 +52,116 @@ function revealClippedTitle(title: HTMLSpanElement | null, revealed: boolean): v
   else title.scrollLeft = 0
 }
 
+/**
+ * Keyboard seat for one row of a roving-tabindex tree: the tree hands each row
+ * whether it holds the tab stop, and a row that takes focus claims it.
+ */
+export interface TreeRowSeat {
+  /** Whether this row is the tree's single tab stop. */
+  tabbable: boolean
+  /** Record this row as the tab stop once it takes focus. */
+  claim: () => void
+}
+
+/**
+ * Own a tree's roving tab stop: the row named by `initialId` holds it until a
+ * row claims focus, and `initialId` taking a new value hands the stop back to
+ * the row it names.
+ * @param initialId - row id the tree starts on, usually the selected Session.
+ * @returns the current tab-stop id and the claim callback.
+ */
+export function useTreeTabStop(initialId: string | undefined): {
+  tabStopId: string | undefined
+  claim: (id: string) => void
+} {
+  const [claimedId, setClaimedId] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (initialId !== undefined) setClaimedId(undefined)
+  }, [initialId])
+  return { tabStopId: claimedId ?? initialId, claim: setClaimedId }
+}
+
+/** Row actions a tree's keys drive. */
+interface TreeRowKeys {
+  /** Run the row's own action: open a Session, or toggle a Workspace. */
+  activate: () => void
+  /** Fold or unfold the row; absent for rows that do not expand. */
+  toggle?: () => void
+  /** The row's expansion state; absent for rows that do not expand. */
+  expanded?: boolean
+}
+
+/** Move a tree's tab stop to the neighbouring row, or hold it at an end. */
+function moveTreeFocus(row: HTMLElement, direction: -1 | 1): void {
+  const tree = row.closest<HTMLElement>('[role="tree"]')
+  /* v8 ignore next -- rows render only beneath their owning role=tree. */
+  if (tree === null) return
+  const rows = Array.from(tree.querySelectorAll<HTMLElement>('[role="treeitem"]'))
+  const current = rows.indexOf(row)
+  /* v8 ignore next -- the keyed row is a member of the queried set. */
+  if (current < 0) return
+  const next = rows[current + direction]
+  /* v8 ignore next -- an end row has no neighbour; the tree holds the stop. */
+  if (next !== undefined) next.focus()
+}
+
+/** Focus a tree's first or last row. */
+function edgeTreeFocus(row: HTMLElement, edge: 'Home' | 'End'): void {
+  const tree = row.closest<HTMLElement>('[role="tree"]')
+  /* v8 ignore next -- rows render only beneath their owning role=tree. */
+  if (tree === null) return
+  const rows = Array.from(tree.querySelectorAll<HTMLElement>('[role="treeitem"]'))
+  const target = edge === 'Home' ? rows[0] : rows.at(-1)
+  /* v8 ignore next -- a tree with rows always resolves an edge row. */
+  if (target !== undefined) target.focus()
+}
+
+/**
+ * Tree-row keys: Up and Down move the tab stop, Home and End jump to the
+ * ends, Enter and Space run the row's own action, and the horizontal arrows
+ * fold or unfold a Workspace row through the same toggle its click runs.
+ * Right on an open section steps into its first child.
+ * @param event - the row's keydown event.
+ * @param keys - the row's actions.
+ */
+function onTreeRowKeyDown(event: ReactKeyboardEvent<HTMLElement>, keys: TreeRowKeys): void {
+  // A keydown raised by a row's own controls — its action buttons, an open
+  // menu — belongs to those controls, not to the row.
+  if (event.target !== event.currentTarget) return
+  switch (event.key) {
+    case 'ArrowDown':
+    case 'ArrowUp':
+      event.preventDefault()
+      moveTreeFocus(event.currentTarget, event.key === 'ArrowUp' ? -1 : 1)
+      return
+    case 'Home':
+    case 'End':
+      event.preventDefault()
+      edgeTreeFocus(event.currentTarget, event.key)
+      return
+    case 'ArrowRight':
+    case 'ArrowLeft': {
+      // Only a Workspace row folds; a Session row has no horizontal move.
+      if (keys.toggle === undefined || keys.expanded === undefined) return
+      event.preventDefault()
+      if (keys.expanded === (event.key === 'ArrowLeft')) {
+        keys.toggle()
+        return
+      }
+      if (event.key === 'ArrowRight') moveTreeFocus(event.currentTarget, 1)
+      return
+    }
+    case 'Enter':
+    case ' ':
+      event.preventDefault()
+      keys.activate()
+      return
+    /* v8 ignore next -- every other key belongs to the host or the input. */
+    default:
+      return
+  }
+}
+
 /** Localized compact relative time ("刚刚"/"5分钟" in zh, "now"/"5min" in en). */
 function timeLabel(updatedAt: number, now: number, t: RowTranslate): string {
   const { unit, n } = relativeTime(updatedAt, now)
@@ -62,6 +172,16 @@ function timeLabel(updatedAt: number, now: number, t: RowTranslate): string {
 function hoverTimeLabel(updatedAt: number, now: number, t: RowTranslate): string {
   const { unit, n } = relativeTime(updatedAt, now)
   return unit === 'now' ? t('time.now') : t('time.ago', { t: t(`time.${unit}`, { n }) })
+}
+
+/**
+ * Pluralized group size from the dictionary's count templates.
+ * @param sessionCount - visible sessions in the group.
+ * @param t - the browser root's locale seat.
+ * @returns the localized count label.
+ */
+function sessionCountLabel(sessionCount: number, t: RowTranslate): string {
+  return t(sessionCount === 1 ? 'sessions.count.one' : 'sessions.count.other', { n: sessionCount })
 }
 
 /**
@@ -76,9 +196,10 @@ function createdLabel(createdAt: number, t: RowTranslate): string {
   return t('hover.created', { time: `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}` })
 }
 
-/** Hover-card body: workspace title, display directory path, absolute creation time. */
-function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
+/** Hover-card body: workspace title, group size, display directory path, absolute creation time. */
+function WorkspaceHoverContent({ label, sessionCount, cwd, createdAt, t }: {
   label: string
+  sessionCount: number
   cwd: string | undefined
   createdAt: number
   t: RowTranslate
@@ -86,6 +207,7 @@ function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
   return (
     <div className={css.hoverContent}>
       <div className={css.hoverTitle}>{label}</div>
+      <div className={css.hoverTime}>{sessionCountLabel(sessionCount, t)}</div>
       <div className={css.hoverPath}>{cwd}</div>
       <div className={css.hoverTime}>{createdLabel(createdAt, t)}</div>
     </div>
@@ -122,7 +244,7 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 }
 
 /**
- * Project (workspace) header row: folder + title;
+ * Project (workspace) header row: folder + title + directory path;
  * hover reveals the chevron and create button, and dwelling on a real
  * Workspace shows its hover card (the ungrouped bucket has none).
  * `containsCurrent` arrives on the node (derivation fact, no renderer scan).
@@ -135,7 +257,7 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
  * @param props.t - the browser root's locale seat.
  * @returns the row element.
  */
-export function ProjectRowItem({ group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag, home, t }: {
+export function ProjectRowItem({ group, containsCurrentDescendant = false, onToggle, onCreate, actions, drag, seat, home, t }: {
   group: GroupNode
   containsCurrentDescendant?: boolean
   onToggle: () => void
@@ -144,6 +266,8 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   actions?: { rename: () => void; delete: () => void } | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
+  /** Roving-tabindex seat; absent on surfaces that are not keyboard-navigated. */
+  seat?: TreeRowSeat | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
   t: RowTranslate
@@ -163,6 +287,11 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       role="treeitem"
       aria-expanded={row.expanded}
       onClick={onToggle}
+      tabIndex={seat === undefined ? undefined : (seat.tabbable ? 0 : -1)}
+      onFocus={seat === undefined ? undefined : seat.claim}
+      onKeyDown={(event) => {
+        onTreeRowKeyDown(event, { activate: onToggle, toggle: onToggle, expanded: row.expanded })
+      }}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -181,6 +310,13 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       </span>
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
+        {/* Directory path: two Workspaces can share a basename, so the row
+            names the directory it points at. Hidden from the accessibility
+            tree — the hover card carries the same path, and a two-clause
+            treeitem name scans worse than the label alone. */}
+        {row.cwd !== undefined && (
+          <span className={css.meta} aria-hidden="true">{abbreviateHomePath(row.cwd, home)}</span>
+        )}
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
@@ -229,6 +365,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       anchor={ownRow}
       content={<WorkspaceHoverContent
         label={row.label}
+        sessionCount={row.sessionCount}
         cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
         createdAt={row.createdAt}
         t={t}
@@ -400,11 +537,12 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.onReveal - scroll this row into view after search navigation, then acknowledge it.
  * @param props.drag - optional row-drag target wiring; blank rows cannot start a drag.
  * @param props.flat - omit the empty status slot in the hierarchy-free flat list.
+ * @param props.seat - roving-tabindex seat; absent on surfaces that are not keyboard-navigated.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
 export function SessionNodeItem({
-  node, currentId, now, onOpen, onRename, onFork, onArchive, onReveal, drag, flat = false, t,
+  node, currentId, now, onOpen, onRename, onFork, onArchive, onReveal, drag, flat = false, seat, t,
 }: {
   node: SessionNode
   currentId: string | undefined
@@ -422,6 +560,8 @@ export function SessionNodeItem({
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
   flat?: boolean | undefined
+  /** Roving-tabindex seat; absent on surfaces that are not keyboard-navigated. */
+  seat?: TreeRowSeat | undefined
   t: RowTranslate
 }) {
   const row = node
@@ -460,6 +600,9 @@ export function SessionNodeItem({
       role="treeitem"
       aria-selected={selected}
       onClick={() => { onOpen(node.id) }}
+      tabIndex={seat === undefined ? undefined : (seat.tabbable ? 0 : -1)}
+      onFocus={seat === undefined ? undefined : seat.claim}
+      onKeyDown={(event) => { onTreeRowKeyDown(event, { activate: () => { onOpen(node.id) } }) }}
       onPointerEnter={() => { revealClippedTitle(titleRef.current, true) }}
       onPointerLeave={() => { revealClippedTitle(titleRef.current, false) }}
       draggable={draggable}
