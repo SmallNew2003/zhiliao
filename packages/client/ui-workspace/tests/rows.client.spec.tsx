@@ -150,29 +150,6 @@ describe('workspace browser rows', () => {
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
-  it('names the directory a Workspace points at, home-abbreviated', () => {
-    const group: GroupNode = {
-      key: 'project', workspaceId: wid('project'), cwd: '/home/u/code/frontend', createdAt: 0, label: 'frontend',
-      sessionCount: 0, expanded: false, containsCurrent: false, sessions: [],
-    }
-    render(<ProjectRowItem group={group} home="/home/u" onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
-
-    // The row's accessible name stays the label; the path is the visual cue
-    // that separates two Workspaces sharing one basename.
-    expect(screen.getByRole('treeitem', { name: 'frontend' })).toBeTruthy()
-    expect(screen.getByText('~/code/frontend').getAttribute('aria-hidden')).toBe('true')
-  })
-
-  it('leaves the ungrouped bucket without a directory line', () => {
-    const group: GroupNode = {
-      key: '', workspaceId: undefined, cwd: undefined, createdAt: undefined, label: '',
-      sessionCount: 2, expanded: false, containsCurrent: false, sessions: [],
-    }
-    render(<ProjectRowItem group={group} onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
-    // The bucket has no directory to name, so the row carries the label only.
-    expect(screen.getByRole('treeitem', { name: '未分组' }).textContent).toBe('未分组')
-  })
-
   it('renders and opens a selected running Session row', () => {
     const node: SessionNode = {
       id: sid('session'), title: 'Session', blank: false, running: true,
@@ -420,8 +397,7 @@ describe('workspace browser rows', () => {
       act(() => { vi.advanceTimersByTime(500) })
       // Card body: full title + cwd + absolute creation time.
       expect(screen.getAllByText('Project')).toHaveLength(2)
-      // The row names the directory too, so the path shows on both surfaces.
-      expect(screen.getAllByText('/projects/project')).toHaveLength(2)
+      expect(screen.getByText('/projects/project')).toBeTruthy()
       expect(screen.getByText(/^创建于 \d+年\d+月\d+日 /)).toBeTruthy()
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: '复制: /projects/project' })) })
       expect(writeText).toHaveBeenCalledWith('/projects/project')
@@ -465,7 +441,7 @@ describe('workspace browser rows', () => {
       render(<ProjectRowItem group={group} home="/home/u" onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getAllByText('~/Documents/project')).toHaveLength(2)
+      expect(screen.getByText('~/Documents/project')).toBeTruthy()
       expect(screen.queryByText('/home/u/Documents/project')).toBeNull()
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: '复制: /home/u/Documents/project' })) })
       expect(writeText).toHaveBeenCalledWith('/home/u/Documents/project')
@@ -503,7 +479,7 @@ describe('workspace browser rows', () => {
       render(<ProjectRowItem group={group} home="C:\\Users\\u" onToggle={vi.fn()} onCreate={vi.fn()} t={t} />)
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getAllByText('C:\\Users\\u\\project')).toHaveLength(2)
+      expect(screen.getByText('C:\\Users\\u\\project')).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }

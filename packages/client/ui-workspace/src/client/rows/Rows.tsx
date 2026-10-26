@@ -244,7 +244,7 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 }
 
 /**
- * Project (workspace) header row: folder + title + directory path;
+ * Project (workspace) header row: folder + title;
  * hover reveals the chevron and create button, and dwelling on a real
  * Workspace shows its hover card (the ungrouped bucket has none).
  * `containsCurrent` arrives on the node (derivation fact, no renderer scan).
@@ -310,13 +310,6 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       </span>
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
-        {/* Directory path: two Workspaces can share a basename, so the row
-            names the directory it points at. Hidden from the accessibility
-            tree — the hover card carries the same path, and a two-clause
-            treeitem name scans worse than the label alone. */}
-        {row.cwd !== undefined && (
-          <span className={css.meta} aria-hidden="true">{abbreviateHomePath(row.cwd, home)}</span>
-        )}
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
