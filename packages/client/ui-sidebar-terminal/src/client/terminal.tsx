@@ -130,7 +130,12 @@ function TerminalScreen({ state, model, visible, label, theme }: {
       xterm.reset()
       xterm.resize(render.frame.info.cols, render.frame.info.rows)
     }
-    xterm.write(render.frame.type === 'snapshot' ? render.frame.screen : render.frame.data, () => { model.acknowledge(render.revision) })
+    // A snapshot carries the palette OSCs the program has sent; writing them
+    // behind the screen keeps program-set colors across renderer rebuilds.
+    const payload = render.frame.type === 'snapshot'
+      ? render.frame.screen + (render.frame.palette ?? '')
+      : render.frame.data
+    xterm.write(payload, () => { model.acknowledge(render.revision) })
   }, [state.render, model])
 
   useLayoutEffect(() => {

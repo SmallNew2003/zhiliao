@@ -23,7 +23,10 @@ async function openTerminal(page: Page, waitForShell = true): Promise<void> {
 }
 
 async function command(page: Page, text: string): Promise<void> {
-  await page.locator('.xterm-helper-textarea:visible').click()
+  // Programmatic focus: the helper textarea's geometry is xterm-internal
+  // (0x0 until an IME composition sizes it), so a click-based gesture breaks
+  // whenever the screen is rebuilt.
+  await page.locator('.xterm-helper-textarea').evaluate((element) => { element.focus() })
   await page.keyboard.insertText(text)
   await page.keyboard.press('Enter')
 }
@@ -173,7 +176,9 @@ describe.skipIf(process.platform === 'win32')('Web sidebar terminal', () => {
     expect(ronLight.foreground).toBe('rgb(0, 0, 0)')
     await terminal.screenshot({ path: `${shots}/ron-light.png`, animations: 'disabled' })
     await selectTerminalTheme(page, 'Dark')
-    await page.locator('.xterm-helper-textarea:visible').click()
+    // The settings round-trip rebuilt the screen; refocus it before painting
+    // cursor states.
+    await page.locator('.xterm-helper-textarea').evaluate((element) => { element.focus() })
     await expect.poll(async () => (await cursorColors()).background).toBe('rgb(249, 250, 251)')
     await paintCursor('38;2;0;0;0;48;2;255;255;255')
     await expect.poll(async () => (await cursorColors()).background).toBe('rgb(0, 0, 0)')

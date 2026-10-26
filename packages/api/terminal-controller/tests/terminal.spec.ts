@@ -35,6 +35,44 @@ async function attach(terminal: BrowserTerminal, id = 'first') {
 }
 
 describe('BrowserTerminal', () => {
+  it('replays a program\u2019s palette OSC after a rebuilt follower\u2019s snapshot and ignores unrelated OSC', async () => {
+    const { terminal, output } = fixture()
+    const first = await attach(terminal)
+    output.write(Buffer.from('\u001b]4;1;#009900\u0007\u001b]0;title\u0007\u001b[31mANSI_CUSTOM\u001b[0m\r\n'))
+    expect(await readFrame(first.iterator)).toMatchObject({ type: 'output', data: '\u001b]4;1;#009900\u0007\u001b]0;title\u0007\u001b[31mANSI_CUSTOM\u001b[0m\r\n' })
+    first.controller.abort()
+    await first.iterator.return?.()
+
+    const second = await attach(terminal, 'second')
+    // The snapshot carries the palette retune; the window-title OSC stays out.
+    expect(second.baseline).toMatchObject({ type: 'snapshot', palette: '\u001b]4;1;#009900\u0007' })
+  })
+
+  it('captures a palette OSC whose terminator is split across output chunks', async () => {
+    const { terminal, output } = fixture()
+    await attach(terminal)
+    const sequence = '\u001b]11;#112233\u001b\\'
+    output.write(Buffer.from(sequence.slice(0, sequence.length - 1)))
+    await expect.poll(() => output.readableLength).toBe(0)
+    output.write(Buffer.from(sequence.slice(-1)))
+    await expect.poll(() => output.readableLength).toBe(0)
+
+    const second = await attach(terminal, 'second')
+    expect(second.baseline).toMatchObject({ type: 'snapshot', palette: sequence })
+  })
+
+  it('keeps an ST-closed palette OSC when a later BEL closes another OSC in the same chunk', async () => {
+    const { terminal, output } = fixture()
+    await attach(terminal)
+    // The palette OSC closes on the earlier ST; the later BEL belongs to a
+    // window-title OSC, which stays out of the replayed palette.
+    output.write(Buffer.from('\u001b]11;#112233\u001b\\\u001b]0;title\u0007'))
+    await expect.poll(() => output.readableLength).toBe(0)
+
+    const second = await attach(terminal, 'second')
+    expect(second.baseline).toMatchObject({ type: 'snapshot', palette: '\u001b]11;#112233\u001b\\' })
+  })
+
   it('restores the screen after detach without re-executing the shell or replaying duplicate output', async () => {
     const { terminal, output, handle } = fixture()
     const first = await attach(terminal)
