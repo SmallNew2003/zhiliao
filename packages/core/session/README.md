@@ -187,7 +187,7 @@ These limits define when the session store needs special care. They are current 
 - **`TurnEndReasonMap` omits the ACP-named `refusal` / `max_turn_requests` variants** — producer-gated: they land when an adapter or the loop first emits them.
 - **No session tree beyond fork** — a pi-style entry tree over branched sessions is deferred unless a consumer needs more than boundary-based forking.
 
-`user/message-edit` restores the surface before the latest human input and inserts its replacement without deleting raw events. Repeated edits retain the same original prefix. `user/message-admit` records subsequent pre-step text preparation at the latest human input’s existing sequence; message identity, source metadata, attachments, and prior image-offload selections remain unchanged.
+`user/message-edit` restores the surface before the latest human input and inserts its replacement without deleting raw events. Repeated edits retain the same original prefix. A legacy `user/message` re-emission carrying the edited message identity does not start a newer input generation, so a later edit still targets the durable edit event. `user/message-admit` records subsequent pre-step text preparation at the latest human input’s existing sequence; message identity, source metadata, attachments, and prior image-offload selections remain unchanged.
 
 <a id="dev-note"></a>
 

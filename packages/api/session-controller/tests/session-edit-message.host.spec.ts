@@ -222,6 +222,24 @@ describe('Session latest-message editing', () => {
     } finally { await h.ctx.fiber.dispose() }
   })
 
+  it('edits a legacy re-emitted replacement instead of treating its original edit as stale', async () => {
+    const h = await harness()
+    try {
+      await h.send(input('A'))
+      const target = await h.latest()
+      await h.edit(target, 'A2')
+      await h.agent.whenIdle()
+      const firstEdit = (await h.events()).findLast(event => event.type === 'user/message-edit')
+      if (firstEdit?.type !== 'user/message-edit') throw new Error('missing edit event')
+      h.agent.session.append('user/message', firstEdit.data.message, { surfaceOp: 'append' })
+      expect(await h.edit(firstEdit.seq, 'A2', 'legacy-resend')).toEqual({ accepted: true })
+      await h.agent.whenIdle()
+      expect(h.agent.session.deriveMessages().filter(message => message.role === 'user').map(message => message.content))
+        .toEqual([[{ type: 'text', text: 'A2' }]])
+      expect(h.adapter.requests).toHaveLength(3)
+    } finally { await h.ctx.fiber.dispose() }
+  })
+
   it('preserves ordered image and file references without uploads, including attachment-only edits', async () => {
     const h = await harness()
     try {

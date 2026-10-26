@@ -16,6 +16,7 @@ import {
 import type { MessageSource } from '@deepseek-ai/dsh-llm'
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import { latestHumanInput } from '@deepseek-ai/dsh-session/surface'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
@@ -393,7 +394,7 @@ export class SessionCommandController {
           reason: 'active-or-pending-input',
         })
       }
-      const latest = latestUserInput(events)
+      const latest = latestHumanInput(events)
       if (latest === undefined || latest.seq !== request.targetSeq) {
         throw new RemoteError('session/edit-stale', 'message is no longer the latest sent user input', { sessionId: agent.id })
       }
@@ -686,18 +687,6 @@ function hasEditRequest(events: readonly SessionEvent[], requestId: SessionReque
     && event.data.message.source.kind === 'user'
     && 'rpcId' in event.data.message.source
     && event.data.message.source.rpcId === requestId)
-}
-
-function latestUserInput(events: readonly SessionEvent[]): { readonly seq: SessionSeq; readonly message: UserMessage } | undefined {
-  const event = events.findLast((candidate): candidate is SessionEvent<'user/message' | 'user/message-edit'> => {
-    const message = candidate.type === 'user/message' ? candidate.data
-      : candidate.type === 'user/message-edit' ? candidate.data.message : undefined
-    return message?.source.kind === 'user'
-  })
-  return event === undefined ? undefined : {
-    seq: event.seq,
-    message: event.type === 'user/message' ? event.data : event.data.message,
-  }
 }
 
 function replaceInputText(content: UserMessage['content'], text: string): UserMessage['content'] {
