@@ -22,6 +22,7 @@ import { resolveDesktopPaths } from './paths.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
+import { installDesktopNotifications } from './notifications.ts'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
 import { formatDesktopMessage, resolveDesktopLocale } from './locale.ts'
@@ -137,6 +138,10 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
+      // Session status arrives over the host WebSocket, so a minimized
+      // window must keep delivering it: background throttling would delay
+      // completion and failure announcements behind a one-second timer.
+      backgroundThrottling: false,
     },
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -411,6 +416,7 @@ async function main(): Promise<void> {
   })
 
   installDesktopDirectoryPicker(() => mainWindow)
+  installDesktopNotifications(() => mainWindow)
 
   ipcMain.handle(DESKTOP_IPC.boot, async (event) => {
     assertDesktopSender(event, ['app'])

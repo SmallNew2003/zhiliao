@@ -69,6 +69,33 @@ it('exposes a directory picker only to the local application document', async ()
   }
 })
 
+it('exposes native notifications only to the application document', async () => {
+  vi.stubGlobal('location', new URL('dsh-app://app/'))
+  await import('../src/preload-app.ts')
+  const api = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
+  await api.notifications.show({ title: '会话已完成', body: '「demo」', sessionId: 's1' })
+  expect(electron.ipcRenderer.invoke).toHaveBeenCalledWith(DESKTOP_IPC.notifyShow, { title: '会话已完成', body: '「demo」', sessionId: 's1' })
+  electron.ipcRenderer.invoke.mockResolvedValue('granted')
+  await expect(api.notifications.permission()).resolves.toBe('granted')
+  expect(electron.ipcRenderer.invoke).toHaveBeenCalledWith(DESKTOP_IPC.notifyPermission)
+
+  const listener = vi.fn()
+  const dispose = api.notifications.subscribe(listener)
+  const clicked = electron.ipcRenderer.on.mock.calls.find(([channel]) => channel === DESKTOP_IPC.notifyClicked)
+  const handler = clicked?.[1] as (event: unknown, id: string) => void
+  handler({}, 's1')
+  expect(listener).toHaveBeenCalledWith('s1')
+  dispose()
+  expect(electron.ipcRenderer.off).toHaveBeenCalledWith(DESKTOP_IPC.notifyClicked, handler)
+
+  vi.resetModules()
+  electron.contextBridge.exposeInMainWorld.mockClear()
+  vi.stubGlobal('location', new URL('dsh-app://shell/plugin-manager.html'))
+  await import('../src/preload-app.ts')
+  const shellApi = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'dshDesktop')?.[1] as DshDesktopProductApi
+  expect(shellApi.notifications).toBeUndefined()
+})
+
 it.each(['dsh-app://app/', 'dsh-app://shell/plugin-manager.html', 'https://example.com/'])(
   'installs Windows appearance only for the application document (%s)', async (url) => {
     vi.stubGlobal('location', new URL(url))
