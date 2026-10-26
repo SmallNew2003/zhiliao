@@ -9,6 +9,7 @@ import { PluginManagerPage } from '../src/client/PluginManagerPage.tsx'
 import type { PluginManagerPageProps } from '../src/client/PluginManagerPage.tsx'
 import type { ConfigLedger } from '../src/client/config-ledger.ts'
 import { rowKey, type InstallState, type PackageRow, type PackageView, type PluginManagerState } from '../src/client/manager-store.ts'
+import { createPluginManagerViewStore, type View } from '../src/client/view-store.ts'
 import { en, zh, type PluginManagerLocaleKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -80,9 +81,14 @@ function renderTab(state: Partial<PluginManagerState> = {}, config: Partial<Conf
     setRowEnabled: vi.fn(),
     dismissNotice: vi.fn(),
   }
+  const viewStore = createPluginManagerViewStore().create()
   const props = {
     t,
     ...actions,
+    actions: {
+      openView: (view: View) => { viewStore.actions.openView(view) },
+    },
+    useStore: bindSnapshotSelector(viewStore),
     usePluginManager: bindSnapshotSelector(store),
     useConfigLedger: bindSnapshotSelector(ledger),
     renderSlot: (name: string, owner: { view: 'summary' | 'page' }, opts: { only?: string; entryKey?: string }) =>

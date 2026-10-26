@@ -1,6 +1,6 @@
 /** Model input types stay below both capacity fields across editor widths. */
 import type { Locator, Page } from 'playwright'
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
 
 /**
  * Verify the expanded row at the current viewport and a narrow viewport.
@@ -14,16 +14,19 @@ export async function assertModelInputLayout(page: Page, editor: Locator): Promi
   try {
     for (const viewport of [original, { width: 760, height: 1000 }]) {
       await page.setViewportSize(viewport)
-      const context = await editor.getByLabel('上下文窗口 1', { exact: true }).boundingBox()
-      const output = await editor.getByLabel('最大输出 token 数 1', { exact: true }).boundingBox()
-      const types = await editor.getByRole('group', { name: '输入类型 1' }).boundingBox()
-      expect(context).not.toBeNull()
-      expect(output).not.toBeNull()
-      expect(types).not.toBeNull()
-      if (context === null || output === null || types === null) throw new Error('Expanded model fields are not visible')
-      expect(Math.abs(context.y - output.y)).toBeLessThan(1)
-      expect(types.y).toBeGreaterThanOrEqual(Math.max(context.y + context.height, output.y + output.height))
-      expect(types.width).toBeGreaterThan(context.width)
+      // The switch lands over several frames: a read mid-reflow pairs stale
+      // and fresh geometry — a phantom wrap between the capacity fields, a
+      // scrollbar mid-arrival narrowing the content column. Wait for the
+      // settled layout to answer all three relations.
+      await vi.waitFor(async () => {
+        const context = await editor.getByLabel('上下文窗口 1', { exact: true }).boundingBox()
+        const output = await editor.getByLabel('最大输出 token 数 1', { exact: true }).boundingBox()
+        const types = await editor.getByRole('group', { name: '输入类型 1' }).boundingBox()
+        if (context === null || output === null || types === null) throw new Error('Expanded model fields are not visible')
+        expect(Math.abs(context.y - output.y)).toBeLessThan(1)
+        expect(types.y).toBeGreaterThanOrEqual(Math.max(context.y + context.height, output.y + output.height))
+        expect(types.width).toBeGreaterThan(context.width)
+      }, { timeout: 10_000 })
     }
   } finally {
     await page.setViewportSize(original)

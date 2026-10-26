@@ -17,7 +17,7 @@ import {
   IconWarningOutline16, Input, Modal, StateDot, Switch, Tag, TerminalBlock, Toast,
   type StateDotState, type TerminalBlockLabels,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { rowConfigKey, type OfficialItem } from './config-ledger.ts'
 import type { PluginManagerLocaleKey } from './locales.ts'
 import {
@@ -27,6 +27,7 @@ import {
 } from './manager-store.ts'
 import { managementText, noticeText, packageText, type Translate } from './presentation.ts'
 import type {} from './slot-contract.ts'
+import type { createPluginManagerViewStore } from './view-store.ts'
 import css from './PluginManagerPage.module.css'
 
 /** Full component props assembled by the main slot renderer. */
@@ -34,17 +35,11 @@ export type PluginManagerPageProps =
   PropsRuntime<'main'>
   & PropsLocale<'pluginManager'>
   & PropsRenderSlots<'plugins.item' | 'plugins.bundle.config' | 'plugins.row.config'>
+  & PropsStore<ReturnType<typeof createPluginManagerViewStore>>
   & InjectFace<PluginManagerFace>
 
 /** The page's slot renderer, narrowed to the configuration slots. */
 type RenderConfig = PluginManagerPageProps['renderSlot']
-
-/** What the page shows: the cards, a bundle's page, an official plugin's page, or a row's configuration page. */
-type View =
-  | { readonly kind: 'list' }
-  | { readonly kind: 'package'; readonly name: string }
-  | { readonly kind: 'item'; readonly id: string }
-  | { readonly kind: 'row'; readonly name: string; readonly rowId: string }
 
 type RowPhase = NonNullable<PackageRow['phase']>
 
@@ -838,11 +833,12 @@ function ConfirmDialog({ confirm, t, onConfirm, onCancel }: {
 
 /** Render the plugin manager: the official plugins and installed bundles, their pages, the install dialog, and the confirmation. */
 export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
-  const { t, ensure, renderSlot } = props
+  const { t, ensure, renderSlot, useStore, actions } = props
   const state = props.usePluginManager(snapshot => snapshot)
   const ledger = props.useConfigLedger(snapshot => snapshot)
-  // What is open; a package that leaves the list (uninstalled) drops back to the cards.
-  const [view, setView] = useState<View>({ kind: 'list' })
+  // What is open, held across the panel's unmounts (another global panel can
+  // replace it); a package that leaves the list (uninstalled) drops back to the cards.
+  const view = useStore(s => s.view)
   useEffect(() => { ensure() }, [ensure])
   // A package an install just enabled: scroll it into view and mark it for a moment.
   const { highlight, clearHighlight } = { highlight: state.highlight, clearHighlight: props.clearHighlight }
@@ -873,7 +869,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   }
   const configure = (pkg: PackageView): RowConfigure => ({
     has: row => ledger.rows.has(rowConfigKey(pkg.name, row.rowId)),
-    open: (row) => { setView({ kind: 'row', name: pkg.name, rowId: row.rowId }) },
+    open: (row) => { actions.openView({ kind: 'row', name: pkg.name, rowId: row.rowId }) },
   })
   const packageCard = (pkg: PackageView): ReactNode => (
     <PackageCard
@@ -882,7 +878,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
       t={t}
       busy={state.busy.includes(pkg.name)}
       highlighted={state.highlight === pkg.name}
-      onOpen={() => { setView({ kind: 'package', name: pkg.name }) }}
+      onOpen={() => { actions.openView({ kind: 'package', name: pkg.name }) }}
       onSetEnabled={(enabled) => { props.setEnabled(pkg.name, enabled) }}
     />
   )
@@ -890,7 +886,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
   const officialCards = [
     ...official.map(packageCard),
     ...ledger.items.map(item => (
-      <ItemCard key={`item:${item.id}`} item={item} t={t} renderSlot={renderSlot} onOpen={() => { setView({ kind: 'item', id: item.id }) }} />
+      <ItemCard key={`item:${item.id}`} item={item} t={t} renderSlot={renderSlot} onOpen={() => { actions.openView({ kind: 'item', id: item.id }) }} />
     )),
   ]
   // One group of cards under its heading and count; the Official group comes first, and a group with nothing in it takes no room.
@@ -952,7 +948,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             row={openRow}
             t={t}
             renderSlot={renderSlot}
-            onBack={() => { setView({ kind: 'package', name: openPkg.name }) }}
+            onBack={() => { actions.openView({ kind: 'package', name: openPkg.name }) }}
           />
         )
         : null}
@@ -966,7 +962,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
             configured={ledger.bundles.has(openPkg.name)}
             configure={configure(openPkg)}
             renderSlot={renderSlot}
-            onBack={() => { setView({ kind: 'list' }) }}
+            onBack={() => { actions.openView({ kind: 'list' }) }}
             onSetEnabled={(enabled) => { props.setEnabled(openPkg.name, enabled) }}
             onUninstall={() => { props.uninstall(openPkg.name) }}
             onSetRowEnabled={setRowEnabled}
@@ -974,7 +970,7 @@ export function PluginManagerPage(props: PluginManagerPageProps): ReactNode {
         )
         : null}
       {loaded && openItem !== undefined
-        ? <ItemDetail item={openItem} t={t} renderSlot={renderSlot} onBack={() => { setView({ kind: 'list' }) }} />
+        ? <ItemDetail item={openItem} t={t} renderSlot={renderSlot} onBack={() => { actions.openView({ kind: 'list' }) }} />
         : null}
       {loaded && showsCards
         ? officialCards.length === 0 && mine.length === 0

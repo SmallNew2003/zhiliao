@@ -65,6 +65,16 @@ export interface TerminalCreateRequest {
 
 /** Every attachment begins with a complete bounded screen, then ordered output. */
 export type TerminalFrame =
-  | { readonly type: 'snapshot'; readonly sequence: number; readonly screen: string; readonly info: WebTerminalInfo }
+  | {
+    readonly type: 'snapshot'
+    readonly sequence: number
+    readonly screen: string
+    /**
+     * OSC sequences that retune the renderer palette. Replayed right after
+     * the screen, so a rebuilt browser view keeps program-set colors.
+     */
+    readonly palette?: string
+    readonly info: WebTerminalInfo
+  }
   | { readonly type: 'output'; readonly sequence: number; readonly data: string }
   | { readonly type: 'state'; readonly info: WebTerminalInfo }

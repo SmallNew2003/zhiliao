@@ -24,6 +24,7 @@ import { PluginManagerPage } from './PluginManagerPage.tsx'
 import { PluginsPanelIcon } from './PluginsPanelIcon.tsx'
 import { configLedgerSource } from './config-ledger.ts'
 import { PluginManagerController } from './manager-store.ts'
+import { createPluginManagerViewStore } from './view-store.ts'
 import { en, zh, type PluginManagerLocaleKey } from './locales.ts'
 import type {} from './slot-contract.ts'
 
@@ -78,12 +79,17 @@ export function apply(ctx: ClientContext): void {
   // The page is a global panel: it belongs to the profile, not to a Session,
   // and the sidebar's entry selects it. What is installed and switched on is
   // the page's own; a plugin's configuration arrives through the slots the
-  // page declares here, so the page never names a configurable plugin.
+  // page declares here, so the page never names a configurable plugin. The
+  // open view is seated as the registration's store: another global panel
+  // (settings) unmounts this one, and returning restores the page the user
+  // was reading.
   const configLedger = configLedgerSource(ctx)
+  const viewStore = createPluginManagerViewStore()
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
     key: PANEL_ID,
     locale: NS,
+    store: viewStore,
     inject: () => controller.inject(configLedger),
     children: {
       'plugins.item': { kind: 'list', scope: 'root' },
