@@ -147,7 +147,10 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
             {/* `~`: usedTokens prefers projectedTokens, whose surface delta is
                 heuristically repriced on top of the provider-anchored sample. */}
             <span className={css.figures}>
-              {`~${formatTokens(context.usedTokens, t)} / ${formatTokens(context.contextWindow, t)}`}
+              {t('context.figures', {
+                used: formatTokens(context.usedTokens, t),
+                total: formatTokens(context.contextWindow, t),
+              })}
             </span>
           </div>
           <div className={css.bar}>
@@ -167,7 +170,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
                     <span className={`${css.swatch} ${row.color}`} aria-hidden />
                     {t(row.label)}
                   </dt>
-                  <dd>{`~${formatTokens(breakdown[row.key], t)}`}</dd>
+                  <dd>{t('context.tokens', { value: formatTokens(breakdown[row.key], t) })}</dd>
                 </div>
               ))}
             </dl>
