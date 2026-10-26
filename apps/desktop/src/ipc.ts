@@ -11,6 +11,9 @@ export const DESKTOP_IPC = {
   updatesOpen: 'dsh-desktop:updates-open',
   updatesPresentation: 'dsh-desktop:updates-presentation',
   nativeThemeSet: 'dsh-desktop:native-theme-set',
+  notifyShow: 'dsh-desktop:notify-show',
+  notifyClicked: 'dsh-desktop:notify-clicked',
+  notifyPermission: 'dsh-desktop:notify-permission',
   windowsAppearance: 'dsh-desktop:windows-appearance',
   windowsMenu: 'dsh-desktop:windows-menu',
 } as const
@@ -58,6 +61,27 @@ export interface DshDesktopProductApi {
     open(): Promise<void>
     subscribe(listener: (state: DesktopUpdatePresentation) => void): () => void
   }
+  readonly notifications: {
+    /** Present one native notification. */
+    show(request: DesktopNotificationRequest): Promise<void>
+    /** Subscribe to notification clicks; the listener receives the session id when one was carried. */
+    subscribe(listener: (sessionId: string) => void): () => void
+    /** The current OS authorization state. */
+    permission(): Promise<DesktopNotificationPermission>
+  }
+}
+
+/** OS notification authorization state as the shell reports it. */
+export type DesktopNotificationPermission = 'granted' | 'denied' | 'default' | 'unsupported'
+
+/** One native notification the shell is asked to present. */
+export interface DesktopNotificationRequest {
+  /** Short headline the OS shows in the notification centre. */
+  readonly title: string
+  /** Detail line the OS shows under the headline. */
+  readonly body: string
+  /** Session the notification opens when clicked; absent opens no conversation. */
+  readonly sessionId?: string
 }
 
 /** Scheme of Desktop-owned application documents. */

@@ -43,7 +43,15 @@
     - img
   - button "Decrease font size":
     - img
-  - text: px Conversation display Controls process content in completed turns
+  - text: px System notifications Get a system notification when a task needs you
+  - switch "Enable system notifications" [checked]
+  - text: When a session finishes Announce a session that finished in the background
+  - switch "When a session finishes" [checked]
+  - text: When approval or an answer is needed Announce a request that blocks the session on you
+  - switch "When approval or an answer is needed" [checked]
+  - text: When something fails Announce a failed session run
+  - switch "When something fails" [checked]
+  - text: System notification permission is denied; allow it in system settings Conversation display Controls process content in completed turns
   - button "Compact":
     - text: Compact
     - img

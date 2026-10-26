@@ -31,6 +31,7 @@ interface SessionsBench {
   setMainView(id: SessionId, count: number): void
   setRetainInfo(id: SessionId, count: number): void
   emitStatus(id: SessionId, running: boolean): void
+  emitError(id: SessionId, message: string): void
   release(id: SessionId): Promise<void>
 }
 
@@ -40,12 +41,15 @@ const roots: Context[] = []
 
 function createSessionsBench(ctx: Context): SessionsBench {
   roots.push(ctx)
-  let statusListener: ((id: SessionId, running: boolean) => void) | undefined
+  // One listener table keyed by remote event: the bench stub serves every
+  // api-session/* channel the service subscribes to.
+  const remoteListeners = new Map<string, (id: SessionId, payload: never) => void>()
   ctx.provide('remote', {
-    $on: (_event: string, listener: (id: SessionId, running: boolean) => void) => {
-      statusListener = listener
+    $on: (event: string, listener: (id: SessionId, running: boolean) => void) => {
+      const wrapped = listener as unknown as (id: SessionId, payload: never) => void
+      remoteListeners.set(event, wrapped)
       return () => {
-        if (statusListener === listener) statusListener = undefined
+        if (remoteListeners.get(event) === wrapped) remoteListeners.delete(event)
       }
     },
   } as never)
@@ -172,8 +176,14 @@ function createSessionsBench(ctx: Context): SessionsBench {
       })
     },
     emitStatus(id, running) {
-      if (statusListener === undefined) throw new Error('api-session/status is not subscribed')
-      statusListener(id, running)
+      const listener = remoteListeners.get('api-session/status') as unknown as ((i: SessionId, r: boolean) => void) | undefined
+      if (listener === undefined) throw new Error('api-session/status is not subscribed')
+      listener(id, running)
+    },
+    emitError(id, message) {
+      const listener = remoteListeners.get('api-session/error') as unknown as ((i: SessionId, m: string) => void) | undefined
+      if (listener === undefined) throw new Error('api-session/error is not subscribed')
+      listener(id, message)
     },
     async release(id) {
       bindings.delete(id)
@@ -535,6 +545,7 @@ describe('UiSession status', () => {
       running: false,
       pendingInteraction: undefined,
       completionUnread: false,
+      lastAgentError: null,
     })
     bench.list.update((draft) => { draft.byId[id]!.running = true })
     expect(service.sessionStatus.getSnapshot().get(id)?.running).toBe(true)
@@ -566,6 +577,27 @@ describe('UiSession status', () => {
     off()
   })
 
+  it('publishes the latest agent-loop failure and clears it when the session runs again', () => {
+    const ctx = new Context()
+    const bench = createSessionsBench(ctx)
+    const id = sessionId('s1')
+    bench.binding(id)
+    const service = createUiSession(ctx, bench)
+
+    expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBeNull()
+    bench.emitError(id, 'provider unreachable')
+    expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBe('provider unreachable')
+
+    // A restart clears the pending failure so a later success is not announced as an error.
+    bench.emitStatus(id, true)
+    expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBeNull()
+    bench.emitStatus(id, false)
+    expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBeNull()
+
+    bench.emitError(id, 'second failure')
+    expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBe('second failure')
+  })
+
   it('records an idle event before the initial catalog baseline and retires absent status later', () => {
     const ctx = new Context()
     const bench = createSessionsBench(ctx)
@@ -578,6 +610,7 @@ describe('UiSession status', () => {
       running: false,
       pendingInteraction: undefined,
       completionUnread: true,
+      lastAgentError: null,
     })
     bench.list.update((draft) => { draft.phase = 'ready' })
     expect(service.sessionStatus.getSnapshot().has(id)).toBe(false)

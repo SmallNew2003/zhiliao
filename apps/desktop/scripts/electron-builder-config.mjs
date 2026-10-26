@@ -128,6 +128,12 @@ export function createElectronBuilderConfig(
       signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
       notarize: true,
       target: ['dmg', 'zip'],
+      extendInfo: {
+        // macOS 10.14+ refuses the first notification without a purpose
+        // string, so the announcement feature would be silent on a signed
+        // build without it.
+        NSUserNotificationsUsageDescription: '知了在会话完成、等待审批或出错时通过系统通知提醒你。',
+      },
     },
     dmg: {
       sign: true,
