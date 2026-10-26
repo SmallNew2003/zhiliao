@@ -400,9 +400,9 @@ describe('WorkspaceBrowser', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
-    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新',
+      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '全部展开', '全部折叠',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -554,6 +554,44 @@ describe('WorkspaceBrowser', () => {
     expect(b.store.getSnapshot().groupExpansion).toEqual({ alpha: true })
     expect(screen.queryByText('session-6')).toBeNull()
     expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
+  })
+
+  it('folds and unfolds every group from the view options menu', () => {
+    const items = [summary('alpha-s', 2), summary('beta-s', 1)]
+    const b = mount({
+      useSessions: hook(sessionState(items)),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['alpha-s']), workspace('beta', ['beta-s']),
+      ])),
+    })
+    // Neither group owns the selected Session, so both start folded.
+    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(screen.queryByText('beta-s')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '全部展开' }))
+    expect(b.store.getSnapshot().groupExpansion).toEqual({ '': true, alpha: true, beta: true })
+    expect(screen.getByText('alpha-s')).toBeTruthy()
+    expect(screen.getByText('beta-s')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '全部折叠' }))
+    expect(b.store.getSnapshot().groupExpansion).toEqual({ '': false, alpha: false, beta: false })
+    expect(screen.queryByText('alpha-s')).toBeNull()
+    expect(screen.queryByText('beta-s')).toBeNull()
+  })
+
+  it('hides the bulk expansion rows in the single-list view', () => {
+    mount({
+      useSessions: hook(sessionState([summary('alpha-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s'])])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
+    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
+    // The single list owns no groups, so a bulk gesture would act on nothing.
+    expect(screen.queryByRole('menuitem', { name: '全部展开' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '全部折叠' })).toBeNull()
   })
 
   it('keeps the blank New Session outside the five-row folding quota', () => {

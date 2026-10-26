@@ -15,6 +15,7 @@ import {
   Button, IconCloseFill14, IconPersonalizationOutline16,
   IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   SessionListState, SessionSearchResultItem,
 } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -97,32 +98,47 @@ function useNativeDragAcceptance(active: boolean): void {
 }
 
 /** Grouping and ordering menu; own open state so it resets with the wide chrome. */
-function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, t }: {
+function ViewOptionsMenu({ groupBy, orderBy, onGroupPick, onOrderPick, onExpandAll, onCollapseAll, t }: {
   groupBy: SessionGroupBy
   orderBy: SessionOrderBy
   onGroupPick: (mode: SessionGroupBy) => void
   onOrderPick: (mode: SessionOrderBy) => void
+  onExpandAll: () => void
+  onCollapseAll: () => void
   t: WorkspaceBrowserProps['t']
 }) {
   const [open, setOpen] = useState(false)
+  const items: MenuEntry[] = [
+    { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
+    { id: 'workspace', label: t('groupBy.workspace') },
+    { id: 'workspace-tree', label: t('groupBy.workspaceTree') },
+    { id: 'flat', label: t('groupBy.flat') },
+    { type: 'separator' as const, id: 'order-by-separator' },
+    { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
+    { id: 'manual', label: t('orderBy.manual') },
+    { id: 'updated', label: t('orderBy.updated') },
+  ]
+  // The single-list view owns no groups, so a bulk expansion gesture would act
+  // on nothing: the section appears only where groups exist.
+  if (groupBy !== 'flat') {
+    items.push(
+      { type: 'separator' as const, id: 'expansion-separator' },
+      { type: 'label' as const, id: 'expansion-label', text: t('expansion.label') },
+      { id: 'expand-all', label: t('expansion.expandAll') },
+      { id: 'collapse-all', label: t('expansion.collapseAll') },
+    )
+  }
   return (
     <Menu
       open={open}
       onClose={() => { setOpen(false) }}
-      items={[
-        { type: 'label' as const, id: 'group-by', text: t('groupBy.label') },
-        { id: 'workspace', label: t('groupBy.workspace') },
-        { id: 'workspace-tree', label: t('groupBy.workspaceTree') },
-        { id: 'flat', label: t('groupBy.flat') },
-        { type: 'separator' as const, id: 'order-by-separator' },
-        { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
-        { id: 'manual', label: t('orderBy.manual') },
-        { id: 'updated', label: t('orderBy.updated') },
-      ]}
+      items={items}
       selectedIds={[groupBy, orderBy]}
       onSelect={(id) => {
         if (id === 'workspace' || id === 'workspace-tree' || id === 'flat') onGroupPick(id)
         else if (id === 'manual' || id === 'updated') onOrderPick(id)
+        else if (id === 'expand-all') onExpandAll()
+        else if (id === 'collapse-all') onCollapseAll()
         setOpen(false)
       }}
       align="end"
@@ -801,6 +817,11 @@ export function WorkspaceBrowser({
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   const workspaceReady = workspacePhase === 'ready' && workspaceStreamState !== 'loading'
+  /** Every group key the browser can fold, for the bulk expansion gestures. */
+  const allGroupKeys = useMemo(
+    () => [UNGROUPED_KEY, ...workspaces.map(workspace => workspace.workspaceId)],
+    [workspaces],
+  )
   const mainSessionId = Object.values(list.byId)
     .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
   const currentBlank = mainSessionId !== undefined && list.byId[mainSessionId]?.blank === true
@@ -1181,6 +1202,8 @@ export function WorkspaceBrowser({
               orderBy={orderBy}
               onGroupPick={(mode) => { actions.setGroupBy(mode) }}
               onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
+              onExpandAll={() => { actions.setGroupExpansion(allGroupKeys, true) }}
+              onCollapseAll={() => { actions.setGroupExpansion(allGroupKeys, false) }}
               t={t}
             />
           )}
