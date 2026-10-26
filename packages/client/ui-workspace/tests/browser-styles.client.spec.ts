@@ -117,6 +117,14 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(rowDeclarations('.sessionRow:hover .title')?.get('text-overflow')).toBe('clip')
   })
 
+  it('wears the hover fill as the keyboard focus indication on both row kinds', () => {
+    for (const selector of ['.projectRow:focus-visible', '.sessionRow:focus-visible']) {
+      const rule = rowDeclarations(selector)
+      expect(rule?.get('background')).toBe('var(--dsw-alias-interactive-bg-hover)')
+      expect(rule?.get('outline')).toBe('none')
+    }
+  })
+
   it('pins both rail controls to the shared left anchor during the column slide', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')

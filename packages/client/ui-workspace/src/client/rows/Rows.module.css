@@ -20,6 +20,15 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Arrow navigation moves real focus, so the row the keyboard is on carries the
+   same fill the pointer gets: the fill is the row's focus indication, and the
+   browser's default ring would double it. */
+.projectRow:focus-visible,
+.sessionRow:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  outline: none;
+}
+
 .searchResultRow {
   display: flex;
   flex-direction: column;
