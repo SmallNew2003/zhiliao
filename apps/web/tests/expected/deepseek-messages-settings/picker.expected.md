@@ -1,4 +1,4 @@
-- menu "模型与推理等级":
+- menu "模型、推理等级与上下文窗口":
   - group "DeepSeek":
     - text: DeepSeek
     - menuitemradio "Messages Flash" [checked]:
@@ -13,3 +13,8 @@
       - text: High
       - img
     - menuitemradio "Max"
+  - group "上下文窗口":
+    - text: 上下文窗口 当前：1,000,000
+    - menuitemradio "320K"
+    - menuitemradio "640K"
+    - menuitemradio "960K"

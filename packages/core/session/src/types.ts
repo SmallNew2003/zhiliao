@@ -230,7 +230,7 @@ export type TurnEndReason = TurnEndReasonMap[keyof TurnEndReasonMap]
  * empty optional fields are absent.
  */
 export interface EpochHeader {
-  /** The conversation's call configuration (provider, model, reasoning effort, and sampling scalars). */
+  /** The conversation's route, reasoning effort, context budget, and sampling scalars. */
   config: LlmCallConfig
   /** Effective config fields materialized from the exact adapter rather than proposed by a caller. */
   adapterDefaults?: LlmCallConfigAdapterDefaults
@@ -238,13 +238,13 @@ export interface EpochHeader {
   tools?: ToolSchema[]
 }
 
-/** Registration-bound metadata for one resolved model route. */
+/** Registration-bound metadata for one prepared model call. */
 export interface RequestContext {
   /** Registered provider route the metadata belongs to. */
   provider: string
   /** Provider-owned model id the metadata belongs to. */
   model: string
-  /** Maximum combined request and response context in tokens, when advertised. */
+  /** Effective request and response context budget in tokens, when known. */
   contextWindow?: number
   /** `'in-history'` when the route reads the latest `system` message at any position as the effective system prompt. */
   systemPromptUpdate?: SystemPromptUpdate

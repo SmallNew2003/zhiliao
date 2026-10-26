@@ -275,3 +275,15 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+.contextTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+}

@@ -339,7 +339,8 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const customModels = schema.getPath(draft, ['models'])
     const modelsOverridden = schema.hasPath(draft, ['models'])
     const models = modelDrafts(modelsOverridden ? customModels : inheritedModels())
-    const defaultContextWindow = schema.getPath(fallback, ['defaultContextWindow'])
+    const defaultContextWindow: unknown = schema.getPath(fallback, ['defaultContextWindow'])
+      ?? schema.nodeAtPath(root, [...settingsPath, 'defaultContextWindow'])?.meta.default
     const defaultMaxTokens = schema.getPath(fallback, ['maxTokens'])
     const defaultInput = schema.getPath(fallback, ['defaultInput'])
     const keyPlaceholder = keyLocked
@@ -450,9 +451,6 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                 </div>
               )
               : null}
-            {/* Both families edit the same rows through the same contract; only
-                the extras differ — DeepSeek's inherited capacities, pi-ai's
-                endpoint interrogation. */}
             {family === 'deepseek'
               ? (
                 <DeepSeekModelsEditor
@@ -468,6 +466,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                   {...catalogProps}
                   catalogProvider={props.declared === true ? undefined : props.provider}
                   defaultInput={Array.isArray(defaultInput) ? defaultInput : undefined}
+                  defaultContextWindow={typeof defaultContextWindow === 'number' ? defaultContextWindow : undefined}
                   probe={probe}
                   probeBlocked={keyFailure}
                   operations={operations}

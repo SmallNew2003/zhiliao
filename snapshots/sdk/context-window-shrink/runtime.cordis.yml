@@ -1,0 +1,3 @@
+- insert:
+    - id: context-window-shrink-fixture
+      name: ./shrink.mjs

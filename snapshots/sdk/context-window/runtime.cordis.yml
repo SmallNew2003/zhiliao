@@ -1,0 +1,3 @@
+- insert:
+    - id: context-window-fixture
+      name: ./context-window.mjs

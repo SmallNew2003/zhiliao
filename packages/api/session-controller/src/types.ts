@@ -87,6 +87,8 @@ export interface ModelSelection {
   readonly provider: string
   readonly model: string
   readonly reasoningEffort?: string
+  /** Positive integer context budget, or adapter capacity when absent. */
+  readonly contextWindow?: number
 }
 
 /** Host fold state for durable model selection. */
@@ -124,6 +126,8 @@ export interface ModelCatalogModel {
   readonly name: string
   readonly description?: string
   readonly reasoning?: ModelReasoning
+  /** Configured adapter capacity before any Session-local override. */
+  readonly contextWindow?: number
 }
 
 /** One provider and its successfully loaded model catalog. */

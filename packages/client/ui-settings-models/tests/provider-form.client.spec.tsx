@@ -230,6 +230,105 @@ function expandModel(index: number): void {
   fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} ${index}`))
 }
 
+describe('context window presets', () => {
+  it('shows three presets while advanced fields stay collapsed', async () => {
+    const { mutate } = await mountSection({ providers: { openai: { models: [{ id: 'preview', contextWindow: 131_072, maxTokens: 4096 }] } } })
+    openEditor('openai')
+    const picker = screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })
+    expect(within(picker).getAllByRole<HTMLInputElement>('radio').map(radio => radio.value))
+      .toEqual(['320K', '640K', '960K'])
+    expect(within(picker).getByText(/131072/)).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: `${en.contextWindow} 1` })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: `${en.maxTokens} 1` })).toBeNull()
+    expect(screen.queryByRole('group', { name: `${en.modelInputTypes} 1` })).toBeNull()
+    fireEvent.click(within(picker).getByRole('radio', { name: '640K' }))
+    expect(screen.queryByRole('textbox', { name: `${en.contextWindow} 1` })).toBeNull()
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'preview', contextWindow: 640_000, maxTokens: 4096 }])
+  })
+
+  it.each([
+    [[{ id: 'preview', contextWindow: 320_000 }], '320K'],
+    [[], '640K'],
+  ])('shows inherited capacity without storing an override', async (catalog, selected) => {
+    const { mutate } = await mountSection({
+      providers: { openai: { models: [{ id: 'preview' }], defaultContextWindow: 640_000 } },
+      discover: vi.fn(() => Promise.resolve(ok(catalog))),
+    })
+    openEditor('openai')
+    fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} 1`))
+    const picker = screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })
+    await waitFor(() => { expect(within(picker).getByRole<HTMLInputElement>('radio', { name: selected }).checked).toBe(true) })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(screen.queryByText(en.apply)).toBeNull() })
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('keeps an existing custom capacity editable when cleared or typed as a preset', async () => {
+    await mountSection({ providers: { openai: { models: [{ id: 'preview', contextWindow: 131_072 }] } } })
+    openEditor('openai')
+    fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} 1`))
+    const input = screen.getByRole<HTMLInputElement>('textbox', { name: `${en.contextWindow} 1` })
+    fireEvent.change(input, { target: { value: '' } })
+    expect(screen.getByRole('textbox', { name: `${en.contextWindow} 1` })).toBe(input)
+    fireEvent.change(input, { target: { value: '320K' } })
+    fireEvent.blur(input)
+    expect(screen.getByRole('textbox', { name: `${en.contextWindow} 1` })).toBe(input)
+    expect(within(screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })).getByRole<HTMLInputElement>('radio', { name: '320K' }).checked).toBe(true)
+  })
+
+  it('reopens saved presets and keeps preset-valued custom input editable', async () => {
+    await mountSection({ providers: { openai: { models: [{ id: 'preview', contextWindow: 640_000 }] } } })
+    openEditor('openai')
+    fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} 1`))
+    const picker = screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })
+    expect(within(picker).getByRole<HTMLInputElement>('radio', { name: '640K' }).checked).toBe(true)
+    const input = screen.getByRole<HTMLInputElement>('textbox', { name: `${en.contextWindow} 1` })
+    expect(input.value).toBe('640K')
+    fireEvent.change(input, { target: { value: '960K' } })
+    fireEvent.blur(input)
+    expect(within(picker).getByRole<HTMLInputElement>('radio', { name: '960K' }).checked).toBe(true)
+    expect(input.value).toBe('960K')
+  })
+
+  it('clears an invalid custom window without a separate default choice', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { models: [{ id: 'preview', contextWindow: 131_072, maxTokens: 4096 }] } },
+    })
+    openEditor('openai')
+    fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} 1`))
+    fireEvent.change(screen.getByLabelText(`${en.contextWindow} 1`), { target: { value: 'invalid' } })
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+    const picker = screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })
+    expect(within(picker).getAllByRole<HTMLInputElement>('radio').map(radio => radio.value))
+      .toEqual(['320K', '640K', '960K'])
+    fireEvent.change(screen.getByLabelText(`${en.contextWindow} 1`), { target: { value: '' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'preview', maxTokens: 4096 }])
+  })
+
+  it.each([
+    ['320K', 320_000],
+    ['640K', 640_000],
+    ['960K', 960_000],
+  ])('saves %s as a token count', async (preset, tokens) => {
+    const { mutate } = await mountSection({
+      providers: { openai: { models: [{ id: 'preview', contextWindow: 131_072 }] } },
+    })
+    openEditor('openai')
+    fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} 1`))
+    const picker = screen.getByRole('radiogroup', { name: `${en.contextWindowPreset} 1` })
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.contextWindow} 1`).value).toBe('131072')
+    fireEvent.click(within(picker).getByRole('radio', { name: preset }))
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: `${en.contextWindow} 1` }).value).toBe(preset)
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'preview', contextWindow: tokens }])
+  })
+})
+
 /** The button carrying `label`, typed so its disabled/title state is readable. */
 function buttonNamed(label: string): HTMLButtonElement {
   const found = screen.getByText(label)
@@ -420,8 +519,8 @@ describe('model list editing', () => {
     // 'second' now sits at position 1 and keeps its capacities open; 'third'
     // moved to position 2 and stays folded.
     expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('second')
-    expect(screen.queryByLabelText(`${en.contextWindow} 1`)).not.toBeNull()
-    expect(screen.queryByLabelText(`${en.contextWindow} 2`)).toBeNull()
+    expect(screen.queryByLabelText(`${en.maxTokens} 1`)).not.toBeNull()
+    expect(screen.queryByLabelText(`${en.maxTokens} 2`)).toBeNull()
   })
 
   it('leaves an earlier row expanded and forgets the removed row\u2019s own state', async () => {
@@ -439,13 +538,13 @@ describe('model list editing', () => {
     expandModel(1)
     fireEvent.click(screen.getByLabelText(`${en.removeModel} 2`))
     expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('first')
-    expect(screen.queryByLabelText(`${en.contextWindow} 1`)).not.toBeNull()
+    expect(screen.queryByLabelText(`${en.maxTokens} 1`)).not.toBeNull()
 
     // Removing the expanded row itself drops that state rather than handing it
     // to whichever row slides into the position.
     fireEvent.click(screen.getByLabelText(`${en.removeModel} 1`))
     expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('third')
-    expect(screen.queryByLabelText(`${en.contextWindow} 1`)).toBeNull()
+    expect(screen.queryByLabelText(`${en.maxTokens} 1`)).toBeNull()
   })
 
   it('separates emptying the list from restoring the adapter defaults', async () => {
@@ -690,11 +789,11 @@ describe('endpoint interrogation', () => {
     openEditor('openai')
 
     // The row shows what identifies a model; capacities are the exception.
-    expect(screen.queryByLabelText(`${en.contextWindow} 1`)).toBeNull()
+    expect(screen.queryByLabelText(`${en.maxTokens} 1`)).toBeNull()
     expandModel(1)
     expect(screen.getByLabelText(`${en.contextWindow} 1`)).toBeTruthy()
     expandModel(1)
-    expect(screen.queryByLabelText(`${en.contextWindow} 1`)).toBeNull()
+    expect(screen.queryByLabelText(`${en.maxTokens} 1`)).toBeNull()
   })
 
   it('closes the picker without adopting anything on cancel', async () => {

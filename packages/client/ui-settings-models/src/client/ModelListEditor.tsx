@@ -69,6 +69,8 @@ export interface ModelListEditorProps {
   catalogProvider?: string | undefined
   /** Route input types for models absent from the installed catalog. */
   defaultInput?: readonly string[] | undefined
+  /** Provider capacity for models absent from the installed catalog. */
+  defaultContextWindow?: number | undefined
   /** Whether the user layer currently owns the whole array; absent on a create. */
   overridden?: boolean
   /** Replace the drafted rows. */
@@ -94,22 +96,6 @@ export interface ModelListEditorProps {
 
 /** The two token counts edited as K/M-suffixed text behind a row's disclosure. */
 type CapacityField = 'contextWindow' | 'maxTokens'
-
-/**
- * What an empty capacity field is worth, shown as its placeholder so a row left
- * blank does not read as a model with no capacity at all.
- *
- * The magnitudes are the adapter's own route-level fallbacks (`llm-pi-ai`'s
- * `defaultContextWindow` and `defaultMaxTokens`), spelled the way a person
- * would say them. They are a hint, not a mirror: this page counts `K` as 1000,
- * so typing `256K` stores 256000 while leaving the field blank keeps the
- * adapter's 262144. A deployment that overrides those defaults is not
- * reflected here — nothing on this page can read them.
- */
-const CAPACITY_HINT: Readonly<Record<CapacityField, string>> = {
-  contextWindow: '256K',
-  maxTokens: '32K',
-}
 
 /**
  * Spell a stored count for a field that may be unset. The spelling itself is
@@ -159,6 +145,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   }, [catalogProvider, operations, probe.settingsNs])
   const catalog = inheritedCatalog?.provider === catalogProvider ? inheritedCatalog?.models : undefined
   const inputDefaults = useMemo(() => new Map(catalog?.map(model => [model.id, model.inputModalities])), [catalog])
+  const contextDefaults = useMemo(() => new Map(catalog?.map(model => [model.id, model.contextWindow])), [catalog])
   const [candidates, setCandidates] = useState<readonly LlmDiscoveredModel[] | undefined>(undefined)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const [candidateQuery, setCandidateQuery] = useState('')
@@ -179,9 +166,10 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     patch(index, { [field]: parseCapacity(text) })
   }
 
-  /** What a capacity field shows: the buffer while typing, else the stored count. */
+  /** Active keystrokes, otherwise the explicit or inherited capacity. */
   const capacityText = (model: ModelDraft, index: number, field: CapacityField): string =>
-    editing.get(bufferKey(index, field)) ?? capacitySpelling(numberOf(model, field))
+    editing.get(bufferKey(index, field)) ?? capacitySpelling(numberOf(model, field)
+      ?? (field === 'contextWindow' ? contextDefaults.get(textOf(model, 'id')) ?? props.defaultContextWindow : undefined))
 
   /** Drop one row's entries and shift the rows after it down, in one pass. */
   const reindexOnRemove = (
@@ -359,12 +347,12 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
             t={t}
             contextWindow={{
               value: capacityText(model, index, 'contextWindow'),
-              placeholder: CAPACITY_HINT.contextWindow,
+              placeholder: t('contextWindowPlaceholder'),
               onChange: (text) => { editCapacity(index, 'contextWindow', text) },
             }}
             maxTokens={{
               value: capacityText(model, index, 'maxTokens'),
-              placeholder: CAPACITY_HINT.maxTokens,
+              placeholder: t('maxTokensExample'),
               onChange: (text) => { editCapacity(index, 'maxTokens', text) },
             }}
             onFieldChange={(field, value) => { patch(index, { [field]: value }) }}

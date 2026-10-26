@@ -178,6 +178,7 @@ export class SessionController extends TypertRemoteService {
           event.data.header.config.provider,
           event.data.header.config.model,
           event.data.header.config.reasoningEffort,
+          event.data.header.config.contextWindow,
         )
       }
       const message = event.type === 'user/message' ? event.data

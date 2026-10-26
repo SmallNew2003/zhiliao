@@ -78,10 +78,10 @@ Automatic callers state why policy is running; implementations may treat confirm
 
 ```ts type-equiv
 /** Why automatic policy is asking a backend to consider compaction. */
-type CompactionTrigger = 'pressure' | 'context-overflow'
+type CompactionTrigger = 'pressure' | 'context-overflow' | 'context-budget'
 ```
 
-`CompactionEngine` exposes `compactIfNeeded(agent, trigger, signal)` for automatic `pressure` or `context-overflow` policy, `compactNow(agent, signal)` for one useful idle-session reduction even below pressure, and `compactRegion(...)` for an explicit inclusive surface range. `compactNow()` runs as agent maintenance between turns, returns `null` without writing when no useful range exists, records a standalone `turn: null` bracket before summarization, and flushes a closed attempt before later queued prompts may derive from the new surface. Every backend creates its replacement `user/message` source with `compactCheckpointSource(compactionId, sourceCommandId?)`; client and wire consumers import that constructor, `CompactionCheckpointSource`, and `isCompactCheckpointSource()` from the cordis-free `@deepseek-ai/dsh-compaction/checkpoint` subpath, while the package root re-exports them for host consumers. The required transaction identity correlates the replacement checkpoint, while the predicate keeps recognition independent of any one backend. Implementations must forward the supplied signal to summarization. The seam owns no pricing API: the singleton [`ctx.tokenMeter`](token-meter.md) directly owns estimation and replay, while `dsh-compaction-basic` owns retention, event sequencing, routed summarization calls, and their configuration.
+`CompactionEngine` exposes `compactIfNeeded(agent, trigger, signal)` for automatic `pressure`, `context-overflow`, or strict `context-budget` policy, `compactNow(agent, signal)` for one useful idle-session reduction even below pressure, and `compactRegion(...)` for an explicit inclusive surface range. `compactNow()` runs as agent maintenance between turns, returns `null` without writing when no useful range exists, records a standalone `turn: null` bracket before summarization, and flushes a closed attempt before later queued prompts may derive from the new surface. Every backend creates its replacement `user/message` source with `compactCheckpointSource(compactionId, sourceCommandId?)`; client and wire consumers import that constructor, `CompactionCheckpointSource`, and `isCompactCheckpointSource()` from the cordis-free `@deepseek-ai/dsh-compaction/checkpoint` subpath, while the package root re-exports them for host consumers. The required transaction identity correlates the replacement checkpoint, while the predicate keeps recognition independent of any one backend. Implementations must forward the supplied signal to summarization. The seam owns no pricing API: the singleton [`ctx.tokenMeter`](token-meter.md) directly owns estimation and replay, while `dsh-compaction-basic` owns retention, event sequencing, routed summarization calls, and their configuration.
 
 Expected manual failures use `ManualCompactionErrorCode`:
 
@@ -151,11 +151,14 @@ Abstract compaction service. Implementations own trigger policy, retention, and 
  * Consider automatic compaction for one explicit trigger. Pressure policy
  * uses the latest durable routed request, while context-overflow policy may
  * force a useful balanced reduction even below the normal threshold. Return
- * `null` when no safe range can be compacted. A single oversized retained
+ * `null` when no safe range can be compacted for a best-effort trigger.
+ * Explicit context-budget admission rejects when the estimated request
+ * cannot fit after reserving resolved output tokens, including when automatic
+ * summarization is disabled. A single oversized retained
  * unit or request envelope cannot be repaired through surface compaction.
  *
  * @param agent - agent context owning the session surface and routing options.
- * @param trigger - normal pressure or provider-confirmed context overflow.
+ * @param trigger - normal pressure, provider-confirmed overflow, or strict explicit-budget admission.
  * @param signal - cancellation signal; model-backed implementations must forward it.
  * @returns the compaction result, or `null` if no compaction was needed.
  */

@@ -22,7 +22,7 @@ export { compactCheckpointSource, isCompactCheckpointSource } from './checkpoint
 export type { CompactionCheckpointSource } from './checkpoint.ts'
 
 /** Why automatic policy is asking a backend to consider compaction. */
-export type CompactionTrigger = 'pressure' | 'context-overflow'
+export type CompactionTrigger = 'pressure' | 'context-overflow' | 'context-budget'
 
 /** Expected failure classes for an explicit idle-session compaction request. */
 export type ManualCompactionErrorCode =
@@ -118,11 +118,14 @@ export abstract class CompactionEngine extends Service {
    * Consider automatic compaction for one explicit trigger. Pressure policy
    * uses the latest durable routed request, while context-overflow policy may
    * force a useful balanced reduction even below the normal threshold. Return
-   * `null` when no safe range can be compacted. A single oversized retained
+   * `null` when no safe range can be compacted for a best-effort trigger.
+   * Explicit context-budget admission rejects when the estimated request
+   * cannot fit after reserving resolved output tokens, including when automatic
+   * summarization is disabled. A single oversized retained
    * unit or request envelope cannot be repaired through surface compaction.
    *
    * @param agent - agent context owning the session surface and routing options.
-   * @param trigger - normal pressure or provider-confirmed context overflow.
+   * @param trigger - normal pressure, provider-confirmed overflow, or strict explicit-budget admission.
    * @param signal - cancellation signal; model-backed implementations must forward it.
    * @returns the compaction result, or `null` if no compaction was needed.
    */

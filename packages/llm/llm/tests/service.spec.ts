@@ -954,6 +954,48 @@ describe('LlmRuntime', () => {
     })
   })
 
+  it('prepares inherited and explicit context budgets without changing adapter metadata', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['route'], new CatalogAdapter(
+      { id: 'route', name: 'Route' }, [], { model: { contextWindow: 320_000 } },
+    ))
+    const inherited = await ctx.llm.prepareCall({ provider: 'route', model: 'model' })
+    const explicit = await ctx.llm.prepareCall({ provider: 'route', model: 'model', contextWindow: 960_000 })
+    expect(inherited.context).toEqual({ contextWindow: 320_000 })
+    expect(inherited.config).not.toHaveProperty('contextWindow')
+    expect(explicit.config.contextWindow).toBe(960_000)
+    expect(explicit.context).toEqual({ contextWindow: 960_000 })
+    expect(Object.isFrozen(explicit.context)).toBe(true)
+    expect((await ctx.llm.resolveModelInfo('route', 'model')).context).toEqual({ contextWindow: 320_000 })
+    expect(() => explicit.stream({ ...explicit.config, contextWindow: 320_000, messages: [] }))
+      .toThrow(/config changed/)
+    await collect(explicit.stream({ ...explicit.config, messages: [] }))
+    await ctx.fiber.dispose()
+  })
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid per-call context budget %s', async (contextWindow) => {
+      const ctx = new Context()
+      await ctx.plugin(LlmRuntime)
+      ctx.llm.registerAdapter(['route'], new CatalogAdapter({ id: 'route', name: 'Route' }, []))
+      await expect(ctx.llm.prepareCall({ provider: 'route', model: 'model', contextWindow }))
+        .rejects.toMatchObject({ code: 'INVALID_CONTEXT_WINDOW' })
+      await expect(ctx.llm.resolveCallConfig({ provider: 'route', model: 'model', contextWindow }))
+        .rejects.toMatchObject({ code: 'INVALID_CONTEXT_WINDOW' })
+      await ctx.fiber.dispose()
+    },
+  )
+
+  it('provides explicit context capacity for an adapter with no inherited capacity', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    ctx.llm.registerAdapter(['route'], new CatalogAdapter({ id: 'route', name: 'Route' }, []))
+    const prepared = await ctx.llm.prepareCall({ provider: 'route', model: 'model', contextWindow: 640_000 })
+    expect(prepared.context).toEqual({ contextWindow: 640_000 })
+    await ctx.fiber.dispose()
+  })
+
   it('reuses one exact-model lookup for prepared config and context metadata', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
