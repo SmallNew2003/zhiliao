@@ -257,7 +257,15 @@ function providerWording(inheritsConversation: boolean): { description: string; 
         + 'completed turns so far (it does not see the current in-flight turn). Use this when the subtask '
         + 'builds on this conversation\'s context — a follow-up analysis, '
         + 'a review, a continuation — without consuming this conversation\'s context for the work itself. '
-        + 'You receive its result, not its intermediate steps.',
+        + 'You receive its result, not its intermediate steps. Delegate proactively: ordinary delegation '
+        + 'does not require the user to ask; only Agent Teams and workflow require an explicit request. '
+        + 'Reach for a fork when a search or investigation may span many files and direct lookups may not '
+        + 'find the target, when two or more independent subtasks can run in parallel, when a subtask would '
+        + 'consume large amounts of context, or when completed work needs independent verification. A fork '
+        + 'is especially useful when the child needs context already established in this conversation. Keep '
+        + 'work local when the target is already known, when the task takes only one or two direct steps, or '
+        + 'when delegating would only move synthesis of results to the child. Once a search is delegated, do '
+        + 'not repeat it yourself, and do not predict a pending subagent\'s result.',
       promptDescription:
         'The task for the subagent. It already sees this conversation\'s completed turns, so build on them '
         + 'freely and state only what is new.',
@@ -268,8 +276,15 @@ function providerWording(inheritsConversation: boolean): { description: string; 
       'Delegate a self-contained task to a subagent (a separate agent that works in its own context) '
       + 'to offload focused, independent work — research, a scoped '
       + 'implementation, an analysis — so it does not consume this conversation\'s context. The subagent '
-      + 'returns its result, not its intermediate steps. Give it a '
-      + 'complete, standalone prompt: it does not see this conversation.',
+      + 'returns its result, not its intermediate steps. Delegate proactively: ordinary delegation does '
+      + 'not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for '
+      + 'a subagent when a search or investigation may span many files and you are not confident a few '
+      + 'direct lookups will find the target, when two or more independent subtasks can run in parallel, '
+      + 'when a subtask would consume large amounts of context, or when completed work needs independent '
+      + 'verification. Keep work local when the target is already known, when the task takes only one or '
+      + 'two direct steps, or when delegating would only move synthesis of results to the child. Once a '
+      + 'search is delegated, do not repeat it yourself, and do not predict a pending subagent\'s result. '
+      + 'Give it a complete, standalone prompt: it does not see this conversation.',
     promptDescription:
       'The complete, self-contained task for the subagent. It does not share this '
       + 'conversation\'s context, so include everything it needs.',
@@ -601,7 +616,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
         order: runtimeCtx.systemPrompt.getSectionOrder('TOOL_SUBAGENT'),
         text: context => mounted === undefined || runtimeCtx.tools.get(toolName, context.scope) === undefined
           ? ''
-          : `Use ${toolName} in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set \`run_in_background: false\` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.`,
+          : `Use ${toolName} in the background by default. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Start independent delegations together in one assistant message and continue useful work while they run. Reach for a subagent when a search or investigation may span many files and direct lookups may not find the target, when independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. Keep work local when the target is already known or the task takes only one or two direct steps, and do not repeat a search already delegated. Set \`run_in_background: false\` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.`,
       })
     }
   }

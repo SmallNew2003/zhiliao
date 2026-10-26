@@ -162,7 +162,7 @@ When `enableRunInBackground` and `backgroundMode: continuable` are both set, the
 ##### Tool-guidance section
 
 ```markdown
-Use subagent in the background by default. Start independent delegations together in one assistant message and continue useful work while they run. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.
+Use subagent in the background by default. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Start independent delegations together in one assistant message and continue useful work while they run. Reach for a subagent when a search or investigation may span many files and direct lookups may not find the target, when independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. Keep work local when the target is already known or the task takes only one or two direct steps, and do not repeat a search already delegated. Set `run_in_background: false` only when your next action depends on that subagent's result. When a background run settles, the runtime sends you a notice containing its outcome and any final assistant message.
 ```
 
 #### Token effect

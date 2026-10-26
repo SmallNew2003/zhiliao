@@ -459,6 +459,14 @@ describe('dsh-tool-subagent', () => {
     expect(schema.description).toContain('inherits this conversation')
     expect(schema.description).not.toContain('does not see this conversation')
     expect(schema.description).not.toContain('can prevent provider-side reuse of the inherited conversation prefix')
+    expect(schema.description).toContain('Delegate proactively: ordinary delegation does not require the user to ask')
+    expect(schema.description).toContain('direct lookups may not find the target')
+    expect(schema.description).toContain('two or more independent subtasks can run in parallel')
+    expect(schema.description).toContain('would consume large amounts of context')
+    expect(schema.description).toContain('completed work needs independent verification')
+    expect(schema.description).toContain('Keep work local when the target is already known')
+    expect(schema.description).toContain('Once a search is delegated, do not repeat it yourself')
+    expect(schema.description).toContain('do not predict a pending subagent\'s result')
     const props = (schema.parameters as { properties: Record<string, { description: string }> }).properties
     expect(props['prompt']!.description).toContain('completed turns')
   })
@@ -1221,6 +1229,15 @@ describe('dsh-tool-subagent continuable background mode', () => {
     expect(schema.description).not.toContain('send_message` starts a later turn')
     expect(schema.description).toContain('runs in the background by default')
     expect(schema.description).not.toContain('never poll or wait on it')
+    // Proactive delegation guidance: triggers and restraint are written together.
+    expect(schema.description).toContain('Delegate proactively: ordinary delegation does not require the user to ask')
+    expect(schema.description).toContain('not confident a few direct lookups will find the target')
+    expect(schema.description).toContain('two or more independent subtasks can run in parallel')
+    expect(schema.description).toContain('would consume large amounts of context')
+    expect(schema.description).toContain('completed work needs independent verification')
+    expect(schema.description).toContain('Keep work local when the target is already known')
+    expect(schema.description).toContain('Once a search is delegated, do not repeat it yourself')
+    expect(schema.description).toContain('do not predict a pending subagent\'s result')
     const properties = (schema.parameters as {
       properties: Record<string, { description?: string }>
     }).properties
@@ -1229,6 +1246,13 @@ describe('dsh-tool-subagent continuable background mode', () => {
     const guidance = assembly.sections.find(section => section.name === 'tool:subagent')
     expect(guidance?.text).toContain('Use subagent in the background by default')
     expect(guidance?.text).toContain('runtime sends you a notice containing its outcome')
+    expect(guidance?.text).toContain('Delegate proactively: ordinary delegation does not require the user to ask')
+    expect(guidance?.text).toContain('direct lookups may not find the target')
+    expect(guidance?.text).toContain('independent subtasks can run in parallel')
+    expect(guidance?.text).toContain('would consume large amounts of context')
+    expect(guidance?.text).toContain('completed work needs independent verification')
+    expect(guidance?.text).toContain('Keep work local when the target is already known')
+    expect(guidance?.text).toContain('do not repeat a search already delegated')
 
     const started = await callSubagent(
       ctx,
