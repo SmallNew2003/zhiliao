@@ -25,11 +25,19 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
  */
 const READING_SLOT = '\u0000'
 
-/** Panel legend rows, in bar-segment order; each color class carries the shared swatch/segment tint. */
+/**
+ * Panel legend rows, in bar-segment order; each color class carries the shared
+ * swatch/segment tint. The two tool rows partition `toolsTokens`, and the two
+ * tints are one violet at two weights so the split reads as origin, not as a
+ * second category. An `optional` row is omitted while its figure is zero: a
+ * session with no MCP server shows the harness's own tools alone, and the row
+ * appears the moment one contributes schema tokens.
+ */
 const ROWS = [
-  { key: 'systemTokens', label: 'context.system', color: css.colorSystem },
-  { key: 'toolsTokens', label: 'context.tools', color: css.colorTools },
-  { key: 'messageTokens', label: 'context.messages', color: css.colorMessages },
+  { key: 'systemTokens', label: 'context.system', color: css.colorSystem, optional: false },
+  { key: 'systemToolsTokens', label: 'context.toolsBuiltin', color: css.colorToolsBuiltin, optional: false },
+  { key: 'externalToolsTokens', label: 'context.toolsExternal', color: css.colorToolsExternal, optional: true },
+  { key: 'messageTokens', label: 'context.messages', color: css.colorMessages, optional: false },
 ] as const
 
 /**
@@ -161,7 +169,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
           </div>
           {breakdown !== undefined && (
             <dl className={css.rows}>
-              {ROWS.map(row => (
+              {ROWS.filter(row => !row.optional || breakdown[row.key] > 0).map(row => (
                 <div key={row.key} className={css.row}>
                   <dt>
                     <span className={`${css.swatch} ${row.color}`} aria-hidden />

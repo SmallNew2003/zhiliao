@@ -7,7 +7,7 @@
 import { z } from 'zod'
 import { canonicalHeader, isSurfaceEvent, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { estimateToolsTokens } from './estimate.ts'
+import { estimateExternalToolTokens, estimateSystemToolTokens } from './estimate.ts'
 import { commitSurfaceTokens, planSurfaceTokens } from './surface-fold.ts'
 // Import for the `contextBreakdown` SessionProjectionStateMap key merge.
 import type {} from './projection.ts'
@@ -24,6 +24,8 @@ const sessionSeq = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).t
 const breakdownSchema = z.object({
   systemTokens: tokenCount,
   toolsTokens: tokenCount,
+  systemToolsTokens: tokenCount,
+  externalToolsTokens: tokenCount,
   messageTokens: tokenCount,
 }).strict()
 
@@ -43,22 +45,44 @@ type ContextBreakdownState = z.infer<typeof contextBreakdownStateSchema>
  * order classified as system tokens; all other visible prices are messages.
  * Replacements use the measurement planner, not shadow-price claims. State
  * and surface transitions cost O(current retained surface), not O(log length).
- * Tools are priced from the latest request header. No route pricing applies.
+ * Tools are priced from the latest request header and split into the harness's
+ * own schemas and the MCP-bridged ones by public-name prefix. No route pricing
+ * applies.
  */
 export const contextBreakdownProjectionDefinition = {
   key: 'contextBreakdown',
-  stateVersion: 5,
+  stateVersion: 6,
   stateSchema: contextBreakdownStateSchema,
   init: (): ContextBreakdownState => ({
     nodes: [],
-    breakdown: { systemTokens: 0, toolsTokens: 0, messageTokens: 0 },
+    breakdown: {
+      systemTokens: 0,
+      toolsTokens: 0,
+      systemToolsTokens: 0,
+      externalToolsTokens: 0,
+      messageTokens: 0,
+    },
   }),
   apply: (state, event) => {
     if (event.type === 'request/header') {
-      const toolsTokens = estimateToolsTokens(canonicalHeader(event.data.header))
-      return toolsTokens === state.breakdown.toolsTokens
-        ? state
-        : { ...state, breakdown: { ...state.breakdown, toolsTokens } }
+      // Both figures price every schema on its own, so they partition the tool
+      // total exactly: a session whose tools are all MCP-bridged reports no
+      // harness-side tokens rather than the envelope's framing remainder.
+      const header = canonicalHeader(event.data.header)
+      const systemToolsTokens = estimateSystemToolTokens(header)
+      const externalToolsTokens = estimateExternalToolTokens(header)
+      const previous = state.breakdown
+      if (systemToolsTokens === previous.systemToolsTokens
+        && externalToolsTokens === previous.externalToolsTokens) return state
+      return {
+        ...state,
+        breakdown: {
+          ...previous,
+          toolsTokens: systemToolsTokens + externalToolsTokens,
+          systemToolsTokens,
+          externalToolsTokens,
+        },
+      }
     }
     if (!isSurfaceEvent(event)) return state
     const plan = planSurfaceTokens(state.nodes, event)
@@ -71,11 +95,14 @@ export const contextBreakdownProjectionDefinition = {
     const messageTokens = state.breakdown.systemTokens + state.breakdown.messageTokens + plan.deltaTokens - systemTokens
     const breakdown = systemTokens === state.breakdown.systemTokens && messageTokens === state.breakdown.messageTokens
       ? state.breakdown
-      : { systemTokens, toolsTokens: state.breakdown.toolsTokens, messageTokens }
+      : { ...state.breakdown, systemTokens, messageTokens }
     return { nodes, breakdown }
   },
   wire: {
     viewSchema: breakdownSchema,
+    // The breakdown object is the published reference: reusing it when the
+    // composition is unchanged is what suppresses publication for a rewrite
+    // that only moves checkpoint positions.
     view: state => state.breakdown,
   },
 } satisfies ProjectionDefinition<'contextBreakdown', ContextBreakdownState>

@@ -49,8 +49,8 @@ export interface ContextPressureProjection {
 
 /**
  * Heuristic composition of the next request's context: what the prompt is
- * made of, not what it costs. All three figures use the meter's fixed
- * density estimate, so they will not sum to the provider-anchored
+ * made of, not what it costs. Every figure uses the meter's fixed density
+ * estimate, so they will not sum to the provider-anchored
  * `projectedTokens`: the estimator systematically underprices CJK text and
  * JSON schemas, which is exactly the error the anchoring in
  * {@link ContextPressureProjection.projectedTokens} keeps out of the occupancy
@@ -59,8 +59,23 @@ export interface ContextPressureProjection {
 export interface ContextBreakdownProjection {
   /** Heuristic tokens of the last nonempty surviving system prompt in surface order; 0 when none exists. */
   systemTokens: number
-  /** Heuristic tokens of the newest request envelope's tool schemas; 0 before any request. */
+  /**
+   * Heuristic tokens of the newest request envelope's tool schemas; 0 before
+   * any request. The sum of the two origin figures below, each schema priced
+   * on its own rather than as one envelope.
+   */
   toolsTokens: number
+  /**
+   * Heuristic tokens of the harness's own tool schemas in the same envelope —
+   * every schema without an MCP public-name prefix, including one a
+   * third-party plugin registered without a namespace.
+   */
+  systemToolsTokens: number
+  /**
+   * Heuristic tokens of the MCP-bridged tool schemas in the same envelope,
+   * classified by public-name prefix; 0 when no MCP server contributes a tool.
+   */
+  externalToolsTokens: number
   /** Heuristic tokens of every other visible surface node, including superseded system prompts. */
   messageTokens: number
 }
@@ -71,7 +86,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
     tokenUsage: TokenUsageProjection
     /** Newest request pressure paired with the newest known route capacity. */
     contextPressure: ContextPressureProjection
-    /** Heuristic system/tools/message composition of the next request. */
+    /** Heuristic system/tool/message composition of the next request. */
     contextBreakdown: ContextBreakdownProjection
   }
 }

@@ -451,6 +451,16 @@ export interface ToolSchema {
   parameters: Record<string, unknown>
 }
 
+/**
+ * Public-name prefix every MCP-bridged tool carries. The MCP client's
+ * `publicToolName` is the single constructor of these names, so the prefix is
+ * the only origin marker a model-visible {@link ToolSchema} retains: the
+ * registry projects name, description, and parameters onto the wire and drops
+ * every other field. Tools registered by the harness itself, and by third-party
+ * plugins that register without a namespace, carry no prefix.
+ */
+export const MCP_TOOL_NAME_PREFIX = 'mcp__'
+
 /** A single model request, fully assembled. */
 export interface GenerateOptions {
   /** Registered provider route selecting the adapter instance. */

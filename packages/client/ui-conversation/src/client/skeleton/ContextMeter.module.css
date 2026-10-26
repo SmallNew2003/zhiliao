@@ -121,7 +121,14 @@
   --meter-tint: var(--dsw-static-neutral-bluish-400);
 }
 
-.colorTools {
+.colorToolsBuiltin {
+  /* The violet-400 literal of .colorToolsExternal at reduced weight: the
+     harness's own tools and the MCP-bridged ones read as one tool family split
+     by origin, not as two categories. */
+  --meter-tint: rgba(167, 139, 250, 0.45);
+}
+
+.colorToolsExternal {
   /* The design platform ships no purple static token; violet-400 literal. */
   --meter-tint: rgb(167, 139, 250);
 }
