@@ -90,9 +90,11 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-/* Compact one-line Workspace row after removing the session-count subtitle. */
+/* Workspace row: title plus directory path, so it grows past the one-line
+   floor when the path renders. The ungrouped bucket has no directory and
+   stays at the floor. */
 .projectRow {
-  height: 34px;
+  min-height: 34px;
   align-items: center;
   box-sizing: border-box;
 }
