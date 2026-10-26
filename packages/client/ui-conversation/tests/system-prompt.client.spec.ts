@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { inspectSystemPrompt, type SystemPromptState } from '../src/client/contract/system-prompt.ts'
 
@@ -10,8 +12,42 @@ function system(seq: number, text: string, replaces?: number): SessionEvent {
   } as SessionEvent
 }
 
+/**
+ * A compaction checkpoint message: the compaction backend lands one as a
+ * user-role message over the span it shadows, carrying the `compact` plugin
+ * source. That source is what keeps it out of the latest-input snapshot.
+ * Annotated so the literal's `content` is not widened to `never[]`, which the
+ * event cast below would reject.
+ */
+const checkpointMessage: UserMessage = createUserMessage({
+  content: [], source: { kind: 'plugin', plugin: 'compact' },
+})
+
+const questionMessage: UserMessage = createUserMessage({
+  content: [{ type: 'text', text: 'question' }], source: { kind: 'user' },
+})
+
+const revisedMessage: UserMessage = createUserMessage({
+  content: [{ type: 'text', text: 'revised' }], source: { kind: 'user' },
+})
+
 function replace(seq: number, start: number, end: number): SessionEvent {
-  return { seq, time: seq, type: 'user/message', surfaceOp: { op: 'replace', startSeq: start, endSeq: end } } as SessionEvent
+  return {
+    seq, time: seq, type: 'user/message',
+    data: checkpointMessage,
+    surfaceOp: { op: 'replace', startSeq: start, endSeq: end },
+  } as SessionEvent
+}
+
+function userInput(seq: number): SessionEvent {
+  return { seq, time: seq, type: 'user/message', data: questionMessage } as SessionEvent
+}
+
+function editInput(seq: number, targetSeq: number): SessionEvent {
+  return {
+    seq, time: seq, type: 'user/message-edit',
+    data: { targetSeq, message: revisedMessage },
+  } as SessionEvent
 }
 
 function fold(events: readonly SessionEvent[]): SystemPromptState | undefined {
@@ -58,6 +94,20 @@ describe('loaded system surface interpretation', () => {
     expect(state?.nodes).toEqual([])
     expect(state?.effective).toBeUndefined()
     expect(fold([replace(12, 5, 9)])?.effective).toBeUndefined()
+  })
+
+  it('snapshots the prompt before the latest user input and restores it across an edit', () => {
+    const before = fold([system(1, 'A')])
+    const withInput = inspectSystemPrompt(before, userInput(4))
+    // Later prompts keep serving; the snapshot retains the pre-input one.
+    const later = inspectSystemPrompt(withInput, system(6, 'B'))
+    expect(later.effective?.text).toBe('B')
+    const edited = inspectSystemPrompt(later, editInput(7, 4))
+    expect(edited.effective?.text).toBe('A')
+    expect(edited.latestInput?.seq).toBe(7)
+    // A compaction checkpoint is a user-role message too; its source keeps it
+    // out of the snapshot the edit restores.
+    expect(inspectSystemPrompt(later, replace(8, 6, 6)).latestInput?.seq).toBe(4)
   })
 
   it('drops shadowed replacement endpoints without mutating historical prefixes', () => {
