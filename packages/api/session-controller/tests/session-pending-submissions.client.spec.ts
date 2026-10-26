@@ -214,6 +214,48 @@ describe('observed retirement', () => {
     })
   })
 
+  it('keeps a transcript echo alive across a next-turn queue projection until its own user/message lands', async ({ mock, start }) => {
+    const session = await sessionBench(mock, start, SID)
+    await session.open()
+    const retirements: PendingSubmissionRetirement[] = []
+    const handle = session.beginSubmission({
+      mode: 'queue', text: '首条', attachments: [], onRetire: r => retirements.push(r),
+    })
+    // Idle submission: the echo placement is 'transcript'.
+    expect(session.getSnapshot().pendingSubmissions).toMatchObject([{ placement: 'transcript', text: '首条' }])
+    // The host first splices the message into the durable next-turn queue.
+    const queued = queuedItem(handle.requestId, [])
+    session.projections.apply('inbox', { 'next-turn': [queued], 'next-step': [] }, SessionSeq(0))
+    await settleFrames()
+    // The echo survives the queue projection: no flow seat renders a next-turn
+    // row, so retiring here would drop the bubble into the turn's loading signal.
+    expect(session.getSnapshot().pendingSubmissions).toMatchObject([{ placement: 'transcript', text: '首条' }])
+    expect(retirements).toEqual([])
+    // The turn node's own user/message retires the echo and hands off atomically.
+    await pushEvent(mock, promptEvent(SessionSeq(0), handle.requestId))
+    await settleFrames()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retirements).toEqual([{ reason: 'observed', attachments: [] }])
+  })
+
+  it('does not retire a transcript echo on a next-turn inbox splice event', async ({ mock, start }) => {
+    const session = await sessionBench(mock, start, SID)
+    await session.open()
+    const retirements: PendingSubmissionRetirement[] = []
+    const handle = session.beginSubmission({
+      mode: 'queue', text: '首条', attachments: [], onRetire: r => retirements.push(r),
+    })
+    const queued = queuedItem(handle.requestId, [])
+    await pushEvent(mock, {
+      type: 'agent/inbox/spliced', seq: SessionSeq(0), time: 1,
+      data: { target: 'next-turn', start: 0, inserted: [queued] },
+    })
+    await settleFrames()
+    // A next-turn splice is queue-only; the transcript echo waits for user/message.
+    expect(session.getSnapshot().pendingSubmissions).toMatchObject([{ placement: 'transcript', text: '首条' }])
+    expect(retirements).toEqual([])
+  })
+
   it('retires a mixed echo with durable references in original selection order', async ({ mock, start }) => {
     const session = await sessionBench(mock, start, SID)
     await session.open()

@@ -1102,6 +1102,26 @@ describe('ChatView', () => {
     expect(view.getAllByText('即发即显')).toHaveLength(1)
   })
 
+  it('renders a fresh submission echo above the turn loading status', () => {
+    const h = makeHarness(
+      { nodes: [] },
+      {
+        running: true,
+        pendingSubmissions: [{
+          requestId: 'req-fresh' as never, placement: 'transcript',
+          time: 5_000, text: '刚发出', attachments: [],
+        }],
+      },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    const echo = view.getByText('刚发出').closest('[data-submission-echo]') as HTMLElement
+    const status = view.getByRole('status')
+    // A just-sent message must lead the flow instead of hiding under the
+    // turn's "deep diving" loading signal.
+    expect(echo.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('renders a local steer echo as pending steering before Host image admission completes', () => {
     const h = makeHarness(
       { nodes: [assistant(1, 'working')] },
@@ -1165,6 +1185,46 @@ describe('ChatView', () => {
     // The queued occurrence and its local predecessor both belong to the
     // queue dock, never the Chat flow.
     expect(view.queryByText('排队中')).toBeNull()
+  })
+
+  it('keeps a fresh transcript echo visible while its message sits in the queue, until the turn node renders', () => {
+    const h = makeHarness(
+      { nodes: [] },
+      {
+        running: true,
+        pendingSubmissions: [{
+          requestId: 'req-qt' as never, placement: 'transcript',
+          time: 6_500, text: '首条消息', attachments: [],
+        }],
+      },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('首条消息').closest('[data-submission-echo]')).not.toBeNull()
+    // The host first splices the message into the durable next-turn queue; the
+    // echo must not vanish into the queue dedupe before the turn node renders.
+    act(() => {
+      h.setSession({
+        testInbox: { 'next-step': [], 'next-turn': [{
+          id: 'qt-occurrence' as never,
+          content: [{ type: 'text' as const, text: '首条消息' }],
+          role: 'user', source: { kind: 'user', rpcId: 'req-qt' as never },
+        }] },
+      })
+    })
+    expect(view.getByText('首条消息').closest('[data-submission-echo]')).not.toBeNull()
+    // The turn node lands: the echo hands off atomically to the durable bubble.
+    act(() => {
+      h.setChat({
+        nodes: [{
+          kind: 'user', seq: 1, time: 2_000,
+          content: [{ type: 'text', text: '首条消息' }] as never,
+          source: { kind: 'user', rpcId: 'req-qt' },
+        }],
+      })
+      h.setSession({ testInbox: { 'next-step': [], 'next-turn': [] } })
+    })
+    expect(view.getAllByText('首条消息')).toHaveLength(1)
+    expect(view.container.querySelector('[data-submission-echo]')).toBeNull()
   })
 
   it('an image echo renders its previews through the message-image slot', () => {

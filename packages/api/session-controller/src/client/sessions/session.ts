@@ -706,9 +706,20 @@ export class Session implements SessionFace {
   private observeSubmissionEvent(event: { readonly type: string; readonly data?: unknown }): void {
     if (this.submissionSettlements.size === 0) return
     if (event.type === 'agent/inbox/spliced') {
-      const splice = event.data as { readonly inserted?: unknown } | undefined
+      const splice = event.data as { readonly inserted?: unknown; readonly target?: unknown } | undefined
       if (Array.isArray(splice?.inserted)) {
-        for (const message of splice.inserted) this.observeSubmissionEvent({ type: 'user/message', data: message })
+        // A next-step steer admission hands its echo to the pending-steering
+        // seat in the same frame. A next-turn splice retires only queued echoes
+        // (the queue dock takes over); a transcript echo waits for its own
+        // user/message so the bubble survives until the turn node renders.
+        const admitted = splice.target === 'next-step'
+          ? splice.inserted
+          : splice.inserted.filter((message: unknown) => {
+            const source = (message as { readonly source?: { readonly kind?: unknown; readonly rpcId?: unknown } }).source
+            return !(source?.kind === 'user' && typeof source.rpcId === 'string'
+              && this.pendingEchoPlacement(source.rpcId as SessionRequestId) === 'transcript')
+          })
+        for (const message of admitted) this.observeSubmissionEvent({ type: 'user/message', data: message })
       }
       return
     }
@@ -722,16 +733,35 @@ export class Session implements SessionFace {
     this.scheduleObservedRetirement(source.rpcId as SessionRequestId, attachmentRefsIn(data?.content))
   }
 
-  /** Retire local echoes when their accepted messages appear in the durable Inbox projection. */
+  /** The placement of one still-pending local echo, or undefined once retired. */
+  private pendingEchoPlacement(requestId: SessionRequestId): PendingSubmission['placement'] | undefined {
+    return this.pendingSubmissions.find(echo => echo.requestId === requestId)?.placement
+  }
+
+  /**
+   * Retire local echoes when their admitted messages appear in the durable
+   * Inbox projection. A next-step steer admission hands its echo to the flow
+   * tail's pending-steering seat in the same frame. A next-turn row retires a
+   * queued echo (the queue dock takes over), but a transcript echo is a fresh
+   * submission whose turn node has not rendered yet — retiring it on the queue
+   * splice would drop the bubble into the loading signal — so it waits for its
+   * own user/message.
+   */
   private observeSubmissionInbox(): void {
     if (this.submissionSettlements.size === 0) return
     const inbox = this.projections.get('inbox') as InboxState | undefined
     if (inbox === undefined) return
-    for (const message of [...inbox['next-turn'], ...inbox['next-step']]) {
+    for (const message of inbox['next-step']) {
       const source = message.source
       if (source.kind === 'user' && 'rpcId' in source) {
         this.scheduleObservedRetirement(source.rpcId, attachmentRefsIn(message.content))
       }
+    }
+    for (const message of inbox['next-turn']) {
+      const source = message.source
+      if (source.kind !== 'user' || !('rpcId' in source)) continue
+      if (this.pendingEchoPlacement(source.rpcId) === 'transcript') continue
+      this.scheduleObservedRetirement(source.rpcId, attachmentRefsIn(message.content))
     }
   }
 
