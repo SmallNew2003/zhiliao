@@ -18,6 +18,7 @@ import { specTypeSchemas, type Client, type ImageContent } from '@modelcontextpr
 import type { Context } from '@deepseek-ai/cordis'
 import { isImageAdmissionError } from '@deepseek-ai/dsh-attachment'
 import type { AttachmentStore, ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
+import { MCP_TOOL_NAME_PREFIX } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ToolDefinition, ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { assertSupportedJsonSchema } from '@deepseek-ai/dsh-tools'
@@ -68,7 +69,8 @@ const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9
  * Derive the model-facing public name for one MCP tool.
  *
  * Deterministic pure function of `(serverName, rawName)`: the clean case is
- * `mcp__<serverName>__<rawName>` verbatim. When character replacement or
+ * `mcp__<serverName>__<rawName>` verbatim (the prefix is
+ * {@link MCP_TOOL_NAME_PREFIX}). When character replacement or
  * truncation to the DeepSeek function-name contract (64 chars,
  * `[A-Za-z0-9_-]`) changes the name, a 12-hex-char SHA-256 hash of the
  * identity is appended so distinct MCP identities never collapse into the
@@ -79,7 +81,7 @@ const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9
  * @returns The globally unique, model-facing ToolRuntime name.
  */
 export function publicToolName(serverName: string, rawName: string): string {
-  const joined = `mcp__${serverName}__${rawName}`
+  const joined = `${MCP_TOOL_NAME_PREFIX}${serverName}__${rawName}`
   const normalized = joined.replace(INVALID_NAME_CHARS, '_')
   if (normalized === joined && normalized.length <= MAX_PUBLIC_NAME_LENGTH) return normalized
   const hash = createHash('sha256').update(`${serverName}\0${rawName}`).digest('hex').slice(0, HASH_LENGTH)

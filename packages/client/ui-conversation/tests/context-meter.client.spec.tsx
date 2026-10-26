@@ -14,7 +14,13 @@ afterEach(cleanup)
 const t = makeTranslate(zh, commonZh) as ContextMeterProps['t']
 const tEn = makeTranslate(en, commonEn) as ContextMeterProps['t']
 
-const BREAKDOWN = { systemTokens: 120, toolsTokens: 21_500, messageTokens: 477_000 }
+const BREAKDOWN = {
+  systemTokens: 120,
+  toolsTokens: 21_500,
+  systemToolsTokens: 19_500,
+  externalToolsTokens: 2_000,
+  messageTokens: 477_000,
+}
 
 const segmentClass = css.segment
 if (segmentClass === undefined) throw new Error('segment class missing from ContextMeter.module.css')
@@ -58,10 +64,11 @@ describe('ContextMeter', () => {
     expect(panel.textContent).toContain('25%')
     expect(panel.textContent).toContain('上下文已用')
     expect(panel.textContent).toContain('系统提示词~120')
-    expect(panel.textContent).toContain('工具定义~21.5K')
+    expect(panel.textContent).toContain('内置工具~19.5K')
+    expect(panel.textContent).toContain('MCP 工具~2K')
     expect(panel.textContent).toContain('对话消息~477K')
     // The occupancy bar splits into one colored segment per composition row.
-    expect(panel.getElementsByClassName(segmentClass)).toHaveLength(3)
+    expect(panel.getElementsByClassName(segmentClass)).toHaveLength(4)
     // Clicking the trigger again toggles the panel shut.
     fireEvent.click(trigger)
     expect(view.queryByRole('dialog')).toBeNull()
@@ -82,6 +89,20 @@ describe('ContextMeter', () => {
     fireEvent.click(enView.getByRole('button', { name: '25% of context used' }))
     expect(enView.queryByRole('dialog', { name: 'of context used' })!.textContent)
       .toMatch(/^25%of context used/)
+  })
+
+  it('omits the MCP row and its segment while no MCP tool contributes', () => {
+    const view = meter({
+      contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 },
+      contextBreakdown: { ...BREAKDOWN, systemToolsTokens: 21_500, externalToolsTokens: 0 },
+    })
+    fireEvent.click(view.getByRole('button', { name: '上下文已用 25%' }))
+    const panel = view.queryByRole('dialog')!
+    // The harness's own tools keep the whole tool figure, and the MCP row costs
+    // no panel space until a server contributes schema tokens.
+    expect(panel.textContent).toContain('内置工具~21.5K')
+    expect(panel.textContent).not.toContain('MCP 工具')
+    expect(panel.getElementsByClassName(segmentClass)).toHaveLength(3)
   })
 
   it('draws no bar segment at zero occupancy', () => {

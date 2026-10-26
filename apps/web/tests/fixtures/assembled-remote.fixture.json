@@ -331,6 +331,8 @@
             "contextBreakdown": {
               "systemTokens": 17,
               "toolsTokens": 0,
+              "systemToolsTokens": 0,
+              "externalToolsTokens": 0,
               "messageTokens": 4427
             },
             "sessionStats": {
@@ -396,6 +398,8 @@
             "contextBreakdown": {
               "systemTokens": 0,
               "toolsTokens": 0,
+              "systemToolsTokens": 0,
+              "externalToolsTokens": 0,
               "messageTokens": 0
             },
             "sessionStats": {
@@ -461,6 +465,8 @@
             "contextBreakdown": {
               "systemTokens": 0,
               "toolsTokens": 0,
+              "systemToolsTokens": 0,
+              "externalToolsTokens": 0,
               "messageTokens": 0
             },
             "sessionStats": {
@@ -5811,6 +5817,8 @@
         "contextBreakdown": {
           "systemTokens": 17,
           "toolsTokens": 0,
+          "systemToolsTokens": 0,
+          "externalToolsTokens": 0,
           "messageTokens": 4427
         },
         "sessionStats": {
