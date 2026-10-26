@@ -27,7 +27,10 @@ import {
   deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, UNGROUPED_KEY, visibleSessionIds,
 } from '../tree.ts'
-import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
+import {
+  ProjectRowItem, SearchResultItem, SessionNodeItem, useTreeTabStop,
+  type TreeRowSeat,
+} from './Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
 import css from './WorkspaceBrowser.module.css'
@@ -385,6 +388,22 @@ function SessionTree({
     && workspaceDrag?.over?.id === rootGroups[0].workspaceId
     && workspaceDrag.over.half === 'before'
 
+  // Roving tab stop: the selected Session's row holds it until a row claims
+  // focus, and with no selection it rests on the first row so Tab still enters
+  // the tree.
+  const { tabStopId, claim: claimTabStop } = useTreeTabStop(current)
+  const firstRowId = useMemo(() => {
+    const first = groups[0]
+    if (first === undefined || !first.expanded) return first?.key
+    const firstSession = first.sessions[0]
+    return firstSession === undefined ? first.key : firstSession.id
+  }, [groups])
+  const stopId = tabStopId ?? firstRowId
+  const seatFor = (id: string): TreeRowSeat => ({
+    tabbable: stopId === id,
+    claim: () => { claimTabStop(id) },
+  })
+
   const renderGroup = (group: GroupNode, depth: number): ReactNode => {
     const workspaceId = group.workspaceId
     const children = childrenByParent.get(group.key) ?? []
@@ -478,6 +497,7 @@ function SessionTree({
             }
           }}
           drag={workspaceDragProps}
+          seat={seatFor(group.key)}
           actions={group.workspaceId === undefined
             ? undefined
             : {
@@ -542,6 +562,7 @@ function SessionTree({
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
               drag={dragProps}
+              seat={seatFor(node.id)}
               t={t}
             />
           )
@@ -610,6 +631,15 @@ function FlatList({
   const [drag, setDrag] = useState<DragState | null>(null)
   const dropCommitted = useRef(false)
   useNativeDragAcceptance(drag !== null)
+  // Roving tab stop over the one flat list: the selected Session's row holds
+  // it, and the first row takes it when nothing is selected.
+  const { tabStopId, claim: claimTabStop } = useTreeTabStop(
+    panelActive ? undefined : Object.values(list.byId).find(s => (s.retainedBy.mainView ?? 0) > 0)?.id,
+  )
+  const seatFor = (id: string): TreeRowSeat => ({
+    tabbable: (tabStopId ?? sessionIds[0]) === id,
+    claim: () => { claimTabStop(id) },
+  })
   const currentId = panelActive
     ? undefined
     : Object.values(list.byId).find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
@@ -655,6 +685,7 @@ function FlatList({
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
               flat
+              seat={seatFor(node.id)}
               drag={{
                 start: () => {
                   dropCommitted.current = false
