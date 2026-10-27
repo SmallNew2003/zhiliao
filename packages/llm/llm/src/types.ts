@@ -456,6 +456,8 @@ export interface GenerateOptions {
   /** Registered provider route selecting the adapter instance. */
   provider: string
   model: string
+  /** Positive integer context budget for this call; absent inherits adapter capacity. */
+  contextWindow?: number
   /** Adapter-owned reasoning effort selected for this exact model. */
   reasoningEffort?: ReasoningEffortId
   /**

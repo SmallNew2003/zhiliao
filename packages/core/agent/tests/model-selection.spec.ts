@@ -90,6 +90,7 @@ describe('installModelSelection()', () => {
       provider: 'alpha',
       model: 'a1',
       reasoningEffort: ReasoningEffortId('high'),
+      contextWindow: 640_000,
     }
     expect((await ctx.systemPrompt.assemble()).variables).toMatchObject({ provider: 'alpha', model: 'a1' })
     selection.current = { provider: 'beta', model: 'b1' }
@@ -99,6 +100,7 @@ describe('installModelSelection()', () => {
       provider: 'alpha',
       model: 'a1',
       reasoningEffort: ReasoningEffortId('high'),
+      contextWindow: 640_000,
       temperature: 0.2,
     })
 
@@ -107,6 +109,7 @@ describe('installModelSelection()', () => {
       provider: 'alpha',
       model: 'a1',
       reasoningEffort: ReasoningEffortId('max'),
+      contextWindow: 960_000,
       temperature: 0.2,
     }
     await expect(agentEvents(ctx, agent).waterfall(
@@ -145,6 +148,16 @@ describe('installModelSelection()', () => {
     await ctx.fiber.dispose()
   })
 
+  it('does not announce a window-only change on the same route', async () => {
+    const { agent, ctx, dispose } = await switchHarness(
+      { provider: 'alpha', model: 'a0', contextWindow: 960_000 },
+      { provider: 'alpha', model: 'a0', contextWindow: 320_000 },
+    )
+    await expect(preStep(ctx, agent)).resolves.toMatchObject({ kind: 'enter', messages: [INPUT] })
+    dispose()
+    await ctx.fiber.dispose()
+  })
+
   it('does not announce initial, same-route, effort-only, rejected, aborted, or disposed steps', async () => {
     const { agent, ctx, dispose, selection } = await switchHarness({ provider: 'alpha', model: 'a0' })
     await expect(preStep(ctx, agent)).resolves.toMatchObject({ kind: 'enter', messages: [INPUT] })
@@ -155,6 +168,7 @@ describe('installModelSelection()', () => {
       provider: 'alpha',
       model: 'a0',
       reasoningEffort: ReasoningEffortId('high'),
+      contextWindow: 640_000,
     }
     await ctx.systemPrompt.assemble()
     await expect(preStep(ctx, agent)).resolves.toMatchObject({ kind: 'enter', messages: [INPUT] })

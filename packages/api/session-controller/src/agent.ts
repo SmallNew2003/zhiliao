@@ -67,7 +67,7 @@ export type ApiSessionAgentResult =
 
 type InstalledSelection = ModelSelectionRef & {
   current: AgentModelSelection
-  consume(provider: string, model: string, reasoningEffort: string | undefined): boolean
+  consume(provider: string, model: string, reasoningEffort: string | undefined, contextWindow: number | undefined): boolean
 }
 
 /**
@@ -306,15 +306,17 @@ export class ApiSessionAgentController {
             || loggedHeader.adapterDefaults?.reasoningEffort === true
             ? {}
             : { reasoningEffort: logged.reasoningEffort }),
+          ...(logged.contextWindow === undefined ? {} : { contextWindow: logged.contextWindow }),
         }
       },
       set current(next: AgentModelSelection) {
         picked = next
       },
-      consume(provider: string, model: string, reasoningEffort: string | undefined): boolean {
+      consume(provider: string, model: string, reasoningEffort: string | undefined, contextWindow: number | undefined): boolean {
         if (picked?.provider !== provider
           || picked.model !== model
-          || picked.reasoningEffort !== reasoningEffort) return false
+          || picked.reasoningEffort !== reasoningEffort
+          || picked.contextWindow !== contextWindow) return false
         picked = undefined
         return true
       },
@@ -341,6 +343,7 @@ export class ApiSessionAgentController {
    * @param provider - provider route used by the request.
    * @param model - provider-owned model used by the request.
    * @param reasoningEffort - adapter-owned effort used by the request.
+   * @param contextWindow - explicit context budget used by the request, if any.
    * @returns whether the pending selection was consumed.
    */
   consumeSelection(
@@ -348,8 +351,9 @@ export class ApiSessionAgentController {
     provider: string,
     model: string,
     reasoningEffort: string | undefined,
+    contextWindow?: number,
   ): boolean {
-    return this.selections.get(agent)?.consume(provider, model, reasoningEffort) ?? false
+    return this.selections.get(agent)?.consume(provider, model, reasoningEffort, contextWindow) ?? false
   }
 
   /**
@@ -532,5 +536,6 @@ function agentModelSelection(selection: ModelSelection): AgentModelSelection {
     ...(selection.reasoningEffort === undefined
       ? {}
       : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) }),
+    ...(selection.contextWindow === undefined ? {} : { contextWindow: selection.contextWindow }),
   }
 }

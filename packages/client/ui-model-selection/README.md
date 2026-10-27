@@ -31,6 +31,12 @@ Mount this plugin alongside `ui-conversation` and the commands package; the comp
 
 Models stay grouped by provider. The composer menu shows model and effort names only. The `/model` popup shows provider names and catalog descriptions; it localizes the two built-in DeepSeek descriptions and leaves external provider descriptions verbatim. The popup applies the selected model's default effort; the composer can then choose any advertised effort. An adapter without reasoning metadata leaves the Effort row absent; there is no arbitrary effort input.
 
+### Context window
+
+The composer menu adds a Context window row beside Model and Effort, present whenever the session has a current selection. Its value summarizes the effective capacity: the explicit session selection, else the current model's catalog capacity, spelled `320K` for a preset value, the exact token count for any other value, and Unknown when neither source advertises one. Drilling in offers the 320K, 640K, and 960K presets (320,000, 640,000, and 960,000 tokens) with the effective value checked; a non-preset capacity leaves no row checked without discarding the value. Choosing a window preserves the effort, and choosing an effort preserves the explicit window. Clicking the row of the value in use or the current model makes no change; choosing another model clears the old window override. The next request uses the selected budget for request metadata and pressure compaction, and resumed sessions restore it. Custom capacity stays in Settings.
+
+A successful decrease shows a brief notice that context may be compacted before continuing. Running requests retain their admitted budget; subsequent requests validate the selected budget before dispatch.
+
 ### Unroutable sessions
 
 When the Host reports that no adapter serves the session's route, this plugin raises a composer block and the input goes inert with its own copy; recovering clears it without a reload. A `null` before the first load or after one failed never blocks, and catalog membership never blocks either — a route serving a model it does not advertise is missing from the groups yet usable.
@@ -41,13 +47,14 @@ When another writer owns the Session, model-selection failures tell the user to 
 
 -----
 
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-Two entries over ONE per-session directory owned by `ModelDirectoryResolver` (`ctx.modelDirectories`): the `/model` popupSelect contribution (registered through `ctx.commandUi`) and the composer's named `conversation.input.model` seat both load the session's advisory directory through `session.models` and submit through `session.selectModel` via the same `ModelDirectory` instance, so a switch made in either entry is what the other shows next. Directory loads and selections share a generation counter so an older response never overwrites a newer one; a connection reset drops every resident projection and repulls the Host-restored selection before display. Directories are per-session, resolved lazily, and disposed with the session scope; addressed subagent sessions expose neither entry. Every resident directory refetches directly on forwarded `llm/adapters-updated` and `settings/document-updated` owner events.
+`ModelDirectoryResolver` (`ctx.modelDirectories`) owns one shared Host-generation catalog and a lazy directory per session binding. The `/model` popup and composer seat combine that catalog with the durable `modelSelection` projection and submit complete selections through `session.selectModel`. A connection reset invalidates in-flight selection responses while retaining the durable current value as the catalog reloads. Forwarded adapter, settings, and credential-reference changes refresh the shared catalog. Session-scope disposal removes its directory; addressed subagent sessions expose neither entry.
 
 </details>
 
@@ -82,7 +89,7 @@ Switching the route can reduce or invalidate provider-side cache reuse for subse
 These limits define the current model surface. They are current package constraints, not a general model-router comparison or a task backlog.
 
 - **No create-time or addressed-subagent selection** — both entries require an existing ordinary session's Agent; there is no draft-phase model choice to fold into session creation, and subagent continuation deliberately exposes no independent model-selection contract.
-- **Directory names are presentation-only** — selection and persistence use provider/model/effort ids; a provider whose catalog or exact-model metadata lookup fails lists as an unselectable failure row until reload.
+- **Directory names are presentation-only** — selection and persistence use provider/model/effort ids and numeric budgets; a provider whose catalog or exact-model metadata lookup fails lists as an unselectable failure row until reload.
 - **No arbitrary effort input** — the composer offers only the exact model's adapter-advertised levels; an adapter without reasoning metadata leaves the Effort row absent.
 
 <a id="dev-note"></a>

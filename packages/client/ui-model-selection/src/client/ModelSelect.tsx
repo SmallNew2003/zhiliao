@@ -1,9 +1,10 @@
 /**
  * ModelSelect: the composer's named model seat (`conversation.input.model`).
  * Two-level selection per figma 496:26454's MenuDropdown: the root menu is
- * the Model / Effort row pair (label + current value + a right chevron),
- * each drilling into its own list — the provider-grouped model list over
- * the shared directory, and the effort levels. The trigger (313:14108's
+ * the Model / Effort / Context window row triple (label + current value + a
+ * right chevron), each drilling into its own list — the provider-grouped
+ * model list over the shared directory, the effort levels, and the context
+ * presets. The trigger (313:14108's
  * ToggleButton) shows both: model name + effort in the caption tone.
  * While open, ↑/↓ move focus across the rows of the shown pane (wrapping; a
  * step taken while the trigger still holds focus enters at the near end), Tab
@@ -19,7 +20,7 @@
  */
 import {
   useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
-  type CSSProperties, type KeyboardEvent, type FocusEvent,
+  type CSSProperties, type KeyboardEvent, type FocusEvent, type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
@@ -33,7 +34,7 @@ import type { ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 
 /** Which pane the dropdown shows: the two-row root or one drilled-in list. */
-type Pane = 'root' | 'model' | 'effort'
+type Pane = 'root' | 'model' | 'effort' | 'context'
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -44,6 +45,23 @@ interface EffortChoice {
 
 /** Unplaced portal card: hidden but laid out at a fixed origin so offsetWidth/offsetHeight are real (Menu primitive's measure pass). */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
+
+/** Context budgets offered as presets, in tokens. */
+const CONTEXT_WINDOW_PRESETS = [320_000, 640_000, 960_000]
+
+/** The catalog-load failure strip with its Retry, shared by the drilled panes. */
+function LoadErrorStrip({ message, retryLabel, onRetry }: {
+  message: string
+  retryLabel: string
+  onRetry: () => void
+}): ReactNode {
+  return (
+    <div className={css.error}>
+      <span>{message}</span>
+      <button type="button" className={css.retry} onClick={onRetry}>{retryLabel}</button>
+    </div>
+  )
+}
 
 /**
  * Render the composer model seat.
@@ -92,6 +110,12 @@ export function ModelSelect(
     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
+  const contextWindow = state.current?.contextWindow ?? currentChoice?.model.contextWindow
+  const contextLabel = contextWindow === undefined
+    ? t('context.unknown')
+    : CONTEXT_WINDOW_PRESETS.includes(contextWindow)
+      ? t('context.preset', { value: contextWindow / 1000 })
+      : contextWindow.toLocaleString('en-US')
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortLabel = reasoning === undefined
     ? undefined
@@ -134,7 +158,7 @@ export function ModelSelect(
   // sees a keystroke. Every switch therefore names where the keyboard lands:
   // drilling on the pane's current value, coming back on the cell that opened
   // the pane left.
-  const paneFocus = useRef<'drill' | 'model' | 'effort' | null>(null)
+  const paneFocus = useRef<'drill' | 'model' | 'effort' | 'context' | null>(null)
   useEffect(() => {
     const intent = paneFocus.current
     paneFocus.current = null
@@ -149,7 +173,7 @@ export function ModelSelect(
       ;(target ?? triggerRef.current)?.focus()
       return
     }
-    const cell = itemRefs.current[intent === 'effort' ? 1 : 0]
+    const cell = itemRefs.current[intent === 'model' ? 0 : intent === 'effort' ? 1 : 2]
     ;(cell !== null && cell !== undefined && !cell.disabled ? cell : triggerRef.current)?.focus()
   }, [open, pane])
 
@@ -300,6 +324,7 @@ export function ModelSelect(
     void select(selection).then(settleSelection)
   }
 
+
   const chooseEffort = (effort: string | undefined): void => {
     if (state.current === null) return
     if (effectiveEffort === effort) {
@@ -310,9 +335,31 @@ export function ModelSelect(
       provider: state.current.provider,
       model: state.current.model,
       ...effort === undefined ? {} : { reasoningEffort: effort },
+      ...state.current.contextWindow === undefined ? {} : { contextWindow: state.current.contextWindow },
     }
     lastActionRef.current = 'select'
     void select(selection).then(settleSelection)
+  }
+  const chooseContextWindow = (value: number): void => {
+    if (state.current === null) return
+    if (contextWindow === value) {
+      close(true)
+      return
+    }
+    lastActionRef.current = 'select'
+    const smaller = contextWindow !== undefined && value < contextWindow
+    void select({
+      provider: state.current.provider,
+      model: state.current.model,
+      ...state.current.reasoningEffort === undefined ? {} : { reasoningEffort: state.current.reasoningEffort },
+      contextWindow: value,
+    }).then((result) => {
+      settleSelection(result)
+      if (result?.ok === true && smaller && rootRef.current !== null) {
+        toastSeq.current += 1
+        setToast({ seq: toastSeq.current, text: t('context.smaller') })
+      }
+    })
   }
 
   const waiting = state.current === null && state.status === 'loading'
@@ -388,6 +435,13 @@ export function ModelSelect(
                   <IconChevronRightOutline14 className={css.cellChevron} />
                 </button>
               )}
+              {state.current !== null && (
+                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('context') }}>
+                  <span className={css.cellLabel}>{t('menu.contextWindow')}</span>
+                  <span className={css.cellValue}>{contextLabel}</span>
+                  <IconChevronRightOutline14 className={css.cellChevron} />
+                </button>
+              )}
             </>
           )}
 
@@ -397,10 +451,11 @@ export function ModelSelect(
                 <div className={css.status}>{t('status.loading')}</div>
               )}
               {state.error !== null && lastActionRef.current === 'load' && (
-                <div className={css.error}>
-                  <span>{t('error.action', { message: state.error })}</span>
-                  <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
-                </div>
+                <LoadErrorStrip
+                  message={t('error.action', { message: state.error })}
+                  retryLabel={t('retry')}
+                  onRetry={reload}
+                />
               )}
               {state.failures.map(failure => (
                 <div className={css.warning} key={failure.id}>
@@ -450,10 +505,11 @@ export function ModelSelect(
           {pane === 'effort' && (
             <>
               {state.error !== null && lastActionRef.current === 'load' && (
-                <div className={css.error}>
-                  <span>{t('error.action', { message: state.error })}</span>
-                  <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
-                </div>
+                <LoadErrorStrip
+                  message={t('error.action', { message: state.error })}
+                  retryLabel={t('action.reload')}
+                  onRetry={reload}
+                />
               )}
               {effortChoices.length === 0
                 ? <div className={css.empty}>{t('empty.efforts')}</div>
@@ -476,6 +532,37 @@ export function ModelSelect(
                     </span>
                   </button>
                 ))}
+            </>
+          )}
+
+          {pane === 'context' && (
+            <>
+              {state.error !== null && lastActionRef.current === 'load' && (
+                <LoadErrorStrip
+                  message={t('error.action', { message: state.error })}
+                  retryLabel={t('action.reload')}
+                  onRetry={reload}
+                />
+              )}
+              {CONTEXT_WINDOW_PRESETS.map(value => (
+                <button
+                  ref={itemRef()}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={contextWindow === value}
+                  className={clsx(css.option, contextWindow === value && css.selected)}
+                  key={value}
+                  disabled={busy}
+                  onClick={() => { chooseContextWindow(value) }}
+                >
+                  <span className={css.optionCopy}>
+                    <span className={css.modelName}>{t('context.preset', { value: value / 1000 })}</span>
+                  </span>
+                  <span className={css.check}>
+                    {contextWindow === value ? <IconCheckOutline16 /> : null}
+                  </span>
+                </button>
+              ))}
             </>
           )}
         </div>,
