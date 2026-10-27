@@ -1,13 +1,15 @@
 /**
- * The memory browser's state: the Host's banks, the selected bank's statistics
- * and knowledge pages, the page body open beside them, and the search over the
- * knowledge index. Every fact comes from the Host — the store re-reads after a
- * bank switch and after every manual refresh, and it never retains or edits a
- * memory itself.
+ * The memory browser's state: the Host's banks, the selected bank's statistics,
+ * knowledge pages, and memory units, the page body open beside them, the search
+ * over the knowledge index, and the two writes a person performs — recording a
+ * finding and curating an existing one. Every fact comes from the Host; the
+ * store never talks to the daemon itself.
  *
  * An unavailable Host is a first-class state rather than an error: a deployment
  * that ships no memory provider has nothing to browse, and the page says so
- * with the reason the Host classified instead of showing a blank panel.
+ * with the reason the Host classified instead of showing a blank panel. The
+ * same holds per section: a provider that curates no knowledge pages leaves
+ * that section saying so, while the rest of the bank keeps rendering.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -18,6 +20,7 @@ import type {
   MemoryKnowledgeHit,
   MemoryKnowledgePage,
   MemoryKnowledgePageBody,
+  MemoryUnitSummary,
   MemoryUnavailableReason,
 } from '@deepseek-ai/dsh-host-memory-controller/types'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -42,6 +45,30 @@ export type MemoryPanelProblem =
 /** How much of a bank the panel is currently loading. */
 export type MemoryLoadScope = 'none' | 'banks' | 'bank'
 
+/** The add-memory form's draft while it is open. */
+export interface MemoryAddDraft {
+  readonly text: string
+  readonly context: string
+}
+
+/** The curate form's draft while it is open over one unit. */
+export interface MemoryEditDraft {
+  readonly unitId: string
+  readonly text: string
+  readonly context: string
+  readonly factType: string
+}
+
+/**
+ * What the last write did, as the page words it. A refused write keeps its
+ * form open and carries the backend's own detail; an accepted one closes the
+ * form and refreshes the bank.
+ */
+export type MemoryWriteNote =
+  | { readonly kind: 'remembered'; readonly detail: string }
+  | { readonly kind: 'curated'; readonly detail: string }
+  | { readonly kind: 'refused'; readonly detail: string }
+
 /** What the page renders. */
 export interface MemoryBrowserState {
   /** `unavailable` keeps the last banks; `error` is a failed read the page retries. */
@@ -55,7 +82,11 @@ export interface MemoryBrowserState {
   readonly loading: MemoryLoadScope
   /** The selected bank's statistics, absent until the Host answers with them. */
   readonly stats: MemoryBankStats | null
+  /** Why the statistics section cannot render, when it cannot. */
+  readonly statsProblem: MemoryPanelProblem | null
   readonly pages: readonly MemoryKnowledgePage[]
+  /** Why the knowledge-page section cannot render, when it cannot. */
+  readonly pagesProblem: MemoryPanelProblem | null
   /** The knowledge page open over the bank, with its body. */
   readonly openPage: MemoryKnowledgePageBody | null
   /** Whether the open page's body is still being read. */
@@ -70,6 +101,32 @@ export interface MemoryBrowserState {
   readonly total: number
   /** Why the last search produced nothing, when it failed. */
   readonly searchProblem: MemoryPanelProblem | null
+  /** The selected bank's memory units for the current filter and page. */
+  readonly units: readonly MemoryUnitSummary[]
+  /** Total units the backend holds for the current filter, which may exceed `units.length`. */
+  readonly unitsTotal: number
+  /** The page size the Host answered with, so pagination agrees with it. */
+  readonly unitsLimit: number
+  /** Zero-based index of the first unit on screen. */
+  readonly unitsOffset: number
+  /** The committed unit filter; an empty string lists every unit. */
+  readonly unitQuery: string
+  /** The filter box's current text, applied on submit. */
+  readonly unitQueryDraft: string
+  /** Whether the units page is being read. */
+  readonly unitsLoading: boolean
+  /** Why the units section cannot render, when it cannot. */
+  readonly unitsProblem: MemoryPanelProblem | null
+  /** The add-memory form's draft, or null when the form is closed. */
+  readonly addDraft: MemoryAddDraft | null
+  /** The curate form's draft, or null when no unit is being edited. */
+  readonly editDraft: MemoryEditDraft | null
+  /** Whether a write call is in flight. */
+  readonly writing: boolean
+  /** Why the last write could not be issued, when it could not. */
+  readonly writeProblem: MemoryPanelProblem | null
+  /** What the last write did, when it completed. */
+  readonly writeNote: MemoryWriteNote | null
 }
 
 /** The registration-side face the panel's slot entry injects. */
@@ -92,9 +149,45 @@ export interface MemoryBrowserFace {
   openPage: (pageId: string) => void
   /** Close the open page. */
   closePage: () => void
+  /** Type into the unit filter box; the list stays until the filter runs. */
+  editUnitQuery: (text: string) => void
+  /** Apply the unit filter from the first page. */
+  runUnitFilter: () => void
+  /** Read another page of units. */
+  pageUnits: (offset: number) => void
+  /** Open the add-memory form. */
+  startAdd: () => void
+  /** Edit the add-memory draft. */
+  editAdd: (field: 'text' | 'context', value: string) => void
+  /** Record the drafted finding. */
+  submitAdd: () => void
+  /** Close the add-memory form, discarding the draft. */
+  cancelAdd: () => void
+  /** Open the curate form over one unit. */
+  startEdit: (unit: MemoryUnitSummary) => void
+  /** Edit the curate draft. */
+  editCurate: (field: 'text' | 'context' | 'factType', value: string) => void
+  /** Submit the curation. */
+  submitEdit: () => void
+  /** Close the curate form, discarding the draft. */
+  cancelEdit: () => void
+  /** Forget the last write's outcome note. */
+  dismissWriteNote: () => void
   /** Forget the recorded failure so the page can try again. */
   dismissProblem: () => void
 }
+
+/** What both write payloads carry: whether the backend accepted, and its detail. */
+interface WriteOutcome {
+  readonly remembered?: boolean
+  readonly curated?: boolean
+  readonly detail?: string
+}
+
+/** A write answer as the generated client settles it. */
+type WriteAnswer =
+  | { readonly ok: true; readonly value: MemoryAnswer<WriteOutcome> }
+  | { readonly ok: false; readonly error: { readonly message: string } }
 
 /** Read the unavailable half of an answer as the panel's problem. */
 function problemOf(value: Extract<MemoryAnswer<unknown>, { available: false }>): MemoryPanelProblem {
@@ -118,7 +211,9 @@ const IDLE: MemoryBrowserState = {
   bankId: null,
   loading: 'none',
   stats: null,
+  statsProblem: null,
   pages: [],
+  pagesProblem: null,
   openPage: null,
   pageLoading: false,
   query: '',
@@ -126,6 +221,19 @@ const IDLE: MemoryBrowserState = {
   hits: [],
   total: 0,
   searchProblem: null,
+  units: [],
+  unitsTotal: 0,
+  unitsLimit: 0,
+  unitsOffset: 0,
+  unitQuery: '',
+  unitQueryDraft: '',
+  unitsLoading: false,
+  unitsProblem: null,
+  addDraft: null,
+  editDraft: null,
+  writing: false,
+  writeProblem: null,
+  writeNote: null,
 }
 
 /**
@@ -191,12 +299,24 @@ export class MemoryBrowserController {
         this.patch({
           bankId,
           stats: null,
+          statsProblem: null,
           pages: [],
+          pagesProblem: null,
           openPage: null,
           pageLoading: false,
           hits: [],
           total: 0,
           searchProblem: null,
+          units: [],
+          unitsTotal: 0,
+          unitsOffset: 0,
+          unitsLoading: false,
+          unitsProblem: null,
+          addDraft: null,
+          editDraft: null,
+          writing: false,
+          writeNote: null,
+          writeProblem: null,
         })
         void this.loadBank(bankId)
       },
@@ -213,6 +333,51 @@ export class MemoryBrowserController {
           this.patch({ openPage: null, pageLoading: false })
         }
       },
+      editUnitQuery: (text) => { if (this.getSnapshot().unitQueryDraft !== text) this.patch({ unitQueryDraft: text }) },
+      runUnitFilter: () => {
+        const { bankId, unitQueryDraft, unitQuery, unitsOffset } = this.getSnapshot()
+        if (bankId === null || (unitQueryDraft.trim() === unitQuery && unitsOffset === 0)) return
+        this.patch({ unitQuery: unitQueryDraft.trim(), unitsOffset: 0 })
+        void this.readUnits(bankId)
+      },
+      pageUnits: (offset) => {
+        const { bankId, unitsOffset } = this.getSnapshot()
+        if (bankId === null || offset === unitsOffset) return
+        this.patch({ unitsOffset: offset })
+        void this.readUnits(bankId)
+      },
+      startAdd: () => {
+        if (this.getSnapshot().addDraft !== null) return
+        this.patch({ addDraft: { text: '', context: '' }, editDraft: null, writeNote: null, writeProblem: null })
+      },
+      editAdd: (field, value) => {
+        const draft = this.getSnapshot().addDraft
+        if (draft === null) return
+        this.patch({ addDraft: { ...draft, [field]: value } })
+      },
+      submitAdd: () => { void this.remember() },
+      cancelAdd: () => { this.patch({ addDraft: null }) },
+      startEdit: (unit) => {
+        this.patch({
+          editDraft: {
+            unitId: unit.id,
+            text: unit.text,
+            context: unit.context ?? '',
+            factType: unit.factType ?? '',
+          },
+          addDraft: null,
+          writeNote: null,
+          writeProblem: null,
+        })
+      },
+      editCurate: (field, value) => {
+        const draft = this.getSnapshot().editDraft
+        if (draft === null) return
+        this.patch({ editDraft: { ...draft, [field]: value } })
+      },
+      submitEdit: () => { void this.curate() },
+      cancelEdit: () => { this.patch({ editDraft: null }) },
+      dismissWriteNote: () => { if (this.getSnapshot().writeNote !== null) this.patch({ writeNote: null }) },
       dismissProblem: () => { if (this.getSnapshot().problem !== null) this.patch({ problem: null }) },
     }
   }
@@ -279,24 +444,92 @@ export class MemoryBrowserController {
   }
 
   /**
-   * Read one bank's statistics and page tree. Statistics and pages are separate
-   * Remote methods, so one failing leaves the other standing: a bank whose
-   * statistics the daemon cannot measure still lists its pages. A failed half
-   * keeps whatever was on screen rather than clearing a working view.
+   * Read one bank's statistics, page tree, and memory units. The three are
+   * separate Remote methods, so one failing leaves the others standing: a bank
+   * whose statistics the daemon cannot measure still lists its units, and a
+   * provider that curates no knowledge pages leaves that section saying so. A
+   * failed half keeps whatever was on screen rather than clearing a working
+   * view.
    * @param bankId - the bank to read.
-   * @returns settlement after both reads are reflected.
+   * @returns settlement after the reads are reflected.
    */
   private async loadBank(bankId: string): Promise<void> {
-    this.patch({ loading: 'bank' })
-    const [stats, pages] = await Promise.all([
-      this.ctx.remote.memoryController.stats(bankId),
-      this.ctx.remote.memoryController.pages(bankId),
+    this.patch({ loading: 'bank', statsProblem: null, pagesProblem: null, unitsProblem: null })
+    await Promise.all([
+      this.readStats(bankId),
+      this.readPages(bankId),
+      this.readUnits(bankId),
     ])
     if (this.disposed || this.getSnapshot().bankId !== bankId) return
+    this.patch({ loading: 'none' })
+  }
+
+  /**
+   * Read one bank's statistics. A provider that measures none answers
+   * unsupported, which this section keeps as its own problem rather than
+   * hiding the section without a word.
+   * @param bankId - the bank to read.
+   * @returns settlement after the read is reflected.
+   */
+  private async readStats(bankId: string): Promise<void> {
+    const answer = await this.ctx.remote.memoryController.stats(bankId)
+    if (this.disposed || this.getSnapshot().bankId !== bankId) return
+    if (!answer.ok) {
+      this.patch({ stats: null, statsProblem: failedAnswer(answer.error) })
+      return
+    }
+    if (!answer.value.available) {
+      this.patch({ stats: null, statsProblem: problemOf(answer.value) })
+      return
+    }
+    this.patch({ stats: answer.value.stats ?? null, statsProblem: null })
+  }
+
+  /**
+   * Read one bank's knowledge-page tree.
+   * @param bankId - the bank to read.
+   * @returns settlement after the read is reflected.
+   */
+  private async readPages(bankId: string): Promise<void> {
+    const answer = await this.ctx.remote.memoryController.pages(bankId)
+    if (this.disposed || this.getSnapshot().bankId !== bankId) return
+    if (!answer.ok) {
+      this.patch({ pages: [], pagesProblem: failedAnswer(answer.error) })
+      return
+    }
+    if (!answer.value.available) {
+      this.patch({ pages: [], pagesProblem: problemOf(answer.value) })
+      return
+    }
+    this.patch({ pages: answer.value.pages, pagesProblem: null })
+  }
+
+  /**
+   * Read one page of the bank's memory units under the committed filter. The
+   * page size is the Host's, returned with the page, so the pagination controls
+   * and the listing always agree about where one page ends.
+   * @param bankId - the bank to read.
+   * @returns settlement after the read is reflected.
+   */
+  private async readUnits(bankId: string): Promise<void> {
+    const { unitQuery, unitsOffset } = this.getSnapshot()
+    this.patch({ unitsLoading: true, unitsProblem: null })
+    const answer = await this.ctx.remote.memoryController.units(bankId, unitQuery, undefined, undefined, unitsOffset)
+    if (this.disposed || this.getSnapshot().bankId !== bankId) return
+    if (!answer.ok) {
+      this.patch({ unitsLoading: false, unitsProblem: failedAnswer(answer.error) })
+      return
+    }
+    if (!answer.value.available) {
+      this.patch({ unitsLoading: false, unitsProblem: problemOf(answer.value) })
+      return
+    }
     this.patch({
-      loading: 'none',
-      ...stats.ok && stats.value.available ? { stats: stats.value.stats ?? null } : {},
-      ...pages.ok && pages.value.available ? { pages: pages.value.pages } : {},
+      unitsLoading: false,
+      units: answer.value.units,
+      unitsTotal: answer.value.total,
+      unitsLimit: answer.value.limit,
+      unitsOffset: answer.value.offset,
     })
   }
 
@@ -346,6 +579,100 @@ export class MemoryBrowserController {
       return
     }
     this.patch({ pageLoading: false, openPage: answer.value.page ?? null })
+  }
+
+  /**
+   * Record the drafted finding. Retention is asynchronous on backends that
+   * extract facts by inference, so an accepted write closes the form, notes
+   * the outcome, and refreshes the bank — the unit becomes listable once the
+   * backend finishes extracting it. A refused write keeps the form open with
+   * the backend's own detail.
+   * @returns settlement after the outcome is reflected.
+   */
+  private async remember(): Promise<void> {
+    const { bankId, addDraft } = this.getSnapshot()
+    if (bankId === null || addDraft === null || this.getSnapshot().writing) return
+    const text = addDraft.text.trim()
+    if (text.length === 0) return
+    const context = addDraft.context.trim()
+    await this.write(
+      bankId,
+      () => this.ctx.remote.memoryController.remember(
+        bankId,
+        text,
+        context.length === 0 ? undefined : context,
+      ),
+      outcome => outcome.remembered === true,
+      'remembered',
+      { addDraft: null },
+    )
+  }
+
+  /**
+   * Submit the curation draft. The draft is authoritative: every field is sent,
+   * so clearing the context box clears the context. An accepted curation
+   * closes the form and refreshes the units; a refused one keeps the form open
+   * with the backend's detail.
+   * @returns settlement after the outcome is reflected.
+   */
+  private async curate(): Promise<void> {
+    const { bankId, editDraft } = this.getSnapshot()
+    if (bankId === null || editDraft === null || this.getSnapshot().writing) return
+    const text = editDraft.text.trim()
+    if (text.length === 0) return
+    await this.write(
+      bankId,
+      () => this.ctx.remote.memoryController.curate(
+        bankId,
+        editDraft.unitId,
+        text,
+        editDraft.context.trim(),
+        editDraft.factType.trim(),
+      ),
+      outcome => outcome.curated === true,
+      'curated',
+      { editDraft: null },
+    )
+  }
+
+  /**
+   * Issue one write and settle it. Both writes share their failure halves — a
+   * call that never answered, and one the Host classified — and both refresh
+   * the bank on acceptance so the new fact count and the new or curated unit
+   * show up without a manual refresh. They differ only in the call, how
+   * acceptance reads, the note they leave, and the draft they close.
+   * @param bankId - the bank being written to.
+   * @param call - issues the Remote write.
+   * @param accepted - whether the answered outcome landed the write.
+   * @param kind - the note an accepted write leaves.
+   * @param closeDraft - the state patch that closes the write's form.
+   * @returns settlement after the outcome is reflected.
+   */
+  private async write(
+    bankId: string,
+    call: () => Promise<WriteAnswer>,
+    accepted: (outcome: WriteOutcome) => boolean,
+    kind: 'remembered' | 'curated',
+    closeDraft: Partial<MemoryBrowserState>,
+  ): Promise<void> {
+    this.patch({ writing: true, writeProblem: null, writeNote: null })
+    const answer = await call()
+    if (this.disposed || this.getSnapshot().bankId !== bankId) return
+    if (!answer.ok) {
+      this.patch({ writing: false, writeProblem: failedAnswer(answer.error) })
+      return
+    }
+    if (!answer.value.available) {
+      this.patch({ writing: false, writeProblem: problemOf(answer.value) })
+      return
+    }
+    const detail = answer.value.detail ?? ''
+    if (!accepted(answer.value)) {
+      this.patch({ writing: false, writeNote: { kind: 'refused', detail } })
+      return
+    }
+    this.patch({ ...closeDraft, writing: false, writeNote: { kind, detail } })
+    void this.load()
   }
 
   private patch(next: Partial<MemoryBrowserState>): void {

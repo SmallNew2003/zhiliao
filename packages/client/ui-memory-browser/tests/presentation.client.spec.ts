@@ -21,12 +21,14 @@ describe('problemText', () => {
       { kind: 'unavailable', reason: 'unavailable', detail: 'no provider' },
       { kind: 'unavailable', reason: 'misconfigured', detail: 'two providers' },
       { kind: 'unavailable', reason: 'unreachable', detail: 'no answer' },
+      { kind: 'unavailable', reason: 'unsupported', detail: 'no such section' },
       { kind: 'unavailable', reason: 'failed', detail: '500' },
     ] as const
     expect(reasons.map(problem => problemText(problem, t))).toEqual([
       zh.reasonUnavailable,
       zh.reasonMisconfigured,
       zh.reasonUnreachable,
+      zh.reasonUnsupported,
       zh.reasonFailed,
     ])
     // The classified sentence never leaks the raw detail into the headline.

@@ -1,6 +1,8 @@
 /**
  * Service Definition for the long-term memory capability seam (`ctx.memory`): a provider
- * registry plus bank-resolved recall, search, and retention. Duplicate ids are rejected.
+ * registry plus bank-resolved recall, search, retention, and the optional browse
+ * surface a human-facing consumer resolves through {@link MemoryRuntime.browse}.
+ * Duplicate ids are rejected.
  * At call time a configured provider must be registered and usable, so selection never
  * depends on registration order. The seam performs no network access itself.
  * @module @deepseek-ai/dsh-memory
@@ -10,6 +12,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
   MemoryBankId,
+  MemoryBrowseProvider,
   MemoryProvider,
   MemoryRecallRequest,
   MemoryRecallResult,
@@ -29,16 +32,32 @@ export {
 export type {
   KnowledgePageId,
   MemoryBankId,
+  MemoryBankStats,
+  MemoryBankSummary,
+  MemoryBrowseProvider,
+  MemoryCount,
+  MemoryCurateRequest,
+  MemoryCurateResult,
   MemoryErrorCode,
   MemoryId,
+  MemoryKnowledgeHit,
+  MemoryKnowledgePage,
+  MemoryKnowledgePageBody,
+  MemoryPageSearchRequest,
+  MemoryPageSearchResult,
   MemoryProvider,
   MemoryRecallRequest,
   MemoryRecallResult,
+  MemoryRememberRequest,
+  MemoryRememberResult,
   MemoryRetainRequest,
   MemoryRetainResult,
   MemorySearchRequest,
   MemorySearchResult,
   MemoryUnit,
+  MemoryUnitListRequest,
+  MemoryUnitPage,
+  MemoryUnitSummary,
   TranscriptTurn,
 } from './types.ts'
 
@@ -170,6 +189,27 @@ export class MemoryRuntime extends Service {
    */
   async retain(request: MemoryRetainRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRetainResult> {
     return this.requireProvider().retain(request, bankId, signal)
+  }
+
+  /**
+   * The browse and write surface of the selected provider, for consumers that act
+   * on memory on a person's behalf rather than on the agent's.
+   *
+   * Selection runs per call, exactly as it does for the agent-path methods, so a
+   * provider that appears or disappears between calls is honoured. A selected
+   * provider that offers no browse surface raises
+   * `MEMORY_CAPABILITY_UNSUPPORTED` — a backend that serves recall and retention
+   * only is a valid composition, not a failure.
+   * @returns the selected provider's browse surface.
+   * @throws MemoryError when no provider is selectable, or the selected one has
+   * no browse surface.
+   */
+  browse(): MemoryBrowseProvider {
+    const provider = this.selectProvider()
+    if (provider.browse === undefined) {
+      throw new MemoryError(`memory provider "${provider.id}" offers no browse surface`, 'MEMORY_CAPABILITY_UNSUPPORTED')
+    }
+    return provider.browse
   }
 
   /**

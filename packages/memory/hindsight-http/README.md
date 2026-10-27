@@ -1,5 +1,5 @@
 ---
-description: "The hindsight HTTP memory provider: how a ctx.memory backend attaches to a local hindsight daemon, resolves per-workspace banks, and bounds server-side inference latency across recall, search, and retention."
+description: "The hindsight HTTP memory provider: how a ctx.memory backend attaches to a local hindsight daemon, resolves per-workspace banks, bounds server-side inference latency across recall, search, and retention, and implements the browse surface a human-facing consumer reads and writes through."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use `dsh-memory-hindsight-http` to back `ctx.memory` with a hindsight daemon over HTTP. It resolves one memory bank per workspace, answers recall and search through hindsight's hybrid index, retains finished transcripts, and maps every transport and status failure onto `MemoryError`. Choose it when the deployment already runs a local hindsight daemon. Budget for latency: recall and search are answered by server-side inference, so a single call can exceed a minute and `recallTimeoutMs` defaults to two minutes. Callers on the agent hot path must catch `MEMORY_BACKEND_TIMEOUT` and continue.
+Use `dsh-memory-hindsight-http` to back `ctx.memory` with a hindsight daemon over HTTP. It resolves one memory bank per workspace, answers recall and search through hindsight's hybrid index, retains finished transcripts, implements the browse surface — banks, memory units, statistics, knowledge pages, and the two writes a person performs — and maps every transport and status failure onto `MemoryError`. Choose it when the deployment already runs a local hindsight daemon. Budget for latency: recall and search are answered by server-side inference, so a single call can exceed a minute and `recallTimeoutMs` defaults to two minutes. Hot-path callers must catch `MEMORY_BACKEND_TIMEOUT` and continue.
 
 ## Table of Contents
 
@@ -53,6 +53,12 @@ Every numeric field must be a positive finite number; a non-positive or infinite
 
 Banks are named `coding-agent::<project-directory-name>`, where the project name is the last path segment of the workspace root. Sibling checkouts of the same repository therefore keep separate banks instead of merging into one, and a workspace whose path yields no usable segment falls back to `defaultBankSuffix`. Resolution is `GET /v1/default/banks` followed by a `PUT` that creates the bank when it is absent, so the first session in a new workspace is not a failure.
 
+### The browse surface
+
+The provider carries the seam's browse surface as itself: `ctx.memory.browse()` returns a provider whose public methods are the surface. `listBanks()`, `listUnits()`, `remember()`, and `curateUnit()` answer from the daemon's bank listing, its memory-unit listing, and its retain and curate endpoints; `bankStats()`, `listPages()`, `searchPages()`, and `pageBody()` answer from the statistics and knowledge-base endpoints hindsight curates. The unit listing takes hindsight's `type` filter as the fact type and its `q` filter as the substring filter, and it pages with `limit` and `offset`; the fact-type field is spelled `fact_type` on the listing and `type` on the single-unit endpoints, so one projection reads both.
+
+Writes follow the daemon's own semantics. `remember()` posts the finding as one asynchronous retain item and returns once the daemon accepted it — extraction is server-side inference, so the unit becomes listable afterwards — with the operation id as the outcome's detail. `curateUnit()` patches text, context, or fact type; the daemon refuses fact types it derives, such as observations, and the refusal's message passes through as the outcome's detail. Every browse read shares the cheap-metadata budget, because the unit listing is a scan rather than an inference call.
+
 ### Latency is the operational fact
 
 hindsight answers recall and search by running inference, not by looking up an index. A single recall or search can take well over a minute on a cold daemon, which is why `recallTimeoutMs` defaults to 120 seconds while metadata and retention default to seconds. Callers must treat `MEMORY_BACKEND_TIMEOUT` as an expected outcome rather than an exception: the shipped consumer catches it, logs a warning, and runs the turn without the memory. Retention is cheaper than it looks because it is asynchronous — the call returns once the daemon accepted the items, and extraction continues server-side.
@@ -75,7 +81,7 @@ This section explains the design decisions behind the provider; the observable b
 
 The provider is built on three deliberate choices:
 
-- **One REST surface, three capabilities.** The daemon's `/v1/default` endpoints cover everything needed: bank listing and creation for resolution, one hybrid recall endpoint for both recall and search, and document retention for finished sessions.
+- **One REST surface, every capability.** The daemon's `/v1/default` endpoints cover everything needed: bank listing and creation for resolution, one hybrid recall endpoint for both recall and search, document retention for finished sessions, and the listing, curate, statistics, and knowledge-base endpoints behind the browse surface.
 - **Recall and search are the same request.** hindsight exposes search as recall with a limit, so both capabilities share one code path and one timeout budget instead of pretending to be different operations.
 - **Every call is bounded and classified.** No request is issued without a timeout, and no failure escapes as a raw transport error; each one is mapped onto the seam's taxonomy so a caller routes on a code rather than on an exception message.
 
@@ -84,12 +90,12 @@ The provider is built on three deliberate choices:
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: config schema and defaults, numeric validation, and registration of the provider into `ctx.memory` |
-| [`src/provider.ts`](src/provider.ts) | The HTTP client and the `MemoryProvider` implementation: bank resolution, recall/search, retention, and error mapping |
+| [`src/provider.ts`](src/provider.ts) | The HTTP client and the `MemoryProvider` implementation: bank resolution, recall/search, retention, the browse surface, and error mapping |
 | — | No runtime invariant companion is published; the provider holds no registry and publishes no observation stream beyond its own availability probe. |
 
 ### Data model
 
-`HindsightProviderLimits` is the transport-and-behaviour contract the plugin hands the provider: where to talk, how long each class of request may take, and how much transcript one retention request may carry. Two projections shape the seam-facing results. Bank listing is read defensively — both a bare array and a `{ banks: [...] }` envelope are accepted, because only `bank_id` is read from each row. Recall rows are projected onto `MemoryUnit` by skipping any entry without string `id` and `text`, so a malformed backend response degrades to fewer units rather than to a thrown error.
+`HindsightProviderLimits` is the transport-and-behaviour contract the plugin hands the provider: where to talk, how long each class of request may take, and how much transcript one retention request may carry. Two projections shape the seam-facing results. Bank listing is read defensively — both a bare array and a `{ banks: [...] }` envelope are accepted, because only `bank_id` is read from each row. Recall rows are projected onto `MemoryUnit` by skipping any entry without string `id` and `text`, so a malformed backend response degrades to fewer units rather than to a thrown error. The browse projections follow the same discipline: bank rows without an id are skipped, unit rows project the optional fact type, context, state, tags, and instants when the backend reports them, and a curation response that carries no readable unit is a refusal whose detail is passed through rather than guessed at.
 
 ### Request flow
 

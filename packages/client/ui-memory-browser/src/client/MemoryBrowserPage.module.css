@@ -383,13 +383,10 @@
 }
 
 .pageBody {
-  margin: 0;
   max-height: 420px;
   overflow: auto;
-  font-family: var(--dsw-font-mono, monospace);
-  font-size: 12px;
-  line-height: 20px;
-  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 22px;
   overflow-wrap: anywhere;
 }
 
@@ -487,4 +484,123 @@
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary);
+}
+.units {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.unitList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-label-tertiary);
+  border-radius: 10px;
+}
+
+.unitText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.unitMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.unitMeta > :last-child {
+  margin-left: auto;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.writeNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-label-tertiary);
+  border-radius: 10px;
+}
+
+.writeNoteMain {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.writeNoteText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.writeNoteDetail {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.writeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-label-tertiary);
+  border-radius: 10px;
+}
+
+.writeRow {
+  display: flex;
+  gap: 8px;
+}
+
+.writeTextarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-label-tertiary);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  resize: vertical;
+}
+
+.writeContext {
+  flex: 1;
+  min-width: 0;
+}
+
+.writeActions {
+  display: flex;
+  gap: 8px;
 }

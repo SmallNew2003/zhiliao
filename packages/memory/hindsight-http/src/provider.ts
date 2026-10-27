@@ -4,6 +4,12 @@
  * for workspace→bank resolution, hybrid recall for session openings and searches, and
  * document retention for finished sessions.
  *
+ * The same client also carries the provider's browse surface (`browse`): the bank,
+ * statistics, knowledge-page, memory-unit, and write projections a human-facing
+ * consumer reads and writes through the seam. hindsight is one backend; the surface
+ * it implements is the provider-neutral one declared by `@deepseek-ai/dsh-memory`, so
+ * a consumer written against the seam works against any provider that offers it.
+ *
  * Every call is bounded by a timeout and mapped onto the seam's error taxonomy, because
  * this backend answers by running LLM inference and can therefore stay silent far longer
  * than an agent turn tolerates.
@@ -13,16 +19,34 @@
 
 import type {
   MemoryBankId,
+  MemoryBankStats,
+  MemoryBankSummary,
+  MemoryBrowseProvider,
+  MemoryCount,
+  MemoryCurateRequest,
+  MemoryCurateResult,
+  MemoryKnowledgeHit,
+  MemoryKnowledgePage,
+  MemoryKnowledgePageBody,
+  MemoryPageSearchRequest,
+  MemoryPageSearchResult,
   MemoryProvider,
   MemoryRecallRequest,
   MemoryRecallResult,
+  MemoryRememberRequest,
+  MemoryRememberResult,
   MemoryRetainRequest,
   MemoryRetainResult,
   MemorySearchRequest,
   MemorySearchResult,
   MemoryUnit,
+  MemoryId,
+  MemoryUnitListRequest,
+  MemoryUnitPage,
+  MemoryUnitSummary,
 } from '@deepseek-ai/dsh-memory'
-import { MemoryError, memoryBankId, memoryId } from '@deepseek-ai/dsh-memory'
+import type { KnowledgePageId } from '@deepseek-ai/dsh-memory'
+import { MemoryError, knowledgePageId, memoryBankId, memoryId } from '@deepseek-ai/dsh-memory'
 
 /** Transport and behaviour limits for {@link HindsightMemoryProvider}. */
 export interface HindsightProviderLimits {
@@ -45,7 +69,44 @@ export interface HindsightProviderLimits {
 /** The shape of `GET /v1/default/banks` rows this provider reads. */
 interface BankRow {
   readonly bank_id?: unknown
+  readonly name?: unknown
+  readonly fact_count?: unknown
+  readonly last_write_at?: unknown
 }
+
+/** The shape of one `GET .../memories/list` row this provider reads. */
+interface UnitRow {
+  readonly id?: unknown
+  readonly text?: unknown
+  /** The list endpoint's fact-type field. */
+  readonly fact_type?: unknown
+  /** The single-unit endpoints spell the same field `type`. */
+  readonly type?: unknown
+  readonly context?: unknown
+  readonly state?: unknown
+  readonly tags?: unknown
+  readonly mentioned_at?: unknown
+  readonly updated_at?: unknown
+}
+
+/** The shape of one `GET .../knowledge-base/tree` node. */
+interface PageNode {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly description?: unknown
+  readonly timestamp?: unknown
+  readonly is_stale?: unknown
+  readonly children?: unknown
+}
+
+/** The shape of one `GET .../knowledge-base/search` hit. */
+interface SearchHitRow {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly snippet?: unknown
+  readonly score?: unknown
+}
+
 
 /** The shape of a `POST .../memories/recall` result row. */
 interface RecallRow {
@@ -78,6 +139,13 @@ export const HINDSIGHT_PROVIDER_ID = 'hindsight'
  */
 export class HindsightMemoryProvider implements MemoryProvider {
   readonly id: string
+
+  /**
+   * This provider's browse surface: the provider itself, whose public methods below
+   * are exactly the surface's contract. hindsight backs every member, including the
+   * optional statistics and knowledge-page ones.
+   */
+  readonly browse: MemoryBrowseProvider = this
 
   private readonly limits: HindsightProviderLimits
   private probed: boolean | undefined
@@ -193,6 +261,122 @@ export class HindsightMemoryProvider implements MemoryProvider {
     }
   }
 
+  /**
+   * List the banks the daemon holds. hindsight answers a bare array or a
+   * `{ banks: [...] }` envelope depending on version, so both are read.
+   */
+  async listBanks(signal?: AbortSignal): Promise<readonly MemoryBankSummary[]> {
+    const payload = await this.request('/v1/default/banks', 'GET', undefined, this.limits.metadataTimeoutMs, signal)
+    const banks = Array.isArray(payload) ? payload as BankRow[] : readBankRows(payload)
+    return banks.flatMap(row => readBankSummary(row) ?? [])
+  }
+
+  /**
+   * Page through one bank's memory units. The `q` filter is a case-insensitive
+   * substring scan the daemon performs per call, so it shares the metadata budget:
+   * it is a browsing aid, not the hybrid recall the agent path uses.
+   */
+  async listUnits(request: MemoryUnitListRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryUnitPage> {
+    const query = new URLSearchParams()
+    if (request.limit !== undefined) query.set('limit', String(request.limit))
+    if (request.offset !== undefined) query.set('offset', String(request.offset))
+    if (request.query !== undefined) query.set('q', request.query)
+    if (request.factType !== undefined) query.set('type', request.factType)
+    const search = query.toString()
+    const path = `/v1/default/banks/${encodeURIComponent(bankId)}/memories/list${search.length === 0 ? '' : `?${search}`}`
+    const payload = await this.request(path, 'GET', undefined, this.limits.metadataTimeoutMs, signal)
+    return readUnitPage(payload)
+  }
+
+  /**
+   * Record one finding into a bank. Retention is asynchronous — hindsight extracts
+   * facts by running inference, which no interactive write may wait for — so the
+   * call returns once the items are accepted and `detail` carries the operation id.
+   */
+  async remember(request: MemoryRememberRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRememberResult> {
+    const item: Record<string, string> = { content: request.text }
+    if (request.context !== undefined) item.context = request.context
+    const body = await this.request(
+      `/v1/default/banks/${encodeURIComponent(bankId)}/memories`,
+      'POST',
+      { items: [item], async: true },
+      this.limits.retainTimeoutMs,
+      signal,
+    )
+    const envelope = body as RetainResponse
+    return {
+      remembered: envelope.success !== false,
+      ...typeof envelope.operation_id === 'string' ? { detail: envelope.operation_id } : {},
+    }
+  }
+
+  /**
+   * Curate one existing memory unit. A curation re-embeds the unit, so it is given
+   * the recall budget rather than the metadata one. hindsight refuses fact types it
+   * derives (observations) with an error whose message the caller shows.
+   */
+  async curateUnit(
+    request: MemoryCurateRequest,
+    bankId: MemoryBankId,
+    unitId: MemoryId,
+    signal?: AbortSignal,
+  ): Promise<MemoryCurateResult> {
+    const patch: Record<string, string> = {}
+    if (request.text !== undefined) patch.text = request.text
+    if (request.context !== undefined) patch.context = request.context
+    if (request.factType !== undefined) patch.fact_type = request.factType
+    if (Object.keys(patch).length === 0) {
+      throw new MemoryError('a memory curation must change at least one field', 'MEMORY_BACKEND_ERROR')
+    }
+    const body = await this.request(
+      `/v1/default/banks/${encodeURIComponent(bankId)}/memories/${encodeURIComponent(unitId)}`,
+      'PATCH',
+      patch,
+      this.limits.recallTimeoutMs,
+      signal,
+    )
+    return readCurateOutcome(body)
+  }
+
+  /** Read one bank's statistics: totals plus the two backend distributions. */
+  async bankStats(bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryBankStats> {
+    const payload = await this.request(`/v1/default/banks/${encodeURIComponent(bankId)}/stats`, 'GET', undefined, this.limits.metadataTimeoutMs, signal)
+    return readStats(asRecord(payload), bankId)
+  }
+
+  /** List one bank's knowledge pages as a flat, depth-first list. */
+  async listPages(bankId: MemoryBankId, signal?: AbortSignal): Promise<readonly MemoryKnowledgePage[]> {
+    const payload = await this.request(`/v1/default/banks/${encodeURIComponent(bankId)}/knowledge-base/tree`, 'GET', undefined, this.limits.metadataTimeoutMs, signal)
+    return readRows<PageNode>(asRecord(payload), 'roots').flatMap(node => readPages(node))
+  }
+
+  /** Search one bank's knowledge-page index. */
+  async searchPages(request: MemoryPageSearchRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryPageSearchResult> {
+    const query = new URLSearchParams({ q: request.query })
+    if (request.limit !== undefined) query.set('limit', String(request.limit))
+    const payload = asRecord(await this.request(
+      `/v1/default/banks/${encodeURIComponent(bankId)}/knowledge-base/search?${query.toString()}`,
+      'GET',
+      undefined,
+      this.limits.metadataTimeoutMs,
+      signal,
+    ))
+    const hits = readRows<SearchHitRow>(payload, 'results').flatMap(row => readHit(row) ?? [])
+    return { hits, total: Math.max(countOf(payload.total), hits.length) }
+  }
+
+  /** Read one knowledge page's body, or undefined when the daemon holds none under that id. */
+  async pageBody(bankId: MemoryBankId, pageId: KnowledgePageId, signal?: AbortSignal): Promise<MemoryKnowledgePageBody | undefined> {
+    const payload = await this.request(
+      `/v1/default/banks/${encodeURIComponent(bankId)}/knowledge-base/pages/${encodeURIComponent(pageId)}`,
+      'GET',
+      undefined,
+      this.limits.metadataTimeoutMs,
+      signal,
+    )
+    return readPageBody(asRecord(payload))
+  }
+
   /** Issue one request against the daemon, mapping transport and status failures onto {@link MemoryError}. */
   private async request(path: string, method: string, body: unknown, timeoutMs: number, caller?: AbortSignal): Promise<unknown> {
     const url = `${this.limits.baseUrl}${path}`
@@ -276,6 +460,165 @@ function transcriptItems(request: MemoryRetainRequest, maxChars: number): { cont
     length += content.length
   }
   return items
+}
+
+/** Read a decoded body as a JSON object, so field reads never throw on a primitive or `null`. */
+function asRecord(payload: unknown): Record<string, unknown> {
+  return typeof payload === 'object' && payload !== null ? payload as Record<string, unknown> : {}
+}
+
+/** Read a finite number, falling back when the field is absent or not numeric. */
+function countOf(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+/** Read a string field, or undefined when the backend omitted or mistyped it. */
+function textOf(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined
+}
+
+/** Read a named array field from a decoded body, tolerating a bare array. */
+function readRows<Row>(payload: Record<string, unknown>, field: string): Row[] {
+  const rows = payload[field]
+  return Array.isArray(rows) ? rows as Row[] : []
+}
+
+/**
+ * Project one bank row, skipping a row without the id every later request needs.
+ * @param row - one row of the banks listing.
+ * @returns the summary, or undefined for a malformed row.
+ */
+function readBankSummary(row: BankRow): MemoryBankSummary | undefined {
+  if (typeof row.bank_id !== 'string' || row.bank_id.length === 0) return undefined
+  const lastWriteAt = textOf(row.last_write_at)
+  return {
+    bankId: memoryBankId(row.bank_id),
+    name: textOf(row.name) ?? row.bank_id,
+    factCount: countOf(row.fact_count),
+    ...lastWriteAt === undefined ? {} : { lastWriteAt },
+  }
+}
+
+/**
+ * Project one memory-unit row. The list endpoint spells the fact type `fact_type`
+ * and the single-unit endpoints spell it `type`; both are read so one projection
+ * serves list, get, and curation responses.
+ */
+function readUnitSummary(row: UnitRow): MemoryUnitSummary | undefined {
+  const id = textOf(row.id)
+  const text = textOf(row.text)
+  if (id === undefined || text === undefined) return undefined
+  const factType = textOf(row.fact_type) ?? textOf(row.type)
+  const context = textOf(row.context)
+  const state = textOf(row.state)
+  const mentionedAt = textOf(row.mentioned_at)
+  const updatedAt = textOf(row.updated_at)
+  const tags = Array.isArray(row.tags) ? row.tags.filter((tag): tag is string => typeof tag === 'string') : undefined
+  return {
+    id: memoryId(id),
+    text,
+    ...factType === undefined ? {} : { factType },
+    ...context === undefined ? {} : { context },
+    ...state === undefined ? {} : { state },
+    ...tags === undefined || tags.length === 0 ? {} : { tags },
+    ...mentionedAt === undefined ? {} : { mentionedAt },
+    ...updatedAt === undefined ? {} : { updatedAt },
+  }
+}
+
+/** Project a units-listing envelope onto one page, skipping malformed rows. */
+function readUnitPage(payload: unknown): MemoryUnitPage {
+  const envelope = asRecord(payload)
+  const rows = Array.isArray(envelope.items) ? envelope.items as unknown[] : []
+  const units = rows.flatMap((row) => {
+    if (typeof row !== 'object' || row === null) return []
+    return readUnitSummary(row) ?? []
+  })
+  return {
+    units,
+    total: countOf(envelope.total),
+    limit: countOf(envelope.limit),
+    offset: countOf(envelope.offset),
+  }
+}
+
+/**
+ * Read a curation response as an outcome. A 200 carries the updated unit; anything
+ * without a readable id and text is a refusal the daemon worded itself, so its
+ * detail is passed through rather than guessed at.
+ */
+function readCurateOutcome(payload: unknown): MemoryCurateResult {
+  const envelope = asRecord(payload)
+  const unit = readUnitSummary(envelope)
+  if (unit === undefined) return { curated: false, detail: textOf(envelope.detail) ?? '' }
+  return { curated: true }
+}
+
+/**
+ * Project one statistics envelope. Every field degrades to zero rather than
+ * failing the read: a partial count is more useful on a page than no page.
+ */
+function readStats(payload: Record<string, unknown>, bankId: MemoryBankId): MemoryBankStats {
+  return {
+    bankId,
+    totalNodes: countOf(payload.total_nodes),
+    totalLinks: countOf(payload.total_links),
+    totalDocuments: countOf(payload.total_documents),
+    nodesByFactType: readCounts(payload.nodes_by_fact_type),
+    linksByLinkType: readCounts(payload.links_by_link_type),
+    pendingOperations: countOf(payload.pending_operations),
+    failedOperations: countOf(payload.failed_operations),
+  }
+}
+
+/** Read one distribution object as ranked counts, largest first. */
+function readCounts(value: unknown): MemoryCount[] {
+  if (typeof value !== 'object' || value === null) return []
+  return Object.entries(value)
+    .map(([label, count]) => ({ label, count: countOf(count) }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+}
+
+/**
+ * Walk a knowledge-base tree into the flat page list a browser renders. A node
+ * without an id is skipped with its subtree: its children are addressed by their
+ * own ids, so dropping the parent loses no reachable page.
+ */
+function readPages(node: PageNode): MemoryKnowledgePage[] {
+  const children = Array.isArray(node.children) ? node.children as PageNode[] : []
+  const nested = children.flatMap(child => readPages(child))
+  if (typeof node.id !== 'string' || node.id.length === 0) return nested
+  const description = textOf(node.description)
+  const updatedAt = textOf(node.timestamp)
+  return [{
+    pageId: knowledgePageId(node.id),
+    name: textOf(node.name) ?? node.id,
+    stale: node.is_stale === true,
+    ...description === undefined ? {} : { description },
+    ...updatedAt === undefined ? {} : { updatedAt },
+  }, ...nested]
+}
+
+/** Project one search hit, skipping a row without an id or a snippet: a hit the page cannot open and cannot quote is not a hit. */
+function readHit(row: SearchHitRow): MemoryKnowledgeHit | undefined {
+  if (typeof row.id !== 'string' || row.id.length === 0) return undefined
+  const snippet = textOf(row.snippet)
+  if (snippet === undefined) return undefined
+  const score = row.score
+  return {
+    pageId: knowledgePageId(row.id),
+    name: textOf(row.name) ?? row.id,
+    snippet,
+    ...typeof score === 'number' && Number.isFinite(score) ? { score } : {},
+  }
+}
+
+/** Project a page envelope, or undefined when the backend has no body for it. */
+function readPageBody(payload: Record<string, unknown>): MemoryKnowledgePageBody | undefined {
+  const id = textOf(payload.id)
+  const body = textOf(payload.body)
+  if (id === undefined || body === undefined) return undefined
+  return { pageId: knowledgePageId(id), name: textOf(payload.name) ?? id, body }
 }
 
 /**

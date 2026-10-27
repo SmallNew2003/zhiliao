@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { AddressInfo } from 'node:net'
-import { MemoryError, memoryBankId, memoryId } from '@deepseek-ai/dsh-memory'
+import { MemoryError, knowledgePageId, memoryBankId, memoryId } from '@deepseek-ai/dsh-memory'
 import { HindsightMemoryProvider, HINDSIGHT_PROVIDER_ID } from '../src/provider.ts'
 import type { HindsightProviderLimits } from '../src/provider.ts'
 import * as plugin from '../src/index.ts'
@@ -378,6 +378,363 @@ describe('HindsightMemoryProvider over a scripted daemon', () => {
     const provider = makeProvider({ defaultBankSuffix: 'fallback' })
 
     await expect(provider.resolveBank('')).resolves.toBe(memoryBankId('coding-agent::fallback'))
+  })
+
+  describe('HindsightMemoryProvider browse surface', () => {
+    it('exposes itself as the browse surface', () => {
+      const provider = makeProvider()
+      expect(provider.browse).toBe(provider)
+    })
+
+    it('projects the bank listing with counts and last write', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          banks: [
+            { bank_id: 'coding-agent::demo', name: 'demo', fact_count: 42, last_write_at: '2026-10-01T00:00:00Z' },
+            { bank_id: 'coding-agent::bare' },
+            { name: 'no id at all' },
+          ],
+        })
+      }
+
+      await expect(makeProvider().listBanks()).resolves.toEqual([
+        { bankId: memoryBankId('coding-agent::demo'), name: 'demo', factCount: 42, lastWriteAt: '2026-10-01T00:00:00Z' },
+        { bankId: memoryBankId('coding-agent::bare'), name: 'coding-agent::bare', factCount: 0 },
+      ])
+      expect(recorded[0]?.path).toBe('/v1/default/banks')
+    })
+
+    it('sends pagination, the substring filter, and the fact type on a units listing', async () => {
+      handler = (_req, res) => { reply(res, 200, { items: [], total: 0, limit: 20, offset: 40 }) }
+
+      await makeProvider().listUnits({ query: 'web', factType: 'world', limit: 20, offset: 40 }, bank)
+
+      expect(recorded[0]?.path).toBe(
+        '/v1/default/banks/coding-agent%3A%3Ademo/memories/list?limit=20&offset=40&q=web&type=world',
+      )
+    })
+
+    it('omits absent filters from a units listing', async () => {
+      handler = (_req, res) => { reply(res, 200, { items: [], total: 0, limit: 20, offset: 0 }) }
+
+      await makeProvider().listUnits({}, bank)
+
+      expect(recorded[0]?.path).toBe('/v1/default/banks/coding-agent%3A%3Ademo/memories/list')
+    })
+
+    it('projects a units page with its totals and optional fields', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          items: [
+            {
+              id: 'u-1', text: 'a fact', fact_type: 'world', context: 'chat', state: 'valid',
+              tags: ['source:upload'], mentioned_at: '2026-10-01T00:00:00Z', updated_at: '2026-10-02T00:00:00Z',
+            },
+            { id: 'u-2', text: 'bare' },
+          ],
+          total: 7, limit: 2, offset: 0,
+        })
+      }
+
+      await expect(makeProvider().listUnits({ limit: 2 }, bank)).resolves.toEqual({
+        units: [
+          {
+            id: memoryId('u-1'), text: 'a fact', factType: 'world', context: 'chat', state: 'valid',
+            tags: ['source:upload'], mentionedAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-02T00:00:00Z',
+          },
+          { id: memoryId('u-2'), text: 'bare' },
+        ],
+        total: 7, limit: 2, offset: 0,
+      })
+    })
+
+    it('skips malformed unit rows instead of failing the listing', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          items: [{ id: 'ok', text: 'good' }, { id: 'no-text' }, { text: 'no-id' }, null, 42],
+          total: 5, limit: 5, offset: 0,
+        })
+      }
+
+      const page = await makeProvider().listUnits({}, bank)
+
+      expect(page.units).toEqual([{ id: memoryId('ok'), text: 'good' }])
+      expect(page.total).toBe(5)
+    })
+
+    it('reads the single-unit endpoints\' type spelling as the fact type', async () => {
+      handler = (_req, res) => { reply(res, 200, { id: 'u-1', text: 'curated', type: 'experience' }) }
+
+      await expect(makeProvider().curateUnit({ context: 'ctx' }, bank, memoryId('u-1'))).resolves.toEqual({ curated: true })
+    })
+
+    it('sends the finding as one async retain item and reports the operation id', async () => {
+      handler = (_req, res) => { reply(res, 200, { success: true, items_count: 1, operation_id: 'op-9' }) }
+
+      await expect(makeProvider().remember({ text: 'keep this', context: 'probe' }, bank)).resolves.toEqual({
+        remembered: true, detail: 'op-9',
+      })
+      expect(recorded[0]).toMatchObject({
+        path: '/v1/default/banks/coding-agent%3A%3Ademo/memories',
+        method: 'POST',
+        body: { items: [{ content: 'keep this', context: 'probe' }], async: true },
+      })
+    })
+
+    it('omits the context field when a finding carries none', async () => {
+      handler = (_req, res) => { reply(res, 200, { success: true, operation_id: 'op-9' }) }
+
+      await makeProvider().remember({ text: 'keep this' }, bank)
+
+      expect(recorded[0]?.body).toEqual({ items: [{ content: 'keep this' }], async: true })
+    })
+
+    it('reports a refused write as not remembered', async () => {
+      handler = (_req, res) => { reply(res, 200, { success: false }) }
+
+      await expect(makeProvider().remember({ text: 'keep this' }, bank)).resolves.toEqual({ remembered: false })
+    })
+
+    it('sends a curation as snake_case fields on PATCH', async () => {
+      handler = (_req, res) => { reply(res, 200, { id: 'u-1', text: 'curated', type: 'world' }) }
+
+      await makeProvider().curateUnit({ text: 'curated', context: 'ctx', factType: 'world' }, bank, memoryId('u-1'))
+
+      expect(recorded[0]).toMatchObject({
+        path: '/v1/default/banks/coding-agent%3A%3Ademo/memories/u-1',
+        method: 'PATCH',
+        body: { text: 'curated', context: 'ctx', fact_type: 'world' },
+      })
+    })
+
+    it('passes a refused curation through with the backend\'s own detail', async () => {
+      handler = (_req, res) => { reply(res, 200, { detail: 'only world/experience facts can be curated' }) }
+
+      await expect(makeProvider().curateUnit({ text: 'x' }, bank, memoryId('u-1'))).resolves.toEqual({
+        curated: false, detail: 'only world/experience facts can be curated',
+      })
+    })
+
+    it('refuses a curation that changes nothing, without a request', async () => {
+      await expect(makeProvider().curateUnit({}, bank, memoryId('u-1'))).rejects.toThrow(
+        expect.objectContaining({ code: 'MEMORY_BACKEND_ERROR' }),
+      )
+      expect(recorded).toHaveLength(0)
+    })
+
+    it('projects bank statistics with distributions ranked largest first', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          total_nodes: 522, total_links: 9963, total_documents: 16,
+          nodes_by_fact_type: { observation: 192, experience: 202, world: 128 },
+          links_by_link_type: { semantic: 4460, temporal: 4925 },
+          pending_operations: 2, failed_operations: 1,
+        })
+      }
+
+      await expect(makeProvider().bankStats(bank)).resolves.toEqual({
+        bankId: bank,
+        totalNodes: 522, totalLinks: 9963, totalDocuments: 16,
+        nodesByFactType: [
+          { label: 'experience', count: 202 },
+          { label: 'observation', count: 192 },
+          { label: 'world', count: 128 },
+        ],
+        linksByLinkType: [
+          { label: 'temporal', count: 4925 },
+          { label: 'semantic', count: 4460 },
+        ],
+        pendingOperations: 2, failedOperations: 1,
+      })
+    })
+
+    it('flattens the knowledge-page tree depth-first and skips id-less nodes', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          roots: [
+            {
+              id: 'p-1', name: 'One', timestamp: '2026-10-01T00:00:00Z', is_stale: true,
+              children: [{ id: 'p-1-1', name: 'Child' }],
+            },
+            { name: 'no id', children: [{ id: 'p-2', name: 'Two' }] },
+          ],
+        })
+      }
+
+      await expect(makeProvider().listPages(bank)).resolves.toEqual([
+        { pageId: knowledgePageId('p-1'), name: 'One', stale: true, updatedAt: '2026-10-01T00:00:00Z' },
+        { pageId: knowledgePageId('p-1-1'), name: 'Child', stale: false },
+        { pageId: knowledgePageId('p-2'), name: 'Two', stale: false },
+      ])
+    })
+
+    it('searches the knowledge index with the query and limit', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          results: [{ id: 'p-1', name: 'One', snippet: 'matched', score: 0.5 }, { id: 'no-snippet', name: 'X' }],
+          total: 9,
+        })
+      }
+
+      await expect(makeProvider().searchPages({ query: 'web', limit: 5 }, bank)).resolves.toEqual({
+        hits: [{ pageId: knowledgePageId('p-1'), name: 'One', snippet: 'matched', score: 0.5 }],
+        total: 9,
+      })
+      expect(recorded[0]?.path).toBe(
+        '/v1/default/banks/coding-agent%3A%3Ademo/knowledge-base/search?q=web&limit=5',
+      )
+    })
+
+    it('reports at least the hit count when the backend names no total', async () => {
+      handler = (_req, res) => { reply(res, 200, { results: [{ id: 'p-1', name: 'One', snippet: 's' }] }) }
+
+      const result = await makeProvider().searchPages({ query: 'web' }, bank)
+
+      expect(result.total).toBe(1)
+      expect(recorded[0]?.path).toBe('/v1/default/banks/coding-agent%3A%3Ademo/knowledge-base/search?q=web')
+    })
+
+    it('accepts a bare array bank listing as well as an envelope', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, [
+          { bank_id: 'coding-agent::demo', name: 'demo', fact_count: 1 },
+        ])
+      }
+
+      await expect(makeProvider().listBanks()).resolves.toEqual([
+        { bankId: memoryBankId('coding-agent::demo'), name: 'demo', factCount: 1 },
+      ])
+    })
+
+    it('orders equal-count distribution entries by label', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          total_nodes: 2,
+          nodes_by_fact_type: { world: 1, observation: 1 },
+        })
+      }
+
+      const stats = await makeProvider().bankStats(bank)
+
+      expect(stats.nodesByFactType.map(entry => entry.label)).toEqual(['observation', 'world'])
+    })
+
+    it('keeps a page node\'s description when the backend reports one', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          roots: [{
+            id: 'p-1', name: 'One', description: 'what it covers',
+            timestamp: '2026-10-01T00:00:00Z',
+          }],
+        })
+      }
+
+      await expect(makeProvider().listPages(bank)).resolves.toEqual([
+        {
+          pageId: knowledgePageId('p-1'), name: 'One', stale: false,
+          description: 'what it covers', updatedAt: '2026-10-01T00:00:00Z',
+        },
+      ])
+    })
+
+    it('falls back to the id for a search hit without a name', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, { results: [{ id: 'p-1', snippet: 's' }], total: 1 })
+      }
+
+      await expect(makeProvider().searchPages({ query: 'web' }, bank)).resolves.toEqual({
+        hits: [{ pageId: knowledgePageId('p-1'), name: 'p-1', snippet: 's' }],
+        total: 1,
+      })
+    })
+
+    it('falls back to the id for a page body without a name', async () => {
+      handler = (_req, res) => { reply(res, 200, { id: 'p-1', body: '# One' }) }
+
+      await expect(makeProvider().pageBody(bank, knowledgePageId('p-1'))).resolves.toEqual({
+        pageId: knowledgePageId('p-1'), name: 'p-1', body: '# One',
+      })
+    })
+
+    it('skips a search hit without an id', async () => {
+      handler = (_req, res) => {
+        reply(res, 200, {
+          results: [{ name: 'no id', snippet: 's' }, { id: 'p-1', name: 'One', snippet: 't' }],
+          total: 2,
+        })
+      }
+
+      const result = await makeProvider().searchPages({ query: 'web' }, bank)
+
+      expect(result.hits.map(hit => hit.pageId)).toEqual([knowledgePageId('p-1')])
+      expect(result.total).toBe(2)
+    })
+
+    it('reads a units listing without an items array as an empty page', async () => {
+      handler = (_req, res) => { reply(res, 200, { total: 3, limit: 20, offset: 0 }) }
+
+      await expect(makeProvider().listUnits({}, bank)).resolves.toEqual({
+        units: [], total: 3, limit: 20, offset: 0,
+      })
+    })
+
+    it('reads a statistics body that is not an object as zeroed totals', async () => {
+    // A valid JSON body that is not an object: the daemon answered, oddly.
+      handler = (_req, res) => { reply(res, 200, '42') }
+
+      await expect(makeProvider().bankStats(bank)).resolves.toEqual({
+        bankId: bank,
+        totalNodes: 0, totalLinks: 0, totalDocuments: 0,
+        nodesByFactType: [], linksByLinkType: [], pendingOperations: 0, failedOperations: 0,
+      })
+    })
+
+    it('reads a distribution the backend did not report as empty rather than failing', async () => {
+      handler = (_req, res) => { reply(res, 200, { total_nodes: 1, nodes_by_fact_type: 'nope' }) }
+
+      const stats = await makeProvider().bankStats(bank)
+
+      expect(stats.totalNodes).toBe(1)
+      expect(stats.nodesByFactType).toEqual([])
+    })
+
+    it('reads a knowledge tree without a roots array as no pages', async () => {
+      handler = (_req, res) => { reply(res, 200, {}) }
+
+      await expect(makeProvider().listPages(bank)).resolves.toEqual([])
+    })
+
+    it('falls back to the id for a page node without a name', async () => {
+      handler = (_req, res) => { reply(res, 200, { roots: [{ id: 'p-1' }] }) }
+
+      await expect(makeProvider().listPages(bank)).resolves.toEqual([
+        { pageId: knowledgePageId('p-1'), name: 'p-1', stale: false },
+      ])
+    })
+
+    it('reads a search without a results array as no hits', async () => {
+      handler = (_req, res) => { reply(res, 200, { total: 4 }) }
+
+      await expect(makeProvider().searchPages({ query: 'web' }, bank)).resolves.toEqual({ hits: [], total: 4 })
+    })
+
+    it('reports a curation refusal that carries no detail as an empty one', async () => {
+      handler = (_req, res) => { reply(res, 200, { success: true }) }
+
+      await expect(makeProvider().curateUnit({ text: 'x' }, bank, memoryId('u-1'))).resolves.toEqual({
+        curated: false, detail: '',
+      })
+    })
+
+    it('reads a knowledge page body, or undefined when the backend holds none', async () => {
+      handler = (_req, res) => { reply(res, 200, { id: 'p-1', name: 'One', body: '# One' }) }
+      await expect(makeProvider().pageBody(bank, knowledgePageId('p-1'))).resolves.toEqual({
+        pageId: knowledgePageId('p-1'), name: 'One', body: '# One',
+      })
+
+      handler = (_req, res) => { reply(res, 200, {}) }
+      await expect(makeProvider().pageBody(bank, knowledgePageId('gone'))).resolves.toBeUndefined()
+    })
   })
 })
 

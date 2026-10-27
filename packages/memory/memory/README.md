@@ -1,5 +1,5 @@
 ---
-description: "The long-term memory service (ctx.memory): how plugins and tool authors recall, search, and retain durable memory per workspace through interchangeable providers, with one selection policy and error vocabulary."
+description: "The long-term memory service (ctx.memory): how plugins and tool authors recall, search, and retain durable memory per workspace through interchangeable providers, plus the optional browse surface a human-facing consumer resolves, under one selection policy and error vocabulary."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Use `dsh-memory` to add long-term memory to a composition without binding callers to one backend. It owns a provider registry, resolves a memory bank per workspace, and exposes recall, search, and retention under one selection policy and one error vocabulary. Choose it when a plugin must read or write durable memory across sessions. A backend must be mounted, because the seam itself performs no network access; the shipped `dsh-memory-hindsight-http` provider registers one for you. Callers on the agent hot path are expected to catch `MemoryError` and continue, because memory must never block a turn.
+Use `dsh-memory` to add long-term memory to a composition without binding callers to one backend. It owns a provider registry, resolves a memory bank per workspace, and exposes recall, search, and retention under one selection policy and one error vocabulary. A provider can publish a browse surface — banks, memory units, and the two writes a person performs — that `ctx.memory.browse()` hands to a human-facing consumer, so a panel built against it survives a backend swap. Choose it when a plugin must read or write memory across sessions; a backend must be mounted, because the seam performs no network access.
 
 ## Table of Contents
 
@@ -64,6 +64,27 @@ const outcome = await ctx.memory.retain({ turns }, bankId)
 
 Every call accepts an optional `AbortSignal` that is forwarded to the provider for cancellation. Callers that own a turn budget should pass one and still catch failures: a memory backend that is slow, unreachable, or misconfigured must cost a degraded turn, never a failed one.
 
+### Browsing and writing for a person
+
+`ctx.memory.browse()` resolves the selected provider's browse surface, the half of the seam a human-facing consumer reads and writes through. Selection runs per call exactly as it does for the agent path, and a selected provider without a surface refuses with `MEMORY_CAPABILITY_UNSUPPORTED` — a backend that serves recall and retention only is a valid composition, not a failure.
+
+Every browsable provider implements four members: `listBanks()` lists the deployment's banks, `listUnits()` pages through one bank's memory units under an optional substring filter and fact type, `remember()` records one finding, and `curateUnit()` edits an existing unit. Four further members are optional because they are provider-specific projections: `bankStats()`, `listPages()`, `searchPages()`, and `pageBody()` serve the curated knowledge-page view, and a backend without it simply omits them for the consumer to degrade.
+
+```text
+// The browse surface, resolved per call like every other seam method:
+const browse = ctx.memory.browse()
+
+// What the deployment remembers, and what one bank holds:
+const banks = await browse.listBanks()
+const page = await browse.listUnits({ query: 'web', limit: 20, offset: 0 }, bankId)
+
+// The two writes a person performs:
+const recorded = await browse.remember({ text: 'we chose Cordis for the plugin lifecycle', context: 'decision' }, bankId)
+const curated = await browse.curateUnit({ text: 'we chose Cordis for the plugin lifecycle', context: 'decision' }, bankId, unitId)
+```
+
+Writes report acceptance rather than projecting the stored unit: retention is asynchronous on backends that extract facts by inference, so `remember()` returns once the items are accepted and the caller re-reads the bank when it wants the new unit. `curateUnit()` refuses fact types the backend derives, with the backend's own message as the outcome's detail.
+
 ### Provider selection
 
 Each call resolves its provider at execution time, and registration or load order never matters. A configured provider id wins when it is registered and usable; without a configured id, the service runs the single usable provider or fails clearly:
@@ -106,13 +127,13 @@ The package is built on one deliberate separation:
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the `MemoryRuntime` service, the provider registry, execution-time selection, and `capUnits` |
+| [`src/index.ts`](src/index.ts) | Plugin entry: the `MemoryRuntime` service, the provider registry, execution-time selection, the `browse()` surface accessor, and `capUnits` |
 | [`src/types.ts`](src/types.ts) | Vocabulary: the `MemoryProvider` contract, request/result shapes, branded identifiers, and the `MemoryError` taxonomy |
 | — | No runtime invariant companion is published; the provider map is private and selection and result caps are enforced on each call; the seam publishes no independent registry or recall/result observation stream. |
 
 ### Data model
 
-The provider contract and the request/result types define the normalized vocabulary callers build on, and the exhaustive fields and JSDoc live in [`src/types.ts`](src/types.ts). Three deliberate choices shape them. `MemoryBankId`, `MemoryId`, and `KnowledgePageId` are branded strings, so a bank can never be passed where a memory id belongs; the cast helpers exist because a provider, not a caller, owns the representation. `MemoryUnit.text` is documented as already formatted for model consumption, which keeps rendering policy out of the seam's consumers. `MemoryError` extends `Error` with a closed `code` union, so a caller can route on a small stable set rather than parse messages.
+The provider contract and the request/result types define the normalized vocabulary callers build on, and the exhaustive fields and JSDoc live in [`src/types.ts`](src/types.ts). Three deliberate choices shape them. `MemoryBankId`, `MemoryId`, and `KnowledgePageId` are branded strings, so a bank can never be passed where a memory id belongs; the cast helpers exist because a provider, not a caller, owns the representation. `MemoryUnit.text` is documented as already formatted for model consumption, which keeps rendering policy out of the seam's consumers. `MemoryError` extends `Error` with a closed `code` union, so a caller can route on a small stable set rather than parse messages. The browse vocabulary — bank summaries, unit pages, write outcomes, and the optional statistics and knowledge-page projections — lives beside the agent-path vocabulary so the wire a browser speaks and the wire an agent speaks share one home.
 
 ### Selection flow
 

@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-memory-browser",
-  "description": "Long-term memory browser for the dsh web client: the sidebar Memory panel lists the deployment's memory banks, their statistics and fact-type composition, their knowledge pages, and searches the knowledge index",
+  "description": "Long-term memory browser for the dsh web client: the sidebar Memory panel lists the deployment's memory banks, their statistics and fact-type composition, their memory units, and their knowledge pages; it searches the knowledge index and records or curates memory units",
   "version": "0.1.6-alpha.2",
   "publishConfig": {
     "access": "public"

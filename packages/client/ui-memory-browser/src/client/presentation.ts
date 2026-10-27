@@ -14,6 +14,7 @@ const REASON_KEYS = {
   unavailable: 'reasonUnavailable',
   misconfigured: 'reasonMisconfigured',
   unreachable: 'reasonUnreachable',
+  unsupported: 'reasonUnsupported',
   failed: 'reasonFailed',
 } satisfies Record<MemoryUnavailableReason, MemoryBrowserLocaleKey>
 

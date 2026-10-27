@@ -3,6 +3,12 @@
  * the per-request status envelope every Remote method answers with. Types only
  * — no runtime service, no network access.
  *
+ * The browse vocabulary itself — banks, statistics, knowledge pages, memory
+ * units, and the write outcomes — is declared once by the memory seam and
+ * re-exported here, so the wire and the seam never drift apart. This module
+ * keeps only what is specific to the wire: the status envelope and each
+ * method's payload.
+ *
  * Every method answers a status envelope rather than throwing for a missing
  * provider or an unreachable daemon: a browser panel has to render "memory is
  * not available here", and a rejected Remote call can only become a generic
@@ -11,87 +17,47 @@
  * @module @deepseek-ai/dsh-host-memory-controller/types
  */
 
+import type {
+  MemoryBankStats,
+  MemoryBankSummary,
+  MemoryKnowledgeHit,
+  MemoryKnowledgePage,
+  MemoryKnowledgePageBody,
+  MemoryUnitPage,
+} from '@deepseek-ai/dsh-memory'
+
+export type {
+  KnowledgePageId,
+  MemoryBankId,
+  MemoryBankStats,
+  MemoryBankSummary,
+  MemoryCount,
+  MemoryId,
+  MemoryKnowledgeHit,
+  MemoryKnowledgePage,
+  MemoryKnowledgePageBody,
+  MemoryUnitPage,
+  MemoryUnitSummary,
+} from '@deepseek-ai/dsh-memory'
+
 /**
- * Why a memory read could not be answered. Stable and safe to branch on; the
- * human-facing sentence lives in the browser package's dictionary.
+ * Why a memory read or write could not be answered. Stable and safe to branch
+ * on; the human-facing sentence lives in the browser package's dictionary.
  *
  * - `unavailable`: no usable provider is registered on the Host, so memory is
  *   switched off for this deployment rather than broken.
  * - `misconfigured`: the Host pinned a provider id that is not registered.
  * - `unreachable`: the provider's backend did not answer in time.
+ * - `unsupported`: the provider answered, but offers no browse surface or not
+ *   the section asked for — a backend that serves the agent path only.
  * - `failed`: the backend answered with an error, or the bank does not exist.
  */
 export type MemoryUnavailableReason =
   | 'unavailable'
   | 'misconfigured'
   | 'unreachable'
+  | 'unsupported'
   | 'failed'
-
-/** One memory bank as the browser lists it. */
-export interface MemoryBankSummary {
-  /** Provider-owned bank id; contains `::`, so URLs must encode it. */
-  readonly bankId: string
-  /** Display name the backend published for the bank. */
-  readonly name: string
-  /** Number of facts the backend holds for the bank. */
-  readonly factCount: number
-  /** ISO-8601 instant of the bank's last write, when the backend reports one. */
-  readonly lastWriteAt?: string
-}
-
-/** One counted entry of a bank statistic distribution, e.g. a fact type. */
-export interface MemoryCount {
-  /** Backend-owned label, such as `experience` or `semantic`. */
-  readonly label: string
-  /** How many nodes or links carry the label. */
-  readonly count: number
-}
-
-/** A bank's numeric health and composition, as the browser's statistics block. */
-export interface MemoryBankStats {
-  readonly bankId: string
-  readonly totalNodes: number
-  readonly totalLinks: number
-  readonly totalDocuments: number
-  /** Node counts per fact type, as the backend reported them. */
-  readonly nodesByFactType: readonly MemoryCount[]
-  /** Link counts per link type, as the backend reported them. */
-  readonly linksByLinkType: readonly MemoryCount[]
-  /** Operations the backend has not finished. */
-  readonly pendingOperations: number
-  /** Operations the backend could not complete. */
-  readonly failedOperations: number
-}
-
-/** One knowledge page as the browser's page browser lists it. */
-export interface MemoryKnowledgePage {
-  readonly pageId: string
-  readonly name: string
-  /** The prompt the page was generated from, when the backend keeps one. */
-  readonly description?: string
-  /** ISO-8601 instant of the page's last refresh, when the backend reports one. */
-  readonly updatedAt?: string
-  /** Whether the backend marked the page as due for a refresh. */
-  readonly stale: boolean
-}
-
-/** One knowledge-base search hit. */
-export interface MemoryKnowledgeHit {
-  readonly pageId: string
-  readonly name: string
-  /** Matching excerpt of the page body. */
-  readonly snippet: string
-  /** Backend relevance score; absent when the backend ranks without one. */
-  readonly score?: number
-}
-
-/** One knowledge page's rendered content. */
-export interface MemoryKnowledgePageBody {
-  readonly pageId: string
-  readonly name: string
-  /** Markdown body the browser renders as preformatted text. */
-  readonly body: string
-}
 
 /** The answers a Remote method settles with: a payload, or why there is none. */
 export type MemoryAnswer<T> =
@@ -133,6 +99,25 @@ export interface MemoryPagePayload {
   readonly page?: MemoryKnowledgePageBody
 }
 
+/** Payload of `memoryController.units`: one page of a bank's memory units. */
+export type MemoryUnitsPayload = MemoryUnitPage
+
+/** Payload of `memoryController.remember`. */
+export interface MemoryRememberPayload {
+  /** Whether the backend accepted the finding. */
+  readonly remembered: boolean
+  /** Backend-reported detail, such as the async operation id, when present. */
+  readonly detail?: string
+}
+
+/** Payload of `memoryController.curate`. */
+export interface MemoryCuratePayload {
+  /** Whether the backend accepted the curation. */
+  readonly curated: boolean
+  /** Backend-reported detail, when present. */
+  readonly detail?: string
+}
+
 /** Answer of `memoryController.list`. */
 export type MemoryListResult = MemoryAnswer<MemoryBanksPayload>
 
@@ -147,3 +132,12 @@ export type MemorySearchResult = MemoryAnswer<MemorySearchPayload>
 
 /** Answer of `memoryController.page`. */
 export type MemoryPageResult = MemoryAnswer<MemoryPagePayload>
+
+/** Answer of `memoryController.units`. */
+export type MemoryUnitsResult = MemoryAnswer<MemoryUnitsPayload>
+
+/** Answer of `memoryController.remember`. */
+export type MemoryRememberResult = MemoryAnswer<MemoryRememberPayload>
+
+/** Answer of `memoryController.curate`. */
+export type MemoryCurateResult = MemoryAnswer<MemoryCuratePayload>

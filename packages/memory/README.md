@@ -27,7 +27,7 @@ Recall is served by a hindsight daemon that runs inference to answer a query. A 
 
 | Package | Role | ctx key |
 |---|---|---|
-| [`memory/`](memory/README.md) | Memory service: bank resolution plus recall, search, and retention through interchangeable providers | `ctx.memory` |
+| [`memory/`](memory/README.md) | Memory service: bank resolution plus recall, search, retention, and the human-facing browse surface through interchangeable providers | `ctx.memory` |
 | [`hindsight-http/`](hindsight-http/README.md) | Provider backed by a hindsight HTTP daemon; resolves a bank per workspace | registers on `ctx.memory` |
 | [`tool-memory/`](tool-memory/README.md) | Consumer: opening recall, turn retention, cold-bank seeding, and the `hindsight_search` / `hindsight_remember` tools | consumes `ctx.memory` |
 
@@ -38,6 +38,7 @@ Recall is served by a hindsight daemon that runs inference to answer a query. A 
 2. **First request.** `agent/pre-step` recalls memories relevant to the opening prompt and appends them as a durable user-role message framed as background knowledge that may be stale.
 3. **Turn closes.** `agent/turn-stopping` retains the finished exchange; the backend extracts facts asynchronously.
 4. **Model asks.** `hindsight_search` looks up something the injected memory did not cover; `hindsight_remember` records a finding worth keeping deliberately.
+5. **A person asks.** The browser's Memory panel resolves the seam's browse surface through the Host's `memoryController` Remote: it lists the banks, pages through one bank's memory units, reads its statistics and knowledge pages, and performs the two writes — recording a finding and curating an existing unit. The surface is provider-neutral, so the panel keeps working when the deployment swaps backends.
 
 Delegated subagent sessions carry no bank of their own: they inherit the parent's workspace but a different working set, and folding them into the parent's memory would interleave two conversations.
 
