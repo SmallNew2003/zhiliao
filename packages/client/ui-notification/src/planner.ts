@@ -60,5 +60,6 @@ export function detectTriggers(
       triggers.push({ kind: 'awaiting-input', sessionId })
     }
   }
-  return triggers.sort((left, right) => (left.sessionId < right.sessionId ? -1 : left.sessionId > right.sessionId ? 1 : 0))
+  // Session ids are unique, so the comparator never sees an equal pair.
+  return triggers.sort((left, right) => (left.sessionId < right.sessionId ? -1 : 1))
 }

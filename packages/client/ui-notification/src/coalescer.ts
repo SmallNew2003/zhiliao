@@ -14,8 +14,8 @@ import type { NotificationTrigger } from './planner.ts'
 export interface NotificationBatch {
   /** Why the announcement is raised. */
   readonly kind: NotificationKind
-  /** Sessions that earned the kind, in first-seen order. */
-  readonly sessionIds: readonly SessionId[]
+  /** Sessions that earned the kind, in first-seen order; never empty. */
+  readonly sessionIds: readonly [SessionId, ...SessionId[]]
 }
 
 /** Timer primitives the coalescer schedules with; injectable for tests. */
@@ -84,11 +84,11 @@ export class NotificationCoalescer {
     const batches: NotificationBatch[] = []
     for (const kind of NOTIFICATION_KINDS) {
       const sessions = this.pending.get(kind)
-      if (sessions === undefined || sessions.size === 0) continue
-      batches.push({ kind, sessionIds: [...sessions] })
+      if (sessions === undefined) continue
+      // The coalescer only records a kind once a trigger names a session, so the set is non-empty.
+      batches.push({ kind, sessionIds: [...sessions] as [SessionId, ...SessionId[]] })
     }
     this.pending.clear()
-    if (batches.length === 0) return
     this.flush(batches)
   }
 }

@@ -89,28 +89,19 @@ export class WebNotifier implements Notifier {
   }
 
   /**
-   * Ask the browser for authorization when it has not decided yet. Chrome
-   * admits the prompt once the page has been interacted with, so the first
-   * announcement is also the moment the user is asked.
-   * @returns the state after the prompt, or the current one when the API cannot prompt.
-   */
-  private async ensurePermission(): Promise<NotificationPermission> {
-    if (typeof Notification === 'undefined') return 'unsupported'
-    if (typeof Notification.requestPermission !== 'function') return toPermission(Notification.permission)
-    return toPermission(await Notification.requestPermission())
-  }
-
-  /**
    * Present one notification, asking the browser for authorization first when
-   * it has not decided yet.
+   * it has not decided yet. Chrome admits the prompt once the page has been
+   * interacted with, so the first announcement is also the moment the user is
+   * asked.
    * @param request - headline, detail, and the session to open on click.
    * @returns after the browser accepted the request; a denied permission stays silent.
    */
   async show(request: NotificationShowRequest): Promise<void> {
     if (typeof Notification === 'undefined') return
-    const state = toPermission(Notification.permission) === 'default'
-      ? await this.ensurePermission()
-      : toPermission(Notification.permission)
+    let state = toPermission(Notification.permission)
+    if (state === 'default' && typeof Notification.requestPermission === 'function') {
+      state = toPermission(await Notification.requestPermission())
+    }
     if (state !== 'granted') return
     const notification = new Notification(request.title, {
       body: request.body,

@@ -5,7 +5,7 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
@@ -14,13 +14,23 @@ import { apply, inject } from '../src/client/index.ts'
 import { SETTINGS_NS } from '../src/client/runtime.ts'
 import { NotificationRow } from '../src/client/NotificationRow.tsx'
 import { NotificationBridge } from '../src/client/NotificationBridge.tsx'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { NOTIFICATION_SETTINGS_NAMESPACE, NotificationSettingsSchema } from '../src/notification-settings.ts'
 import { createNotificationRowStore } from '../src/client/settings-store.ts'
 
 const ITEM_SLOT = 'settings.general.item'
 const OVERLAY_SLOT = 'shell.overlay'
 
-async function bench() {
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+
+const sessionId = (value: string): SessionId => value as SessionId
+
+/** Optional collaborator shape the runtime calls on a notification click. */
+interface WorkspaceStub {
+  openSession(sessionId: SessionId): void
+}
+
+async function bench(options: { revision?: number | undefined; workspace?: WorkspaceStub } = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
@@ -33,7 +43,8 @@ async function bench() {
     value: { ...section },
     applies: 'live' as const,
     secrets: [],
-    revision: 0,
+    // Only an explicit `revision: undefined` models a wire that supplied none.
+    revision: ('revision' in options ? options.revision : 0) as number,
   })
   const describeSettings = vi.fn(() => Promise.resolve({
     ok: true as const,
@@ -48,6 +59,7 @@ async function bench() {
   events.$host = { home: undefined, isLoopback: true }
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   ctx.provide('sessions', { list: { getSnapshot: () => ({ byId: {} }) } })
+  if (options.workspace !== undefined) ctx.provide('uiWorkspace', options.workspace)
   ;(ctx.get('slots') as SlotRegistry).register({
     name: 'root',
     children: {
@@ -125,5 +137,142 @@ describe('ui-notification browser half', () => {
     await fiber.dispose()
     expect(ctx.slots.entries(ITEM_SLOT)).toHaveLength(0)
     expect(ctx.slots.entries(OVERLAY_SLOT)).toHaveLength(0)
+  })
+})
+
+/** Stub the Electron preload carrier, capturing the click listener it registers. */
+function stubDesktopShell(): { shown: { title: string; body: string; sessionId?: string }[]; click: (id: string) => void } {
+  const shown: { title: string; body: string; sessionId?: string }[] = []
+  let listener: ((id: string) => void) | undefined
+  vi.stubGlobal('dshDesktop', {
+    protocolVersion: 1,
+    notifications: {
+      show: vi.fn(async (request: { title: string; body: string; sessionId?: string }) => { shown.push(request) }),
+      subscribe: vi.fn((registered: (id: string) => void) => { listener = registered; return () => {} }),
+      permission: vi.fn(async () => 'granted' as const),
+    },
+  })
+  return { shown, click: (id) => { listener?.(id) } }
+}
+
+describe('ui-notification announcements', () => {
+  it('presents a merged completion after the coalescing window', async () => {
+    vi.useFakeTimers()
+    try {
+      const shell = stubDesktopShell()
+      const { ctx, slots } = await bench()
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      const entry = slots.entries(OVERLAY_SLOT).find(e => e.component === NotificationBridge)!
+      const injected = entry.inject as unknown as () => { push: (trigger: unknown) => void }
+      injected().push({ kind: 'turn-complete', sessionId: sessionId('s1') })
+      injected().push({ kind: 'turn-complete', sessionId: sessionId('s2') })
+      await vi.advanceTimersByTimeAsync(800)
+      expect(shell.shown).toEqual([{ title: '2 个会话已完成', body: '点击查看', sessionId: 's1' }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('presents one session with its display title when the list knows it', async () => {
+    vi.useFakeTimers()
+    try {
+      const shell = stubDesktopShell()
+      const ctx = new Context()
+      await ctx.plugin(SlotRegistry).await()
+      const locale = new LocaleRuntime(ctx)
+      locale.setLocale('zh')
+      ctx.provide('locale', locale)
+      const events = new TestRemote(ctx, { settings: { describe: vi.fn(), mutate: vi.fn() } })
+      events.$host = { home: undefined, isLoopback: true }
+      await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
+      ctx.provide('sessions', { list: { getSnapshot: () => ({ byId: { s1: { displayTitle: '重构登录' } } }) } })
+      ;(ctx.get('slots') as SlotRegistry).register({
+        name: 'root', children: { [OVERLAY_SLOT]: { kind: 'list', scope: 'root' } },
+      } as never, () => null)
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      const entry = ctx.slots.entries(OVERLAY_SLOT).find(e => e.component === NotificationBridge)!
+      const injected = entry.inject as unknown as () => { push: (trigger: unknown) => void }
+      injected().push({ kind: 'turn-complete', sessionId: sessionId('s1') })
+      await vi.advanceTimersByTimeAsync(800)
+      expect(shell.shown).toEqual([{ title: '会话已完成', body: '「重构登录」', sessionId: 's1' }])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('opens the session a click names through the workspace collaborator', async () => {
+    const shell = stubDesktopShell()
+    const openSession = vi.fn()
+    const { ctx } = await bench({ workspace: { openSession } })
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    shell.click('s1')
+    expect(openSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('ignores a click when no workspace collaborator is composed', async () => {
+    const shell = stubDesktopShell()
+    const { ctx } = await bench()
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    expect(() => { shell.click('s1') }).not.toThrow()
+  })
+
+  it('records a trigger without a transport and presents nothing', async () => {
+    vi.useFakeTimers()
+    try {
+      const { ctx, slots } = await bench()
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      const entry = slots.entries(OVERLAY_SLOT).find(e => e.component === NotificationBridge)!
+      const injected = entry.inject as unknown as () => { push: (trigger: unknown) => void }
+      expect(() => {
+        injected().push({ kind: 'turn-complete', sessionId: sessionId('s1') })
+        vi.advanceTimersByTime(800)
+      }).not.toThrow()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('logs a refused presentation and keeps the merge window usable', async () => {
+    vi.useFakeTimers()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      vi.stubGlobal('dshDesktop', {
+        protocolVersion: 1,
+        notifications: {
+          show: vi.fn(async () => { throw new Error('refused') }),
+          subscribe: vi.fn(() => () => {}),
+          permission: vi.fn(async () => 'granted' as const),
+        },
+      })
+      const { ctx, slots } = await bench()
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      const entry = slots.entries(OVERLAY_SLOT).find(e => e.component === NotificationBridge)!
+      const injected = entry.inject as unknown as () => { push: (trigger: unknown) => void }
+      injected().push({ kind: 'turn-complete', sessionId: sessionId('s1') })
+      await vi.advanceTimersByTimeAsync(800)
+      expect(warn).toHaveBeenCalled()
+    } finally {
+      warn.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('carries a missing revision as 0, which the row store guard then holds', async () => {
+    const { ctx, slots, mutate } = await bench({ revision: undefined })
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    const { instance, face } = rowFaceOf(slots)
+    ;(face.setField as (field: string, value: boolean) => void)('awaitingInput', true)
+    await vi.waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    // Revision 0 is not ahead of the revision 0 the row already synced at, so
+    // the guard holds and the mirror keeps its value.
+    expect(instance.getSnapshot().revision).toBe(0)
+    expect(instance.getSnapshot().settings.awaitingInput).toBe(false)
+  })
+
+  it('syncs the row with revision 0 when the wire supplied none', async () => {
+    const { ctx, slots } = await bench({ revision: undefined })
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    const { instance } = rowFaceOf(slots)
+    expect(instance.getSnapshot().revision).toBe(0)
   })
 })
