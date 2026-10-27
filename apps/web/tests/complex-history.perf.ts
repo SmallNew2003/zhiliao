@@ -1276,7 +1276,9 @@ describe('manual web performance: complex workspace and history', () => {
       while (turns < LONG_HISTORY_TURNS) {
         const previousTurns = turns
         const older = await measure(cdp, async () => {
-          await page.getByRole('button', { name: 'Load earlier', exact: true }).click()
+          // Auto paging starts when the reader enters the history headroom.
+          await page.locator('[data-conversation-scroll]').first()
+            .evaluate((host) => { host.scrollTop = 0 })
           await expect.poll(() => conversationTurns(page), { timeout: 30_000 })
             .toBeGreaterThan(previousTurns)
           return conversationTurns(page)
@@ -1378,7 +1380,9 @@ describe('manual web performance: complex workspace and history', () => {
       while (turns < LONG_HISTORY_TURNS) {
         const previousTurns = turns
         const older = await measure(cdp, async () => {
-          await world.page.getByRole('button', { name: 'Load earlier', exact: true }).click()
+          // Auto paging starts when the reader enters the history headroom.
+          await world.page.locator('[data-conversation-scroll]').first()
+            .evaluate((host) => { host.scrollTop = 0 })
           await expect.poll(() => conversationTurns(world.page), { timeout: 30_000 })
             .toBeGreaterThan(previousTurns)
           return conversationTurns(world.page)

@@ -800,7 +800,7 @@ describe('ChatView', () => {
     const first = view.getByRole('button', { name: '跳转到第 1 轮' })
     expect(first.getAttribute('aria-current')).toBe('true')
     // The mark stays busy until the jump settles: the loader's completion
-    // runs the final landing correction after the load-earlier button leaves.
+    // runs the final landing correction after the paging pass ends.
     expect(first.getAttribute('aria-busy')).toBe('true')
     await act(async () => { releaseJump?.() })
     // Only the busy lifecycle is asserted after settlement: jsdom's zero
@@ -842,9 +842,8 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
     readerScroll(scroller, 50)
-    fireEvent.click(view.getByText('加载更早'))
-    // The reader moves after the request starts; this, not the click-time
-    // row, is the intent the arriving page must preserve.
+    // The headroom starts the pull; the reader then moves before the page
+    // arrives, and that later row is the intent the page must preserve.
     firstTop = -200
     nextTop = 60
     readerScroll(scroller, 90)
@@ -914,7 +913,6 @@ describe('ChatView', () => {
     })
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
-    readerScroll(scroller, 50)
 
     const hitTest = vi.fn((_x: number, _y: number): Element[] => [])
     Object.defineProperty(document, 'elementsFromPoint', {
@@ -923,10 +921,14 @@ describe('ChatView', () => {
     })
     try {
       rowRectCalls = 0
-      fireEvent.click(view.getByText('加载更早'))
+      // Entering the headroom starts the pull; its anchor hit-tests the
+      // reading line once, then reads a bounded number of ordered rows.
+      scroller.scrollTop = 50
+      fireEvent.scroll(scroller)
       expect(hitTest).toHaveBeenCalledTimes(1)
       expect(hitTest.mock.calls[0]?.[1]).toBe(1)
       expect(rowRectCalls).toBeLessThanOrEqual(6)
+      fireEvent(scroller, new Event('scrollend'))
 
       Object.defineProperty(scroller, 'scrollHeight', { value: 1_300, writable: true })
       prepended = true
@@ -1102,6 +1104,26 @@ describe('ChatView', () => {
     expect(view.getAllByText('即发即显')).toHaveLength(1)
   })
 
+  it('renders a fresh submission echo above the turn loading status', () => {
+    const h = makeHarness(
+      { nodes: [] },
+      {
+        running: true,
+        pendingSubmissions: [{
+          requestId: 'req-fresh' as never, placement: 'transcript',
+          time: 5_000, text: '刚发出', attachments: [],
+        }],
+      },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    const echo = view.getByText('刚发出').closest('[data-submission-echo]') as HTMLElement
+    const status = view.getByRole('status')
+    // A just-sent message must lead the flow instead of hiding under the
+    // turn's "deep diving" loading signal.
+    expect(echo.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+
   it('renders a local steer echo as pending steering before Host image admission completes', () => {
     const h = makeHarness(
       { nodes: [assistant(1, 'working')] },
@@ -1165,6 +1187,46 @@ describe('ChatView', () => {
     // The queued occurrence and its local predecessor both belong to the
     // queue dock, never the Chat flow.
     expect(view.queryByText('排队中')).toBeNull()
+  })
+
+  it('keeps a fresh transcript echo visible while its message sits in the queue, until the turn node renders', () => {
+    const h = makeHarness(
+      { nodes: [] },
+      {
+        running: true,
+        pendingSubmissions: [{
+          requestId: 'req-qt' as never, placement: 'transcript',
+          time: 6_500, text: '首条消息', attachments: [],
+        }],
+      },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('首条消息').closest('[data-submission-echo]')).not.toBeNull()
+    // The host first splices the message into the durable next-turn queue; the
+    // echo must not vanish into the queue dedupe before the turn node renders.
+    act(() => {
+      h.setSession({
+        testInbox: { 'next-step': [], 'next-turn': [{
+          id: 'qt-occurrence' as never,
+          content: [{ type: 'text' as const, text: '首条消息' }],
+          role: 'user', source: { kind: 'user', rpcId: 'req-qt' as never },
+        }] },
+      })
+    })
+    expect(view.getByText('首条消息').closest('[data-submission-echo]')).not.toBeNull()
+    // The turn node lands: the echo hands off atomically to the durable bubble.
+    act(() => {
+      h.setChat({
+        nodes: [{
+          kind: 'user', seq: 1, time: 2_000,
+          content: [{ type: 'text', text: '首条消息' }] as never,
+          source: { kind: 'user', rpcId: 'req-qt' },
+        }],
+      })
+      h.setSession({ testInbox: { 'next-step': [], 'next-turn': [] } })
+    })
+    expect(view.getAllByText('首条消息')).toHaveLength(1)
+    expect(view.container.querySelector('[data-submission-echo]')).toBeNull()
   })
 
   it('an image echo renders its previews through the message-image slot', () => {
@@ -2342,8 +2404,8 @@ describe('ChatView', () => {
       () => ({ top: anchoredTop, bottom: anchoredTop + 40 } as DOMRect),
     )
     readerScroll(scroller, 80)
-    // Arm the paging anchor, then deliver an older page (head seq decreases).
-    fireEvent.click(view.getByText('加载更早'))
+    // Entering the headroom starts the pull and arms its paging anchor, then
+    // deliver an older page (head seq decreases).
     Object.defineProperty(scroller, 'scrollHeight', { value: 1600, writable: true })
     anchoredTop = 700
     act(() => {
@@ -2366,7 +2428,6 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
     readerScroll(scroller, 50)
-    fireEvent.click(view.getByText('加载更早'))
     fireEvent.click(view.getByLabelText('回到底部'))
     Object.defineProperty(scroller, 'scrollHeight', { value: 1_300, writable: true })
     act(() => { h.setChat({ nodes: [assistant(2, 'older'), user(9, 'late')] }) })
@@ -2798,13 +2859,73 @@ describe('ChatView', () => {
     }
   })
 
-  it('paging button loads older and shows its busy label', () => {
+  it('pages older history in on scroll while the reader is inside the headroom', () => {
     const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
     const view = render(<h.ChatView {...h.props} />)
-    fireEvent.click(view.getByText('加载更早'))
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // The quiet path never shows the manual control.
+    expect(view.queryByRole('button', { name: '加载更早失败，点击重试' })).toBeNull()
+  })
+
+  it('leaves older history alone while the reader stays below the headroom', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 2_000)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+  })
+
+  it('does not start a second page while a pull is outstanding', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
+    readerScroll(scroller, 400)
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers a manual retry only when a settled pull leaves the head unchanged', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
     expect(h.loadOlder).toHaveBeenCalledTimes(1)
     act(() => { h.setSession({ loadingOlder: true }) })
-    expect(view.getByText('加载中…')).toBeTruthy()
+    expect(view.queryByRole('button', { name: '加载更早失败，点击重试' })).toBeNull()
+    // A failed page leaves the head in place: stop auto-pulling and expose the
+    // manual control instead of hammering the pager on every scroll event.
+    act(() => { h.setSession({ loadingOlder: false }) })
+    const retry = view.getByRole('button', { name: '加载更早失败，点击重试' })
+    readerScroll(scroller, 400)
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // The retry pulls again; a page that lowers the head clears the control.
+    fireEvent.click(retry)
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
+    act(() => { h.setSession({ loadingOlder: true }) })
+    act(() => { h.setChat({ nodes: [user(1, 'older'), user(5, 'later')] }) })
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(view.queryByRole('button', { name: '加载更早失败，点击重试' })).toBeNull()
+  })
+
+  it('chains the next page when the committed page leaves the reader in the headroom', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // The page commits but cannot carry the reader below the margin (too short
+    // or folded away): the settle pass starts the following page immediately.
+    act(() => { h.setSession({ loadingOlder: true }) })
+    act(() => { h.setChat({ nodes: [user(1, 'older'), user(5, 'later')] }) })
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
   })
 
   it('shows open error and loading states', () => {
@@ -2816,7 +2937,8 @@ describe('ChatView', () => {
     expect(view.getByText(/历史加载失败：boom/)).toBeTruthy()
     const loading = makeHarness({}, { openState: 'loading' })
     const lv = render(<loading.ChatView {...loading.props} />)
-    expect(lv.getByText('载入历史…')).toBeTruthy()
+    // One announced status line, not a stray sentence at the column's top edge.
+    expect(lv.getByRole('status').textContent).toBe('正在载入历史…')
   })
 
   it('renders command nodes as durable rows: settled text, error state, executing spinner, run-less soft-fall', () => {

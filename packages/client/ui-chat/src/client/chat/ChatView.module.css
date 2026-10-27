@@ -136,10 +136,62 @@
   }
 }
 
-.hint {
+/* Session replay owns no rows yet, so the view fills the view area and centres
+   its only child instead of pinning one muted sentence to the column's top
+   edge. The host fixes the root to content height; the loading state gives it
+   back the flexible box so the centring has a band to centre in. */
+.root[data-loading] {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.root[data-loading] .scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+/* A fast replay never shows the loader: the fade-in waits 160ms, so a session
+   that opens sooner never flashes it. Reduced motion keeps it static (and
+   immediately visible). */
+.loadingHistory {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   color: var(--dsw-alias-label-tertiary);
   font-size: var(--dsh-content-font-size-secondary, 13px);
   line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
+  animation: dsh-loading-history-in 200ms ease-out 160ms both;
+}
+
+.loadingSpinner {
+  flex: none;
+  animation: dsh-loading-history-spin 700ms linear infinite;
+}
+
+@keyframes dsh-loading-history-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dsh-loading-history-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingHistory {
+    animation: none;
+  }
+
+  .loadingSpinner {
+    animation: none;
+  }
 }
 
 .openError {

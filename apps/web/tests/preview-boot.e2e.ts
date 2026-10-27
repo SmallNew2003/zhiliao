@@ -431,7 +431,8 @@ async function bootPreview(origin: string, browser: Browser): Promise<void> {
     await catalog.getByRole('treeitem', { name: /Continue preview verification/ }).waitFor()
     await catalog.press('Escape')
 
-    await page.getByRole('button', { name: 'Load earlier', exact: true }).click()
+    // Auto paging: entering the history headroom pulls the older page in.
+    await page.locator('[data-conversation-scroll]').first().evaluate((host) => { host.scrollTop = 0 })
     await page.getByText(SHOWCASE_OLDEST, { exact: true }).waitFor({ timeout: 15_000 })
     expect(pageErrors.map(error => error.message)).toEqual([])
     expect(consoleErrors.filter(line =>

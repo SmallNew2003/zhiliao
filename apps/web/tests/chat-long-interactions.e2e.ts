@@ -108,6 +108,19 @@ async function wheelUntilMounted(page: Page, selector: string, deltaY: number): 
   throw new Error(`semantic Chat target did not mount: ${selector}`)
 }
 
+/** Wheel the transcript up to its history head, where the next older page starts on its own. */
+async function wheelToHistoryStart(page: Page): Promise<void> {
+  const scrollport = page.locator('[data-conversation-scroll]')
+  const box = await scrollport.boundingBox()
+  if (box === null) throw new Error('conversation scrollport has no layout box')
+  await page.mouse.move(box.x + box.width / 2, box.y + Math.min(140, box.height / 3))
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    if (await scrollport.evaluate(host => host.scrollTop) <= 1) return
+    await page.mouse.wheel(0, -2_400)
+    await nextPaint(page)
+  }
+}
+
 function requiredEvent<T extends SessionEvent['type']>(
   events: readonly SessionEvent[],
   type: T,
@@ -217,10 +230,10 @@ describe('web e2e: long Chat interaction contract', () => {
     ))
     expect(firstTurnPosition).toBe('0px')
 
-    const loadEarlier = page.getByRole('button', { name: 'Load earlier', exact: true })
     const loadedMarks = turnNavigation.getByRole('button', { name: /^Jump to turn / })
     const loadedBefore = await loadedMarks.count()
-    await loadEarlier.click()
+    // Auto paging starts when the reader enters the history headroom.
+    await wheelToHistoryStart(page)
     // Paging converts marks to their loaded form without moving the
     // fixed-pitch ladder.
     await expect.poll(() => loadedMarks.count(), { timeout: 15_000 }).toBeGreaterThan(loadedBefore)

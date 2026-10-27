@@ -1,13 +1,13 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
-import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutline14, IconLoadingOutline16, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
@@ -19,6 +19,8 @@ import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
 const SCROLL_SAMPLE_INTERVAL_MS = 500
+/** Distance from the history head that starts the next older page. */
+const OLDER_PREFETCH_PX = 600
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -131,9 +133,14 @@ function openFailureMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * Prompt-RPC identities already rendered by durable material: user/steering
- * node sources plus queue occurrences. A submission echo whose identity
- * appears here is hidden in the same render, so the echo→durable swap is
+ * Prompt-RPC identities already rendered by durable material that a local
+ * echo must yield to: user/steering node sources in the flow, plus next-step
+ * steering occurrences the flow tail's pending-steering seat renders. A
+ * next-turn queue row is deliberately excluded — a freshly submitted message
+ * is spliced into next-turn before its turn node exists and no flow seat
+ * renders that row, so hiding the echo on it would drop the bubble into the
+ * turn's loading signal until the turn node lands. An echo whose identity
+ * appears here is hidden in the same render, so the echo→durable swap stays
  * atomic — no duplicate, no gap — regardless of when the echo leaves the
  * session snapshot.
  */
@@ -151,7 +158,7 @@ function observedRpcIds(
       | undefined
     if (source?.kind === 'user' && typeof source.rpcId === 'string') observed.add(source.rpcId)
   }
-  for (const { source } of [...inbox?.['next-turn'] ?? [], ...inbox?.['next-step'] ?? []]) {
+  for (const { source } of inbox?.['next-step'] ?? []) {
     if (source.kind === 'user' && 'rpcId' in source) observed.add(source.rpcId)
   }
   return observed
@@ -203,12 +210,21 @@ function TurnStatus({ startTime, t }: {
 
 type ChatNodeListProps = Omit<ComponentProps<typeof ChatNodeSeat>, 'nodeKey'> & {
   readonly order: readonly string[]
+  /** Trailing rows rendered after the ordered nodes in the same flow layer as a
+   *  settled node (local submission echoes), so an echo hands off to its durable
+   *  node in place instead of jumping between the flow tail and the node list. */
+  readonly tail?: ReactNode
 }
 
-const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNodeListProps) {
-  return order.map(nodeKey => (
-    <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
-  ))
+const ChatNodeList = memo(function ChatNodeList({ order, tail, ...seatProps }: ChatNodeListProps) {
+  return (
+    <>
+      {order.map(nodeKey => (
+        <ChatNodeSeat key={nodeKey} nodeKey={nodeKey} {...seatProps} />
+      ))}
+      {tail}
+    </>
+  )
 })
 
 /**
@@ -323,6 +339,12 @@ export function ChatView({
   /** Whether the in-flight jump already landed mid-paging (settle then only corrects an untouched landing). */
   const jumpLandedRef = useRef(false)
   const [busyJumpTurn, setBusyJumpTurn] = useState<number | null>(null)
+  /** A settled older-page pull that did not advance the head keeps the manual retry row. */
+  const [olderFailed, setOlderFailed] = useState(false)
+  /** Head seq captured when a view-initiated older-page pull starts; null when none is outstanding. */
+  const olderPullHeadRef = useRef<number | null>(null)
+  /** Latest-ref trigger of the next older page: the scroll listener and commit effects hold no render state. */
+  const autoLoadOlderRef = useRef<() => void>(() => {})
   /** Bumped when a loadThrough completion settles, after its last page's commit. */
   const [jumpSettleTick, setJumpSettleTick] = useState(0)
   /** Window head at the last settle-time repage; an unmoved head falls back instead of repaging forever. */
@@ -402,9 +424,11 @@ export function ChatView({
 
   const toBottom = (el: HTMLElement): void => {
     anchorRef.current = null
-    // Returning to the live tail supersedes a jump still landing.
+    // Returning to the live tail supersedes a jump still landing, and lets the
+    // next approach to the head pull again.
     pendingJumpRef.current = null
     setBusyJumpTurn(current => current === null ? current : null)
+    setOlderFailed(current => current ? false : current)
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
@@ -434,8 +458,7 @@ export function ChatView({
    * Land the pending jump once its Turn has a rendered anchor row; false
    * while it must keep waiting. Mid-jump landings (`settle` false) keep the
    * jump armed with the target row as the paging anchor, so later chunks and
-   * the load-earlier button's unmount re-land on the same row; the settling
-   * call clears the jump.
+   * the settle pass re-land on the same row; the settling call clears the jump.
    */
   const realizePendingJump = (local: HTMLElement, el: HTMLElement, settle: boolean): boolean => {
     const pending = pendingJumpRef.current
@@ -597,6 +620,10 @@ export function ChatView({
       setScrollSampleTick(tick => tick + 1)
     }
     const onScroll = (): void => {
+      // Page in older history as soon as the reader enters the headroom, not
+      // after the sampling timer: the request has to cover the remaining
+      // travel, so the prepended page lands without a visible wait at the top.
+      autoLoadOlderRef.current()
       scrollSamplePendingRef.current = true
       if (atBottomRef.current) {
         const floor = Math.max(0, el.scrollHeight - el.clientHeight)
@@ -641,25 +668,46 @@ export function ChatView({
     const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
     // Flow-height changes (image loads, tool disclosures) move rows across the
     // reading line without a scroll event, so the active mark resyncs here too.
+    // The same call retries the next older page when a viewport/column change
+    // (hidden-tab open, short window, image load) leaves the reader headroom.
     const observer = new ResizeObserver(() => {
       followRef.current?.()
       activeTurnRef.current?.()
+      autoLoadOlderRef.current()
     })
     observer.observe(column)
     if (composer !== null) observer.observe(composer)
     return () => { observer.disconnect() }
   }, [])
 
-  // A failed/empty page leaves the head unchanged. Once the request leaves
-  // its busy state there is no future prepend for the saved anchor to own.
+  // View paging state dies with the viewed Session.
   useEffect(() => {
-    if (!loadingOlder) anchorRef.current = null
-  }, [loadingOlder])
+    olderPullHeadRef.current = null
+    setOlderFailed(false)
+  }, [sessionId])
+
+  // A settled pull clears the anchor of a page that will never prepend, and
+  // detects one that delivered nothing: an unchanged head stops auto-pulling
+  // until the reader retries. A reader still inside the headroom — a page
+  // shorter than the margin, or a restored position — chains the next page.
+  useEffect(() => {
+    if (loadingOlder) return
+    anchorRef.current = null
+    const pullHead = olderPullHeadRef.current
+    const failed = pullHead !== null && firstSeq === pullHead
+    if (pullHead !== null) {
+      olderPullHeadRef.current = null
+      setOlderFailed(failed)
+    }
+    // Chaining now would read this render's `olderFailed` and retry a page the
+    // pull just failed to deliver, so a failed pull waits for the reader.
+    if (!failed) autoLoadOlderRef.current()
+  }, [loadingOlder, firstSeq])
 
   // Jump settlement: every loadThrough completion bumps the tick after its
   // last page's commit, and a plain pull's loadingOlder flip re-settles a
   // jump it made wait. A still-pending jump is realized now, held while a
-  // plain load-earlier pull owns the pager (its completion retries below),
+  // plain older-page pull owns the pager (its completion retries below),
   // repaged once per head movement, or landed on the nearest rendered Turn
   // at or after the target (failure, exhausted history, or a Turn with no
   // visible row).
@@ -668,8 +716,8 @@ export function ChatView({
     const local = listRef.current
     if (pending === null || local === null) return
     const el = scrollerOf(local)
-    // The settling landing runs after the load-earlier button's unmount
-    // commit, so the target row cannot drift once the jump clears.
+    // The settling landing runs after the commit that ended the paging pass,
+    // so the target row cannot drift once the jump clears.
     if (realizePendingJump(local, el, true)) return
     const uncovered = firstSeq === null || firstSeq > pending.seq
     if (uncovered && hasMore) {
@@ -694,6 +742,9 @@ export function ChatView({
     }
     pendingJumpRef.current = null
     setBusyJumpTurn(null)
+    // A jump lands on the reader row nearest the head: page the next older
+    // one in so scrolling on from there stays seamless.
+    autoLoadOlderRef.current()
     // Snapshot values are read at settle time; the completion tick is the trigger.
   }, [jumpSettleTick])
 
@@ -705,7 +756,7 @@ export function ChatView({
 
   const loadOlderAnchored = (): void => {
     const local = listRef.current
-    /* v8 ignore next -- ref-null guard: the paging button renders inside the list tree. */
+    /* v8 ignore next -- ref-null guard: every trigger runs from the mounted list tree. */
     if (local !== null) {
       const el = scrollerOf(local)
       const row = pagingAnchor(local, el)
@@ -717,6 +768,27 @@ export function ChatView({
       }
     }
     loadOlder()
+  }
+
+  /** View-initiated pull: records the head the arriving page must lower. */
+  const pullOlder = (): void => {
+    olderPullHeadRef.current = firstSeq
+    loadOlderAnchored()
+  }
+
+  autoLoadOlderRef.current = (): void => {
+    if (!hasMore || loadingOlder || olderFailed || openState !== 'open') return
+    if (pendingJumpRef.current !== null || busyJumpTurn !== null) return
+    if (olderPullHeadRef.current !== null) return
+    const local = listRef.current
+    /* v8 ignore next -- ref-null guard: every trigger runs from the mounted list tree. */
+    if (local === null) return
+    const el = scrollerOf(local)
+    // A scrollport without layout (hidden view, pre-paint) has no reader
+    // position to compare; the first scroll event or commit retries.
+    if (el.clientHeight === 0) return
+    if (el.scrollTop > OLDER_PREFETCH_PX) return
+    pullOlder()
   }
 
   // Identity feeds the memoized rail; a fresh closure per render would defeat it.
@@ -759,7 +831,7 @@ export function ChatView({
   }, [loadingOlder, loadThrough])
 
   return (
-    <div className={css.root}>
+    <div className={css.root} data-loading={openState === 'loading' || undefined}>
       <div ref={listRef} className={css.scroll}>
         <TurnNavigator
           items={railItems}
@@ -768,23 +840,37 @@ export function ChatView({
           onNavigate={navigateToTurn}
           t={t}
         />
-        <div ref={columnRef} className={css.column} data-chat-flow="">
-          {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
+        <div ref={columnRef} className={css.column} data-chat-flow="" data-history-more={hasMore || undefined}>
+          {openState === 'loading' && (
+            <div className={css.loadingHistory} role="status" aria-live="polite">
+              <IconLoadingOutline16 size={14} className={css.loadingSpinner} />
+              <span>{t('chat.loadingHistory')}</span>
+            </div>
+          )}
           {openState === 'error' && openError !== null && (
             <div className={css.openError}>
               {t('chat.loadError', { message: openError.message, code: openError.code })}
             </div>
           )}
-          {hasMore && (
+          {hasMore && olderFailed && (
             <div className={css.older}>
-              <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
-                {loadingOlder ? t('loading') : t('chat.loadOlder')}
+              <button type="button" disabled={loadingOlder} onClick={pullOlder}>
+                {t('chat.loadOlderRetry')}
               </button>
             </div>
           )}
           <MarkdownDelegateProvider openExternalLink={openExternalLink} openFile={requestOpenFile}>
             <ChatNodeList
               order={order}
+              tail={visibleSubmissions.map(submission => (
+                <div key={submission.requestId} className={css.flowItem}>
+                  <PendingSubmissionBubble
+                    submission={submission}
+                    renderMessageImages={renderMessageImages}
+                    t={t}
+                  />
+                </div>
+              ))}
               useChatNode={useChatNode}
               useChatNodeProcess={useChatNodeProcess}
               historyIncomplete={hasMore}
@@ -807,20 +893,16 @@ export function ChatView({
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+              wait, tool execution, streaming) so it never flickers per step. A
+              fresh local transcript echo also shows it in the same frame, so the
+              flow height is already settled when the echo lands and the
+              echo→durable hand-off does not grow a frame later and jolt the
+              follow-scroll. */}
+          {(running || visibleSubmissions.length > 0) && <TurnStatus startTime={runningTurnStart} t={t} />}
           {pendingSteering.map(item => (
             <PendingSteeringBubble
               key={item.id}
               content={item.content}
-              renderMessageImages={renderMessageImages}
-              t={t}
-            />
-          ))}
-          {visibleSubmissions.map(submission => (
-            <PendingSubmissionBubble
-              key={submission.requestId}
-              submission={submission}
               renderMessageImages={renderMessageImages}
               t={t}
             />
