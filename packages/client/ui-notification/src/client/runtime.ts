@@ -115,7 +115,7 @@ export class NotificationRuntime {
       void this.notifier.show({
         title: this.headline(batch),
         body: this.detail(batch, sessionId),
-        ...(sessionId !== undefined ? { sessionId } : {}),
+        sessionId,
       }).catch((error: unknown) => {
         // A refused or failed presentation is not actionable here: the next
         // trigger retries, and the settings row already shows the permission.
@@ -140,9 +140,10 @@ export class NotificationRuntime {
    * @param sessionId - the session the click opens.
    * @returns the detail line: the session title for one, a prompt for many.
    */
-  private detail(batch: NotificationBatch, sessionId: SessionId | undefined): string {
-    if (batch.sessionIds.length !== 1 || sessionId === undefined) return this.t('notification.body.many')
-    return this.t('notification.body.one', { title: this.titleOf(sessionId) })
+  private detail(batch: NotificationBatch, sessionId: SessionId): string {
+    return batch.sessionIds.length === 1
+      ? this.t('notification.body.one', { title: this.titleOf(sessionId) })
+      : this.t('notification.body.many')
   }
 
   /**

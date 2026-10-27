@@ -73,6 +73,20 @@ describe('NotificationCoalescer', () => {
     coalescer.dispose()
   })
 
+  it('cancels the scheduled window on the process timers when disposed before it elapses', () => {
+    vi.useFakeTimers()
+    try {
+      const flush = vi.fn<(batches: readonly NotificationBatch[]) => void>()
+      const coalescer = new NotificationCoalescer(800, flush)
+      coalescer.push(trigger('turn-complete', 's1'))
+      coalescer.dispose()
+      vi.advanceTimersByTime(800)
+      expect(flush).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('starts a fresh window after a flush', () => {
     const timers = benchTimers()
     const flush = vi.fn<(batches: readonly NotificationBatch[]) => void>()
@@ -84,6 +98,22 @@ describe('NotificationCoalescer', () => {
     expect(flush).toHaveBeenCalledTimes(2)
     expect(flush.mock.calls[1]?.[0]).toEqual([{ kind: 'turn-complete', sessionIds: [sessionId('s2')] }])
     coalescer.dispose()
+  })
+
+  it('flushes on the process timers when none are injected', () => {
+    vi.useFakeTimers()
+    try {
+      const flush = vi.fn<(batches: readonly NotificationBatch[]) => void>()
+      const coalescer = new NotificationCoalescer(800, flush)
+      coalescer.push(trigger('turn-complete', 's1'))
+      vi.advanceTimersByTime(799)
+      expect(flush).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(flush).toHaveBeenCalledWith([{ kind: 'turn-complete', sessionIds: [sessionId('s1')] }])
+      coalescer.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('drops the pending window on dispose without flushing', () => {

@@ -127,6 +127,17 @@ describe('WebNotifier', () => {
     expect(prompts.at(-1)).not.toHaveBeenCalled()
   })
 
+  it('presents without a click target when the request carries no session', async () => {
+    const created = stubWeb('granted')
+    await new WebNotifier().show({ title: '会话已完成', body: '「demo」' })
+    expect(created).toHaveLength(1)
+  })
+
+  it('stays silent when the browser API is absent', async () => {
+    vi.stubGlobal('Notification', undefined)
+    await expect(new WebNotifier().show(request)).resolves.toBeUndefined()
+  })
+
   it('routes a click to the subscribers carrying that session', async () => {
     const created = stubWeb('granted')
     const notifier = new WebNotifier()
@@ -146,6 +157,18 @@ describe('WebNotifier', () => {
     await notifier.show(request)
     created[0]?.onclick?.()
     expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('reports the browser permission state when the API is present', async () => {
+    stubWeb('granted')
+    expect(await new WebNotifier().permission()).toBe('granted')
+    stubWeb('denied')
+    expect(await new WebNotifier().permission()).toBe('denied')
+  })
+
+  it('reports unsupported for a permission value the union does not name', async () => {
+    vi.stubGlobal('Notification', { permission: 'prompt' })
+    expect(await new WebNotifier().permission()).toBe('unsupported')
   })
 
   it('reports unsupported and stays silent without the browser API', async () => {
