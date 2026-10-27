@@ -209,11 +209,11 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
     })
   }
 
-  /** The field's text: its live keystrokes, else the stored count spelled short. */
-  const capacityText = (model: DeepSeekModelDraft, index: number, field: CapacityField): string => {
+  /** Active keystrokes, otherwise the explicit or inherited capacity. */
+  const capacityText = (model: DeepSeekModelDraft, index: number, field: CapacityField, fallback?: number): string => {
     const typed = editing.get(`${String(index)}:${field}`)
     if (typed !== undefined) return typed
-    const value = model[field]
+    const value = model[field] ?? fallback
     return typeof value === 'number' ? formatCapacity(value) : ''
   }
 
@@ -233,7 +233,7 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
   }
 
   const capacityInput = (model: DeepSeekModelDraft, index: number, field: CapacityField, fallback: number | undefined) => ({
-    value: capacityText(model, index, field),
+    value: capacityText(model, index, field, field === 'contextWindow' ? fallback : undefined),
     placeholder: fallback === undefined
       ? props.t(field === 'contextWindow' ? 'contextWindowPlaceholder' : 'maxTokensPlaceholder')
       : formatCapacity(fallback),
