@@ -185,6 +185,26 @@ function sessionCountLabel(sessionCount: number, t: RowTranslate): string {
 }
 
 /**
+ * Pluralized live-Session count, shared by the Workspace row and its hover card.
+ * @param runningCount - Sessions running themselves or through a subagent descendant.
+ * @param t - the browser root's locale seat.
+ * @returns the localized count label.
+ */
+function runningCountLabel(runningCount: number, t: RowTranslate): string {
+  return t(runningCount === 1 ? 'group.running.one' : 'group.running.other', { n: runningCount })
+}
+
+/**
+ * Pluralized awaiting-Session count for the Workspace row.
+ * @param pendingCount - Sessions awaiting this user.
+ * @param t - the browser root's locale seat.
+ * @returns the localized count label.
+ */
+function awaitingCountLabel(pendingCount: number, t: RowTranslate): string {
+  return t(pendingCount === 1 ? 'group.awaiting.one' : 'group.awaiting.other', { n: pendingCount })
+}
+
+/**
  * Absolute creation time through the dictionary's date template (the message
  * clock pattern): `toLocaleString` would follow the browser language, not the
  * app locale, and produce mixed-language text after a switch.
@@ -196,10 +216,11 @@ function createdLabel(createdAt: number, t: RowTranslate): string {
   return t('hover.created', { time: `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}` })
 }
 
-/** Hover-card body: workspace title, group size, display directory path, absolute creation time. */
-function WorkspaceHoverContent({ label, sessionCount, cwd, createdAt, t }: {
+/** Hover-card body: workspace title, group size, live count, display directory path, absolute creation time. */
+function WorkspaceHoverContent({ label, sessionCount, runningCount, cwd, createdAt, t }: {
   label: string
   sessionCount: number
+  runningCount: number
   cwd: string | undefined
   createdAt: number
   t: RowTranslate
@@ -208,6 +229,14 @@ function WorkspaceHoverContent({ label, sessionCount, cwd, createdAt, t }: {
     <div className={css.hoverContent}>
       <div className={css.hoverTitle}>{label}</div>
       <div className={css.hoverTime}>{sessionCountLabel(sessionCount, t)}</div>
+      {/* The row's dot names the count; the card repeats it in words, the same
+          way a Session card spells out the statuses its row dots stand for. */}
+      {runningCount > 0 && (
+        <div className={css.hoverStatus}>
+          <StateDot state="ongoing" />
+          <span>{runningCountLabel(runningCount, t)}</span>
+        </div>
+      )}
       <div className={css.hoverPath}>{cwd}</div>
       <div className={css.hoverTime}>{createdLabel(createdAt, t)}</div>
     </div>
@@ -311,21 +340,25 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
-      {/* A folded group still reports activity: the row carries the same
-          running dot a Session row does, so a Workspace with a live Session
-          reads as busy without unfolding it. The title is the flex cell, so
-          the slot costs no width while the group is idle. */}
+      {/* A folded group still reports what is inside it: the row carries the
+          same running dot a Session row does, and an amber one when a Session
+          awaits this user, so a folded section reads as busy or as needing
+          attention without unfolding it. The title is the row's flex cell, so
+          these slots cost no width while nothing is happening. */}
       {row.runningCount > 0 && (
         <>
           <span className={css.slot}>
             <StateDot state="ongoing" />
           </span>
-          <span className={css.visuallyHidden}>
-            {t(
-              row.runningCount === 1 ? 'group.running.one' : 'group.running.other',
-              { n: row.runningCount },
-            )}
+          <span className={css.visuallyHidden}>{runningCountLabel(row.runningCount, t)}</span>
+        </>
+      )}
+      {row.pendingCount > 0 && (
+        <>
+          <span className={css.slot}>
+            <StateDot state="warning" />
           </span>
+          <span className={css.visuallyHidden}>{awaitingCountLabel(row.pendingCount, t)}</span>
         </>
       )}
       <span className={css.rowActions}>
@@ -377,6 +410,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
         label={row.label}
         sessionCount={row.sessionCount}
         cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
+        runningCount={row.runningCount}
         createdAt={row.createdAt}
         t={t}
       />}

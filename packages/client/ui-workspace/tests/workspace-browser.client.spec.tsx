@@ -7,7 +7,9 @@ import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-sess
 import type {
   WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type {
+  SessionPendingInteraction, SessionStatusSnapshot,
+} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -606,6 +608,30 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByText('live')).toBeNull()
     expect(row.querySelector('[data-state="ongoing"]')).toBeTruthy()
     expect(screen.getByText('1 个会话进行中')).toBeTruthy()
+  })
+
+  it('marks a folded Workspace row amber while a Session awaits the user', () => {
+    const awaiting = summary('awaiting', 20)
+    const attention: SessionStatusSnapshot = new Map([[
+      awaiting.id,
+      {
+        running: undefined,
+        pendingInteraction: {
+          key: 'approval:1', kind: 'approval', sessionId: awaiting.id,
+        } as SessionPendingInteraction,
+        completionUnread: false,
+      },
+    ]])
+    mount({
+      useSessions: hook(sessionState([awaiting])),
+      useSessionStatus: hook(attention),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['awaiting'])])),
+    })
+    const row = screen.getByText('alpha').closest('[role="treeitem"]')!
+    expect(screen.queryByText('awaiting')).toBeNull()
+    expect(row.querySelector('[data-state="warning"]')).toBeTruthy()
+    expect(row.querySelector('[data-state="ongoing"]')).toBeNull()
+    expect(screen.getByText('1 个会话等待中')).toBeTruthy()
   })
 
   it('leaves an idle folded Workspace row unmarked', () => {
