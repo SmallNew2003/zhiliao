@@ -14,6 +14,15 @@ export async function assertModelInputLayout(page: Page, editor: Locator): Promi
   try {
     for (const viewport of [original, { width: 760, height: 1000 }]) {
       await page.setViewportSize(viewport)
+      // The switch lands over several frames: a read mid-reflow pairs stale
+      // and fresh geometry and reports a phantom wrap. Poll until the settled
+      // layout answers.
+      await expect.poll(async () => {
+        const context = await editor.getByLabel('上下文窗口 1', { exact: true }).boundingBox()
+        const output = await editor.getByLabel('最大输出 token 数 1', { exact: true }).boundingBox()
+        if (context === null || output === null) throw new Error('Expanded model fields are not visible')
+        return Math.abs(context.y - output.y)
+      }).toBeLessThan(1)
       const context = await editor.getByLabel('上下文窗口 1', { exact: true }).boundingBox()
       const output = await editor.getByLabel('最大输出 token 数 1', { exact: true }).boundingBox()
       const types = await editor.getByRole('group', { name: '输入类型 1' }).boundingBox()
@@ -21,7 +30,6 @@ export async function assertModelInputLayout(page: Page, editor: Locator): Promi
       expect(output).not.toBeNull()
       expect(types).not.toBeNull()
       if (context === null || output === null || types === null) throw new Error('Expanded model fields are not visible')
-      expect(Math.abs(context.y - output.y)).toBeLessThan(1)
       expect(types.y).toBeGreaterThanOrEqual(Math.max(context.y + context.height, output.y + output.height))
       expect(types.width).toBeGreaterThan(context.width)
     }
