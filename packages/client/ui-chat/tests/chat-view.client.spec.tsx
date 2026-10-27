@@ -2928,6 +2928,125 @@ describe('ChatView', () => {
     expect(h.loadOlder).toHaveBeenCalledTimes(2)
   })
 
+  // A bottom-pinned reader has not approached the head, however short the
+  // window is: the position test alone cannot tell the two apart, so the
+  // floor distance decides. The observer fires on observe() with no gesture.
+  it('leaves older history alone while the reader is pinned to the live tail, however short the window is', () => {
+    let notify: (() => void) | undefined
+    let fires = 0
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        // The shared jsdom shim never calls back, so the stub owns delivery.
+        notify = () => { fires += 1; callback([], this as unknown as ResizeObserver) }
+      }
+
+      observe = vi.fn()
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    // Shorter than the 600px headroom, so the position test alone would pass.
+    installScrollMetrics(scroller, 1_200, 1_000)
+    // The observe-time callback, delivered once the scroller has layout. The
+    // reader never moved.
+    act(() => { notify?.() })
+    // The callback really ran; a silent observer would otherwise read as "no pull".
+    expect(fires).toBe(1)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+    expect(view.queryByRole('button', { name: '加载更早失败，点击重试' })).toBeNull()
+  })
+
+  // Known boundary, decided 2026-10-27: when the loaded window's scrollable
+  // range is at or under the follow threshold the reader is at the floor and
+  // at the head at once, so neither path offers older history — auto-paging is
+  // blocked by the floor guard, and the manual retry row only exists after a
+  // pull this state cannot start (f4f6480913 removed the load-earlier button).
+  // Rethink before changing the guard: this is the one state with no route to
+  // older history.
+  it('offers no route to older history when the loaded window has no scrollable range', () => {
+    let notify: (() => void) | undefined
+    let fires = 0
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        // The shared jsdom shim never calls back, so the stub owns delivery.
+        notify = () => { fires += 1; callback([], this as unknown as ResizeObserver) }
+      }
+
+      observe = vi.fn()
+      disconnect = vi.fn()
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverStub)
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    // A 10px range: one screen holds everything loaded.
+    installScrollMetrics(scroller, 1_010, 1_000)
+    act(() => { notify?.() })
+    // The callback really ran; a silent observer would otherwise read as "no pull".
+    expect(fires).toBe(1)
+    expect(h.loadOlder).not.toHaveBeenCalled()
+    expect(view.queryByRole('button', { name: '加载更早失败，点击重试' })).toBeNull()
+  })
+
+  // Control for the cases below: with the session held, a settled pull whose
+  // head did not move is classified as a failure and stops the chain.
+  it('classifies a settled pull that leaves the head unchanged as a failure and stops auto-paging', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    act(() => { h.setSession({ loadingOlder: true }) })
+    // The page commits nothing: the head stays where the pull found it.
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    expect(view.getByRole('button', { name: '加载更早失败，点击重试' })).toBeTruthy()
+  })
+
+  // A pull that outlives its session is abandoned, not classified: it claims
+  // no retry row for the session that replaced it, and chains no page from a
+  // head that session never had.
+  it('abandons an in-flight pull when the viewed session changes instead of chaining from a stale head', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    act(() => { h.setSession({ loadingOlder: true }) })
+    // The reader switches session while the page is still in flight.
+    view.rerender(<h.ChatView {...h.props} sessionId={'s2' as SessionId} />)
+    // The pull lands without moving the head.
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(view.queryByRole('button', { name: '加载更早失败，点击重试' })).toBeNull()
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+  })
+
+  // Abandonment is one-shot: the next session's own pull is classified on its
+  // own head, so a stale mark cannot silently disable the failure path.
+  it('classifies the next session own pull normally after an abandoned one', () => {
+    const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    installScrollMetrics(scroller, 4_000, 1_000)
+    readerScroll(scroller, 500)
+    act(() => { h.setSession({ loadingOlder: true }) })
+    view.rerender(<h.ChatView {...h.props} sessionId={'s2' as SessionId} />)
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // The new session's own pull: the reader approaches the head again.
+    readerScroll(scroller, 400)
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
+    act(() => { h.setSession({ loadingOlder: true }) })
+    act(() => { h.setSession({ loadingOlder: false }) })
+    // Head unmoved, so this one is a failure: retry row, and no chain.
+    expect(view.getByRole('button', { name: '加载更早失败，点击重试' })).toBeTruthy()
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
+  })
+
   it('shows open error and loading states', () => {
     const h = makeHarness({}, {
       openState: 'error',

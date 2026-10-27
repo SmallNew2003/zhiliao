@@ -343,6 +343,8 @@ export function ChatView({
   const [olderFailed, setOlderFailed] = useState(false)
   /** Head seq captured when a view-initiated older-page pull starts; null when none is outstanding. */
   const olderPullHeadRef = useRef<number | null>(null)
+  /** One-shot mark for a pull abandoned by a session change; the settle pass consumes it. */
+  const olderPullAbandonedRef = useRef(false)
   /** Latest-ref trigger of the next older page: the scroll listener and commit effects hold no render state. */
   const autoLoadOlderRef = useRef<() => void>(() => {})
   /** Bumped when a loadThrough completion settles, after its last page's commit. */
@@ -680,8 +682,12 @@ export function ChatView({
     return () => { observer.disconnect() }
   }, [])
 
-  // View paging state dies with the viewed Session.
+  // View paging state dies with the viewed Session. A pull still in flight is
+  // abandoned rather than classified: its landing claims no retry row for the
+  // session that replaced it, and chains no page from a head that session
+  // never had.
   useEffect(() => {
+    if (olderPullHeadRef.current !== null) olderPullAbandonedRef.current = true
     olderPullHeadRef.current = null
     setOlderFailed(false)
   }, [sessionId])
@@ -694,14 +700,19 @@ export function ChatView({
     if (loadingOlder) return
     anchorRef.current = null
     const pullHead = olderPullHeadRef.current
+    const abandoned = olderPullAbandonedRef.current
     const failed = pullHead !== null && firstSeq === pullHead
-    if (pullHead !== null) {
+    if (pullHead !== null || abandoned) {
       olderPullHeadRef.current = null
-      setOlderFailed(failed)
+      olderPullAbandonedRef.current = false
     }
+    if (pullHead !== null && !abandoned) setOlderFailed(failed)
     // Chaining now would read this render's `olderFailed` and retry a page the
-    // pull just failed to deliver, so a failed pull waits for the reader.
-    if (!failed) autoLoadOlderRef.current()
+    // pull just failed to deliver, so a failed pull waits for the reader. An
+    // abandoned pull belongs to the session the reader left, so it neither
+    // claims a retry row nor starts a page here.
+    if (failed || abandoned) return
+    autoLoadOlderRef.current()
   }, [loadingOlder, firstSeq])
 
   // Jump settlement: every loadThrough completion bumps the tick after its
@@ -773,6 +784,7 @@ export function ChatView({
   /** View-initiated pull: records the head the arriving page must lower. */
   const pullOlder = (): void => {
     olderPullHeadRef.current = firstSeq
+    olderPullAbandonedRef.current = false
     loadOlderAnchored()
   }
 
@@ -787,6 +799,10 @@ export function ChatView({
     // A scrollport without layout (hidden view, pre-paint) has no reader
     // position to compare; the first scroll event or commit retries.
     if (el.clientHeight === 0) return
+    // Following the live tail is not approaching the head: a window shorter
+    // than the margin keeps an at-bottom reader under it without any reader
+    // intent, so the distance to the floor — not the position alone — decides.
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1) return
     if (el.scrollTop > OLDER_PREFETCH_PX) return
     pullOlder()
   }
