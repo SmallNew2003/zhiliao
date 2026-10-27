@@ -21,12 +21,15 @@
 }
 
 /* Arrow navigation moves real focus, so the row the keyboard is on carries the
-   same fill the pointer gets: the fill is the row's focus indication, and the
-   browser's default ring would double it. */
+   hover fill plus an inset brand ring: the fill is the pointer's faint wash,
+   which cannot say which row the keyboard is on. The ring rides the row's own
+   radius, and the browser's default outline would double it. */
 .projectRow:focus-visible,
-.sessionRow:focus-visible {
+.sessionRow:focus-visible,
+.searchResultRow:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
   outline: none;
+  box-shadow: inset 0 0 0 2px var(--dsw-alias-brand-primary);
 }
 
 .searchResultRow {

@@ -117,11 +117,12 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(rowDeclarations('.sessionRow:hover .title')?.get('text-overflow')).toBe('clip')
   })
 
-  it('wears the hover fill as the keyboard focus indication on both row kinds', () => {
-    for (const selector of ['.projectRow:focus-visible', '.sessionRow:focus-visible']) {
+  it('rings the keyboard-focused row with the hover fill plus an inset brand stroke', () => {
+    for (const selector of ['.projectRow:focus-visible', '.sessionRow:focus-visible', '.searchResultRow:focus-visible']) {
       const rule = rowDeclarations(selector)
       expect(rule?.get('background')).toBe('var(--dsw-alias-interactive-bg-hover)')
       expect(rule?.get('outline')).toBe('none')
+      expect(rule?.get('box-shadow')).toBe('inset 0 0 0 2px var(--dsw-alias-brand-primary)')
     }
   })
 
