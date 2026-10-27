@@ -1,5 +1,5 @@
 ---
-description: "Long-term memory browser for the Web client: the sidebar Memory panel lists the deployment's memory banks, their statistics and fact-type composition, their knowledge pages, and searches the knowledge index."
+description: "Long-term memory browser for the Web client: the sidebar Memory panel lists the deployment's memory banks, their statistics and fact-type composition, their memory units, and their knowledge pages; it searches the knowledge index and records or curates memory units."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Select **Memory** in the Web sidebar to see what a deployment's long-term memory holds. The panel lists every memory bank with its fact count and last write, and for the bank you select shows its node, link, and document totals, its fact-type and link-type composition as ranked bars, and its knowledge pages. A knowledge page opens over the bank with its rendered body, and a search box queries the bank's knowledge index so you can jump straight to a page that mentions a term. Nothing here writes: the panel is a read-only view over what the agent already remembered.
+Select **Memory** in the Web sidebar to see what a deployment's long-term memory holds. The panel lists each memory bank with its fact count and last write, and for the selected bank shows its node, link, and document totals, its fact-type and link-type composition as ranked bars, its memory units, and its knowledge pages. A knowledge page opens over the bank with its rendered body, and a search box queries the bank's knowledge index. The units section is also where you write: record a finding worth keeping, and curate one the backend already holds.
 
 ## Table of Contents
 
@@ -39,6 +39,12 @@ The selected bank shows five totals — nodes, links, documents, pending operati
 
 A pending or failed operation count is what the backend reported, not this panel's judgment about it.
 
+### Reading and writing memory units
+
+Between the statistics and the knowledge pages, the panel lists the bank's **memory units** — the individual facts the backend extracted, which the statistics summarize but never show. Each row carries the unit's text, its fact type as a tag, and when it was mentioned, with an **Edit** entry that opens the unit's fields over the row. A filter box narrows the list with a case-insensitive substring match over unit text and context, and the footer pages through the list with the backend's own total for the current filter; a blank filter is not a run, and an empty result says whether the bank holds nothing at all or nothing that matches.
+
+**Add memory** opens a form above the list: the finding, stated so it still makes sense out of context, and an optional context the backend files it under. Submitting records it and refreshes the bank — retention extracts facts by running inference, so the note says the unit becomes listable once extraction finishes, and the backend's operation detail shows beneath it when there is one. **Edit** on a unit opens the same fields prefilled, and the draft is authoritative: saving sends every field, so clearing the context box clears the context. A write the backend refuses — hindsight declines the fact types it derives — keeps its form open with the backend's own words, and a write the Host could not answer shows the same classified note the reads use. Switching banks closes an open draft, so a finding in progress is never written into the bank you left.
+
 ### Browsing and searching knowledge pages
 
 Below the statistics, the panel lists the bank's knowledge pages with the prompt each was generated from, its last-refresh time, and a **Stale** tag where the backend marked it due for a refresh. Opening a page reads its body and shows it over the bank — the statistics and the page list stay mounted beneath it, because a page is a reading of the bank rather than a step away from it. The close control in the page's corner, or the crumb back to the bank list, closes it.
@@ -57,6 +63,7 @@ A deployment that ships no memory provider has nothing to browse, and the panel 
 | The memory provider is misconfigured | The Host pinned a provider id that is not registered, or several compete with none pinned. |
 | The memory daemon did not answer within its budget | The daemon is up but slow, or unreachable. |
 | The memory daemon returned an error | The request reached the daemon and it refused. |
+| This memory provider does not offer that | The provider serves the agent path only, or not the section asked for; the rest of the bank keeps rendering. |
 
 A classified condition also shows the Host's own diagnostic beneath the sentence, which is usually what names the address or id to fix. A call that never produced an answer at all — a closed socket, a codec mismatch — shows the transport's words instead, once, with a **Retry** button: that failure is worth retrying, while a deployment with no provider is not. The banks already on screen stay put when the daemon goes away, so a blip does not erase what you were reading.
 
@@ -74,13 +81,13 @@ The browser plugin registers the `memory` sidebar entry and its `main` panel thr
 
 ### The store
 
-`MemoryBrowserController` owns the banks, the selected bank, its statistics and pages, the open page's body, the search, and any failure. It owns no timer and no subscription: the only invalidation it follows is the browser's own reconnect, because the daemon can restart under a running page and nothing else signals that. Reads coalesce — a **Refresh** during a slow load marks one rerun rather than asking the daemon twice for the same answer — and a settlement arriving after disposal, or after the panel moved to another bank, is dropped rather than written into a view it no longer belongs to.
+`MemoryBrowserController` owns the banks, the selected bank, its statistics, memory units, and pages, the open page's body, the search, the write drafts, and any failure. It owns no timer and no subscription: the only invalidation it follows is the browser's own reconnect, because the daemon can restart under a running page and nothing else signals that. Reads coalesce — a **Refresh** during a slow load marks one rerun rather than asking the daemon twice for the same answer — and a settlement arriving after disposal, or after the panel moved to another bank, is dropped rather than written into a view it no longer belongs to. A bank switch also clears the in-flight indicators of the bank left behind, so a read or write that was still crossing the wire cannot leave the new bank spinning.
 
-The bank list, its statistics, and its page tree are three separate Remote methods, so one failing leaves the others standing: a bank whose statistics the daemon cannot measure still lists its pages, and a failed read keeps whatever was already on screen rather than clearing a working view.
+The bank list, its statistics, its units, and its page tree are four separate Remote methods, so one failing leaves the others standing: a bank whose statistics the daemon cannot measure still lists its units, and a failed read keeps whatever was already on screen rather than clearing a working view. A section the provider does not offer — statistics or knowledge pages on a backend that curates none — says so in place rather than vanishing without a word. The two writes settle through one shared path: a transport refusal and a Host-classified refusal become the write's own problem note, a backend refusal keeps the form open with the backend's detail, and an accepted write closes the form, notes the outcome, and re-reads the bank.
 
 ### Presentation
 
-Only the write time and the four unavailability reasons go through presentation helpers; both take `t` rather than closing over a dictionary, so a locale change reaches them. The relative-time bucketing comes from the shared `relativeTime` helper precisely so this panel and the session lists agree; the words stay in this package's own dictionary. An instant this runtime cannot parse reads as *never written* rather than showing an unparsed backend string in the middle of a list.
+Only the write time and the five unavailability reasons go through presentation helpers; both take `t` rather than closing over a dictionary, so a locale change reaches them. The relative-time bucketing comes from the shared `relativeTime` helper precisely so this panel and the session lists agree; the words stay in this package's own dictionary. An instant this runtime cannot parse reads as *never written* rather than showing an unparsed backend string in the middle of a list.
 
 ### Styling
 
@@ -116,13 +123,11 @@ None; this package neither assembles nor sends a provider request.
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what this browse view can show. They are current package constraints, not a task backlog.
+These limits define what this browse-and-write view can do. They are current package constraints, not a task backlog.
 
-- **Search covers knowledge pages, not memories** — the query runs against the curated knowledge index because the memory seam's search answers by running inference on the daemon and takes over a minute; a fact-level search is therefore not available here.
-- **Page bodies render as preformatted text** — the Markdown is shown as the backend wrote it rather than rendered, so structure is legible but not styled.
-- **No raw memory units** — the daemon's memory rows carry provider-internal context the Remote does not project, so the panel shows banks, statistics, and knowledge pages rather than individual remembered facts.
-- **One bank at a time** — statistics, pages, and search all address the selected bank; there is no cross-bank view or comparison.
-- **No history and no writes** — the panel cannot retain, edit, consolidate, delete, or tell what changed since the last read, and it does not say which provider registered.
+- **Search covers knowledge pages, not memories** — the query runs against the curated knowledge index because the memory seam's search answers by running inference on the daemon and takes over a minute; the unit filter is the fact-level aid here, and it scans rather than ranks.
+- **No deletion and no history** — the writes record and curate; nothing here deletes a unit, triggers consolidation, or tells what changed since the last read, and the panel does not say which provider registered.
+- **One bank at a time** — statistics, units, pages, and search all address the selected bank; there is no cross-bank view or comparison.
 
 <a id="dev-note"></a>
 ### Dev Note

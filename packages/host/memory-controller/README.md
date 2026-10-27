@@ -1,5 +1,5 @@
 ---
-description: "Read-only Remote projection of the long-term memory a deployment retains: bank listing, per-bank statistics, the knowledge-page tree, knowledge-base search, and page bodies, for the browser memory panel."
+description: "Remote projection of the long-term memory a deployment retains: bank listing, per-bank statistics, the knowledge-page tree, knowledge-base search, page bodies, memory-unit paging, and the two writes a person performs, for the browser memory panel."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-Clients call five read-only methods on the `memoryController` namespace to display what a deployment's long-term memory holds: `list` for the memory banks with their fact counts and last write, `stats` for one bank's totals and distributions, `pages` for a bank's knowledge pages, `search` for the knowledge index, and `page` for one page's body. Every method answers a structured status instead of throwing, so a browser can say *which* condition it hit — memory switched off, the deployment misconfigured, the daemon unreachable, or the request failed — rather than showing a generic transport error.
+Clients call eight methods on the `memoryController` namespace to display and edit a deployment's long-term memory: `list` for the banks, `stats` for one bank's totals and distributions, `pages`, `search`, and `page` for its knowledge pages, `units` for one page of its memory units, and `remember` and `curate` for the two writes a person performs. Every method answers a structured status instead of throwing — memory off, misconfigured, unsupported by the provider, unreachable, or failed — and calls through the memory seam's browse surface, so the panel works against whichever provider is mounted rather than binding to one backend.
 
 ## Table of Contents
 
@@ -43,6 +43,16 @@ Mount this package beside the [memory seam](../../memory/memory/README.md) and a
 
 `memoryController/page` takes a bank id and a page id and returns that page's name and Markdown body. A page the backend has no body for answers as an available read carrying no page, rather than as a failure: the request succeeded and there was nothing to show.
 
+### Paging through a bank's memory units
+
+`memoryController/units` returns one page of a bank's memory units — the individual facts the backend extracted, which the statistics and knowledge pages summarize but never list. Each unit carries its text and, when the backend reports them, its fact type, context, tags, and mention and update instants. The caller's `query` is a case-insensitive substring filter over unit text and context, and `factType` restricts to one backend classification; an empty filter is dropped rather than sent, and the page size is clamped into `[1, 100]` with a default of 20. The answer carries the backend's total for the current filter, so a client can page without counting. The listing is a scan on the daemon, not an inference call: it is the browsing aid, while the seam's own search remains the inference-priced lookup the agent uses.
+
+### Writing memory
+
+`memoryController/remember` records one finding: the text, stated so it still makes sense out of context, and an optional context the backend files it under. Retention is asynchronous on backends that extract facts by inference, so the answer reports acceptance and carries the backend's operation detail; the unit becomes listable once extraction finishes, and a client refreshes to show it. An empty finding is refused before any call, as `remembered: false` with a detail naming why.
+
+`memoryController/curate` edits one existing unit: replacement text, context, or fact type, sent only when the caller passes them. A curation that changes nothing is refused the same way, as is one that would empty the text. A backend that refuses the fact type — hindsight declines the facts it derives — answers with the backend's own message as the outcome's detail, which the client shows verbatim.
+
 ### Unavailability is an answer, not an exception
 
 Every method answers `available: false` with a `reason` and a `detail` instead of rejecting. The four reasons are:
@@ -51,6 +61,7 @@ Every method answers `available: false` with a `reason` and a `detail` instead o
 |---|---|
 | `unavailable` | No usable provider is registered, so memory is switched off for this deployment. No socket is opened. |
 | `misconfigured` | The Host pinned a provider id that is not registered, or several usable providers compete with none pinned. Both are fixed by configuring one provider id. |
+| `unsupported` | The provider answered, but offers no browse surface, or not the section asked for — a backend that serves the agent path only. The fix is to point the deployment at a provider that browses. |
 | `unreachable` | The daemon did not answer within the configured budget. |
 | `failed` | The daemon answered an error, answered a non-JSON body, does not have the bank, or the transport failed. |
 
@@ -66,37 +77,21 @@ This matters because a rejected Remote call reaches a browser as an opaque trans
 
 ### Design concept
 
-The `memory` seam owns recall, search, and retention for the agent's hot path, and deliberately does not project banks, statistics, or knowledge pages, because nothing on the agent path needs them. This controller adds that browse surface for a human, so it reads the daemon's REST endpoints directly rather than widening the seam — a seam that grew a display-only projection would put UI vocabulary on the agent's critical dependency.
+The `memory` seam owns the browse surface for a person exactly as it owns recall, search, and retention for the agent: the surface's vocabulary — banks, statistics, knowledge pages, memory units, and the write outcomes — is declared once by the seam, and this controller projects it over Typert Remote. A controller that spoke to a daemon directly would bind the panel to one backend, which is what the seam exists to prevent; a controller that projected its own copy of the vocabulary would let the wire and the seam drift apart.
 
-Availability is read through `ctx.memory.isAvailable()` before each request, because that is the cheap synchronous answer: a deployment with memory switched off costs no socket. `isAvailable()` never throws, so a misconfigured provider id is simply *not available* here rather than a second failure to classify; the misconfigured reason is reachable only when a provider's own request path raises it.
+The surface is resolved per call through `ctx.memory.browse()`, so a provider that appears or disappears between calls is honoured, and the classification of a missing or misconfigured provider happens before any socket opens. A provider without a browse surface — or without one of the optional statistics and knowledge-page members — refuses with `MEMORY_CAPABILITY_UNSUPPORTED`, which projects onto the `unsupported` reason: a backend that serves the agent path only is a valid deployment, and the panel says so in place of the section rather than failing every read.
 
-### Endpoint mapping
+### Endpoint ownership
 
-| Method | Daemon endpoint |
-|---|---|
-| `list` | `GET /v1/default/banks` |
-| `stats` | `GET /v1/default/banks/{bank}/stats` |
-| `pages` | `GET /v1/default/banks/{bank}/knowledge-base/tree` |
-| `search` | `GET /v1/default/banks/{bank}/knowledge-base/search?q=&limit=` |
-| `page` | `GET /v1/default/banks/{bank}/knowledge-base/pages/{page}` |
-
-Every path segment is percent-encoded, because the bank id contains `::` and the page id may contain anything. `memories/recall` is deliberately not called from any method here: it runs inference server-side and answers in over a minute, which is unusable for an interactive page.
-
-### Transport
-
-Each request is a bounded `GET` under `AbortSignal.timeout`. A timeout, an unreachable socket, a `404`, a non-2xx status, and a non-JSON body each become a classified `MemoryError` at the request boundary, which `answer()` then projects onto the wire reason. Reads tolerate a bare array or a `{ field: [...] }` envelope, so a backend that drops the envelope still answers.
-
-### Configuration
-
-`baseUrl` (default `http://127.0.0.1:9077`) and `timeoutMs` (default `10000`) are the whole config surface. The default budget is the provider's *cheap-metadata* budget, not its inference budget, because every endpoint used here is a metadata read. A trailing slash on `baseUrl` is stripped, so `http://host:9077/` and `http://host:9077` behave alike.
+This package maps no endpoints. The daemon's URLs, their timeouts, and their response projections belong to the provider — the shipped one is [`dsh-memory-hindsight-http`](../../memory/hindsight-http/README.md) — so a second backend mounts without touching this controller. The wire ids a client passes back in are provider-owned and are branded at the seam boundary; `memories/recall` is deliberately not projected by any method here, because it runs inference server-side and answers in over a minute, which is unusable for an interactive page.
 
 ### Source map
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `MemoryController`: the `memoryController` Remote service, the daemon transport, and the seam-taxonomy projection |
-| [`src/types.ts`](src/types.ts) | Public payload types: `MemoryBankSummary`, `MemoryBankStats`, `MemoryKnowledgePage`, `MemoryKnowledgeHit`, `MemoryAnswer` |
-| — | No runtime invariant companion is published; every answer is projected directly from the daemon's response. |
+| [`src/index.ts`](src/index.ts) | `MemoryController`: the `memoryController` Remote service, the seam-browse delegation, and the seam-taxonomy projection |
+| [`src/types.ts`](src/types.ts) | Wire vocabulary: the status envelope and per-method payloads, with the browse vocabulary re-exported from the seam |
+| — | No runtime invariant companion is published; every answer is projected directly from the seam's surface. |
 
 Typert generates the Host and Client Remote artifacts exposed by `./typert` and `./remote`.
 
@@ -130,11 +125,10 @@ None; this package neither assembles nor sends a provider request.
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what a read-only browse surface cannot do. They are current package constraints, not a task backlog.
+These limits define what this browse-and-write surface cannot do. They are current package constraints, not a task backlog.
 
-- **Search covers knowledge pages, not memories** — `search` queries the curated knowledge index because the seam's memory search runs inference server-side and answers in over a minute; a fact-level search is therefore not available through this Remote.
-- **Raw memories are not projected** — the daemon's memory rows carry provider-internal context this package does not map, so the surface shows banks, statistics, and knowledge pages rather than individual memory units.
-- **No writes and no history** — nothing here retains, edits, consolidates, or deletes, and a snapshot carries no record of what changed since the previous read.
+- **Search covers knowledge pages, not memories** — `search` queries the curated knowledge index because the seam's memory search runs inference server-side and answers in over a minute; the unit listing's substring filter is the fact-level aid available through this Remote, and it scans rather than ranks.
+- **No deletion and no history** — the writes record and curate; nothing here deletes a unit, triggers consolidation, or records what changed since the previous read. A backend that owns a delete endpoint would need a seam member before this Remote could project one.
 - **Availability is a gate, not a diagnosis** — the controller reports that memory is unavailable, not which provider registered or why its backend is unhealthy; the provider's own logs hold that.
 
 <a id="dev-note"></a>

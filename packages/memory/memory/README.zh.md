@@ -1,5 +1,5 @@
 ---
-description: "长期记忆服务（ctx.memory）：插件与工具作者如何按 workspace 通过可互换的提供方召回、搜索与保留持久记忆，以及统一的选择策略与错误词汇。"
+description: "长期记忆服务（ctx.memory）：插件与工具作者如何按 workspace 通过可互换的提供方召回、搜索与保留持久记忆，以及面向人的消费方解析的可选浏览表面，统一的选择策略与错误词汇。"
 kind: "package-reference"
 ---
 
@@ -10,6 +10,8 @@ kind: "package-reference"
 ## 概述
 
 使用 `dsh-memory` 为组合增加长期记忆，而无需让调用方依赖特定后端。它拥有提供方注册表、按 workspace 解析记忆库，并在统一的选择策略与统一的错误词汇下暴露召回、搜索与保留三项能力。当插件必须跨会话读写持久记忆时选择它。必须挂载一个后端，因为该 seam 自身不发起网络访问；已交付的 `dsh-memory-hindsight-http` 提供方会为你注册一个。位于 agent 热路径的调用方应当捕获 `MemoryError` 并继续，因为记忆绝不能阻塞一个回合。
+
+提供方还可以发布一个浏览表面——列出记忆库、分页浏览一个库的记忆单元、以及一个人执行的两项写入——由 `ctx.memory.browse()` 交给面向人的消费方。该表面与提供方中立，因此针对它构建的面板在部署更换后端后照常工作；不提供该表面的提供方会以 `MEMORY_CAPABILITY_UNSUPPORTED` 拒绝。
 
 ## 目录
 
@@ -64,6 +66,27 @@ const outcome = await ctx.memory.retain({ turns }, bankId)
 
 每次调用都接受可选的 `AbortSignal`，用于把取消转发给提供方。拥有回合并算预算的调用方应当传入它，并且仍然捕获失败：缓慢、不可达或配置有误的记忆后端应当只造成一个降级的回合，而不是一个失败的回合。
 
+### 为人浏览与写入
+
+`ctx.memory.browse()` 解析选中提供方的浏览表面，即 seam 中面向人的消费方读写的另一半。选择与 agent 路径一样逐次执行；选中的提供方没有该表面时以 `MEMORY_CAPABILITY_UNSUPPORTED` 拒绝——只服务召回与保留的后端是合法组合，不是失败。
+
+每个可浏览的提供方实现四个成员：`listBanks()` 列出部署的记忆库，`listUnits()` 在可选的子串过滤与事实类型下分页浏览一个库的记忆单元，`remember()` 记录一条发现，`curateUnit()` 编辑一条已有单元。另有四个成员是可选的，因为它们是与提供方相关的投影：`bankStats()`、`listPages()`、`searchPages()` 与 `pageBody()` 服务策展后的知识页视图，没有它的后端直接省略，由消费方降级。
+
+```text
+// The browse surface, resolved per call like every other seam method:
+const browse = ctx.memory.browse()
+
+// What the deployment remembers, and what one bank holds:
+const banks = await browse.listBanks()
+const page = await browse.listUnits({ query: 'web', limit: 20, offset: 0 }, bankId)
+
+// The two writes a person performs:
+const recorded = await browse.remember({ text: 'we chose Cordis for the plugin lifecycle', context: 'decision' }, bankId)
+const curated = await browse.curateUnit({ text: 'we chose Cordis for the plugin lifecycle', context: 'decision' }, bankId, unitId)
+```
+
+写入报告受理结果而不投影存储后的单元：在通过推理提取事实的后端上保留是异步的，因此 `remember()` 在条目被接受后即返回，调用方想看到新单元时重新读取库。`curateUnit()` 会拒绝后端派生的事实类型，并把后端自己的话作为结果的 detail。
+
 ### 提供方选择
 
 每次调用都在执行时解析提供方，注册或加载顺序从不影响结果。已配置的提供方 id 在已注册且可用时优先；没有配置 id 时，服务运行唯一可用的提供方，或在情况不明时明确失败：
@@ -106,13 +129,13 @@ const outcome = await ctx.memory.retain({ turns }, bankId)
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | 插件入口：`MemoryRuntime` 服务、提供方注册表、执行时选择与 `capUnits` |
+| [`src/index.ts`](src/index.ts) | 插件入口：`MemoryRuntime` 服务、提供方注册表、执行时选择、`browse()` 表面访问器与 `capUnits` |
 | [`src/types.ts`](src/types.ts) | 词汇：`MemoryProvider` 约定、请求／结果形状、 branded 标识符与 `MemoryError` 分类体系 |
 | — | 不发布运行时不变式配套项；提供方映射是私有数据，服务会在每次调用时执行提供方选择并强制执行结果上限；该 seam 不发布独立注册表，也不发布召回／结果观测流。 |
 
 ### 数据模型
 
-提供方约定与请求／结果类型定义了调用方赖以构建的规范化词汇，穷尽式字段与 JSDoc 见 [`src/types.ts`](src/types.ts)。三个刻意的选择塑造了它们。`MemoryBankId`、`MemoryId` 与 `KnowledgePageId` 都是 branded 字符串，因此库 id 绝不会被当作记忆 id 传入；强制转换辅助函数的存在，是因为表示方式归提供方而非调用方所有。`MemoryUnit.text` 被定义为已经为模型消费格式化好的，从而把渲染策略挡在 seam 的消费方之外。`MemoryError` 继承 `Error` 并携带封闭的 `code` 联合，因此调用方可以按一个小的稳定集合路由，而不必解析消息。
+提供方约定与请求／结果类型定义了调用方赖以构建的规范化词汇，穷尽式字段与 JSDoc 见 [`src/types.ts`](src/types.ts)。三个刻意的选择塑造了它们。`MemoryBankId`、`MemoryId` 与 `KnowledgePageId` 都是 branded 字符串，因此库 id 绝不会被当作记忆 id 传入；强制转换辅助函数的存在，是因为表示方式归提供方而非调用方所有。`MemoryUnit.text` 被定义为已经为模型消费格式化好的，从而把渲染策略挡在 seam 的消费方之外。`MemoryError` 继承 `Error` 并携带封闭的 `code` 联合，因此调用方可以按一个小的稳定集合路由，而不必解析消息。浏览词汇——库摘要、单元分页、写入结果，以及可选的统计与知识页投影——与 agent 路径词汇并列存放，使浏览器所说的线与 agent 所说的线共享同一个家。
 
 ### 选择流程
 

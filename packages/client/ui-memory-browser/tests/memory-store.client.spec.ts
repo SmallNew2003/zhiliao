@@ -2,6 +2,11 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryBrowserController, sortBanks } from '../src/client/memory-store.ts'
 import type { MemoryBrowserState } from '../src/client/memory-store.ts'
+import type { MemoryBankId, MemoryId, MemoryUnitSummary } from '@deepseek-ai/dsh-host-memory-controller/types'
+
+/** Brand helpers the way the seam constructs them; the wire carries plain strings. */
+const bankId = (value: string): MemoryBankId => value as MemoryBankId
+const unitId = (value: string): MemoryId => value as MemoryId
 
 const contexts: Context[] = []
 
@@ -26,6 +31,15 @@ interface Script {
   readonly pages?: (bankId: string) => Promise<unknown>
   readonly search?: (bankId: string, query: string, limit: number | undefined) => Promise<unknown>
   readonly page?: (bankId: string, pageId: string) => Promise<unknown>
+  readonly units?: (
+    bankId: string, query: string | undefined, factType: string | undefined,
+    limit: number | undefined, offset: number | undefined,
+  ) => Promise<unknown>
+  readonly remember?: (bankId: string, text: string, context: string | undefined) => Promise<unknown>
+  readonly curate?: (
+    bankId: string, unitId: string, text: string | undefined,
+    context: string | undefined, factType: string | undefined,
+  ) => Promise<unknown>
 }
 
 /** Mount the controller over a Remote double answering `script`. */
@@ -38,6 +52,9 @@ async function harness(script: Script = {}) {
     pages: vi.fn(script.pages ?? (() => Promise.resolve(ok({ available: true, pages: [] })))),
     search: vi.fn(script.search ?? (() => Promise.resolve(ok({ available: true, hits: [], total: 0 })))),
     page: vi.fn(script.page ?? (() => Promise.resolve(ok({ available: true })))),
+    units: vi.fn(script.units ?? (() => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })))),
+    remember: vi.fn(script.remember ?? (() => Promise.resolve(ok({ available: true, remembered: true })))),
+    curate: vi.fn(script.curate ?? (() => Promise.resolve(ok({ available: true, curated: true })))),
   }
   ctx.provide('remote', { memoryController: calls })
   const controller = new MemoryBrowserController(ctx as never)
@@ -47,27 +64,27 @@ async function harness(script: Script = {}) {
 const BANKS = {
   available: true as const,
   banks: [
-    { bankId: 'b-old', name: 'old', factCount: 1, lastWriteAt: '2026-01-01T00:00:00Z' },
-    { bankId: 'b-new', name: 'new', factCount: 2, lastWriteAt: '2026-06-01T00:00:00Z' },
+    { bankId: bankId('b-old'), name: 'old', factCount: 1, lastWriteAt: '2026-01-01T00:00:00Z' },
+    { bankId: bankId('b-new'), name: 'new', factCount: 2, lastWriteAt: '2026-06-01T00:00:00Z' },
   ],
 }
 
 describe('sortBanks', () => {
   it('puts the most recently written bank first and never-written banks last', () => {
     const sorted = sortBanks([
-      { bankId: 'a', name: 'a', factCount: 0 },
-      { bankId: 'b', name: 'b', factCount: 0, lastWriteAt: '2026-01-01T00:00:00Z' },
-      { bankId: 'c', name: 'c', factCount: 0, lastWriteAt: '2026-06-01T00:00:00Z' },
+      { bankId: bankId('a'), name: 'a', factCount: 0 },
+      { bankId: bankId('b'), name: 'b', factCount: 0, lastWriteAt: '2026-01-01T00:00:00Z' },
+      { bankId: bankId('c'), name: 'c', factCount: 0, lastWriteAt: '2026-06-01T00:00:00Z' },
     ])
     expect(sorted.map(entry => entry.bankId)).toEqual(['c', 'b', 'a'])
   })
 
   it('orders same-instant banks by name so the list does not shuffle', () => {
     const sorted = sortBanks([
-      { bankId: 'z', name: 'zebra', factCount: 0, lastWriteAt: '2026-01-01T00:00:00Z' },
-      { bankId: 'a', name: 'alpha', factCount: 0, lastWriteAt: '2026-01-01T00:00:00Z' },
-      { bankId: 'm', name: 'm', factCount: 0 },
-      { bankId: 'n', name: 'n', factCount: 0 },
+      { bankId: bankId('z'), name: 'zebra', factCount: 0, lastWriteAt: '2026-01-01T00:00:00Z' },
+      { bankId: bankId('a'), name: 'alpha', factCount: 0, lastWriteAt: '2026-01-01T00:00:00Z' },
+      { bankId: bankId('m'), name: 'm', factCount: 0 },
+      { bankId: bankId('n'), name: 'n', factCount: 0 },
     ])
     expect(sorted.map(entry => entry.name)).toEqual(['alpha', 'zebra', 'm', 'n'])
   })
@@ -464,5 +481,493 @@ describe('MemoryBrowserController', () => {
     const state: MemoryBrowserState = controller.getSnapshot()
     expect(state.status).toBe('idle')
     expect(state.banks).toEqual([])
+  })
+})
+
+describe('MemoryBrowserController memory units', () => {
+  const UNITS_PAGE = {
+    available: true as const,
+    units: [{ id: unitId('u-1'), text: 'a fact', factType: 'world', mentionedAt: '2026-10-01T00:00:00Z' }],
+    total: 42,
+    limit: 20,
+    offset: 0,
+  }
+
+  it('reads the units page with the bank and keeps the Host page size', async () => {
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units: () => Promise.resolve(ok(UNITS_PAGE)),
+    })
+    controller.inject().ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().units).toHaveLength(1) })
+    expect(controller.getSnapshot()).toMatchObject({
+      unitsTotal: 42, unitsLimit: 20, unitsOffset: 0, unitsLoading: false,
+    })
+  })
+
+  it('keeps a section saying so when the provider offers no statistics or pages', async () => {
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      stats: () => Promise.resolve({ ok: true as const, value: { available: false as const, reason: 'unsupported' as const, detail: 'no statistics' } }),
+      pages: () => Promise.resolve({ ok: true as const, value: { available: false as const, reason: 'unsupported' as const, detail: 'no pages' } }),
+      units: () => Promise.resolve(ok(UNITS_PAGE)),
+    })
+    controller.inject().ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().units).toHaveLength(1) })
+    expect(controller.getSnapshot().statsProblem).toEqual({ kind: 'unavailable', reason: 'unsupported', detail: 'no statistics' })
+    expect(controller.getSnapshot().pagesProblem).toEqual({ kind: 'unavailable', reason: 'unsupported', detail: 'no pages' })
+    expect(controller.getSnapshot().loading).toBe('none')
+  })
+
+  it('applies the unit filter from the first page', async () => {
+    const units = vi.fn(() => Promise.resolve(ok(UNITS_PAGE)))
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().units).toHaveLength(1) })
+    units.mockClear()
+
+    face.editUnitQuery('  web  ')
+    // The draft alone is not a filter: the list stays until the filter runs.
+    expect(units).not.toHaveBeenCalled()
+    face.runUnitFilter()
+
+    await vi.waitFor(() => { expect(units).toHaveBeenCalledTimes(1) })
+    expect(units).toHaveBeenCalledWith('b-new', 'web', undefined, undefined, 0)
+    expect(controller.getSnapshot().unitQuery).toBe('web')
+  })
+
+  it('reads another page of units on request', async () => {
+    // The daemon echoes the requested offset, so the page on screen is the one asked for.
+    const units = vi.fn((
+      _bankId: string, _query: string | undefined, _factType: string | undefined,
+      _limit: number | undefined, offset: number | undefined,
+    ) => Promise.resolve(ok({ ...UNITS_PAGE, offset: offset ?? 0 })))
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().units).toHaveLength(1) })
+    units.mockClear()
+
+    face.pageUnits(20)
+
+    await vi.waitFor(() => { expect(units).toHaveBeenCalledWith('b-new', '', undefined, undefined, 20) })
+    expect(controller.getSnapshot().unitsOffset).toBe(20)
+  })
+
+  it('reports a failed units read without losing the bank beneath it', async () => {
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units: () => Promise.resolve(refused('units broke')),
+    })
+    controller.inject().ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().unitsProblem).not.toBeNull() })
+    expect(controller.getSnapshot().unitsProblem).toEqual({ kind: 'error', detail: 'units broke' })
+    expect(controller.getSnapshot().bankId).toBe('b-new')
+  })
+})
+
+describe('MemoryBrowserController writes', () => {
+  it('records a drafted finding, notes it, and refreshes the bank', async () => {
+    const list = vi.fn(() => Promise.resolve(ok(BANKS)))
+    const remember = vi.fn(() => Promise.resolve(ok({ available: true, remembered: true, detail: 'op-7' })))
+    const controller = await harness({
+      list,
+      units: () => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })),
+      remember,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+    list.mockClear()
+
+    face.startAdd()
+    face.editAdd('text', '  keep this  ')
+    face.editAdd('context', '  probe  ')
+    face.submitAdd()
+
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeNote).not.toBeNull() })
+    expect(remember).toHaveBeenCalledWith('b-new', 'keep this', 'probe')
+    expect(controller.getSnapshot().addDraft).toBeNull()
+    expect(controller.getSnapshot().writeNote).toEqual({ kind: 'remembered', detail: 'op-7' })
+    // The bank is re-read so the new fact count and unit show up.
+    await vi.waitFor(() => { expect(list).toHaveBeenCalledTimes(1) })
+  })
+
+  it('omits an empty context when recording a finding', async () => {
+    const remember = vi.fn(() => Promise.resolve(ok({ available: true, remembered: true })))
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      remember,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.startAdd()
+    face.editAdd('text', 'keep this')
+    face.editAdd('context', '   ')
+    face.submitAdd()
+
+    await vi.waitFor(() => { expect(remember).toHaveBeenCalledWith('b-new', 'keep this', undefined) })
+  })
+
+  it('ignores a submit with no text', async () => {
+    const remember = vi.fn(() => Promise.resolve(ok({ available: true, remembered: true })))
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      remember,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.startAdd()
+    face.editAdd('text', '   ')
+    face.submitAdd()
+    await Promise.resolve()
+
+    expect(remember).not.toHaveBeenCalled()
+  })
+
+  it('keeps the form open with the backend detail when a write is refused', async () => {
+    const remember = vi.fn(() => Promise.resolve(ok({ available: true, remembered: false, detail: 'quota reached' })))
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      remember,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.startAdd()
+    face.editAdd('text', 'keep this')
+    face.submitAdd()
+
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeNote).not.toBeNull() })
+    expect(controller.getSnapshot().writeNote).toEqual({ kind: 'refused', detail: 'quota reached' })
+    expect(controller.getSnapshot().addDraft).toEqual({ text: 'keep this', context: '' })
+  })
+
+  it('reports a write the Host could not answer', async () => {
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      remember: () => Promise.resolve(refused('socket closed')),
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.startAdd()
+    face.editAdd('text', 'keep this')
+    face.submitAdd()
+
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeProblem).not.toBeNull() })
+    expect(controller.getSnapshot().writeProblem).toEqual({ kind: 'error', detail: 'socket closed' })
+  })
+
+  it('curates a unit from its prefilled draft and refreshes', async () => {
+    const list = vi.fn(() => Promise.resolve(ok(BANKS)))
+    const curate = vi.fn(() => Promise.resolve(ok({ available: true, curated: true })))
+    const controller = await harness({
+      list,
+      units: () => Promise.resolve(ok({
+        available: true,
+        units: [{ id: unitId('u-1'), text: 'a fact', factType: 'world', context: 'chat' }],
+        total: 1, limit: 20, offset: 0,
+      })),
+      curate,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().units).toHaveLength(1) })
+    list.mockClear()
+
+    const listed = controller.getSnapshot().units[0]
+    expect(listed).toBeDefined()
+    face.startEdit(listed as MemoryUnitSummary)
+    expect(controller.getSnapshot().editDraft).toEqual({ unitId: 'u-1', text: 'a fact', context: 'chat', factType: 'world' })
+    face.editCurate('text', 'a curated fact')
+    face.editCurate('context', '')
+    face.submitEdit()
+
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeNote).not.toBeNull() })
+    expect(curate).toHaveBeenCalledWith('b-new', 'u-1', 'a curated fact', '', 'world')
+    expect(controller.getSnapshot().editDraft).toBeNull()
+    expect(controller.getSnapshot().writeNote).toEqual({ kind: 'curated', detail: '' })
+    await vi.waitFor(() => { expect(list).toHaveBeenCalledTimes(1) })
+  })
+
+  it('keeps the curate draft open when the backend refuses the fact type', async () => {
+    const curate = vi.fn(() => Promise.resolve(ok({
+      available: true, curated: false, detail: 'only world/experience facts can be curated',
+    })))
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units: () => Promise.resolve(ok({
+        available: true,
+        units: [{ id: unitId('u-1'), text: 'a fact' }],
+        total: 1, limit: 20, offset: 0,
+      })),
+      curate,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().units).toHaveLength(1) })
+
+    face.startEdit(controller.getSnapshot().units[0] as MemoryUnitSummary)
+    face.submitEdit()
+
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeNote).not.toBeNull() })
+    expect(controller.getSnapshot().writeNote).toEqual({
+      kind: 'refused', detail: 'only world/experience facts can be curated',
+    })
+    expect(controller.getSnapshot().editDraft?.unitId).toBe('u-1')
+  })
+
+  it('closes a draft on cancel and clears the note on dismiss', async () => {
+    const controller = await harness({ list: () => Promise.resolve(ok(BANKS)) })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.startAdd()
+    face.cancelAdd()
+    expect(controller.getSnapshot().addDraft).toBeNull()
+
+    face.startEdit({ id: unitId('u-1'), text: 'a fact' })
+    face.cancelEdit()
+    expect(controller.getSnapshot().editDraft).toBeNull()
+
+    face.dismissWriteNote()
+    expect(controller.getSnapshot().writeNote).toBeNull()
+  })
+})
+
+describe('MemoryBrowserController action guards', () => {
+  /** A harness already showing one bank, with the units read in flight settled. */
+  async function loaded(script: Script = {}) {
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units: () => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })),
+      ...script,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+    return { controller, face }
+  }
+
+  it('reports an unavailable units read as the section\'s classified reason', async () => {
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units: () => Promise.resolve({ ok: true as const, value: { available: false as const, reason: 'unreachable' as const, detail: 'daemon slow' } }),
+    })
+    controller.inject().ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().unitsProblem).not.toBeNull() })
+    expect(controller.getSnapshot().unitsProblem).toEqual({ kind: 'unavailable', reason: 'unreachable', detail: 'daemon slow' })
+    // The rest of the bank keeps rendering.
+    expect(controller.getSnapshot().bankId).toBe('b-new')
+  })
+
+  it('ignores a note dismissal with no note, and a problem dismissal with no problem', async () => {
+    const { controller, face } = await loaded()
+
+    face.dismissWriteNote()
+    face.dismissProblem()
+
+    expect(controller.getSnapshot().writeNote).toBeNull()
+    expect(controller.getSnapshot().problem).toBeNull()
+  })
+
+  it('ignores a filter edit that types the text already in the box', async () => {
+    const { controller, face } = await loaded()
+
+    face.editUnitQuery('')
+
+    expect(controller.getSnapshot().unitQueryDraft).toBe('')
+  })
+
+  it('drops a write that settles after the panel moved to another bank', async () => {
+    const remember = deferred<unknown>()
+    const controller = await harness({
+      list: () => Promise.resolve(ok(BANKS)),
+      units: () => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })),
+      remember: () => remember.promise,
+    })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.startAdd()
+    face.editAdd('text', 'keep this')
+    face.submitAdd()
+    // The panel moves on while the write is in flight.
+    face.selectBank('b-old')
+    remember.settle({ ok: true, value: { available: true, remembered: true } })
+    await remember.promise
+
+    // The late settlement belongs to the bank that is no longer selected.
+    expect(controller.getSnapshot().writeNote).toBeNull()
+    expect(controller.getSnapshot().writing).toBe(false)
+  })
+
+  it('drops a bank read that settles after the panel is disposed', async () => {
+    const first = deferred<unknown>()
+    let reading = false
+    const controller = await harness({
+      list: () => { reading = true; return first.promise },
+      units: () => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })),
+    })
+    controller.inject().ensure()
+    // The read is awaiting the daemon when the panel goes away.
+    await vi.waitFor(() => { expect(reading).toBe(true) })
+    controller.dispose()
+    first.settle({ ok: true, value: { available: true, banks: BANKS.banks } })
+    await first.promise
+
+    // The late answer lands nowhere: nothing is published after disposal. The
+    // read was in flight when the panel went away, so the loading state stays.
+    expect(controller.getSnapshot().banks).toEqual([])
+    expect(controller.getSnapshot().status).toBe('loading')
+    expect(controller.getSnapshot().problem).toBeNull()
+  })
+
+  it('dismisses a note once the outcome has been read', async () => {
+    const { controller, face } = await loaded({
+      remember: () => Promise.resolve(ok({ available: true, remembered: true, detail: 'op-7' })),
+    })
+    face.startAdd()
+    face.editAdd('text', 'keep this')
+    face.submitAdd()
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeNote).not.toBeNull() })
+
+    face.dismissWriteNote()
+
+    expect(controller.getSnapshot().writeNote).toBeNull()
+  })
+
+  it('reports a write the Host answered unavailable', async () => {
+    const { controller, face } = await loaded({
+      remember: () => Promise.resolve({ ok: true as const, value: { available: false as const, reason: 'unavailable' as const, detail: 'no provider' } }),
+    })
+    face.startAdd()
+    face.editAdd('text', 'keep this')
+    face.submitAdd()
+
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeProblem).not.toBeNull() })
+    expect(controller.getSnapshot().writeProblem).toEqual({ kind: 'unavailable', reason: 'unavailable', detail: 'no provider' })
+    // The form stays open so the finding is not lost.
+    expect(controller.getSnapshot().addDraft).toEqual({ text: 'keep this', context: '' })
+    expect(controller.getSnapshot().writing).toBe(false)
+  })
+
+  it('ignores a curation submit with no form open', async () => {
+    const curate = vi.fn(() => Promise.resolve(ok({ available: true, curated: true })))
+    const { face } = await loaded({ curate })
+
+    face.submitEdit()
+    await Promise.resolve()
+
+    expect(curate).not.toHaveBeenCalled()
+  })
+
+  it('ignores a unit filter run with no bank selected', async () => {
+    const units = vi.fn(() => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })))
+    const controller = await harness({ list: () => Promise.resolve(ok({ available: true, banks: [] })), units })
+    const face = controller.inject()
+    face.ensure()
+    await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('ready') })
+
+    face.editUnitQuery('web')
+    face.runUnitFilter()
+
+    expect(units).not.toHaveBeenCalled()
+  })
+
+  it('ignores a filter run that changes nothing', async () => {
+    const units = vi.fn(() => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })))
+    const { face } = await loaded({ units })
+    units.mockClear()
+
+    face.runUnitFilter()
+
+    expect(units).not.toHaveBeenCalled()
+  })
+
+  it('ignores a page request for the page already on screen', async () => {
+    const units = vi.fn(() => Promise.resolve(ok({ available: true, units: [], total: 0, limit: 20, offset: 0 })))
+    const { face } = await loaded({ units })
+    units.mockClear()
+
+    face.pageUnits(0)
+
+    expect(units).not.toHaveBeenCalled()
+  })
+
+  it('ignores a second add form while one is open', async () => {
+    const { controller, face } = await loaded()
+
+    face.startAdd()
+    face.startAdd()
+
+    expect(controller.getSnapshot().addDraft).toEqual({ text: '', context: '' })
+  })
+
+  it('ignores draft edits with no form open', async () => {
+    const { controller, face } = await loaded()
+
+    face.editAdd('text', 'orphan')
+    face.editCurate('text', 'orphan')
+
+    expect(controller.getSnapshot().addDraft).toBeNull()
+    expect(controller.getSnapshot().editDraft).toBeNull()
+  })
+
+  it('ignores a note dismissal with no note to dismiss', async () => {
+    const { controller, face } = await loaded()
+
+    face.dismissWriteNote()
+
+    expect(controller.getSnapshot().writeNote).toBeNull()
+  })
+
+  it('ignores a write while another is in flight', async () => {
+    const remember = vi.fn(() => Promise.resolve(ok({ available: true, remembered: true })))
+    const { controller, face } = await loaded({ remember })
+    face.startAdd()
+    face.editAdd('text', 'first')
+    face.submitAdd()
+    // The first write is still in flight; a second submit must not double it.
+    face.editAdd('text', 'second')
+    face.submitAdd()
+    await vi.waitFor(() => { expect(controller.getSnapshot().writeNote).not.toBeNull() })
+
+    expect(remember).toHaveBeenCalledTimes(1)
+    expect(remember).toHaveBeenCalledWith('b-new', 'first', undefined)
+  })
+
+  it('ignores a curation with no text', async () => {
+    const curate = vi.fn(() => Promise.resolve(ok({ available: true, curated: true })))
+    const { face } = await loaded({
+      units: () => Promise.resolve(ok({
+        available: true,
+        units: [{ id: unitId('u-1'), text: 'a fact' }],
+        total: 1, limit: 20, offset: 0,
+      })),
+      curate,
+    })
+    face.startEdit({ id: unitId('u-1'), text: 'a fact' })
+    face.editCurate('text', '   ')
+    face.submitEdit()
+    await Promise.resolve()
+
+    expect(curate).not.toHaveBeenCalled()
   })
 })

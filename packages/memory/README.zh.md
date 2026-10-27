@@ -27,7 +27,7 @@ kind: "package-group"
 
 | 包 | 角色 | ctx 键 |
 |---|---|---|
-| [`memory/`](memory/README.zh.md) | 记忆服务：bank 解析，以及通过可替换 provider 完成的召回、搜索与回写 | `ctx.memory` |
+| [`memory/`](memory/README.zh.md) | 记忆服务：bank 解析，通过可替换 provider 完成的召回、搜索与回写，以及面向人的浏览表面 | `ctx.memory` |
 | [`hindsight-http/`](hindsight-http/README.zh.md) | 基于 hindsight HTTP daemon 的 provider；按工作区解析 bank | 注册到 `ctx.memory` |
 | [`tool-memory/`](tool-memory/README.zh.md) | Consumer：开场召回、轮次回写、冷 bank 播种，以及 `hindsight_search` / `hindsight_remember` 工具 | 消费 `ctx.memory` |
 
@@ -38,6 +38,7 @@ kind: "package-group"
 2. **首个请求。** `agent/pre-step` 针对开场提示召回记忆，并作为一条持久化的 user-role 消息追加，措辞明确标注为「可能已过时的背景知识」。
 3. **轮次结束。** `agent/turn-stopping` 回写刚完成的对话；后端异步抽取事实。
 4. **模型主动询问。** `hindsight_search` 查注入的记忆没覆盖到的内容；`hindsight_remember` 刻意记录一条值得保留的发现。
+5. **人来查看。** 浏览器的「记忆」面板通过 Host 的 `memoryController` Remote 解析 seam 的浏览表面：列出记忆库、分页浏览一个库的记忆单元、读取其统计与知识页，并执行两项写入——记录一条发现与策展一条已有单元。该表面与 provider 中立，因此部署更换后端后面板照常工作。
 
 被委派的 subagent 会话不持有自己的 bank：它们继承父会话的工作区但工作集不同，折算进父会话的记忆会把两段对话搅在一起。
 

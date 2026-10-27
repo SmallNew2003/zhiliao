@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-memory",
-  "description": "Abstract long-term memory capability seam (ctx.memory) for the DeepSeek Harness — provider registry, bank-resolved recall/search/retention, request/result vocabulary, and the MemoryError taxonomy",
+  "description": "Abstract long-term memory capability seam (ctx.memory) for the DeepSeek Harness — provider registry, bank-resolved recall/search/retention, the optional browse surface, request/result vocabulary, and the MemoryError taxonomy",
   "version": "0.1.6-alpha.2",
   "publishConfig": {
     "access": "public"

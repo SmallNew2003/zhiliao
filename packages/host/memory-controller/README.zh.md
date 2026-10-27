@@ -1,5 +1,5 @@
 ---
-description: "只读 Remote 投影部署保留的长期记忆：bank 列表、每个 bank 的统计、知识页树、知识库搜索与页面正文，供浏览器记忆面板使用。"
+description: "Remote 投影部署保留的长期记忆：bank 列表、每个 bank 的统计、知识页树、知识库搜索、页面正文、记忆单元分页，以及一个人执行的两项写入，供浏览器记忆面板使用。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,9 @@ kind: "package-reference"
 
 ## 概述
 
-客户端在 `memoryController` 命名空间上调用五个方法，展示部署的长期记忆里有什么：`list` 给出记忆库及其事实数与最后写入时间，`stats` 给出单个库的节点、链接、文档总数以及事实类型与链接类型分布，`pages` 给出某个库的知识页，`search` 检索知识索引，`page` 给出单个页面的正文。每个方法都返回结构化状态而不是抛异常，因此浏览器能说明**具体**命中了哪种情况——记忆未启用、部署配置有误、daemon 不可达、请求失败——而不是只显示一个笼统的传输错误。该接口只读：不能写入、编辑或删除记忆。
+客户端在 `memoryController` 命名空间上调用八个方法，展示并编辑部署的长期记忆：`list` 给出记忆库及其事实数与最后写入时间，`stats` 给出单个库的节点、链接、文档总数以及事实类型与链接类型分布，`pages` 给出某个库的知识页，`search` 检索知识索引，`page` 给出单个页面的正文，`units` 给出单个库一页记忆单元，`remember` 与 `curate` 承担一个人执行的两项写入。每个方法都返回结构化状态而不是抛异常，因此浏览器能说明**具体**命中了哪种情况——记忆未启用、部署配置有误、provider 不提供该分区、daemon 不可达、请求失败——而不是只显示一个笼统的传输错误。
+
+本服务是投影而非传输：每个方法都解析记忆 seam 的浏览表面并经它调用，因此面板面对的是部署挂载的那个 provider，更换后端无需改动这里。
 
 ## 目录
 
@@ -43,14 +45,25 @@ kind: "package-reference"
 
 `memoryController/page` 接受库 id 与页面 id，返回该页的名称与 Markdown 正文。后端没有正文的页面返回为「可用但不带页面」的应答，而不是失败：请求成功了，只是没有内容可展示。
 
+### 分页浏览一个库的记忆单元
+
+`memoryController/units` 返回一个库一页的记忆单元——后端提取出的单条事实，统计与知识页只概括它们、从不逐一列出。每个单元携带其文本，并在后端上报时携带事实类型、上下文、标签以及提及与更新时间。调用方的 `query` 是对单元文本与上下文的大小写不敏感子串过滤，`factType` 限定一个后端分类；空过滤会被丢弃而不是发出，页大小钳制在 `[1, 100]`、默认 20。应答携带后端对当前过滤的总数，客户端因此可以分页而无需自己计数。该列表在 daemon 上是一次扫描而非推理调用：它是浏览辅助，而 seam 自己的搜索仍是 agent 使用的那次按推理计价的查找。
+
+### 写入记忆
+
+`memoryController/remember` 记录一条发现：脱离上下文仍成立的文本，以及后端归档它时使用的可选上下文。在通过推理提取事实的后端上保留是异步的，因此应答报告受理结果并携带后端的操作细节；提取完成后单元即可列出，客户端刷新后即可看到。空发现在任何调用之前就被拒绝，以 `remembered: false` 加一条说明原因的 detail 返回。
+
+`memoryController/curate` 编辑一条已有单元：替换文本、上下文或事实类型，只在调用方传入时发送。什么都不改的策展会以同样方式被拒绝，会把文本清空的也一样。拒绝该事实类型的后端——hindsight 拒绝它派生的事实——以后端自己的话作为结果的 detail 应答，客户端原样展示。
+
 ### 不可用是应答，不是异常
 
-每个方法都返回 `available: false` 并带上 `reason` 与 `detail`，而不是 reject。这一点很重要：被拒绝的 Remote 调用到达浏览器时只是一个不透明的传输失败，无法说明发生了哪种后端情况，而*这个构建里没有记忆*与*daemon 挂了*需要用户做出不同的反应。四种原因是：
+每个方法都返回 `available: false` 并带上 `reason` 与 `detail`，而不是 reject。这一点很重要：被拒绝的 Remote 调用到达浏览器时只是一个不透明的传输失败，无法说明发生了哪种后端情况，而*这个构建里没有记忆*与*daemon 挂了*需要用户做出不同的反应。五种原因是：
 
 | 原因 | 含义 |
 |---|---|
 | `unavailable` | 没有可用的 provider 已注册，即该部署未启用记忆。不会打开任何连接。 |
 | `misconfigured` | Host 固定了一个未注册的 provider id，或有多个可用 provider 竞争而未固定。两者都通过配置一个 provider id 解决。 |
+| `unsupported` | provider 有应答，但不提供浏览表面、或不提供所要求的分区——即只服务 agent 路径的后端。修复方式是指向一个可浏览的 provider。 |
 | `unreachable` | daemon 在配置的时间预算内没有应答。 |
 | `failed` | daemon 返回了错误、返回了非 JSON 内容、没有该库，或传输失败。 |
 
@@ -66,37 +79,21 @@ kind: "package-reference"
 
 ### 设计概念
 
-`memory` seam 负责 agent 热路径上的召回、搜索与保留，并且刻意不投影 bank、统计或知识页，因为热路径上没有任何东西需要它们。本控制器为人类补上这个浏览面，因此它直接读取 daemon 的 REST 端点，而不是拓宽 seam——一个长出纯展示投影的 seam 会把 UI 词汇压到 agent 的关键依赖上。
+`memory` seam 与拥有 agent 的召回、搜索、保留一样，拥有面向人的浏览表面：该表面的词汇——库、统计、知识页、记忆单元与写入结果——由 seam 声明一次，本控制器把它投影到 Typert Remote 上。直接与 daemon 对话的控制器会把面板绑死在一个后端上，而这正是 seam 要防止的事；自建一份词汇副本的控制器则会任线上用词与 seam 漂移。
 
-每个请求之前都通过 `ctx.memory.isAvailable()` 读取可用性，因为那是廉价的同步答案：未启用记忆的部署不消耗任何连接。`isAvailable()` 从不抛异常，因此配置错误的 provider id 在这里只是「不可用」，而不是需要分类的第二个失败；`misconfigured` 只有在 provider 自身的请求路径抛出时才可达。
+表面经 `ctx.memory.browse()` 逐次解析，因此两次调用之间出现或消失的 provider 会被尊重，缺失或配置错误的 provider 的分类发生在任何连接打开之前。没有浏览表面的 provider——或缺少可选的统计与知识页成员的——以 `MEMORY_CAPABILITY_UNSUPPORTED` 拒绝，它投影为 `unsupported` 原因：只服务 agent 路径的后端是合法部署，面板就地说明，而不是让每次读取都失败。
 
-### 端点映射
+### 端点归属
 
-| 方法 | daemon 端点 |
-|---|---|
-| `list` | `GET /v1/default/banks` |
-| `stats` | `GET /v1/default/banks/{bank}/stats` |
-| `pages` | `GET /v1/default/banks/{bank}/knowledge-base/tree` |
-| `search` | `GET /v1/default/banks/{bank}/knowledge-base/search?q=&limit=` |
-| `page` | `GET /v1/default/banks/{bank}/knowledge-base/pages/{page}` |
-
-每个路径段都做百分号编码，因为库 id 含 `::`，页面 id 可能含任意字符。这里任何方法都刻意不调用 `memories/recall`：它在服务端运行推理，一分钟以上才返回，对交互式页面不可用。
-
-### 传输
-
-每个请求都是在 `AbortSignal.timeout` 下的有界 `GET`。超时、不可达的连接、`404`、非 2xx 状态与非 JSON 正文，都在请求边界变成带分类的 `MemoryError`，再由 `answer()` 投影为线上原因。读取同时容忍裸数组与 `{ 字段: [...] }` 信封，因此后端即使去掉信封也仍能应答。
-
-### 配置
-
-`baseUrl`（默认 `http://127.0.0.1:9077`）与 `timeoutMs`（默认 `10000`）就是全部配置面。默认预算取 provider 的**廉价元数据**预算，而不是它的推理预算，因为这里用到的每个端点都是元数据读取。`baseUrl` 末尾的斜杠会被去掉，因此 `http://host:9077/` 与 `http://host:9077` 行为一致。
+本包不映射任何端点。daemon 的 URL、超时与响应投影归 provider 所有——已交付的是 [`dsh-memory-hindsight-http`](../../memory/hindsight-http/README.zh.md)——因此挂载第二个后端无需触碰本控制器。客户端传回的线上 id 归 provider 所有，并在 seam 边界处被 branding。这里任何方法都刻意不投影 `memories/recall`：它在服务端运行推理，一分钟以上才返回，对交互式页面不可用。
 
 ### 源码地图
 
 | 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `MemoryController`：`memoryController` Remote 服务、daemon 传输与 seam 分类投影 |
-| [`src/types.ts`](src/types.ts) | 公开载荷类型：`MemoryBankSummary`、`MemoryBankStats`、`MemoryKnowledgePage`、`MemoryKnowledgeHit`、`MemoryAnswer` |
-| — | 不发布运行时不变式伴生检查；每个应答都直接由 daemon 响应投影而来。 |
+| [`src/index.ts`](src/index.ts) | `MemoryController`：`memoryController` Remote 服务、seam 浏览委派与 seam 分类投影 |
+| [`src/types.ts`](src/types.ts) | 线上词汇：状态信封与每个方法的载荷，浏览词汇自 seam 再导出 |
+| — | 不发布运行时不变式伴生检查；每个应答都直接由 seam 的表面投影而来。 |
 
 Typert 生成 `./typert` 与 `./remote` 暴露的 Host 与 Client Remote 产物。
 
@@ -130,11 +127,10 @@ Typert 生成 `./typert` 与 `./remote` 暴露的 Host 与 Client Remote 产物�
 <a id="known-limitations-and-deferred-work"></a>
 
 
-这些限制说明只读浏览面做不到什么。它们是当前包约束，不是任务积压。
+这些限制说明这个浏览加写入界面做不到什么。它们是当前包约束，不是任务积压。
 
-- **搜索只覆盖知识页，不覆盖记忆**——`search` 查询整理好的知识索引，因为 seam 的记忆搜索在服务端运行推理、一分钟以上才返回；因此事实级搜索无法通过本 Remote 提供。
-- **不投影原始记忆**——daemon 的记忆行携带本包不做映射的 provider 内部上下文，因此该界面展示的是库、统计与知识页，而不是单条记忆单元。
-- **无写入、无历史**——这里的一切都不保留、不编辑、不合并、不删除，快照也不记录自上次读取以来发生了什么变化。
+- **搜索只覆盖知识页，不覆盖记忆**——`search` 查询整理好的知识索引，因为 seam 的记忆搜索在服务端运行推理、一分钟以上才返回；本 Remote 提供的事实级辅助是单元列表的子串过滤，它只扫描不排序。
+- **无删除、无历史**——写入只记录与策展；这里不删除单元、不触发合并，也不记录自上次读取以来发生了什么变化。拥有删除端点的后端需要先在 seam 中有对应成员，本 Remote 才能投影它。
 - **可用性是门槛，不是诊断**——控制器报告记忆不可用，但不报告是哪个 provider 注册了、它的后端为什么不健康；这些在 provider 自己的日志里。
 
 <a id="dev-note"></a>

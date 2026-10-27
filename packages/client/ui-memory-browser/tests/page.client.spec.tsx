@@ -3,7 +3,14 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { MemoryBankStats, MemoryBankSummary } from '@deepseek-ai/dsh-host-memory-controller/types'
+import type {
+  KnowledgePageId, MemoryBankId, MemoryBankStats, MemoryBankSummary, MemoryId, MemoryKnowledgePage,
+} from '@deepseek-ai/dsh-host-memory-controller/types'
+
+/** Brand helpers the way the seam constructs them; the wire carries plain strings. */
+const bankId = (value: string): MemoryBankId => value as MemoryBankId
+const unitId = (value: string): MemoryId => value as MemoryId
+const pageId = (value: string): KnowledgePageId => value as KnowledgePageId
 import { MemoryBrowserPage } from '../src/client/MemoryBrowserPage.tsx'
 import type { MemoryBrowserPageProps } from '../src/client/MemoryBrowserPage.tsx'
 import type { MemoryBrowserState } from '../src/client/memory-store.ts'
@@ -26,7 +33,9 @@ const IDLE: MemoryBrowserState = {
   bankId: null,
   loading: 'none',
   stats: null,
+  statsProblem: null,
   pages: [],
+  pagesProblem: null,
   openPage: null,
   pageLoading: false,
   query: '',
@@ -34,6 +43,19 @@ const IDLE: MemoryBrowserState = {
   hits: [],
   total: 0,
   searchProblem: null,
+  units: [],
+  unitsTotal: 0,
+  unitsLimit: 20,
+  unitsOffset: 0,
+  unitQuery: '',
+  unitQueryDraft: '',
+  unitsLoading: false,
+  unitsProblem: null,
+  addDraft: null,
+  editDraft: null,
+  writing: false,
+  writeProblem: null,
+  writeNote: null,
 }
 
 /** Text of one element, with its nested nodes' text folded in. */
@@ -43,7 +65,7 @@ function textOf(testId: string): string {
 
 function bank(overrides: Partial<MemoryBankSummary> = {}): MemoryBankSummary {
   return {
-    bankId: 'coding-agent::zhiliao',
+    bankId: bankId('coding-agent::zhiliao'),
     name: 'zhiliao',
     factCount: 522,
     lastWriteAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
@@ -53,7 +75,7 @@ function bank(overrides: Partial<MemoryBankSummary> = {}): MemoryBankSummary {
 
 function stats(overrides: Partial<MemoryBankStats> = {}): MemoryBankStats {
   return {
-    bankId: 'coding-agent::zhiliao',
+    bankId: bankId('coding-agent::zhiliao'),
     totalNodes: 522,
     totalLinks: 9963,
     totalDocuments: 16,
@@ -76,6 +98,18 @@ function renderPanel(state: Partial<MemoryBrowserState> = {}, tSeat: MemoryBrows
     openPage: vi.fn(),
     closePage: vi.fn(),
     dismissProblem: vi.fn(),
+    editUnitQuery: vi.fn(),
+    runUnitFilter: vi.fn(),
+    pageUnits: vi.fn(),
+    startAdd: vi.fn(),
+    editAdd: vi.fn(),
+    submitAdd: vi.fn(),
+    cancelAdd: vi.fn(),
+    startEdit: vi.fn(),
+    editCurate: vi.fn(),
+    submitEdit: vi.fn(),
+    cancelEdit: vi.fn(),
+    dismissWriteNote: vi.fn(),
   }
   const props = {
     t: tSeat,
@@ -105,7 +139,7 @@ describe('MemoryBrowserPage', () => {
   it('lists the banks with their fact counts, last write, and a count line', () => {
     const { actions } = renderPanel({
       status: 'ready',
-      banks: [bank(), { bankId: 'b', name: 'blank', factCount: 0 }],
+      banks: [bank(), { bankId: bankId('b'), name: 'blank', factCount: 0 }],
     })
     expect(screen.getByText(en.bankCount.replace('{count}', '2'))).toBeTruthy()
     expect(textOf('data-memory-bank="coding-agent::zhiliao"')).toContain('522 facts')
@@ -153,7 +187,7 @@ describe('MemoryBrowserPage', () => {
   it('opens a bank, asks the store to select it, and leaves the list', () => {
     const { actions, openBank } = renderPanel({
       status: 'ready',
-      banks: [bank(), bank({ bankId: 'b', name: 'other' })],
+      banks: [bank(), bank({ bankId: bankId('b'), name: 'other' })],
       bankId: 'coding-agent::zhiliao',
     })
     openBank('other')
@@ -163,9 +197,9 @@ describe('MemoryBrowserPage', () => {
   })
 
   it('renders the bank detail with statistics, distributions, and the page list', () => {
-    const pages = [
-      { pageId: 'kp-a', name: 'Component map', description: 'the parts', updatedAt: new Date().toISOString(), stale: true },
-      { pageId: 'kp-b', name: 'Conventions', stale: false },
+    const pages: MemoryKnowledgePage[] = [
+      { pageId: pageId('kp-a'), name: 'Component map', description: 'the parts', updatedAt: new Date().toISOString(), stale: true },
+      { pageId: pageId('kp-b'), name: 'Conventions', stale: false },
     ]
     const { actions, openBank } = renderPanel({
       status: 'ready',
@@ -266,7 +300,7 @@ describe('MemoryBrowserPage', () => {
       bankId: 'coding-agent::zhiliao',
       pages: [],
       query: 'memory',
-      hits: [{ pageId: 'kp-a', name: 'Conventions', snippet: '## Scope note', score: 0.9 }],
+      hits: [{ pageId: pageId('kp-a'), name: 'Conventions', snippet: '## Scope note', score: 0.9 }],
       total: 7,
     })
     openBank()
@@ -310,10 +344,12 @@ describe('MemoryBrowserPage', () => {
       banks: [bank()],
       bankId: 'coding-agent::zhiliao',
       pages: [],
-      openPage: { pageId: 'kp-a', name: 'Conventions', body: '## Scope note' },
+      openPage: { pageId: pageId('kp-a'), name: 'Conventions', body: '## Scope note' },
     })
     openBank()
-    expect(textOf('data-memory-page-body')).toContain('## Scope note')
+    // The body renders as Markdown: the heading is an element, not fence text.
+    expect(document.querySelector('[data-memory-page-body] h2')?.textContent).toBe('Scope note')
+    expect(textOf('data-memory-page-body')).not.toContain('##')
     fireEvent.click(within(document.querySelector('[data-memory-page="kp-a"]') as HTMLElement)
       .getByRole('button', { name: en.pageTitle }))
     expect(actions.closePage).toHaveBeenCalledTimes(1)
@@ -325,8 +361,8 @@ describe('MemoryBrowserPage', () => {
       banks: [bank()],
       bankId: 'coding-agent::zhiliao',
       stats: stats(),
-      pages: [{ pageId: 'kp-a', name: 'Conventions', stale: false }],
-      openPage: { pageId: 'kp-a', name: 'Conventions', body: '## Scope note' },
+      pages: [{ pageId: pageId('kp-a'), name: 'Conventions', stale: false }],
+      openPage: { pageId: pageId('kp-a'), name: 'Conventions', body: '## Scope note' },
     })
     openBank()
     expect(screen.getByText('Conventions', { selector: '[data-memory-page-row="kp-a"] *' })).toBeTruthy()
@@ -339,7 +375,7 @@ describe('MemoryBrowserPage', () => {
       banks: [bank()],
       bankId: 'coding-agent::zhiliao',
       pages: [],
-      openPage: { pageId: 'kp-a', name: 'Conventions', body: '## Scope note' },
+      openPage: { pageId: pageId('kp-a'), name: 'Conventions', body: '## Scope note' },
     })
     openBank()
     fireEvent.click(screen.getByRole('button', { name: en.backToBanks }))
@@ -367,7 +403,7 @@ describe('MemoryBrowserPage', () => {
       status: 'ready',
       banks: [bank()],
       bankId: 'coding-agent::zhiliao',
-      pages: [{ pageId: 'kp-a', name: 'Conventions', stale: false }],
+      pages: [{ pageId: pageId('kp-a'), name: 'Conventions', stale: false }],
       pageLoading: true,
     })
     openBank()
@@ -380,6 +416,258 @@ describe('MemoryBrowserPage', () => {
     set({ status: 'ready' })
     fireEvent.click(screen.getByRole('button', { name: en.refresh }))
     expect(actions.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('lists the selected bank\'s memory units with their fact type and an edit entry', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      units: [{ id: unitId('u-1'), text: 'a fact', factType: 'world', mentionedAt: new Date(Date.now() - 3 * 3_600_000).toISOString() }],
+      unitsTotal: 1,
+    })
+    const actions = openBank()
+    const row = document.querySelector('[data-memory-unit="u-1"]')
+    expect(row?.textContent).toContain('a fact')
+    expect(row?.textContent).toContain('world')
+    fireEvent.click(screen.getByRole('button', { name: en.edit }))
+    expect(actions.startEdit).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the add-memory form and routes the draft through the actions', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+    })
+    const actions = openBank()
+    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    expect(actions.startAdd).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the add form over the bank and submits through it', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      addDraft: { text: 'keep this', context: 'probe' },
+    })
+    const actions = openBank()
+    const form = document.querySelector('[data-memory-add-form]')
+    expect(form).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.addTextAria), { target: { value: 'keep more' } })
+    expect(actions.editAdd).toHaveBeenCalledWith('text', 'keep more')
+    fireEvent.click(screen.getByRole('button', { name: en.addSubmit }))
+    expect(actions.submitAdd).toHaveBeenCalledTimes(1)
+  })
+
+  it('says the units page is being read while it crosses the wire', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      unitsLoading: true,
+    })
+    openBank()
+    expect(document.querySelector('[data-memory-units] [role="status"]')?.textContent).toBe(en.loading)
+  })
+
+  it('renders the curate form over the unit being edited', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      units: [{ id: unitId('u-1'), text: 'a fact', factType: 'world', context: 'chat' }],
+      unitsTotal: 1,
+      editDraft: { unitId: unitId('u-1'), text: 'a fact', context: 'chat', factType: 'world' },
+    })
+    const actions = openBank()
+    const form = document.querySelector('[data-memory-edit-form="u-1"]')
+    expect(form).toBeTruthy()
+    const context = document.querySelector<HTMLInputElement>(`[aria-label="${en.editContextAria}"]`)
+    expect(context?.value).toBe('chat')
+    fireEvent.click(screen.getByRole('button', { name: en.editSubmit }))
+    expect(actions.submitEdit).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows what the last write did, with the backend detail, and dismisses it', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      writeNote: { kind: 'remembered', detail: 'op-7' },
+    })
+    const actions = openBank()
+    expect(screen.getByText(en.writeRemembered)).toBeTruthy()
+    expect(screen.getByText('op-7')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.dismiss }))
+    expect(actions.dismissWriteNote).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a refused write with its own sentence', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      writeNote: { kind: 'refused', detail: 'quota reached' },
+    })
+    openBank()
+    expect(screen.getByText(en.writeRefused)).toBeTruthy()
+  })
+
+  it('reports a write the Host could not answer', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      writeProblem: { kind: 'error', detail: 'socket closed' },
+    })
+    openBank()
+    expect(screen.getByText('socket closed')).toBeTruthy()
+  })
+
+  it('pages through the units with the Host\'s page size', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      units: [{ id: unitId('u-1'), text: 'a fact' }],
+      unitsTotal: 42,
+      unitsLimit: 20,
+      unitsOffset: 20,
+    })
+    const actions = openBank()
+    expect(screen.getByText(en.unitsRange.replace('{first}', '21').replace('{last}', '21').replace('{total}', '42'))).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en.prevPage }))
+    expect(actions.pageUnits).toHaveBeenCalledWith(0)
+    fireEvent.click(screen.getByRole('button', { name: en.nextPage }))
+    expect(actions.pageUnits).toHaveBeenCalledWith(40)
+  })
+
+  it('reports a failed units read inside the units section', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      unitsProblem: { kind: 'error', detail: 'units broke' },
+    })
+    openBank()
+    expect(screen.getByText('units broke')).toBeTruthy()
+  })
+
+  it('says so in place of a section the provider does not offer', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      statsProblem: { kind: 'unavailable', reason: 'unsupported', detail: 'no statistics' },
+      pagesProblem: { kind: 'unavailable', reason: 'unsupported', detail: 'no pages' },
+    })
+    openBank()
+    expect(screen.getAllByText(en.reasonUnsupported)).toHaveLength(2)
+    // The knowledge search belongs to the pages section, so it goes with it.
+    expect(screen.queryByRole('button', { name: en.searchRun })).toBeNull()
+  })
+
+  it('renders the open page body as Markdown rather than preformatted text', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      openPage: { pageId: pageId('kp-a'), name: 'Conventions', body: '# Conventions\n\nWe chose Cordis.' },
+    })
+    openBank()
+    const body = document.querySelector('[data-memory-page-body]')
+    expect(body?.querySelector('h1')?.textContent).toBe('Conventions')
+    expect(body?.querySelector('p')?.textContent).toBe('We chose Cordis.')
+  })
+
+  it('routes every add-form field through the actions', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      addDraft: { text: 'keep this', context: 'probe' },
+    })
+    const actions = openBank()
+    fireEvent.change(screen.getByLabelText(en.addTextAria), { target: { value: 'keep more' } })
+    expect(actions.editAdd).toHaveBeenCalledWith('text', 'keep more')
+    fireEvent.change(screen.getByLabelText(en.addContextAria), { target: { value: 'probe 2' } })
+    expect(actions.editAdd).toHaveBeenCalledWith('context', 'probe 2')
+    fireEvent.click(screen.getByRole('button', { name: en.cancel }))
+    expect(actions.cancelAdd).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes every curate-form field through the actions', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      units: [{ id: unitId('u-1'), text: 'a fact' }],
+      unitsTotal: 1,
+      editDraft: { unitId: unitId('u-1'), text: 'a fact', context: 'chat', factType: 'world' },
+    })
+    const actions = openBank()
+    fireEvent.change(screen.getByLabelText(en.editTextAria), { target: { value: 'curated' } })
+    expect(actions.editCurate).toHaveBeenCalledWith('text', 'curated')
+    fireEvent.change(screen.getByLabelText(en.editContextAria), { target: { value: 'chat 2' } })
+    expect(actions.editCurate).toHaveBeenCalledWith('context', 'chat 2')
+    fireEvent.change(screen.getByLabelText(en.editFactTypeAria), { target: { value: 'experience' } })
+    expect(actions.editCurate).toHaveBeenCalledWith('factType', 'experience')
+    fireEvent.click(screen.getByRole('button', { name: en.cancel }))
+    expect(actions.cancelEdit).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs the unit filter from the box and the submit', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      // The box holds text, so the run control is enabled as it is while typing.
+      unitQueryDraft: 'we',
+    })
+    const actions = openBank()
+    fireEvent.change(screen.getByLabelText(en.unitsFilterAria), { target: { value: 'web' } })
+    expect(actions.editUnitQuery).toHaveBeenCalledWith('web')
+    fireEvent.click(screen.getByRole('button', { name: en.unitsFilterRun }))
+    expect(actions.runUnitFilter).toHaveBeenCalledTimes(1)
+    // The form submits too, so Enter in the box runs the same filter.
+    fireEvent.submit(document.querySelector('[data-memory-units] form') as HTMLFormElement)
+    expect(actions.runUnitFilter).toHaveBeenCalledTimes(2)
+  })
+
+  it('says the bank holds no units at all', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+    })
+    openBank()
+    expect(screen.getByText(en.unitsEmpty)).toBeTruthy()
+  })
+
+  it('says an empty filter matched nothing, apart from an empty bank', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      unitQuery: 'web',
+    })
+    openBank()
+    expect(screen.getByText(en.unitsFilterEmpty)).toBeTruthy()
+  })
+
+  it('shows an accepted write without a backend detail', () => {
+    const { openBank } = renderPanel({
+      status: 'ready',
+      banks: [bank()],
+      bankId: 'coding-agent::zhiliao',
+      writeNote: { kind: 'curated', detail: '' },
+    })
+    openBank()
+    expect(screen.getByText(en.writeCurated)).toBeTruthy()
+    // No detail line renders when the backend offered none.
+    expect(document.querySelector('[data-memory-write-note="curated"] p:nth-of-type(2)')).toBeNull()
   })
 
   it('renders every user-facing string from the active dictionary', () => {

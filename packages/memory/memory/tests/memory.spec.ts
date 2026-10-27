@@ -10,6 +10,7 @@ import MemoryRuntime, {
 } from '../src/index.ts'
 import type {
   MemoryBankId,
+  MemoryBrowseProvider,
   MemoryProvider,
   MemoryRecallRequest,
   MemoryRecallResult,
@@ -246,6 +247,53 @@ describe('MemoryRuntime delegation', () => {
     await expect(memory.recall({ prompt: 'p' }, memoryBankId('b'))).rejects.toThrow(
       expect.objectContaining({ code: 'MEMORY_BACKEND_ERROR' }),
     )
+  })
+})
+
+describe('MemoryRuntime browse surface', () => {
+  /** A minimal browse surface; the tests only assert resolution, not behaviour. */
+  function browseSurface(id: string): MemoryBrowseProvider {
+    return {
+      id,
+      listBanks: () => Promise.resolve([]),
+      listUnits: () => Promise.resolve({ units: [], total: 0, limit: 0, offset: 0 }),
+      remember: () => Promise.resolve({ remembered: true }),
+      curateUnit: () => Promise.resolve({ curated: true }),
+    }
+  }
+
+  it('resolves the selected provider\'s browse surface', async () => {
+    const { memory } = await mountMemory()
+    const surface = browseSurface('browsable')
+    memory.registerProvider(makeProvider('browsable', available, { browse: surface }))
+
+    expect(memory.browse()).toBe(surface)
+  })
+
+  it('refuses when the selected provider offers no browse surface', async () => {
+    const { memory } = await mountMemory()
+    memory.registerProvider(makeProvider('agent-only', available))
+
+    expect(() => memory.browse()).toThrow(
+      expect.objectContaining({ code: 'MEMORY_CAPABILITY_UNSUPPORTED' }),
+    )
+  })
+
+  it('reports selection failures through browse as through the agent path', async () => {
+    const { memory } = await mountMemory()
+
+    await expect(Promise.resolve().then(() => memory.browse())).rejects.toThrow(
+      expect.objectContaining({ code: 'MEMORY_PROVIDER_UNAVAILABLE' }),
+    )
+  })
+
+  it('honours the configured provider when several are registered', async () => {
+    const { memory } = await mountMemory({ provider: 'picked' })
+    const surface = browseSurface('picked')
+    memory.registerProvider(makeProvider('other', available, { browse: browseSurface('other') }))
+    memory.registerProvider(makeProvider('picked', available, { browse: surface }))
+
+    expect(memory.browse()).toBe(surface)
   })
 })
 
