@@ -478,13 +478,16 @@ function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number;
  * @param props.result - merged local/content search row.
  * @param props.currentId - selected session id.
  * @param props.onOpen - open the selected session.
+ * @param props.seat - roving-tabindex seat; absent on surfaces that are not keyboard-navigated.
  * @param props.t - Workspace-browser translation seat.
  * @returns the result button.
  */
-export function SearchResultItem({ result, currentId, onOpen, t }: {
+export function SearchResultItem({ result, currentId, onOpen, seat, t }: {
   result: SearchResultNode
   currentId: string | undefined
   onOpen: (id: SearchResultNode['id']) => void
+  /** Roving-tabindex seat; absent on surfaces that are not keyboard-navigated. */
+  seat?: TreeRowSeat | undefined
   t: RowTranslate
 }) {
   const selected = result.id === currentId
@@ -497,6 +500,9 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
       role="treeitem"
       aria-selected={selected}
       onClick={() => { onOpen(result.id) }}
+      tabIndex={seat === undefined ? undefined : (seat.tabbable ? 0 : -1)}
+      onFocus={seat === undefined ? undefined : seat.claim}
+      onKeyDown={(event) => { onTreeRowKeyDown(event, { activate: () => { onOpen(result.id) } }) }}
     >
       <span className={css.searchResultHeading}>
         <span className={css.slot}>

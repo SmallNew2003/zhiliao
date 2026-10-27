@@ -686,6 +686,51 @@ describe('WorkspaceBrowser', () => {
     expect(document.activeElement).toBe(row)
   })
 
+  it('moves the search-result tab stop with the arrow keys and opens the focused hit with Enter', () => {
+    const open = vi.fn()
+    mount({
+      useSessions: hook(sessionState([
+        summary('alpha-s', 3, { displayTitle: 'alpha hit' }),
+        summary('beta-s', 2, { displayTitle: 'beta hit' }),
+      ])),
+      open,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
+    fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'hit' } })
+    const rows = () => screen.getAllByRole('treeitem')
+    expect(rows()).toHaveLength(2)
+    // Nothing is selected, so the first hit holds the tree's single tab stop.
+    expect(rows()[0]?.getAttribute('tabindex')).toBe('0')
+    expect(rows()[1]?.getAttribute('tabindex')).toBe('-1')
+
+    fireEvent.keyDown(rows()[0]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows()[1])
+    // The last hit has no neighbour below: the tree holds the stop.
+    fireEvent.keyDown(rows()[1]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows()[1])
+    fireEvent.keyDown(rows()[1]!, { key: 'Home' })
+    expect(document.activeElement).toBe(rows()[0])
+    fireEvent.keyDown(rows()[0]!, { key: 'End' })
+    expect(document.activeElement).toBe(rows()[1])
+
+    fireEvent.keyDown(rows()[1]!, { key: 'Enter' })
+    expect(open).toHaveBeenCalledWith(sid('beta-s'))
+  })
+
+  it('hands the search-result tab stop to the selected Session own hit', () => {
+    mount({
+      useSessions: hook(sessionState([
+        summary('alpha-s', 3, { displayTitle: 'alpha hit' }),
+        summary('beta-s', 2, { displayTitle: 'beta hit' }),
+      ], { main: sid('beta-s') })),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
+    fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'hit' } })
+    const rows = () => screen.getAllByRole('treeitem')
+    expect(rows()[1]?.getAttribute('tabindex')).toBe('0')
+    expect(rows()[0]?.getAttribute('tabindex')).toBe('-1')
+  })
+
   it('keeps the blank New Session outside the five-row folding quota', () => {
     const ordinary = Array.from({ length: 6 }, (_, index) => summary(`session-${index + 1}`, 6 - index))
     const blank = summary('blank', 7, { blank: true })

@@ -766,6 +766,15 @@ function SearchResults({
   const currentId = panelActive
     ? undefined
     : Object.values(list.byId).find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
+  // Roving tab stop over the result rows: the current Session's own hit holds
+  // it, and the first hit takes it when nothing is selected.
+  const { tabStopId, claim: claimTabStop } = useTreeTabStop(
+    results.items.some(result => result.id === currentId) ? currentId : results.items[0]?.id,
+  )
+  const seatFor = (id: SessionId): TreeRowSeat => ({
+    tabbable: (tabStopId ?? results.items[0]?.id) === id,
+    claim: () => { claimTabStop(id) },
+  })
 
   return (
     <div className={clsx(css.treeBody, css.wide)}>
@@ -777,6 +786,7 @@ function SearchResults({
               result={result}
               currentId={currentId}
               onOpen={open}
+              seat={seatFor(result.id)}
               t={t}
             />
           ))}
