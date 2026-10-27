@@ -1,6 +1,9 @@
+<!-- PR 标题规范：<type>(<scope>): <简明中文描述>，例如：feat(client): 支持侧边栏打开子代理会话 -->
+<!-- scope 按实际包/应用名取，不要自造。常用：web / client / desktop / boot / native / plugin-manager -->
+
 ## Motivation
 
-<!-- 用一句话说明需要解决的问题，并以 Fixes #NN 或 Related #NN 引用同仓库 Issue。 -->
+<!-- 用一句话说明需要解决的问题。本仓库未启用 Issues，不要写 Fixes #NN / Related #NN。 -->
 
 ## Changes
 
