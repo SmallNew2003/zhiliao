@@ -43,7 +43,15 @@
     - img
   - button "减小字号":
     - img
-  - text: px 对话显示 控制已完成轮次的过程内容
+  - text: px 系统通知 任务需要你时，在系统通知中心提醒
+  - switch "启用系统通知" [checked]
+  - text: 会话完成时 会话在后台跑完时提醒
+  - switch "会话完成时" [checked]
+  - text: 等待审批或回答时 需要你操作才能继续时提醒
+  - switch "等待审批或回答时" [checked]
+  - text: 出错时 会话执行失败时提醒
+  - switch "出错时" [checked]
+  - text: 系统通知权限已被拒绝，请在系统设置中允许后重试 对话显示 控制已完成轮次的过程内容
   - button "紧凑":
     - text: 紧凑
     - img

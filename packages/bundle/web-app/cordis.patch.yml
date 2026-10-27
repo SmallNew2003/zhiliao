@@ -201,6 +201,10 @@
     - id: ui-theme
       name: '@deepseek-ai/dsh-client-ui-theme'
 
+    # Native OS announcements for session completion, pending approval, and failure.
+    - id: ui-notification
+      name: '@deepseek-ai/dsh-client-ui-notification'
+
     - id: locale
       name: '@deepseek-ai/dsh-client-locale'
 

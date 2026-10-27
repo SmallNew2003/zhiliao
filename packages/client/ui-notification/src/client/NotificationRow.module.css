@@ -1,0 +1,61 @@
+/* Notification row: master switch + one switch per announcement kind, on the
+ * same cell rhythm as the Language and Enter-behavior rows (gap 8, pad 16/0,
+ * hairline separator; the section column strips the last child's separator).
+ * Kind rows indent their text so the hierarchy reads without a second column. */
+
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.row,
+.subRow,
+.permissionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.subRow {
+  padding-left: 16px;
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 48px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.subTitle {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.desc {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Permission notice: copy plus the grant action, only while the OS has not
+   authorized yet. A denied permission shows copy alone, because only system
+   settings can reverse it. */
+.permissionRow {
+  align-items: center;
+  justify-content: space-between;
+}

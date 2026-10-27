@@ -1,7 +1,10 @@
 /** Origin-scoped boot, native directory selection, and update presentation with native confirmation actions. */
 
 import { contextBridge, ipcRenderer } from 'electron'
-import { DESKTOP_IPC, SCHEME, type DshDesktopProductApi, type DesktopUpdatePresentation } from './ipc.ts'
+import {
+  DESKTOP_IPC, SCHEME, type DesktopNotificationPermission, type DesktopNotificationRequest,
+  type DshDesktopProductApi, type DesktopUpdatePresentation,
+} from './ipc.ts'
 import { markDocumentPlatform } from './preload-platform.ts'
 import { syncNativeTheme } from './preload-theme.ts'
 import { syncWindowsAppearance } from './preload-windows.ts'
@@ -16,6 +19,15 @@ const product: DshDesktopProductApi = {
       ipcRenderer.on(DESKTOP_IPC.updatesPresentation, handle)
       return () => { ipcRenderer.off(DESKTOP_IPC.updatesPresentation, handle) }
     },
+  },
+  notifications: {
+    show: (request: DesktopNotificationRequest) => ipcRenderer.invoke(DESKTOP_IPC.notifyShow, request) as Promise<void>,
+    subscribe(listener) {
+      const handle = (_event: Electron.IpcRendererEvent, sessionId: string): void => { listener(sessionId) }
+      ipcRenderer.on(DESKTOP_IPC.notifyClicked, handle)
+      return () => { ipcRenderer.off(DESKTOP_IPC.notifyClicked, handle) }
+    },
+    permission: () => ipcRenderer.invoke(DESKTOP_IPC.notifyPermission) as Promise<DesktopNotificationPermission>,
   },
 }
 
