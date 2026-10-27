@@ -620,6 +620,10 @@ describe('WorkspaceBrowser', () => {
           key: 'approval:1', kind: 'approval', sessionId: awaiting.id,
         } as SessionPendingInteraction,
         completionUnread: false,
+        // `SessionStatus.lastAgentError` landed after this branch's base, so it
+        // arrives through a spread rather than a literal key: a literal would
+        // be an excess property on the base and a missing one downstream.
+        ...{ lastAgentError: null },
       },
     ]])
     mount({
