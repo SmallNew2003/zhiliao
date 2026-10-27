@@ -35,6 +35,8 @@ Choose `dsh-compaction-basic` when a model-written summary fits your needs: you 
 
 When condensation runs, the selected older span of the conversation is replaced by one summary message; recent history is untouched and the conversation continues from the summary. Condensation can be triggered automatically as token pressure builds, on demand, or over an explicit span; the result reports which history was condensed and the estimated tokens freed.
 
+An explicit context-budget trigger checks the logged request before dispatch. The backend must reject admission when its estimated input cannot fit the selected budget after output reservation; a missing safe range, failed summary, or insufficient reduction cannot authorize an oversized request. Provider tokenization can differ from these estimates.
+
 ### Turning condensation on
 
 Mount the shipped backend to register the condensation service, and add `dsh-command-compact` for the on-demand command:

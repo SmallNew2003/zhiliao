@@ -103,6 +103,30 @@ function appendSuccessfulCall(
   session.append('step/end', { turn, step })
 }
 
+describe('context budget anchor compatibility', () => {
+  it('retains provider usage for budget-only changes and invalidates changed routes or tools', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SessionProjectionRegistry)
+      await ctx.plugin(TokenMeter)
+      const session = Session.create(SessionId('budget-anchor'))
+      const original = header('model')
+      appendSuccessfulCall(session, original, { usage: { inputTokens: 500000, outputTokens: 10 } })
+      for (const contextWindow of [1000000, 128000, undefined]) {
+        const config = { ...original.config, ...contextWindow === undefined ? {} : { contextWindow } }
+        const next = canonicalHeader({ ...original, config })
+        expect(ctx.tokenMeter.measure(session, next).baseline).toMatchObject({ kind: 'usage', tokens: 500010 })
+        appendHeader(session, next)
+        expect(ctx.tokenMeter.measure(session).baseline).toMatchObject({ kind: 'usage', tokens: 500010 })
+      }
+      expect(ctx.tokenMeter.measure(session, header('other-model')).baseline.kind).toBe('estimated')
+      expect(ctx.tokenMeter.measure(session, header('model', { tools: [READ_TOOL] })).baseline.kind).toBe('estimated')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+})
+
 function meter(config: TokenMeterConfig = {}): TokenMeter {
   const ctx = new Context()
   // The registry is a required injection of the service (its three projection

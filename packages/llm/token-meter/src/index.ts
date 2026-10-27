@@ -75,13 +75,15 @@ function usageTokens(usage: TokenUsage): number {
     + usage.outputTokens
 }
 
-/** Compare optional envelopes so a headerless estimate can track later surface deltas. */
+/** Compare pricing envelopes; context budgets do not change input serialization or token pricing. */
 function optionalHeaderEquals(
   left: EpochHeader | undefined,
   right: EpochHeader | undefined,
 ): boolean {
   if (left === undefined || right === undefined) return left === right
-  return headerEquals(left, right)
+  const { contextWindow: _leftBudget, ...leftConfig } = left.config
+  const { contextWindow: _rightBudget, ...rightConfig } = right.config
+  return headerEquals({ ...left, config: leftConfig }, { ...right, config: rightConfig })
 }
 
 /** Reject stale or misspelled keys before defaults can hide them. */
@@ -130,7 +132,7 @@ export class TokenMeter extends Service {
    * pricing charges each retained image its visual tokens plus its
    * model-visible text, while other routes keep the fixed heuristic. Provider
    * usage is reused only when the latest successful call's canonical request
-   * envelope matches `requestHeader` and its total is no lower than that
+   * envelope matches `requestHeader` apart from its context budget and its total is no lower than that
    * call's full route-priced anchor; otherwise the complete envelope and
    * surface are repriced. The anchor includes all surface nodes immediately
    * before the assistant message, including inputs admitted after step/start.

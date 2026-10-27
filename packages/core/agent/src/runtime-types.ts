@@ -8,7 +8,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type {
-  LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
+  GenerateOptions, LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
@@ -335,6 +335,23 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
     */
     'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>
+    /**
+     * Admit one frozen, durably logged request that carries an explicit context
+     * budget, before its assistant attempt starts. Throw to reject dispatch or
+     * append durable surface changes to repair it. The loop reconciles the
+     * prompt, rebuilds, and repeats preflight after a surface change,
+     * preserving the assembled route and current input batch. Requests that
+     * inherit adapter capacity never dispatch this event. Listeners must not
+     * mutate the request; cancellation prevents dispatch.
+     * @param payload.agent - agent owning the admitted session surface.
+     * @param payload.request - frozen request derived from the current logged envelope and messages.
+     * @param payload.turn - turn containing the request.
+     * @param payload.step - step containing the request.
+     * @param payload.signal - live turn cancellation signal.
+     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+     * @mode serial
+     */
+    'agent/request-preflight'(this: Scoped<Agent>, payload: { agent: Agent; request: GenerateOptions; turn: number; step: number; signal: AbortSignal }): Promise<void>
     /**
      * Handle one failed model-request attempt before the loop retries or closes
      * its step. A listener returns `{ kind: 'retry' }` without calling `next()`

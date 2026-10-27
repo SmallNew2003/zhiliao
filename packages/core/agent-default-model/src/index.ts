@@ -28,6 +28,8 @@ export interface AgentDefaultModelSettings {
   model: string
   /** Adapter-owned reasoning effort, or provider/default behavior when absent. */
   reasoningEffort?: string
+  /** Positive integer context budget, or adapter capacity when absent. */
+  contextWindow?: number
 }
 
 /** Schema of the default Agent model settings section. */
@@ -35,6 +37,7 @@ export const AGENT_DEFAULT_MODEL_SETTINGS_SCHEMA: z<AgentDefaultModelSettings> =
   provider: z.string().required(),
   model: z.string().required(),
   reasoningEffort: z.string(),
+  contextWindow: z.number().step(1).min(1),
 })
 
 /** Composition entry for the default model selection. */
@@ -53,6 +56,7 @@ function selection(settings: AgentDefaultModelSettings): ModelSelection {
     ...settings.reasoningEffort === undefined
       ? {}
       : { reasoningEffort: ReasoningEffortId(settings.reasoningEffort) },
+    ...settings.contextWindow === undefined ? {} : { contextWindow: settings.contextWindow },
   }
 }
 
@@ -85,7 +89,7 @@ export class AgentDefaultModelConfig extends Service {
 
   /**
    * Read the current default model selection.
-   * @returns a detached provider, model, and optional reasoning selection.
+   * @returns a detached route, optional reasoning effort, and context budget.
    */
   currentSelection(): ModelSelection {
     return selection(this.source())
@@ -102,6 +106,7 @@ export class AgentDefaultModelConfig extends Service {
       provider: next.provider,
       model: next.model,
       ...next.reasoningEffort === undefined ? {} : { reasoningEffort: String(next.reasoningEffort) },
+      ...next.contextWindow === undefined ? {} : { contextWindow: next.contextWindow },
     })
   }
 }

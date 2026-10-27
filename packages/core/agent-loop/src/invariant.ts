@@ -47,6 +47,7 @@ const install: InvariantInstaller = Object.assign((ctx: Context, fail: Invariant
       && options.system === undefined
       && options.temperature === header.config.temperature
       && options.maxTokens === header.config.maxTokens
+      && options.contextWindow === header.config.contextWindow
       && JSON.stringify(options.stop) === JSON.stringify(header.config.stop)
       && JSON.stringify(options.tools ?? []) === JSON.stringify(header.tools ?? [])
     if (!headerMatches) {

@@ -1310,6 +1310,13 @@ describe('ChatView', () => {
     ])
   })
 
+  it('explains that an oversized context budget stopped sending', () => {
+    const h = makeHarness({ nodes: [user(1, 'continue'), turnError(2, 'CONTEXT_BUDGET_EXCEEDED')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByRole('status').textContent).toContain('上下文仍超出所选窗口，已暂停发送。请重试、调大上下文窗口或降低最大输出。')
+    expect(view.queryByText('API key is invalid')).toBeNull()
+  })
+
   it('renders the max-tokens notice with localized guidance, distinct from turn errors', () => {
     const h = makeHarness({ nodes: [user(1, 'try'), assistant(2, 'truncated'), turnMaxTokens(3)] })
     const view = render(<h.ChatView {...h.props} />)

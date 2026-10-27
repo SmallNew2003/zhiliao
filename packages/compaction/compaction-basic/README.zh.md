@@ -31,6 +31,8 @@ kind: "package-reference"
 
 默认设置下你会获得四种行为：会话向模型上下文上限增长时自动压缩；提供方确认上下文溢出错误后的恢复（先压缩再重试该请求）；通过 `/compact` 命令按需压缩；以及——挂载修剪器时——压缩前对超大工具输出的修剪。
 
+显式请求 `contextWindow` 会在当前输入、系统提示词、工具与解析后的请求配置记入日志后、普通模型请求分派前检查。输入额度为所选窗口减去已解析的 `maxTokens`（若存在）；阈值和保留比例均作用于该额度。超预算请求会在配置的重试次数内压缩。压缩失败、缩减不足或输入无法摘要时，以 `CONTEXT_BUDGET_EXCEEDED` 阻止分派；选择更大的窗口或缩减输入、系统提示词或工具后可继续。设置 `auto: false` 时，显式预算下的超限请求会直接阻止，不自动摘要。该检查使用提供方分词的估算值，保留已完成的持久替换，并且不会改变正在流式生成的请求。
+
 ### 最小可用组合
 
 挂载会话存储、token 测量、可选修剪器、本后端，以及可选的按需命令：
@@ -111,7 +113,7 @@ kind: "package-reference"
 
 当 `auto: true` 时，串行 `agent/pre-step` listener 会在请求派生前检查压力：它通过 `ctx.tokenMeter` 为最新持久路由请求 envelope 定价，当压力越过路由模型的阈值时，先剪枝，再在保留已定价近期尾部的同时摘要最旧的平衡范围。每个选定范围都从第一个不是 `system/message` 的 surface 节点开始，因此位于 surface 节点 0 的系统提示词永不会被遮蔽；由历史内提示词更新追加的后续 `system/message` 是普通历史，范围可以遮蔽它，agent loop（智能体循环）的投影随后会在二者文本不同时用当前提示词替换节点 0（[决策规则](../../core/agent-loop/README.zh.md#understand-the-implementation)）。`agent/request-error` listener 响应提供方确认的 `CONTEXT_WINDOW_EXCEEDED`：它绕过常规阈值与保留策略，尝试一次最大平衡头部缩减，并且只在表层替换 generation 前进后才授权重试。取消全程保持最终决定权。
 
-压力策略从拥有持久路由的适配器解析容量。适配器无法为有效动态路由返回容量时，手动压力路径会抛出目标特定配置错误；自动 listener 会对该精确目标警告一次，并携带完整历史继续。
+压力策略通过 `resolveCallContext()` 把最新持久请求头的可选 `contextWindow` 预算应用到路由适配器容量之上。显式预算不会修改适配器或其他会话。路由既无配置容量又无显式预算时，手动压力路径会抛出目标特定配置错误；自动 listener 会对该精确目标警告一次，并携带完整历史继续。
 
 ### 摘要机制
 
@@ -125,7 +127,7 @@ kind: "package-reference"
 
 ### 配置解析
 
-`resolveConfig` 验证并分离默认值，`resolveTargetPolicy` 将精确的提供方／模型覆盖合并到默认值之上，`resolveCompactSpec` 使用适配器拥有的上下文容量将合并后的策略缩放为具体 token 预算。策略解析绝不咨询模型发现（`listModels()`）；只有持久路由的容量才重要。
+`resolveConfig` 验证并分离默认值，`resolveTargetPolicy` 将精确的提供方／模型覆盖合并到默认值之上，`resolveCompactSpec` 使用生效的调用上下文预算将合并后的策略缩放为具体 token 预算。策略解析绝不咨询模型发现（`listModels()`）；只有持久路由的容量才重要。
 
 ### 源码地图
 
