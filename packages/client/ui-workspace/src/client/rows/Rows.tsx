@@ -244,7 +244,7 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
 }
 
 /**
- * Project (workspace) header row: folder + title + directory path;
+ * Project (workspace) header row: folder + title;
  * hover reveals the chevron and create button, and dwelling on a real
  * Workspace shows its hover card (the ungrouped bucket has none).
  * `containsCurrent` arrives on the node (derivation fact, no renderer scan).
@@ -310,13 +310,6 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       </span>
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
-        {/* Directory path: two Workspaces can share a basename, so the row
-            names the directory it points at. Hidden from the accessibility
-            tree — the hover card carries the same path, and a two-clause
-            treeitem name scans worse than the label alone. */}
-        {row.cwd !== undefined && (
-          <span className={css.meta} aria-hidden="true">{abbreviateHomePath(row.cwd, home)}</span>
-        )}
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
@@ -485,13 +478,16 @@ function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number;
  * @param props.result - merged local/content search row.
  * @param props.currentId - selected session id.
  * @param props.onOpen - open the selected session.
+ * @param props.seat - roving-tabindex seat; absent on surfaces that are not keyboard-navigated.
  * @param props.t - Workspace-browser translation seat.
  * @returns the result button.
  */
-export function SearchResultItem({ result, currentId, onOpen, t }: {
+export function SearchResultItem({ result, currentId, onOpen, seat, t }: {
   result: SearchResultNode
   currentId: string | undefined
   onOpen: (id: SearchResultNode['id']) => void
+  /** Roving-tabindex seat; absent on surfaces that are not keyboard-navigated. */
+  seat?: TreeRowSeat | undefined
   t: RowTranslate
 }) {
   const selected = result.id === currentId
@@ -504,6 +500,9 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
       role="treeitem"
       aria-selected={selected}
       onClick={() => { onOpen(result.id) }}
+      tabIndex={seat === undefined ? undefined : (seat.tabbable ? 0 : -1)}
+      onFocus={seat === undefined ? undefined : seat.claim}
+      onKeyDown={(event) => { onTreeRowKeyDown(event, { activate: () => { onOpen(result.id) } }) }}
     >
       <span className={css.searchResultHeading}>
         <span className={css.slot}>

@@ -264,7 +264,7 @@ describe('WorkspaceBrowser', () => {
       })
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getAllByText('~/Documents/project')).toHaveLength(2)
+      expect(screen.getByText('~/Documents/project')).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
@@ -684,6 +684,51 @@ describe('WorkspaceBrowser', () => {
     fireEvent.keyDown(screen.getByRole('button', { name: '在“alpha”中新建会话' }), { key: 'ArrowDown' })
     // The create button owns its own keys; the row must not move the tab stop.
     expect(document.activeElement).toBe(row)
+  })
+
+  it('moves the search-result tab stop with the arrow keys and opens the focused hit with Enter', () => {
+    const open = vi.fn()
+    mount({
+      useSessions: hook(sessionState([
+        summary('alpha-s', 3, { displayTitle: 'alpha hit' }),
+        summary('beta-s', 2, { displayTitle: 'beta hit' }),
+      ])),
+      open,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
+    fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'hit' } })
+    const rows = () => screen.getAllByRole('treeitem')
+    expect(rows()).toHaveLength(2)
+    // Nothing is selected, so the first hit holds the tree's single tab stop.
+    expect(rows()[0]?.getAttribute('tabindex')).toBe('0')
+    expect(rows()[1]?.getAttribute('tabindex')).toBe('-1')
+
+    fireEvent.keyDown(rows()[0]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows()[1])
+    // The last hit has no neighbour below: the tree holds the stop.
+    fireEvent.keyDown(rows()[1]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows()[1])
+    fireEvent.keyDown(rows()[1]!, { key: 'Home' })
+    expect(document.activeElement).toBe(rows()[0])
+    fireEvent.keyDown(rows()[0]!, { key: 'End' })
+    expect(document.activeElement).toBe(rows()[1])
+
+    fireEvent.keyDown(rows()[1]!, { key: 'Enter' })
+    expect(open).toHaveBeenCalledWith(sid('beta-s'))
+  })
+
+  it('hands the search-result tab stop to the selected Session own hit', () => {
+    mount({
+      useSessions: hook(sessionState([
+        summary('alpha-s', 3, { displayTitle: 'alpha hit' }),
+        summary('beta-s', 2, { displayTitle: 'beta hit' }),
+      ], { main: sid('beta-s') })),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
+    fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'hit' } })
+    const rows = () => screen.getAllByRole('treeitem')
+    expect(rows()[1]?.getAttribute('tabindex')).toBe('0')
+    expect(rows()[0]?.getAttribute('tabindex')).toBe('-1')
   })
 
   it('keeps the blank New Session outside the five-row folding quota', () => {
@@ -1925,8 +1970,7 @@ describe('Workspace tree grouping', () => {
     fireEvent.dragEnd(source)
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledExactlyOnceWith(root.workspaceId, undefined)
     rerender(b, { useWorkspaces: hook(workspaceState([team, child, other, outside, root])) })
-    // Row labels in order; each real Workspace row also names its directory.
-    expect(screen.getAllByRole('treeitem').map(row => row.querySelector('[class*="title"]')?.textContent)).toEqual([
+    expect(screen.getAllByRole('treeitem').map(row => row.textContent)).toEqual([
       'outside', 'Projects', 'Team', 'Child', 'other',
     ])
     expect(within(section('Team')).getByText('Child')).toBeTruthy()

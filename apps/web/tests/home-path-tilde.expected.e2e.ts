@@ -23,16 +23,13 @@ describe('assembled POSIX home-path display', () => {
     if (group == null) throw new Error('home-descendant Workspace group missing')
 
     fireEvent.pointerEnter(group.parentElement as HTMLElement)
-    // The row now carries the same abbreviated path, so the card is the copy
-    // that lives outside the tree.
-    const copy = await waitFor(
-      () => screen.getByRole('button', { name: 'Copy: /home/fixture/Documents/project' }),
-      { timeout: 2_000 },
-    )
+    const hoverPath = await waitFor(() => {
+      const found = screen.getByText('~/Documents/project')
+      expect(found).toBeTruthy()
+      return found
+    }, { timeout: 2_000 })
     expect(screen.queryByText('/home/fixture/Documents/project')).toBeNull()
-    const hoverPath = screen.getAllByText('~/Documents/project')
-      .find(el => el.closest('[role="tree"]') === null)
-    if (hoverPath == null) throw new Error('hover card path missing')
+    const copy = screen.getByRole('button', { name: 'Copy: /home/fixture/Documents/project' })
 
     const shape = [
       `hover=${hoverPath.textContent}`,

@@ -50,7 +50,7 @@ async function bench() {
   return { runtime, remote }
 }
 
-/** Open the Workspace row's hover card, one of the two surfaces carrying the path. */
+/** Open the Workspace row's hover card, which is where the home abbreviation shows. */
 function openHoverCard(): void {
   const row = screen.getByRole('treeitem').parentElement as HTMLElement
   fireEvent.pointerEnter(row)
@@ -74,8 +74,7 @@ describe('Host home in the assembled browsing region', () => {
     vi.useFakeTimers()
     try {
       openHoverCard()
-      // No home yet: the row and the card both carry the verbatim path.
-      expect(screen.getAllByText('/home/u/Documents/project')).toHaveLength(2)
+      expect(screen.getByText('/home/u/Documents/project')).toBeTruthy()
       closeHoverCard()
 
       // The ready frame lands: `$host.home` now answers, and the generation is
@@ -84,7 +83,7 @@ describe('Host home in the assembled browsing region', () => {
       act(() => { runtime.ctx.emit('connection/reset') })
       openHoverCard()
 
-      expect(screen.getAllByText('~/Documents/project')).toHaveLength(2)
+      expect(screen.getByText('~/Documents/project')).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
