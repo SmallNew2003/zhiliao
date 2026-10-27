@@ -97,6 +97,39 @@ describe('deriveGroups', () => {
     expect(groups[0]!.sessions.map(session => session.id)).toEqual([sid('older'), sid('newer')])
   })
 
+  it('counts a folded group running Sessions so its header can report activity', () => {
+    const live = { ...summary('live', 20), running: true }
+    const sessions = list(live, summary('idle', 10))
+    const folded = deriveGroups(
+      sessions, [workspace('busy', ['live', 'idle'])], noArchive, noAttention, view([]),
+    )
+    // The count survives the fold: the header row reports activity without
+    // deriving the rows a reader cannot see.
+    expect(folded[0]).toMatchObject({ runningCount: 1, expanded: false, sessions: [] })
+    const open = deriveGroups(
+      sessions, [workspace('busy', ['live', 'idle'])], noArchive, noAttention, view(['busy']),
+    )
+    expect(open[0]).toMatchObject({ runningCount: 1, expanded: true })
+  })
+
+  it('counts a running subagent descendant toward its ancestor group', () => {
+    const parent = summary('parent', 1)
+    const subagent = {
+      ...summary('subagent', 3), parentId: parent.id, origin: 'subagent' as const, running: true,
+    }
+    const groups = deriveGroups(
+      list(parent, subagent), [workspace('first', ['parent'])], noArchive, noAttention, view([]),
+    )
+    expect(groups[0]).toMatchObject({ runningCount: 1 })
+  })
+
+  it('reports no running Sessions for an idle group', () => {
+    const groups = deriveGroups(
+      list(summary('idle', 10)), [workspace('quiet', ['idle'])], noArchive, noAttention, view(['quiet']),
+    )
+    expect(groups[0]).toMatchObject({ runningCount: 0 })
+  })
+
   it('projects pending-interaction state into grouped and flat rows', () => {
     const awaiting = { ...summary('awaiting', 10), running: true }
     const sessions = list(awaiting)

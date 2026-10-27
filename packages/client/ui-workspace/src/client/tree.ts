@@ -77,6 +77,8 @@ export interface GroupNode {
   label: string
   /** Total visible sessions in the group. */
   sessionCount: number
+  /** Sessions running themselves or through a subagent descendant; known while the group is folded. */
+  runningCount: number
   expanded: boolean
   /** The group contains the selected session (active folder tint; supplied here so the renderer never scans). */
   containsCurrent: boolean
@@ -312,6 +314,24 @@ function visiblePendingKind(kind: string | undefined): SessionPendingInteraction
   }
 }
 
+/**
+ * Whether a Session is live: it runs itself, or an uninterrupted subagent
+ * descendant does. A folded group counts its live Sessions through this, so a
+ * group header can report activity without deriving its rows.
+ * @param s - the Session summary.
+ * @param descendants - running subagent descendants keyed by ancestor id.
+ * @param statuses - unified UI status by Session.
+ * @returns whether the Session or one of its descendants is running.
+ */
+function sessionIsLive(
+  s: SessionSummary,
+  descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
+  statuses: SessionStatuses,
+): boolean {
+  const status = statuses.get(s.id)
+  return (status?.running ?? s.running) || (descendants.get(s.id)?.runningCount ?? 0) > 0
+}
+
 function sessionNode(
   s: SessionSummary,
   descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
@@ -371,6 +391,7 @@ export function deriveGroups(
       createdAt: g.createdAt,
       label: g.label,
       sessionCount: g.sessions.length,
+      runningCount: g.sessions.filter(s => sessionIsLive(s, descendants, statuses)).length,
       expanded,
       containsCurrent: g.key === currentGroup,
       sessions: expanded

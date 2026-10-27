@@ -594,6 +594,30 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByRole('menuitem', { name: '全部折叠' })).toBeNull()
   })
 
+  it('marks a folded Workspace row with its running count', () => {
+    const live = summary('live', 20, { running: true })
+    mount({
+      useSessions: hook(sessionState([live])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live'])])),
+    })
+    const row = screen.getByText('alpha').closest('[role="treeitem"]')!
+    // The group owns no selected Session, so it starts folded: its only
+    // activity report is the header row.
+    expect(screen.queryByText('live')).toBeNull()
+    expect(row.querySelector('[data-state="ongoing"]')).toBeTruthy()
+    expect(screen.getByText('1 个会话进行中')).toBeTruthy()
+  })
+
+  it('leaves an idle folded Workspace row unmarked', () => {
+    mount({
+      useSessions: hook(sessionState([summary('idle', 10)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['idle'])])),
+    })
+    const row = screen.getByText('alpha').closest('[role="treeitem"]')!
+    expect(row.querySelector('[data-state="ongoing"]')).toBeNull()
+    expect(screen.queryByText('个会话进行中')).toBeNull()
+  })
+
   it('moves the tree tab stop with the arrow keys and opens the focused session with Enter', () => {
     const items = [summary('alpha-s', 2), summary('beta-s', 1)]
     const b = mount({
