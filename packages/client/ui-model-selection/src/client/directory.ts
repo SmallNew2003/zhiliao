@@ -80,10 +80,10 @@ export class ModelDirectory {
   }
 
   /**
-   * Select the complete provider/model/reasoning selection. The durable
+   * Select the complete provider/model/reasoning/context-window selection. The durable
    * projection frame updates the shared current; failures surface on the store
    * and return with the operation so each entry can present its own failure.
-   * @param selection - provider, provider-owned model id, and optional adapter-owned effort.
+   * @param selection - provider, provider-owned model id, and optional adapter-owned effort and context budget.
    * @returns the selection outcome, including the original Remote failure.
    */
   async select(selection: ModelSelection): Promise<RemoteResult<void>> {
@@ -97,6 +97,7 @@ export class ModelDirectory {
       ...selection.reasoningEffort === undefined
         ? {}
         : { reasoningEffort: selection.reasoningEffort },
+      ...selection.contextWindow === undefined ? {} : { contextWindow: selection.contextWindow },
     })
     if (this.disposed || generation !== this.generation) {
       return result.ok ? { ok: true, value: undefined } : result

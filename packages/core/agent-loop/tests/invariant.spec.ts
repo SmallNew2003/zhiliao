@@ -42,6 +42,17 @@ describe('request-reconstruction invariant', () => {
     expect(() => { dispatch(ctx, options) }).not.toThrow()
   })
 
+  it('rejects an unlogged context budget and accepts the matching durable budget', async () => {
+    const { ctx, session, boundary } = await requestSetup()
+    const options = { model: 'm', messages: Object.freeze(boundary), sessionId: session.id, contextWindow: 640_000 }
+    expect(() => { dispatch(ctx, loopRequest({ ...options })) }).toThrow(/folded request header/)
+    session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'm', contextWindow: 640_000 } }, reason: 'change',
+    })
+    expect(() => { dispatch(ctx, loopRequest({ ...options })) }).not.toThrow()
+    await ctx.fiber.dispose()
+  })
+
   it('includes context appended inside the open step before dispatch', async () => {
     const { ctx, session } = await requestSetup()
     session.append('user/message', createUserMessage({

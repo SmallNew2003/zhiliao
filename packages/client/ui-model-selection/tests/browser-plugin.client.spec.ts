@@ -88,7 +88,7 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
         },
       })
     },
-    selectModel: (payload: { sessionId: SessionId; provider: string; model: string; reasoningEffort?: string }) => {
+    selectModel: (payload: { sessionId: SessionId; provider: string; model: string; reasoningEffort?: string; contextWindow?: number }) => {
       calls.select += 1
       if (selectionFailure !== undefined) return Promise.resolve({ ok: false as const, error: selectionFailure })
       selected = {
@@ -97,6 +97,7 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
         ...payload.reasoningEffort === undefined
           ? {}
           : { reasoningEffort: payload.reasoningEffort },
+        ...payload.contextWindow === undefined ? {} : { contextWindow: payload.contextWindow },
       }
       projections.get(payload.sessionId)?.set({ lastUsed: null, next: selected })
       return Promise.resolve({ ok: true as const, value: { selected } })
@@ -279,6 +280,19 @@ describe('ui-model-selection dual entry', () => {
       model: 'deepseek-v4-pro',
       reasoningEffort: 'high',
     })
+  })
+
+  it('forwards the complete context selection and retains it through catalog reconnects', async () => {
+    const b = await bench()
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+    const chosen = { provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 }
+    await face.select(chosen)
+    expect(face.directory.getSnapshot().current).toEqual(chosen)
+    b.ctx.emit('connection/reset')
+    await vi.waitFor(() => { expect(face.directory.getSnapshot().current).toEqual(chosen) })
+    await face.select({ provider: chosen.provider, model: 'deepseek-v4-pro' })
+    expect(face.directory.getSnapshot().current).toEqual({ provider: chosen.provider, model: 'deepseek-v4-pro' })
   })
 
   it('both entries share one directory instance per session, isolated across sessions', async () => {

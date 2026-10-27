@@ -94,6 +94,8 @@ After `agent/request`, `ctx.llm.prepareCall()` validates adapter-owned fields an
 
 The loop deep-freezes each derived message identity on its first request and reuses that proof only within the same agent. Restored messages keep their identity; request construction does not freeze their containing event wrappers. Each request freezes its local canonical header, fresh message array, and envelope while leaving the cancellation signal live. The [request-freeze decision](../../../.agents/notes/implemented/simplification/2026-09-06-agent-request-freeze-evidence.md) explains ownership and measurement.
 
+After freezing, a request carrying an explicit context budget dispatches `agent/request-preflight`, which the loop awaits before creating an assistant attempt. A durable surface change causes prompt reconciliation and a fresh request/header derivation followed by another preflight; request configuration and adapter selection stay fixed, and the admitted user batch is appended only once. A rejected or cancelled preflight sends no ordinary model request and records no failed assistant attempt.
+
 ### Source map
 
 | File | Role |

@@ -1,6 +1,6 @@
 /** Shared model fields and actions for both adapter catalog editors. */
 
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import { IconChevronDownOutline14, IconChevronRightOutline14, IconTrashOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
 import type { ModelsKey } from './locales.ts'
@@ -13,6 +13,46 @@ interface CapacityInput {
   placeholder: string
   onChange: (value: string) => void
   onBlur?: () => void
+}
+
+const CONTEXT_WINDOW_PRESETS = ['320K', '640K', '960K']
+
+/** Common presets stay visible; other capacities keep their exact value in the summary. */
+function ContextWindowPresets({ input, position, disabled, t }: {
+  input: CapacityInput
+  position: number
+  disabled: boolean
+  t: (key: ModelsKey) => string
+}): ReactNode {
+  const groupName = useId()
+  const isPreset = CONTEXT_WINDOW_PRESETS.includes(input.value)
+  return (
+    <fieldset className={styles['contextWindowField']} role="radiogroup" aria-label={`${t('contextWindowPreset')} ${String(position)}`}>
+      <legend className={styles['modelFieldLabel']}>
+        {t('contextWindow')}
+        {!isPreset && input.value !== ''
+          ? <span className={styles['contextWindowValue']} title={input.value}>{t('contextWindowCustom')} {input.value}</span>
+          : null}
+      </legend>
+      <div className={styles['contextWindowChoices']}>
+        {CONTEXT_WINDOW_PRESETS.map(value => (
+          <label key={value} className={styles['contextWindowChoice']}>
+            <input
+              type="radio"
+              name={groupName}
+              value={value}
+              checked={input.value === value}
+              disabled={disabled}
+              onChange={() => {
+                input.onChange(value)
+              }}
+            />
+            <span>{value}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
 }
 
 /** Adapter-owned data and actions for one model row. */
@@ -41,6 +81,7 @@ interface ModelRowProps {
  */
 export function ModelRow(props: ModelRowProps): ReactNode {
   const { model, position, t, disabled } = props
+  const advancedId = useId()
   return (
     <div className={styles['modelEntry']}>
       <div className={styles['modelRow']}>
@@ -62,16 +103,6 @@ export function ModelRow(props: ModelRowProps): ReactNode {
         ))}
         <button
           type="button"
-          className={styles['iconButton']}
-          aria-label={`${t('modelAdvanced')} ${String(position)}`}
-          aria-expanded={props.expanded}
-          title={t('modelAdvanced')}
-          onClick={props.onToggle}
-        >
-          {props.expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
-        </button>
-        <button
-          type="button"
           className={`${styles['iconButton']} ${styles['iconButtonDanger']}`}
           aria-label={`${t('removeModel')} ${String(position)}`}
           title={t('removeModel')}
@@ -81,25 +112,51 @@ export function ModelRow(props: ModelRowProps): ReactNode {
           <IconTrashOutline16 size={14} />
         </button>
       </div>
+      <div className={styles['modelControls']}>
+        <ContextWindowPresets input={props.contextWindow} position={position} disabled={disabled} t={t} />
+        <button
+          type="button"
+          className={styles['modelAdvancedToggle']}
+          aria-label={`${t('modelAdvanced')} ${String(position)}`}
+          aria-expanded={props.expanded}
+          aria-controls={advancedId}
+          onClick={props.onToggle}
+        >
+          {t('modelAdvanced')}
+          {props.expanded ? <IconChevronDownOutline14 /> : <IconChevronRightOutline14 />}
+        </button>
+      </div>
       {props.expanded
         ? (
-          <div className={styles['modelAdvanced']}>
-            {(['contextWindow', 'maxTokens'] as const).map(field => (
-              <label className={styles['modelField']} key={field}>
-                <span className={styles['modelFieldLabel']}>{t(field)}</span>
-                <input
-                  className={styles['input']}
-                  type="text"
-                  inputMode="numeric"
-                  value={props[field].value}
-                  placeholder={props[field].placeholder}
-                  aria-label={`${t(field)} ${String(position)}`}
-                  disabled={disabled}
-                  onChange={(event) => { props[field].onChange(event.target.value) }}
-                  onBlur={props[field].onBlur}
-                />
-              </label>
-            ))}
+          <div id={advancedId} className={styles['modelAdvanced']}>
+            <label className={styles['modelField']}>
+              <span className={styles['modelFieldLabel']}>{t('contextWindowCustomInput')}</span>
+              <input
+                className={styles['input']}
+                type="text"
+                inputMode="numeric"
+                value={props.contextWindow.value}
+                placeholder={props.contextWindow.placeholder}
+                aria-label={`${t('contextWindow')} ${String(position)}`}
+                disabled={disabled}
+                onChange={(event) => { props.contextWindow.onChange(event.target.value) }}
+                onBlur={props.contextWindow.onBlur}
+              />
+            </label>
+            <label className={styles['modelField']}>
+              <span className={styles['modelFieldLabel']}>{t('maxTokens')}</span>
+              <input
+                className={styles['input']}
+                type="text"
+                inputMode="numeric"
+                value={props.maxTokens.value}
+                placeholder={props.maxTokens.placeholder}
+                aria-label={`${t('maxTokens')} ${String(position)}`}
+                disabled={disabled}
+                onChange={(event) => { props.maxTokens.onChange(event.target.value) }}
+                onBlur={props.maxTokens.onBlur}
+              />
+            </label>
             <ModelInputTypes
               model={model} field={props.inputField} position={position}
               fallback={props.inputFallback} disabled={disabled || props.inputLoading === true} t={t} onChange={props.onChange}

@@ -343,9 +343,9 @@ describe('ModelSelect keyboard walk', () => {
 
   it('a backward step from outside the list enters at the last row, and a closed menu leaves Tab native', () => {
     mountOpen()
-    const [modelRow, effortRow] = screen.getAllByRole('menuitem')
-    expect(fireEvent.keyDown(modelRow!, { key: 'ArrowUp' })).toBe(false)
-    expect(document.activeElement).toBe(effortRow)
+    const cells = screen.getAllByRole('menuitem')
+    expect(fireEvent.keyDown(cells[0]!, { key: 'ArrowUp' })).toBe(false)
+    expect(document.activeElement).toBe(cells.at(-1))
     const trigger = screen.getByRole('button', { name: /选择模型/ })
     fireEvent.keyDown(trigger, { key: 'Escape' })
     expect(screen.queryByRole('menu')).toBeNull()
@@ -411,7 +411,7 @@ describe('ModelSelect keyboard walk', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
     const rows = screen.getAllByRole('menuitemradio')
     fireEvent.keyDown(rows[0]!, { key: 'Escape' })
-    // The root pane is back with its two cells.
+    // The root pane is back with its three cells.
     const cells = screen.getAllByRole('menuitem')
     // Back on the drilled cell, so the next keystroke still reaches the menu.
     expect(document.activeElement).toBe(cells[1])
@@ -444,5 +444,181 @@ describe('ModelSelect keyboard walk', () => {
     const rows = screen.getAllByRole('menuitemradio')
     expect(rows.every(row => row.getAttribute('aria-checked') === 'false')).toBe(true)
     expect(document.activeElement).toBe(rows[0])
+  })
+})
+
+describe('ModelSelect context window', () => {
+  function mount(current: ModelSelection | null = { provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max' }, capacity?: number) {
+    if (arguments.length < 2) capacity = 320_000
+    const initial = state({ current })
+    initial.groups = [{
+      id: 'deepseek-official',
+      name: 'DeepSeek',
+      models: [{
+        id: 'deepseek-v4-flash',
+        name: 'DeepSeek-V4-Flash',
+        reasoning,
+        ...capacity === undefined ? {} : { contextWindow: capacity },
+      }, {
+        id: 'other',
+        name: 'Other',
+        contextWindow: 960_000,
+      }],
+    }]
+    const directory = createSnapshotStore(initial)
+    const select = vi.fn(async (selection: ModelSelection) => {
+      directory.set({ ...initial, current: selection })
+      return { ok: true as const, value: undefined }
+    })
+    const props = { locked: false, available: true, directory, load: vi.fn(), select, t }
+    const view = render(<ModelSelect {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    return { ...view, props, directory, select, initial }
+  }
+
+  /** Open the context pane from the root cell. */
+  function drillContext(): void {
+    fireEvent.click(screen.getByRole('menuitem', { name: /上下文窗口/ }))
+  }
+
+  it('summarizes the effective capacity on the root cell and drills into the presets', () => {
+    mount()
+    const cell = screen.getByRole('menuitem', { name: /上下文窗口/ })
+    // The catalog capacity is a preset value, so the cell spells it short.
+    expect(cell.textContent).toContain('320K')
+    drillContext()
+    const rows = screen.getAllByRole('menuitemradio')
+    expect(rows.map(row => row.textContent)).toEqual(['320K', '640K', '960K'])
+    expect(rows.map(row => row.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false'])
+  })
+
+  it('shows a non-preset capacity as its exact value without checking a preset', () => {
+    mount(undefined, 262_144)
+    expect(screen.getByRole('menuitem', { name: /上下文窗口/ }).textContent).toContain('262,144')
+    drillContext()
+    expect(screen.getAllByRole('menuitemradio').every(row => row.getAttribute('aria-checked') === 'false')).toBe(true)
+  })
+
+  it('shows an unknown capacity when neither the selection nor the catalog advertises one', () => {
+    mount(undefined, undefined)
+    expect(screen.getByRole('menuitem', { name: /上下文窗口/ }).textContent).toContain('未知')
+  })
+
+  it('keeps the effort when choosing a window', async () => {
+    const { select } = mount()
+    drillContext()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+  })
+
+  it('keeps the explicit window when choosing Default effort', async () => {
+    const { directory, select, initial } = mount({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+    directory.set({ ...initial, groups: [{ id: 'deepseek-official', name: 'DeepSeek', models: [
+      { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', contextWindow: 640_000, reasoning: { efforts: reasoning.efforts } },
+    ] }] })
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Default' }))
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 640_000 })
+  })
+
+  it('makes current-window and same-model clicks no-ops and clears overrides on another model', async () => {
+    const { select } = mount({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+    const trigger = screen.getByRole('button', { name: /选择模型/ })
+    drillContext()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    expect(select).not.toHaveBeenCalled()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' }))
+    expect(select).not.toHaveBeenCalled()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Other' }))
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'other' })
+  })
+
+  it('disables context changes while a selection is in flight', () => {
+    const { props, directory, rerender, select, initial } = mount()
+    directory.set({ ...initial, status: 'selecting' })
+    rerender(<ModelSelect {...props} />)
+    drillContext()
+    const rows = screen.getAllByRole('menuitemradio')
+    expect(rows.every(row => (row as HTMLButtonElement).disabled)).toBe(true)
+    fireEvent.click(rows[1]!)
+    expect(select).not.toHaveBeenCalled()
+  })
+
+  it('announces a refused context change while retaining the current window', async () => {
+    const { props, rerender, directory, initial } = mount()
+    const select = vi.fn(async () => {
+      directory.set({ ...initial, status: 'error', error: 'refused' })
+      return { ok: false as const, error: new RemoteError('session/writer-held', 'writer held', { sessionId: SessionId('owned') }) }
+    })
+    rerender(<ModelSelect {...props} select={select} />)
+    drillContext()
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    expect((await screen.findByRole('alert')).textContent).toBe(zh['error.sessionInUse'])
+    expect(screen.getByRole('menuitemradio', { name: '320K' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
+  })
+
+  it('walks the context pane with the keyboard and settles with Tab', async () => {
+    const { select } = mount()
+    drillContext()
+    // The pane opens on the checked preset.
+    const small = screen.getByRole('menuitemradio', { name: '320K' })
+    expect(document.activeElement).toBe(small)
+    fireEvent.keyDown(small, { key: 'ArrowDown' })
+    const medium = screen.getByRole('menuitemradio', { name: '640K' })
+    expect(document.activeElement).toBe(medium)
+    fireEvent.keyDown(medium, { key: 'Tab' })
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+  })
+
+  it('Escape from the context pane lands back on the context cell', () => {
+    mount()
+    drillContext()
+    fireEvent.keyDown(screen.getByRole('menuitemradio', { name: '320K' }), { key: 'Escape' })
+    const cells = screen.getAllByRole('menuitem')
+    expect(document.activeElement).toBe(cells[2])
+    fireEvent.keyDown(cells[2]!, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('omits the context cell until a current model is available', () => {
+    mount(null)
+    expect(screen.queryByRole('menuitem', { name: /上下文窗口/ })).toBeNull()
+  })
+})
+
+describe('smaller context window feedback', () => {
+  it.each([
+    { previous: 960_000, accepted: true, notice: true },
+    { previous: 320_000, accepted: true, notice: false },
+    { previous: 960_000, accepted: false, notice: false },
+  ])('shows the compression notice only after a successful decrease: $previous / $accepted', async ({ previous, accepted, notice }) => {
+    const directory = createSnapshotStore(state({
+      current: { provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: previous },
+    }))
+    const select = vi.fn(async () => accepted
+      ? { ok: true as const, value: undefined }
+      : {
+        ok: false as const,
+        error: new RemoteError('session/model-unavailable', 'unavailable', {
+          provider: 'deepseek-official', model: 'deepseek-v4-flash',
+        }),
+      })
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型，当前/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /上下文窗口/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    await waitFor(() => { expect(select).toHaveBeenCalledOnce() })
+    await waitFor(() => {
+      expect(screen.queryByText('已调小窗口，继续对话前将按需压缩上下文。') !== null).toBe(notice)
+    })
   })
 })

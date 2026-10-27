@@ -76,7 +76,7 @@ Replay owner for one service-wide estimator and isolated per-session folds.
  * pricing charges each retained image its visual tokens plus its
  * model-visible text, while other routes keep the fixed heuristic. Provider
  * usage is reused only when the latest successful call's canonical request
- * envelope matches `requestHeader` and its total is no lower than that
+ * envelope matches `requestHeader` apart from its context budget and its total is no lower than that
  * call's full route-priced anchor; otherwise the complete envelope and
  * surface are repriced. The anchor includes all surface nodes immediately
  * before the assistant message, including inputs admitted after step/start.

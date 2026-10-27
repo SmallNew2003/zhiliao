@@ -94,6 +94,8 @@ const handle = await ctx.agents.create({
 
 循环在每个派生消息对象首次进入请求时执行深冻结，并且仅在同一 agent 内复用该证明。恢复的消息保留对象身份；构造请求不会冻结包含消息的事件包装对象。每个请求都会冻结本地规范化 header、新消息数组和请求封装，同时保留取消信号的可变性。[请求冻结决策](../../../.agents/notes/implemented/simplification/2026-09-06-agent-request-freeze-evidence.zh.md)解释了所有权与测量依据。
 
+冻结后，携带显式上下文预算的请求会派发 `agent/request-preflight`，循环先等待它再创建 assistant attempt。持久 surface 变更会触发提示词协调和新的请求/header 派生，然后再次执行 preflight；请求配置与适配器选择保持固定，已接纳的用户批次仅追加一次。拒绝或取消的 preflight 不发送普通模型请求，也不记录失败的 assistant attempt。
+
 ### 源码地图
 
 | 文件 | 职责 |

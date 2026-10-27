@@ -436,7 +436,7 @@ Owns the default model selection independently of any Host or transport. The com
 ```ts cordis-catalog
 /**
  * Read the current default model selection.
- * @returns a detached provider, model, and optional reasoning selection.
+ * @returns a detached route, optional reasoning effort, and context budget.
  */
 currentSelection(): ModelSelection
 
@@ -1158,6 +1158,36 @@ Handle one failed model-request attempt before the loop retries or closes its st
 ```
 
 Types: [LlmFailure](llm-streaming.zh.md) · [ResolvedRetryPolicy](llm-streaming.zh.md) · [Scoped](scope.zh.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentrequest-preflight--serial"></a>
+
+#### `agent/request-preflight` — serial
+
+Admit one frozen, durably logged request that carries an explicit context budget, before its assistant attempt starts. Throw to reject dispatch or append durable surface changes to repair it. The loop reconciles the prompt, rebuilds, and repeats preflight after a surface change, preserving the assembled route and current input batch. Requests that inherit adapter capacity never dispatch this event. Listeners must not mutate the request; cancellation prevents dispatch.
+
+```ts cordis-catalog
+/**
+ * Admit one frozen, durably logged request that carries an explicit context
+ * budget, before its assistant attempt starts. Throw to reject dispatch or
+ * append durable surface changes to repair it. The loop reconciles the
+ * prompt, rebuilds, and repeats preflight after a surface change,
+ * preserving the assembled route and current input batch. Requests that
+ * inherit adapter capacity never dispatch this event. Listeners must not
+ * mutate the request; cancellation prevents dispatch.
+ * @param payload.agent - agent owning the admitted session surface.
+ * @param payload.request - frozen request derived from the current logged envelope and messages.
+ * @param payload.turn - turn containing the request.
+ * @param payload.step - step containing the request.
+ * @param payload.signal - live turn cancellation signal.
+ * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+ * @mode serial
+ */
+'agent/request-preflight'(this: Scoped<Agent>, payload: { agent: Agent; request: GenerateOptions; turn: number; step: number; signal: AbortSignal }): Promise<void>
+```
+
+Types: [GenerateOptions](llm-streaming.zh.md) · [Scoped](scope.zh.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 

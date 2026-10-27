@@ -38,6 +38,25 @@ import {
 } from './content.ts'
 import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
 
+/**
+ * Resolve a call's context budget independently of adapter metadata.
+ * An explicit positive integer replaces the configured capacity without clamping.
+ * Invalid overrides throw LlmError with code INVALID_CONTEXT_WINDOW.
+ * @param config - provider/model route and optional context budget.
+ * @param context - configured adapter capacity, if available.
+ * @returns inherited context or a detached explicit context budget.
+ */
+export function resolveCallContext(
+  config: LlmCallConfig,
+  context: LlmModelContext | undefined,
+): LlmModelContext | undefined {
+  if (config.contextWindow === undefined) return context
+  if (!Number.isInteger(config.contextWindow) || config.contextWindow <= 0) {
+    throw new LlmError('contextWindow must be a positive integer', 'INVALID_CONTEXT_WINDOW')
+  }
+  return { contextWindow: config.contextWindow }
+}
+
 export * from './attribution.ts'
 export * from './brand.ts'
 export * from './error.ts'
@@ -880,6 +899,7 @@ export class LlmRuntime extends TypertRemoteService {
     const defaulted = config.maxTokens === undefined && info.defaultMaxTokens !== undefined
       ? { ...config, maxTokens: info.defaultMaxTokens }
       : config
+    const context = resolveCallContext(config, info.context)
     const reasoning = info.reasoning
     const requested = defaulted.reasoningEffort
     let resolvedConfig = defaulted
@@ -904,7 +924,7 @@ export class LlmRuntime extends TypertRemoteService {
     }
     return {
       config: resolvedConfig,
-      ...info.context === undefined ? {} : { context: info.context },
+      ...context === undefined ? {} : { context },
       modelInfo: info,
     }
   }

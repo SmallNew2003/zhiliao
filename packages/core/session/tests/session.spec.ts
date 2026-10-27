@@ -503,6 +503,23 @@ describe('Session', () => {
     expect(() => adoptSessionEvent(malformed)).toThrow('message must have role "user"')
   })
 
+  it('restores explicit and inherited request context budgets', () => {
+    for (const contextWindow of [undefined, 320_000, 960_000]) {
+      const config = { provider: 'mock', model: 'model', ...contextWindow === undefined ? {} : { contextWindow } }
+      const header = { type: 'request/header', seq: SessionSeq(0), time: 1, data: { header: { config }, reason: 'initial' } } as const
+      expect(Session.create(SessionId('context-budget'), [header]).requestHeader()?.config).toEqual(config)
+    }
+  })
+
+  it.each([0, -1, 1.5, '640000'])('rejects invalid restored request context budget %s', (contextWindow) => {
+    const invalid = {
+      type: 'request/header', seq: SessionSeq(0), time: 1,
+      data: { header: { config: { provider: 'mock', model: 'model', contextWindow } }, reason: 'initial' },
+    } as unknown as SessionEvent
+    expect(() => Session.create(SessionId('invalid-context-budget'), [invalid]))
+      .toThrow('seed request/header at index 0 has an invalid contextWindow')
+  })
+
   it('round-trips a non-empty reasoning effort and rejects invalid durable values', () => {
     const valid = {
       type: 'request/header',

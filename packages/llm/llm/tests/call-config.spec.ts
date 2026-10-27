@@ -11,6 +11,14 @@ import { ReasoningEffortId } from '../src/brand.ts'
 import type { GenerateOptions } from '../src/types.ts'
 
 describe('callConfigEquals', () => {
+  it('compares explicit context budgets independently of adapter capacity', () => {
+    const base = { provider: 'p', model: 'm' }
+    const selected = { ...base, contextWindow: 640_000 }
+    expect(callConfigEquals(selected, base)).toBe(false)
+    expect(callConfigEquals(selected, { ...selected, contextWindow: 320_000 })).toBe(false)
+    expect(callConfigEquals(selected, { ...selected })).toBe(true)
+  })
+
   it('compares every field, including the stop list element-wise', () => {
     const base = { provider: 'p', model: 'm' }
     expect(callConfigEquals(base, base)).toBe(true)

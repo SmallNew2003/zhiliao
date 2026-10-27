@@ -9,7 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { CompactionEngine, ManualCompactionError } from '@deepseek-ai/dsh-compaction'
 import type { CompactionResult, CompactionTrigger } from '@deepseek-ai/dsh-compaction'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
+import { CONTEXT_WINDOW_EXCEEDED_CODE, errorChain, LlmError, resolveCallContext } from '@deepseek-ai/dsh-llm'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -48,12 +48,12 @@ export type {
 /** Resolve the exact provider/model durably routed for the latest request. */
 function routedTarget(
   session: Session,
-): Pick<LlmCallConfig, 'provider' | 'model'> | undefined {
+): LlmCallConfig | undefined {
   const config = session.requestHeader()?.config
   if (config === undefined || config.provider.length === 0 || config.model.length === 0) {
     return undefined
   }
-  return { provider: config.provider, model: config.model }
+  return config
 }
 
 /** Resolve the conversation target used to select an optional policy override. */
@@ -123,6 +123,18 @@ export class BasicCompactionEngine extends CompactionEngine {
   constructor(ctx: Context, config: BasicCompactionConfig = {}) {
     super(ctx)
     this.config = resolveConfig(config)
+    ctx.on('agent/request-preflight', async ({ agent, signal }) => {
+      try {
+        await this.compactIfNeeded(agent, 'context-budget', signal)
+      } catch (error: unknown) {
+        signal.throwIfAborted()
+        throw new LlmError(
+          `Selected context budget cannot admit this request: ${errorChain(error)}. `
+          + 'Select a larger context window or reduce the input, system prompt, or tools.',
+          'CONTEXT_BUDGET_EXCEEDED',
+        )
+      }
+    })
     if (this.config.auto) this._registerAutomaticCompaction()
   }
 
@@ -145,7 +157,7 @@ export class BasicCompactionEngine extends CompactionEngine {
       { agent, signal },
       next,
     ): Promise<PreStepDecision> => {
-      if (!signal.aborted) {
+      if (!signal.aborted && routedTarget(agent.session)?.contextWindow === undefined) {
         try {
           const result = await this.compactIfNeeded(agent, 'pressure', signal)
           if (result !== null) logResult(result, 'step pressure')
@@ -244,11 +256,14 @@ export class BasicCompactionEngine extends CompactionEngine {
 
   /**
    * Compact for replayed step-boundary pressure or one provider-confirmed context
-   * overflow. Both triggers price the latest durable routed request envelope;
+   * overflow, or strict explicit-budget admission. All triggers price the latest durable routed request envelope;
    * overflow bypasses the normal threshold and retained-tail policy so it can
    * force one useful balanced reduction.
    * @param agent - agent whose latest durable routed request is measured.
-   * @param trigger - normal step-boundary pressure or context-overflow recovery.
+   * Explicit admission reserves resolved output tokens, applies the configured
+   * threshold and retention to the remaining input allowance, and rejects any
+   * unsuccessful reduction. Measurements estimate upstream tokenization.
+   * @param trigger - pressure, overflow recovery, or explicit-budget admission.
    * @param signal - live turn cancellation signal forwarded to summarization.
    * @returns the latest summary compaction result, or `null` when no summary ran.
    */
@@ -266,6 +281,8 @@ export class BasicCompactionEngine extends CompactionEngine {
       case 'context-overflow':
         break
       case 'pressure':
+        break
+      case 'context-budget':
         break
       /* v8 ignore next -- closed-union exhaustiveness guard */
       default:
@@ -287,7 +304,12 @@ export class BasicCompactionEngine extends CompactionEngine {
       return this.compactRegion(range.start, range.end, agent, signal)
     }
 
-    const context = (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context
+    const strict = trigger === 'context-budget'
+    signal.throwIfAborted()
+    const context = target.contextWindow === undefined
+      ? resolveCallContext(target, (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context)
+      : { contextWindow: target.contextWindow }
+    signal.throwIfAborted()
     assertNoActiveCompaction(agent.session, 'automatic pressure compaction')
     const targetKey = `${target.provider}/${target.model}`
     if (context === undefined) {
@@ -297,8 +319,18 @@ export class BasicCompactionEngine extends CompactionEngine {
         + 'configure contextWindow on that adapter model',
       )
     }
-    const spec = resolveCompactSpec(policy, context.contextWindow)
+    // An explicit budget reserves resolved output tokens; best-effort triggers
+    // price the whole window.
+    const reserve = strict && target.maxTokens !== undefined ? target.maxTokens : 0
+    const allowance = context.contextWindow - reserve
+    if (allowance <= 0) {
+      throw new Error(`context window ${context.contextWindow} does not exceed output reserve ${String(reserve)}`)
+    }
+    const spec = resolveCompactSpec(policy, allowance)
     if (measurement.totalTokens < spec.thresholdTokens) return null
+    if (strict && !this.config.auto) {
+      throw new Error(`automatic compaction is disabled (${measurement.totalTokens} estimated tokens >= input threshold ${spec.thresholdTokens})`)
+    }
 
     // Once pressure qualifies, land the model-free pass before choosing a
     // summary range, then remeasure through the singleton replay fold.
@@ -312,6 +344,9 @@ export class BasicCompactionEngine extends CompactionEngine {
     for (let attempt = 0; attempt <= spec.compactionRetries; attempt += 1) {
       const range = selectCompactableRange(agent.session, measurement, spec.retainTokens)
       if (range === null) {
+        if (strict) {
+          throw new Error(`no safe history range remains (${measurement.totalTokens} estimated tokens >= input threshold ${spec.thresholdTokens})`)
+        }
         /* v8 ignore else -- concrete replacement preserves a compactable checkpoint; subclass hooks cannot mutate it. */
         if (result === null) return null
         /* v8 ignore next -- paired with the defensive post-success branch above. */

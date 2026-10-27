@@ -709,7 +709,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--scenario",
-        choices=("all", "sdk-default", "sdk-custom", "sdk-minimal", "sdk-minimal-in-history", "sdk-fs-search", "sdk-spawn-node", "sdk-mcp", "sdk-snapshot", "sdk-restart", "sdk-profile-plugin", "sdk-office", "sdk-live", "runner", "direct"),
+        choices=("all", "sdk-default", "sdk-custom", "sdk-minimal", "sdk-minimal-in-history", "sdk-fs-search", "sdk-spawn-node", "sdk-mcp", "sdk-snapshot", "sdk-restart", "sdk-context-window", "sdk-context-window-shrink", "sdk-profile-plugin", "sdk-office", "sdk-live", "runner", "direct"),
         default="all",
     )
     parser.add_argument("--exe", type=Path)
@@ -728,10 +728,10 @@ def main() -> None:
         parser.error("--scenario sdk-profile-plugin requires --installed-wheel")
     if args.installed_wheel:
         args.exe = assert_installed_wheel_environment()
-    if args.scenario in {"all", "sdk-custom", "sdk-minimal", "sdk-minimal-in-history", "sdk-fs-search", "sdk-spawn-node", "sdk-snapshot", "sdk-restart", "sdk-office", "runner", "direct"} and args.exe is None:
-        parser.error("--exe is required for custom, minimal, fs-search, spawn-node, snapshot, restart, office, runner, and direct scenarios")
-    if args.update_snapshots and args.scenario not in {"all", "sdk-minimal", "sdk-minimal-in-history", "sdk-snapshot", "sdk-restart"}:
-        parser.error("--update-snapshots requires --scenario sdk-minimal, sdk-minimal-in-history, sdk-snapshot, sdk-restart, or all")
+    if args.scenario in {"all", "sdk-custom", "sdk-minimal", "sdk-minimal-in-history", "sdk-fs-search", "sdk-spawn-node", "sdk-snapshot", "sdk-restart", "sdk-context-window", "sdk-context-window-shrink", "sdk-office", "runner", "direct"} and args.exe is None:
+        parser.error("--exe is required for custom, minimal, fs-search, spawn-node, snapshot, restart, context-window, office, runner, and direct scenarios")
+    if args.update_snapshots and args.scenario not in {"all", "sdk-minimal", "sdk-minimal-in-history", "sdk-snapshot", "sdk-restart", "sdk-context-window", "sdk-context-window-shrink"}:
+        parser.error("--update-snapshots requires --scenario sdk-minimal, sdk-minimal-in-history, sdk-snapshot, sdk-restart, sdk-context-window, sdk-context-window-shrink, or all")
     if args.exe is not None and not args.exe.is_file():
         parser.error(f"runtime executable does not exist: {args.exe}")
 
@@ -777,6 +777,12 @@ def main() -> None:
         if args.scenario in {"all", "sdk-snapshot"}:
             assert args.exe is not None
             smoke_sdk_snapshot(model.url, args.exe.resolve(), args.update_snapshots)
+        if args.scenario in {"all", "sdk-context-window"}:
+            assert args.exe is not None
+            smoke_sdk_context_window(model.url, args.exe.resolve(), args.update_snapshots)
+        if args.scenario in {"all", "sdk-context-window-shrink"}:
+            assert args.exe is not None
+            smoke_sdk_context_window(model.url, args.exe.resolve(), args.update_snapshots, shrink=True)
         if args.scenario in {"all", "sdk-restart"}:
             assert args.exe is not None
             smoke_sdk_restart_snapshot(model.url, args.exe.resolve(), args.update_snapshots)
@@ -1326,6 +1332,73 @@ def smoke_sdk_profile_plugin(base_url: str) -> None:
 
         assert result.final_response == PROFILE_PLUGIN_TEXT, result.final_response
         assert_zstd_session_log(dsh_home / "sessions")
+
+
+def smoke_sdk_context_window(
+    base_url: str, executable: Path, update_snapshots: bool, *, shrink: bool = False,
+) -> None:
+    """Preserve selected context budgets in Python SDK events, notifications, and logs."""
+    from deepseek_harness import DeepSeekHarness
+
+    with tempfile.TemporaryDirectory(prefix="dsh-sdk-context-window-") as temporary:
+        root = Path(temporary).resolve()
+        sessions = root / "home" / "sessions"
+        fixture_path = "context-window-shrink/shrink.mjs" if shrink else "context-window/context-window.mjs"
+        fixture = Path(__file__).resolve().parents[1] / "snapshots/sdk" / fixture_path
+        blocked = None
+        patch = write_profile_patch(root, "context-window.patch.yml", sessions, [{"insert": [{
+            "id": "context-window-fixture", "name": fixture.as_uri(),
+        }]}])
+        with DeepSeekHarness(
+            provider="deepseek-official", model="smoke-model", cwd=str(root),
+            dsh_bin=str(executable), dsh_home=str(root / "home"), patches=(str(patch),),
+            env={"DSH_PERMISSION_MODE": "danger-full-access", "DSH_TELEMETRY_DISABLED": "1"},
+            api_key="sk-keyless-smoke", base_url=base_url, request_timeout_seconds=60,
+        ) as harness:
+            result = harness.run("reply with the smoke text", session_id="context-window-smoke")
+            if shrink:
+                blocked = harness.run("Continue with a smaller context window.", session_id="context-window-smoke")
+        assert result.final_response == EXPECTED_TEXT, result.final_response
+        event_types = {"model/selection", "request/header", "request/context"}
+        events = [event for event in result.events if event.get("type") in event_types]
+        notifications = [notification.payload["event"] for notification in result.notifications
+                         if notification.method == "session.event"
+                         and notification.payload.get("event", {}).get("type") in event_types]
+        assert notifications == events, notifications
+        logged = [row for row in read_session_logs(sessions)["context-window-smoke"]
+                  if row.get("type") in event_types]
+        for projection in (events, notifications, logged[:3] if shrink else logged):
+            assert [event["type"] for event in projection] == [
+                "model/selection", "request/header", "request/context",
+            ], projection
+            assert projection[0]["data"] == {
+                "provider": "deepseek-official", "model": "smoke-model", "contextWindow": 640000,
+            }, projection
+            assert projection[1]["data"]["header"]["config"]["contextWindow"] == 640000, projection
+            assert projection[2]["data"]["contextWindow"] == 640000, projection
+        values = {
+            "events": normalize_snapshot_value(project_session_snapshot(events), []),
+            "notifications": normalize_snapshot_value(project_session_snapshot(notifications), []),
+            "persisted": normalize_snapshot_value(project_session_snapshot(logged), []),
+        }
+        if shrink:
+            assert blocked is not None
+            for source in (blocked.events, [notification.payload["event"] for notification in blocked.notifications
+                                           if notification.method == "session.event"]):
+                assert not any(event.get("type") in {"assistant/message", "assistant/attempt"} for event in source), source
+                endings = [event for event in source if event.get("type") == "turn/end"]
+                assert len(endings) == 1, endings
+                assert endings[0]["data"]["reason"]["error"]["code"] == "CONTEXT_BUDGET_EXCEEDED", endings
+                selection = next(event["data"] for event in source if event.get("type") == "model/selection")
+                assert selection["contextWindow"] == 8192, selection
+            values["blocked"] = normalize_snapshot_value(project_session_snapshot(blocked.events), [(str(root), "{{cwd}}")])
+        scenario = "context-window-shrink" if shrink else "context-window"
+        compare_snapshot_files(
+            {"request-context.json": json.dumps(values, indent=2, ensure_ascii=False) + "\n"},
+            update_snapshots,
+            Path(__file__).resolve().parent / "snapshots/python-sdk-single-exe" / scenario,
+            ("request-context.json",),
+        )
 
 
 def smoke_sdk_snapshot(base_url: str, executable: Path, update_snapshots: bool) -> None:

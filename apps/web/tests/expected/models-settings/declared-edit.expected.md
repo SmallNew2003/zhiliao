@@ -58,13 +58,23 @@
             - text: acme-large
           - textbox "显示名称 1":
             - /placeholder: 显示名称
-          - button "模型选项 1" [expanded]:
-            - img
           - button "删除模型 1":
             - img
-          - text: 上下文窗口
+          - radiogroup "上下文窗口档位 1":
+            - text: 上下文窗口 自定义 262144
+            - radio "320K"
+            - text: 320K
+            - radio "640K"
+            - text: 640K
+            - radio "960K"
+            - text: 960K
+          - button "高级设置 1" [expanded]:
+            - text: 高级设置
+            - img
+          - text: 自定义上下文窗口
           - textbox "上下文窗口 1":
-            - /placeholder: 256K
+            - /placeholder: 输入 token 数，如 512K
+            - text: "262144"
           - text: 最大输出 token 数
           - textbox "最大输出 token 数 1":
             - /placeholder: 32K

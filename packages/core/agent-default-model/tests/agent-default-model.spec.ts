@@ -56,6 +56,23 @@ describe('AgentDefaultModelConfig', () => {
     await bench.ctx.fiber.dispose()
   })
 
+  it('persists the context budget for future Agents and clears it for inherited selections', async () => {
+    const bench = await boot()
+    await bench.defaultModel.saveSelection({ provider: 'p', model: 'm', contextWindow: 640_000 })
+    expect(bench.defaultModel.currentSelection()).toEqual({ provider: 'p', model: 'm', contextWindow: 640_000 })
+    await bench.defaultModel.saveSelection({ provider: 'p', model: 'm' })
+    expect(bench.defaultModel.currentSelection()).toEqual({ provider: 'p', model: 'm' })
+    await bench.ctx.fiber.dispose()
+  })
+
+  it.each([0, -1, 1.5])('rejects invalid stored context budget %s', async (contextWindow) => {
+    const bench = await boot()
+    await expect(bench.settingsFiber.ctx.settings.replace(AGENT_DEFAULT_MODEL_SETTINGS_NAMESPACE, {
+      provider: 'p', model: 'm', contextWindow,
+    })).rejects.toThrow()
+    await bench.ctx.fiber.dispose()
+  })
+
   it('clears a stored effort when the saved selection has none', async () => {
     const bench = await boot()
     await bench.defaultModel.saveSelection({
