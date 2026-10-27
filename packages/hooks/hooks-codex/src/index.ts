@@ -52,6 +52,8 @@ export interface Config {
   model?: string
   /** Default per-hook timeout in ms when a hook sets none (Codex default: 600000). */
   defaultTimeoutMs?: number
+  /** Whether hook payloads include original tool arguments beside the Codex command field. */
+  exposeToolArguments?: boolean
   /** Character cap for the `hook/result` event's persisted stderr summary. */
   stderrSummaryMaxChars?: number
 }
@@ -60,6 +62,7 @@ export const Config: z<Config> = z.object({
   configPath: z.string().required(),
   model: z.string().default(''),
   defaultTimeoutMs: z.number().default(DEFAULT_HOOK_TIMEOUT_MS),
+  exposeToolArguments: z.boolean().default(false),
   stderrSummaryMaxChars: z.number().default(DEFAULT_STDERR_SUMMARY_MAX_CHARS),
 })
 
@@ -223,7 +226,7 @@ export function apply(ctx: Context, config: Config): void {
   // PreToolUse → PreToolDecision. Codex blocks only (no allow/ask honored).
   ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
     const turn = lastTurn(ctx, exec.agent)
-    const merged = await runPoint('PreToolUse', exec.name, preToolPayload(ctx, exec, model), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
+    const merged = await runPoint('PreToolUse', exec.name, preToolPayload(ctx, exec, model, config.exposeToolArguments ?? false), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     /* jscpd:ignore-end */
     if (merged.decision === 'deny') return { kind: 'deny', reason: merged.reason ?? 'blocked by PreToolUse hook' }
     return next()
@@ -233,7 +236,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.on('tools/post-execute', async (exec, result, next): Promise<PostToolDecision> => {
     const turn = lastTurn(ctx, exec.agent)
     /* jscpd:ignore-start */
-    const merged = await runPoint('PostToolUse', exec.name, postToolPayload(ctx, exec, result, model), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
+    const merged = await runPoint('PostToolUse', exec.name, postToolPayload(ctx, exec, result, model, config.exposeToolArguments ?? false), { ...exec.agent ? { agent: exec.agent } : {}, turn, signal: exec.signal })
     const context = contextFrom(merged)
     if (merged.decision === 'deny') {
       return { kind: 'block', feedback: [{ type: 'text', text: merged.reason ?? 'blocked by PostToolUse hook' }], ...context ? { additionalContexts: [context] } : {} }
@@ -314,14 +317,24 @@ function commandOf(args: unknown): string {
   return ''
 }
 
-function preToolPayload(ctx: Context, exec: ToolExecution, model: string): Record<string, unknown> {
+function preToolPayload(ctx: Context, exec: ToolExecution, model: string, exposeToolArguments: boolean): Record<string, unknown> {
   // `tool_name` is the REAL tool name (matching the `exec.name` matcher subject);
   // a hardcoded constant would disagree with what the matcher tests and make a
-  // config's tool matcher never fire. `tool_input` keeps Codex's `{ command }`
-  // shape (its shell payload), derived from the call's `command` arg when present.
-  return { ...turnBase(ctx, exec.agent, 'PreToolUse', model), tool_name: exec.name, tool_input: { command: commandOf(exec.arguments) }, tool_use_id: exec.callId }
+  // config's tool matcher never fire. `tool_input` always includes Codex's
+  // string `command` field and can opt into the original tool arguments.
+  return { ...turnBase(ctx, exec.agent, 'PreToolUse', model), tool_name: exec.name, tool_input: toolInput(exec.arguments, exposeToolArguments), tool_use_id: exec.callId }
 }
 
-function postToolPayload(ctx: Context, exec: ToolExecution, result: ToolExecutionResult, model: string): Record<string, unknown> {
-  return { ...turnBase(ctx, exec.agent, 'PostToolUse', model), tool_name: exec.name, tool_input: { command: commandOf(exec.arguments) }, tool_use_id: exec.callId, tool_response: blocksToText(result.content) }
+function postToolPayload(
+  ctx: Context, exec: ToolExecution, result: ToolExecutionResult, model: string, exposeToolArguments: boolean,
+): Record<string, unknown> {
+  return { ...turnBase(ctx, exec.agent, 'PostToolUse', model), tool_name: exec.name, tool_input: toolInput(exec.arguments, exposeToolArguments), tool_use_id: exec.callId, tool_response: blocksToText(result.content) }
+}
+
+/** Build a Codex tool input with an optional copy of the original tool arguments. */
+function toolInput(args: unknown, exposeToolArguments: boolean): Record<string, unknown> {
+  if (!exposeToolArguments || typeof args !== 'object' || args === null || Array.isArray(args)) {
+    return { command: commandOf(args) }
+  }
+  return { ...args, command: commandOf(args) }
 }
