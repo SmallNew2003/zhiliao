@@ -79,6 +79,8 @@ export interface GroupNode {
   sessionCount: number
   /** Sessions running themselves or through a subagent descendant; known while the group is folded. */
   runningCount: number
+  /** Sessions awaiting this user (approval, plan review, or question); known while the group is folded. */
+  pendingCount: number
   expanded: boolean
   /** The group contains the selected session (active folder tint; supplied here so the renderer never scans). */
   containsCurrent: boolean
@@ -315,6 +317,22 @@ function visiblePendingKind(kind: string | undefined): SessionPendingInteraction
 }
 
 /**
+ * The pending-interaction kind a Session's status exposes, or undefined when
+ * it is not one a UI surfaces. A folded group counts its awaiting Sessions
+ * through this, so a group header can report the need for attention without
+ * deriving its rows.
+ * @param s - the Session summary.
+ * @param statuses - unified UI status by Session.
+ * @returns the surfaced pending kind, or undefined.
+ */
+function sessionPendingKind(
+  s: SessionSummary,
+  statuses: SessionStatuses,
+): SessionPendingInteractionStatus | undefined {
+  return visiblePendingKind(statuses.get(s.id)?.pendingInteraction?.kind)
+}
+
+/**
  * Whether a Session is live: it runs itself, or an uninterrupted subagent
  * descendant does. A folded group counts its live Sessions through this, so a
  * group header can report activity without deriving its rows.
@@ -338,7 +356,7 @@ function sessionNode(
   statuses: SessionStatuses,
 ): SessionNode {
   const status = statuses.get(s.id)
-  const pendingInteraction = visiblePendingKind(status?.pendingInteraction?.kind)
+  const pendingInteraction = sessionPendingKind(s, statuses)
   return {
     id: s.id,
     title: sessionTitle(s),
@@ -392,6 +410,7 @@ export function deriveGroups(
       label: g.label,
       sessionCount: g.sessions.length,
       runningCount: g.sessions.filter(s => sessionIsLive(s, descendants, statuses)).length,
+      pendingCount: g.sessions.filter(s => sessionPendingKind(s, statuses) !== undefined).length,
       expanded,
       containsCurrent: g.key === currentGroup,
       sessions: expanded

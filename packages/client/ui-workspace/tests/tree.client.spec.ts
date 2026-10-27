@@ -130,6 +130,27 @@ describe('deriveGroups', () => {
     expect(groups[0]).toMatchObject({ runningCount: 0 })
   })
 
+  it('counts a folded group awaiting Sessions so its header can report the need for attention', () => {
+    const awaiting = summary('awaiting', 20)
+    const sessions = list(awaiting)
+    const attention: SessionStatusSnapshot = new Map([[
+      awaiting.id,
+      status({ key: 'question:1', kind: 'plan-review', sessionId: awaiting.id } as SessionPendingInteraction),
+    ]])
+    const groups = deriveGroups(
+      sessions, [workspace('busy', ['awaiting'])], noArchive, attention, view([]),
+    )
+    expect(groups[0]).toMatchObject({ pendingCount: 1, runningCount: 0, expanded: false, sessions: [] })
+  })
+
+  it('reports no awaiting Sessions for a group whose only activity is running', () => {
+    const live = { ...summary('live', 20), running: true }
+    const groups = deriveGroups(
+      list(live), [workspace('busy', ['live'])], noArchive, noAttention, view([]),
+    )
+    expect(groups[0]).toMatchObject({ pendingCount: 0, runningCount: 1 })
+  })
+
   it('projects pending-interaction state into grouped and flat rows', () => {
     const awaiting = { ...summary('awaiting', 10), running: true }
     const sessions = list(awaiting)
