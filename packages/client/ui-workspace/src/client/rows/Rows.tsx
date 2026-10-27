@@ -311,6 +311,23 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {/* A folded group still reports activity: the row carries the same
+          running dot a Session row does, so a Workspace with a live Session
+          reads as busy without unfolding it. The title is the flex cell, so
+          the slot costs no width while the group is idle. */}
+      {row.runningCount > 0 && (
+        <>
+          <span className={css.slot}>
+            <StateDot state="ongoing" />
+          </span>
+          <span className={css.visuallyHidden}>
+            {t(
+              row.runningCount === 1 ? 'group.running.one' : 'group.running.other',
+              { n: row.runningCount },
+            )}
+          </span>
+        </>
+      )}
       <span className={css.rowActions}>
         {actions !== undefined && (
           <Menu
