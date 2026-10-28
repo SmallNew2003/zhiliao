@@ -255,25 +255,10 @@
   font-weight: 500;
 }
 
-.effortOptions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.effortOption {
-  width: auto;
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 100%;
-  min-height: 34px;
-  padding: 6px 10px;
-}
-
-.effortOption .modelName {
-  font-size: 13px;
-  white-space: normal;
-  overflow-wrap: anywhere;
+/* The effort and context sections each carry one slider; its own step labels
+   sit under the track, so the pane only frames the control. */
+.sliderPane {
+  padding: 0 8px 4px;
 }
 
 .contextTitle {

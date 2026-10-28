@@ -1,9 +1,11 @@
 /**
  * Composer model, reasoning-effort, and context-window selection over the shared ModelDirectory.
  * Provider-grouped models and the current model's advertised efforts share one
- * panel with context presets. Arrow keys traverse options; Tab selects, while Escape and Shift+Tab
- * close and restore the trigger. Catalog errors offer Retry in the panel;
- * rejected selections use the composer-anchored Toast.
+ * panel, with a snapping slider over the effort levels and one over the context
+ * presets. Arrow keys traverse the model rows; Tab selects, while Escape and Shift+Tab
+ * close and restore the trigger. A focused slider keeps the arrow keys itself, so
+ * the row traversal never pulls the keyboard off it. Catalog errors offer Retry in
+ * the panel; rejected selections use the composer-anchored Toast.
  */
 import {
   useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
@@ -14,7 +16,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14,
-  IconDataOutline16, IconWarningOutline16, Toast,
+  IconDataOutline16, IconWarningOutline16, Slider, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -26,6 +28,9 @@ interface EffortChoice {
   effort: string | undefined
   label: string
 }
+
+/** Context budgets offered as presets, in tokens. */
+const CONTEXT_WINDOW_PRESETS = [320_000, 640_000, 960_000]
 
 /** Unplaced portal card: hidden but laid out at a fixed origin so offsetWidth/offsetHeight are real (Menu primitive's measure pass). */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
@@ -78,6 +83,15 @@ export function ModelSelect(
   const reasoning = currentChoice?.model.reasoning
   const contextWindow = state.current?.contextWindow ?? currentChoice?.model.contextWindow
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
+  const contextStepLabel = (value: number): string => CONTEXT_WINDOW_PRESETS.includes(value)
+    ? t('context.preset', { value: value / 1000 })
+    : value.toLocaleString('en-US')
+  // A window the catalog carries but the presets do not (a model's own
+  // default, say) stays on the track as an extra step, so the thumb never
+  // claims a preset the session is not using.
+  const contextSteps = contextWindow !== undefined && !CONTEXT_WINDOW_PRESETS.includes(contextWindow)
+    ? [...CONTEXT_WINDOW_PRESETS, contextWindow].sort((a, b) => a - b)
+    : CONTEXT_WINDOW_PRESETS
   const effortLabel = reasoning === undefined
     ? undefined
     : effectiveEffort === undefined
@@ -205,6 +219,12 @@ export function ModelSelect(
       return
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      // A focused slider keeps the vertical keys: the option traversal must
+      // not pull the keyboard off the control it sits on.
+      if (event.target instanceof Element && event.target.closest('[role="slider"]') !== null) {
+        event.preventDefault()
+        return
+      }
       event.preventDefault()
       moveFocus(event.key === 'ArrowDown' ? 1 : -1)
     }
@@ -245,10 +265,6 @@ export function ModelSelect(
 
   const chooseEffort = (effort: string | undefined): void => {
     if (state.current === null) return
-    if (effectiveEffort === effort) {
-      close(true)
-      return
-    }
     const selection: ModelSelection = {
       provider: state.current.provider,
       model: state.current.model,
@@ -261,10 +277,6 @@ export function ModelSelect(
 
   const chooseContextWindow = (value: number): void => {
     if (state.current === null) return
-    if (contextWindow === value) {
-      close(true)
-      return
-    }
     lastActionRef.current = 'select'
     const smaller = contextWindow !== undefined && value < contextWindow
     void select({ ...state.current, contextWindow: value }).then((result) => {
@@ -389,29 +401,23 @@ export function ModelSelect(
           {reasoning !== undefined && (
             <section role="group" aria-labelledby={`${id}-effort`} className={css.efforts}>
               <div id={`${id}-effort`} className={css.effortTitle}>{t('menu.effort')}</div>
-              <div className={css.effortOptions}>
-                {effortChoices.length === 0
-                  ? <div className={css.empty}>{t('empty.efforts')}</div>
-                  : effortChoices.map(level => (
-                    <button
-                      ref={itemRef()}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={effectiveEffort === level.effort}
-                      className={clsx(css.option, css.effortOption, effectiveEffort === level.effort && css.selected)}
-                      key={level.key}
+              {effortChoices.length === 0
+                ? <div className={css.empty}>{t('empty.efforts')}</div>
+                : (
+                  <div className={css.sliderPane}>
+                    <Slider
+                      steps={effortChoices.map(choice => choice.label)}
+                      value={Math.max(0, effortChoices.findIndex(choice => choice.effort === effectiveEffort))}
+                      label={t('menu.effort')}
                       disabled={busy || locked}
-                      onClick={() => { chooseEffort(level.effort) }}
-                    >
-                      <span className={css.optionCopy}>
-                        <span className={css.modelName}>{level.label}</span>
-                      </span>
-                      <span className={css.check}>
-                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
-                      </span>
-                    </button>
-                  ))}
-              </div>
+                      onChange={(index) => {
+                        const choice = effortChoices[index]
+                        if (choice === undefined) return
+                        chooseEffort(choice.effort)
+                      }}
+                    />
+                  </div>
+                )}
             </section>
           )}
           {state.current !== null && (
@@ -420,24 +426,18 @@ export function ModelSelect(
                 <span id={`${id}-context`}>{t('menu.contextWindow')}</span>
                 <span>{t('context.current', { value: contextWindow === undefined ? t('context.unknown') : contextWindow.toLocaleString('en-US') })}</span>
               </div>
-              <div className={css.effortOptions}>
-                {[320_000, 640_000, 960_000].map(value => (
-                  <button
-                    ref={itemRef()}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={contextWindow === value}
-                    className={clsx(css.option, css.effortOption, contextWindow === value && css.selected)}
-                    key={value}
-                    disabled={busy || locked}
-                    onClick={() => { chooseContextWindow(value) }}
-                  >
-                    <span className={css.optionCopy}>
-                      <span className={css.modelName}>{t('context.preset', { value: value / 1000 })}</span>
-                    </span>
-                    <span className={css.check}>{contextWindow === value ? <IconCheckOutline16 /> : null}</span>
-                  </button>
-                ))}
+              <div className={css.sliderPane}>
+                <Slider
+                  steps={contextSteps.map(contextStepLabel)}
+                  value={Math.max(0, contextSteps.indexOf(contextWindow ?? -1))}
+                  label={t('menu.contextWindow')}
+                  disabled={busy || locked}
+                  onChange={(index) => {
+                    const next = contextSteps[index]
+                    if (next === undefined) return
+                    chooseContextWindow(next)
+                  }}
+                />
               </div>
             </section>
           )}
