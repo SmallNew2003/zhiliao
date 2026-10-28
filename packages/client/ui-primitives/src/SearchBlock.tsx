@@ -217,12 +217,79 @@ function highlightQuery(text: string, query?: string): ReactNode {
 }
 
 /**
+ * A result line. Without `open` the row is plain text; with `open` it is a
+ * button-like row that activates on click, Enter, or Space.
+ * @param open - the activation callback, or undefined when the card cannot open paths.
+ * @param children - the row content.
+ * @returns the line element.
+ */
+function renderLine(open: (() => void) | undefined, children: ReactNode): ReactNode {
+  return (
+    <div
+      className={clsx(css.line, open && css.clickableLine)}
+      role={open ? 'button' : undefined}
+      tabIndex={open ? 0 : undefined}
+      onClick={open ? () => { open() } : undefined}
+      onKeyDown={open ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          open()
+        }
+      } : undefined}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * An open-path trigger inside a file header: a button-like span that opens
+ * `path` on click, Enter, or Space and stops propagation, so the header's
+ * expand/collapse toggle does not also fire.
+ * @param path - the file path the trigger opens.
+ * @param onOpenPath - the card's open-path callback.
+ * @param className - the trigger's class.
+ * @param ariaLabel - the accessible name; undefined for a text-labelled trigger.
+ * @param children - the trigger content.
+ * @returns the trigger element.
+ */
+function openPathTrigger(
+  path: string,
+  onOpenPath: (path: string, line?: number) => void,
+  className: string | undefined,
+  ariaLabel: string | undefined,
+  children: ReactNode,
+): ReactNode {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      className={className}
+      onClick={(event) => {
+        event.stopPropagation()
+        onOpenPath(path)
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          event.stopPropagation()
+          onOpenPath(path)
+        }
+      }}
+    >
+      {children}
+    </span>
+  )
+}
+
+/**
  * Render a completed search as a grouped-matches or flat-path card.
  * @param props - see {@link SearchBlockProps}.
  * @returns the search block element.
  */
 export function SearchBlock(props: SearchBlockProps) {
-  const { truncated, total, maxLines = DEFAULT_SEARCH_MAX_LINES, className } = props
+  const { truncated, total, maxLines = DEFAULT_SEARCH_MAX_LINES, className, onOpenPath } = props
   const [expanded, setExpanded] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set())
 
@@ -266,43 +333,21 @@ export function SearchBlock(props: SearchBlockProps) {
 
   const renderRow = (row: SearchRow): ReactNode => {
     if (row.type === 'path') {
-      return (
-        <div
-          className={clsx(css.line, props.onOpenPath && css.clickableLine)}
-          role={props.onOpenPath ? 'button' : undefined}
-          tabIndex={props.onOpenPath ? 0 : undefined}
-          onClick={props.onOpenPath ? () => { props.onOpenPath?.(row.path) } : undefined}
-          onKeyDown={props.onOpenPath ? (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              props.onOpenPath?.(row.path)
-            }
-          } : undefined}
-        >
-          {highlightQuery(row.path, props.query)}
-        </div>
+      return renderLine(
+        onOpenPath ? () => { onOpenPath(row.path) } : undefined,
+        highlightQuery(row.path, props.query),
       )
     }
     if (row.type === 'match') {
-      return (
-        <div
-          className={clsx(css.line, props.onOpenPath && css.clickableLine)}
-          role={props.onOpenPath ? 'button' : undefined}
-          tabIndex={props.onOpenPath ? 0 : undefined}
-          onClick={props.onOpenPath ? () => { props.onOpenPath?.(row.filePath, row.lineNumber) } : undefined}
-          onKeyDown={props.onOpenPath ? (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              props.onOpenPath?.(row.filePath, row.lineNumber)
-            }
-          } : undefined}
-        >
+      return renderLine(
+        onOpenPath ? () => { onOpenPath(row.filePath, row.lineNumber) } : undefined,
+        <>
           <span className={css.lineNumber}>{row.lineNumber}: </span>
           {highlightQuery(row.line, props.query)}
-        </div>
+        </>,
       )
     }
-    if (props.onOpenPath) {
+    if (onOpenPath) {
       return (
         <div
           className={css.fileHeader}
@@ -317,43 +362,8 @@ export function SearchBlock(props: SearchBlockProps) {
             }
           }}
         >
-          <span
-            role="button"
-            tabIndex={0}
-            className={clsx(css.filePath, css.clickablePath)}
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onOpenPath?.(row.path)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                event.stopPropagation()
-                props.onOpenPath?.(row.path)
-              }
-            }}
-          >
-            {row.path}
-          </span>
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label={row.path}
-            className={css.openIcon}
-            onClick={(event) => {
-              event.stopPropagation()
-              props.onOpenPath?.(row.path)
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                event.stopPropagation()
-                props.onOpenPath?.(row.path)
-              }
-            }}
-          >
-            <IconInspectOutline12 />
-          </span>
+          {openPathTrigger(row.path, onOpenPath, clsx(css.filePath, css.clickablePath), undefined, row.path)}
+          {openPathTrigger(row.path, onOpenPath, css.openIcon, row.path, <IconInspectOutline12 />)}
           <span className={css.fileCount}>{row.count}</span>
         </div>
       )
