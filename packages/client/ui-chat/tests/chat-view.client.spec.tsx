@@ -2962,7 +2962,7 @@ describe('ChatView', () => {
   // range is at or under the follow threshold the reader is at the floor and
   // at the head at once, so neither path offers older history — auto-paging is
   // blocked by the floor guard, and the manual retry row only exists after a
-  // pull this state cannot start (f4f6480913 removed the load-earlier button).
+  // pull this state cannot start (the earlier pagination commit removed the load-earlier button).
   // Rethink before changing the guard: this is the one state with no route to
   // older history.
   it('offers no route to older history when the loaded window has no scrollable range', () => {

@@ -59,3 +59,6 @@ native/system/test/bin/
 # scans nonignored new files, so leaving them unscanned keeps the gate red.
 .workbuddy/
 .codex/
+
+# Agent scratch and Space deliverables (local only; not repository content)
+/output/
