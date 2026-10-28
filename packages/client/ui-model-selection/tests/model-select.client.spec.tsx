@@ -75,11 +75,15 @@ describe('ModelSelect reasoning effort', () => {
     })
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
-      .toEqual(['Off', 'High', 'Max'])
+    // The pane is one slider over the effort names, descriptions dropped.
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    expect(slider.getAttribute('aria-valuetext')).toBe('High')
+    expect(screen.getByText('Off')).toBeTruthy()
+    expect(screen.getByText('Max')).toBeTruthy()
     expect(screen.queryByText('Largest budget')).toBeNull()
 
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
+    // The keyboard steps the slider: High → Max.
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
     await waitFor(() => {
       expect(select).toHaveBeenCalledWith({
         provider: 'deepseek-official',
@@ -116,8 +120,11 @@ describe('ModelSelect reasoning effort', () => {
       name: '选择模型，当前 Model，推理等级 Default',
     }))
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
-      .toEqual(['Default', 'Standard'])
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    // No adapter default: the provider-default step leads the track.
+    expect(slider.getAttribute('aria-valuetext')).toBe('Default')
+    expect(slider.getAttribute('aria-valuenow')).toBe('0')
+    expect(screen.getByText('Standard')).toBeTruthy()
   })
 
   it('shows the durable model id when the catalog has no matching display name', () => {
@@ -276,43 +283,101 @@ describe('ModelSelect keyboard walk', () => {
   }
 
   it('↑↓ walk the rows of the shown pane, wrapping, and stay open', () => {
-    mountOpen()
+    const select = vi.fn().mockResolvedValue({ ok: true, value: undefined })
+    const twoModels = state()
+    twoModels.groups = [{
+      id: 'deepseek-official',
+      name: 'DeepSeek',
+      models: [
+        { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', reasoning },
+        { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', reasoning },
+      ],
+    }]
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(twoModels)}
+      load={vi.fn()}
+      select={select}
+      t={t}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
     // The trigger holds focus while the menu opens: the first forward step
     // enters at the first cell instead of skipping it. false = preventDefault ran.
     const cells = screen.getAllByRole('menuitem')
     expect(fireEvent.keyDown(cells[0]!, { key: 'ArrowDown' })).toBe(false)
     expect(document.activeElement).toBe(cells[0])
 
-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    // The model pane keeps its rows, and the walk wraps there.
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
     const rows = screen.getAllByRole('menuitemradio')
-    expect(rows.map(row => row.textContent)).toEqual(['Off', 'High', 'Max'])
-    // The pane opens on its checked row, so walking starts from High.
-    fireEvent.keyDown(rows[1]!, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(rows[2])
-    fireEvent.keyDown(rows[2]!, { key: 'ArrowDown' }) // wraps to the top
+    // The pane opens on its checked row, so walking starts from the current model.
+    fireEvent.keyDown(rows[0]!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(rows[1])
+    fireEvent.keyDown(rows[1]!, { key: 'ArrowDown' }) // wraps to the top
     expect(document.activeElement).toBe(rows[0])
     fireEvent.keyDown(rows[0]!, { key: 'ArrowUp' }) // wraps to the bottom
-    expect(document.activeElement).toBe(rows[2])
+    expect(document.activeElement).toBe(rows[1])
+
+    // The effort pane is a slider, not rows: it opens on the slider and the
+    // vertical keys stay with it instead of walking anywhere.
+    fireEvent.keyDown(rows[1]!, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    expect(document.activeElement).toBe(slider)
+    expect(fireEvent.keyDown(slider, { key: 'ArrowDown' })).toBe(false)
+    expect(document.activeElement).toBe(slider)
+    expect(fireEvent.keyDown(slider, { key: 'ArrowUp' })).toBe(false)
+    expect(document.activeElement).toBe(slider)
     expect(screen.getByRole('menu')).toBeTruthy()
   })
 
   it('Tab settles the focused row like Enter and closes the menu', async () => {
-    const select = mountOpen()
-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    const select = vi.fn().mockResolvedValue({ ok: true, value: undefined })
+    const twoModels = state()
+    twoModels.groups = [{
+      id: 'deepseek-official',
+      name: 'DeepSeek',
+      models: [
+        { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', reasoning },
+        { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', reasoning },
+      ],
+    }]
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(twoModels)}
+      load={vi.fn()}
+      select={select}
+      t={t}
+    />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
     const rows = screen.getAllByRole('menuitemradio')
-    fireEvent.keyDown(rows[1]!, { key: 'ArrowDown' }) // High → Max
-    expect(fireEvent.keyDown(rows[2]!, { key: 'Tab' })).toBe(false)
+    fireEvent.keyDown(rows[0]!, { key: 'ArrowDown' }) // current model → the other one
+    expect(fireEvent.keyDown(rows[1]!, { key: 'Tab' })).toBe(false)
+    // A model row submits the model; the host applies the model's own default
+    // effort from there.
     expect(select).toHaveBeenCalledWith({
-      provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max',
+      provider: 'deepseek-official', model: 'deepseek-v4-pro',
     })
     await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+  })
+
+  it('leaves Tab native on a focused slider, so the browser moves focus out of the card', () => {
+    mountOpen()
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    // A slider is not a row to settle: the keystroke stays unconsumed, and the
+    // focus leaving the card closes it through the blur path.
+    expect(fireEvent.keyDown(slider, { key: 'Tab' })).toBe(true)
   })
 
   it('Shift+Tab leaves a drilled pane and then closes, like Escape', () => {
     mountOpen()
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    const rows = screen.getAllByRole('menuitemradio')
-    expect(fireEvent.keyDown(rows[0]!, { key: 'Tab', shiftKey: true })).toBe(false)
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    expect(fireEvent.keyDown(slider, { key: 'Tab', shiftKey: true })).toBe(false)
     // Back on the drilled cell, then closed on the second press.
     const cells = screen.getAllByRole('menuitem')
     expect(document.activeElement).toBe(cells[1])
@@ -353,16 +418,18 @@ describe('ModelSelect keyboard walk', () => {
   })
 
   it('hands a drilled pane the focus its unmounted cell left behind, on the value in use', () => {
-    mountOpen()
+    const select = mountOpen()
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    const rows = screen.getAllByRole('menuitemradio')
-    // The fixture's model defaults to the High effort: the checked row is where
-    // the keyboard lands, not the top of the list.
-    expect(rows[1]!.getAttribute('aria-checked')).toBe('true')
-    expect(document.activeElement).toBe(rows[1])
-    // The walk continues from there.
-    fireEvent.keyDown(rows[1]!, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(rows[2])
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    // The fixture's model defaults to the High effort: the slider opens on the
+    // step in use, not the first step.
+    expect(slider.getAttribute('aria-valuetext')).toBe('High')
+    expect(document.activeElement).toBe(slider)
+    // The keyboard steps from there.
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    expect(select).toHaveBeenCalledWith({
+      provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max',
+    })
   })
 
   it('keeps the card navigable when a pane has no rows, and leaves a retry its Tab', () => {
@@ -409,8 +476,7 @@ describe('ModelSelect keyboard walk', () => {
   it('Escape returns to the root pane with the keyboard on the cell that drilled in', () => {
     mountOpen()
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    const rows = screen.getAllByRole('menuitemradio')
-    fireEvent.keyDown(rows[0]!, { key: 'Escape' })
+    fireEvent.keyDown(screen.getByRole('slider', { name: '推理等级' }), { key: 'Escape' })
     // The root pane is back with its three cells.
     const cells = screen.getAllByRole('menuitem')
     // Back on the drilled cell, so the next keystroke still reaches the menu.
@@ -487,16 +553,26 @@ describe('ModelSelect context window', () => {
     // The catalog capacity is a preset value, so the cell spells it short.
     expect(cell.textContent).toContain('320K')
     drillContext()
-    const rows = screen.getAllByRole('menuitemradio')
-    expect(rows.map(row => row.textContent)).toEqual(['320K', '640K', '960K'])
-    expect(rows.map(row => row.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false'])
+    // The presets are the slider's steps; the one in use carries the thumb.
+    const slider = screen.getByRole('slider', { name: '上下文窗口' })
+    expect(slider.getAttribute('aria-valuetext')).toBe('320K')
+    expect(slider.getAttribute('aria-valuenow')).toBe('0')
+    expect(screen.getByText('320K')).toBeTruthy()
+    expect(screen.getByText('640K')).toBeTruthy()
+    expect(screen.getByText('960K')).toBeTruthy()
   })
 
   it('shows a non-preset capacity as its exact value without checking a preset', () => {
     mount(undefined, 262_144)
     expect(screen.getByRole('menuitem', { name: /上下文窗口/ }).textContent).toContain('262,144')
     drillContext()
-    expect(screen.getAllByRole('menuitemradio').every(row => row.getAttribute('aria-checked') === 'false')).toBe(true)
+    // The off-preset capacity stays on the track as its own step, so the thumb
+    // never claims a preset the session is not using.
+    const slider = screen.getByRole('slider', { name: '上下文窗口' })
+    expect(slider.getAttribute('aria-valuetext')).toBe('262,144')
+    expect(slider.getAttribute('aria-valuenow')).toBe('0')
+    expect(screen.getByText('320K')).toBeTruthy()
+    expect(screen.getByText('960K')).toBeTruthy()
   })
 
   it('shows an unknown capacity when neither the selection nor the catalog advertises one', () => {
@@ -507,7 +583,7 @@ describe('ModelSelect context window', () => {
   it('keeps the effort when choosing a window', async () => {
     const { select } = mount()
     drillContext()
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    fireEvent.keyDown(screen.getByRole('slider', { name: '上下文窗口' }), { key: 'ArrowRight' })
     await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
     expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
   })
@@ -518,7 +594,8 @@ describe('ModelSelect context window', () => {
       { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', contextWindow: 640_000, reasoning: { efforts: reasoning.efforts } },
     ] }] })
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Default' }))
+    // Home jumps to the provider-default step, the track's first step.
+    fireEvent.keyDown(screen.getByRole('slider', { name: '推理等级' }), { key: 'Home' })
     await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
     expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 640_000 })
   })
@@ -526,9 +603,13 @@ describe('ModelSelect context window', () => {
   it('makes current-window and same-model clicks no-ops and clears overrides on another model', async () => {
     const { select } = mount({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
     const trigger = screen.getByRole('button', { name: /选择模型/ })
+    // The slider holds 640K and never re-emits the step in use, so there is no
+    // same-window write to make; the model rows keep their own no-op.
     drillContext()
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
-    expect(select).not.toHaveBeenCalled()
+    fireEvent.keyDown(screen.getByRole('slider', { name: '上下文窗口' }), { key: 'ArrowRight' })
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+    expect(select).toHaveBeenCalledTimes(1)
+    select.mockClear()
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: /^模型/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' }))
@@ -545,9 +626,11 @@ describe('ModelSelect context window', () => {
     directory.set({ ...initial, status: 'selecting' })
     rerender(<ModelSelect {...props} />)
     drillContext()
-    const rows = screen.getAllByRole('menuitemradio')
-    expect(rows.every(row => (row as HTMLButtonElement).disabled)).toBe(true)
-    fireEvent.click(rows[1]!)
+    const slider = screen.getByRole('slider', { name: '上下文窗口' })
+    expect(slider.getAttribute('aria-disabled')).toBe('true')
+    expect(slider.getAttribute('tabindex')).toBe('-1')
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    fireEvent.pointerDown(slider, { clientX: 290, pointerId: 1 })
     expect(select).not.toHaveBeenCalled()
   })
 
@@ -559,22 +642,21 @@ describe('ModelSelect context window', () => {
     })
     rerender(<ModelSelect {...props} select={select} />)
     drillContext()
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    fireEvent.keyDown(screen.getByRole('slider', { name: '上下文窗口' }), { key: 'ArrowRight' })
     expect((await screen.findByRole('alert')).textContent).toBe(zh['error.sessionInUse'])
-    expect(screen.getByRole('menuitemradio', { name: '320K' }).getAttribute('aria-checked')).toBe('true')
+    // The refused change leaves the thumb on the step in use.
+    expect(screen.getByRole('slider', { name: '上下文窗口' }).getAttribute('aria-valuetext')).toBe('320K')
     expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
   })
 
-  it('walks the context pane with the keyboard and settles with Tab', async () => {
+  it('steps the context slider with the keyboard and closes on the settled value', async () => {
     const { select } = mount()
     drillContext()
-    // The pane opens on the checked preset.
-    const small = screen.getByRole('menuitemradio', { name: '320K' })
-    expect(document.activeElement).toBe(small)
-    fireEvent.keyDown(small, { key: 'ArrowDown' })
-    const medium = screen.getByRole('menuitemradio', { name: '640K' })
-    expect(document.activeElement).toBe(medium)
-    fireEvent.keyDown(medium, { key: 'Tab' })
+    // The pane opens on the step in use.
+    const slider = screen.getByRole('slider', { name: '上下文窗口' })
+    expect(document.activeElement).toBe(slider)
+    expect(slider.getAttribute('aria-valuetext')).toBe('320K')
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
     await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
     expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
   })
@@ -582,7 +664,7 @@ describe('ModelSelect context window', () => {
   it('Escape from the context pane lands back on the context cell', () => {
     mount()
     drillContext()
-    fireEvent.keyDown(screen.getByRole('menuitemradio', { name: '320K' }), { key: 'Escape' })
+    fireEvent.keyDown(screen.getByRole('slider', { name: '上下文窗口' }), { key: 'Escape' })
     const cells = screen.getAllByRole('menuitem')
     expect(document.activeElement).toBe(cells[2])
     fireEvent.keyDown(cells[2]!, { key: 'Escape' })
@@ -615,7 +697,10 @@ describe('smaller context window feedback', () => {
     render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: /选择模型，当前/ }))
     fireEvent.click(screen.getByRole('menuitem', { name: /上下文窗口/ }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '640K' }))
+    // A decrease steps left, an increase steps right; both land on 640K.
+    fireEvent.keyDown(screen.getByRole('slider', { name: '上下文窗口' }), {
+      key: previous === 960_000 ? 'ArrowLeft' : 'ArrowRight',
+    })
     await waitFor(() => { expect(select).toHaveBeenCalledOnce() })
     await waitFor(() => {
       expect(screen.queryByText('已调小窗口，继续对话前将按需压缩上下文。') !== null).toBe(notice)

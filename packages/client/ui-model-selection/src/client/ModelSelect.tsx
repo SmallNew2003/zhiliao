@@ -2,16 +2,19 @@
  * ModelSelect: the composer's named model seat (`conversation.input.model`).
  * Two-level selection per figma 496:26454's MenuDropdown: the root menu is
  * the Model / Effort / Context window row triple (label + current value + a
- * right chevron), each drilling into its own list — the provider-grouped
- * model list over the shared directory, the effort levels, and the context
- * presets. The trigger (313:14108's
- * ToggleButton) shows both: model name + effort in the caption tone.
+ * right chevron), each drilling into its own pane — the provider-grouped
+ * model list over the shared directory, a snapping slider over the effort
+ * levels, and a snapping slider over the context presets. The trigger
+ * (313:14108's ToggleButton) shows both: model name + effort in the caption
+ * tone.
  * While open, ↑/↓ move focus across the rows of the shown pane (wrapping; a
  * step taken while the trigger still holds focus enters at the near end), Tab
  * settles like Enter, and Escape and Shift+Tab leave a drilled pane first and
- * otherwise close back to the trigger. A drilled pane hands focus to the row
- * of the value in use, and returning to the root pane hands it back to the
- * cell that opened it. Data and submission ride the SAME per-session
+ * otherwise close back to the trigger. A drilled pane hands focus to the
+ * control of the value in use — the checked row, or the slider — and
+ * returning to the root pane hands it back to the cell that opened it. A
+ * focused slider consumes the arrow keys itself, so the row traversal never
+ * pulls the keyboard off it. Data and submission ride the SAME per-session
  * ModelDirectory as the /model popup; exact-model reasoning metadata and the
  * selected effort come from the Host rather than a client-owned vocabulary. A
  * rejected selection announces through the shared transient Toast anchored to
@@ -27,7 +30,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconDataOutline16, IconWarningOutline16, Toast,
+  IconDataOutline16, IconWarningOutline16, Slider, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -111,11 +114,16 @@ export function ModelSelect(
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
   const contextWindow = state.current?.contextWindow ?? currentChoice?.model.contextWindow
-  const contextLabel = contextWindow === undefined
-    ? t('context.unknown')
-    : CONTEXT_WINDOW_PRESETS.includes(contextWindow)
-      ? t('context.preset', { value: contextWindow / 1000 })
-      : contextWindow.toLocaleString('en-US')
+  const contextStepLabel = (value: number): string => CONTEXT_WINDOW_PRESETS.includes(value)
+    ? t('context.preset', { value: value / 1000 })
+    : value.toLocaleString('en-US')
+  const contextLabel = contextWindow === undefined ? t('context.unknown') : contextStepLabel(contextWindow)
+  // A window the catalog carries but the presets do not (a model's own
+  // default, say) stays on the track as an extra step, so the thumb never
+  // claims a preset the session is not using.
+  const contextSteps = contextWindow !== undefined && !CONTEXT_WINDOW_PRESETS.includes(contextWindow)
+    ? [...CONTEXT_WINDOW_PRESETS, contextWindow].sort((a, b) => a - b)
+    : CONTEXT_WINDOW_PRESETS
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortLabel = reasoning === undefined
     ? undefined
@@ -159,18 +167,26 @@ export function ModelSelect(
   // drilling on the pane's current value, coming back on the cell that opened
   // the pane left.
   const paneFocus = useRef<'drill' | 'model' | 'effort' | 'context' | null>(null)
+  /**
+   * The pane's keyboard entry point: the control in use — the slider in the
+   * effort and context panes, the checked row in the model pane — else the
+   * pane's first live row.
+   * @returns the element to focus, or null when the pane holds no live control.
+   */
+  const paneEntryTarget = (): HTMLElement | null => {
+    const slider = menuRef.current?.querySelector<HTMLElement>('[role="slider"]:not([aria-disabled="true"])')
+    if (slider !== null && slider !== undefined) return slider
+    const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
+    return checked ?? itemRefs.current.find(item => item !== null && !item.disabled) ?? null
+  }
   useEffect(() => {
     const intent = paneFocus.current
     paneFocus.current = null
     if (!open || intent === null) return
     if (intent === 'drill') {
-      // The checked row is the value in use; a pane without one opens on its
-      // first row.
-      const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
-      const target = checked ?? itemRefs.current.find(item => item !== null && !item.disabled)
       // Rows a selection in flight disabled cannot take the keyboard; the
       // trigger does, so the card's keys still reach the menu.
-      ;(target ?? triggerRef.current)?.focus()
+      ;(paneEntryTarget() ?? triggerRef.current)?.focus()
       return
     }
     const cell = itemRefs.current[intent === 'model' ? 0 : intent === 'effort' ? 1 : 2]
@@ -281,11 +297,16 @@ export function ModelSelect(
       }
       if (focused !== triggerRef.current) return
       event.preventDefault()
-      const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
-      ;(checked ?? rows.find(item => !item.disabled))?.focus()
+      paneEntryTarget()?.focus()
       return
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      // A focused slider keeps the vertical keys: the row traversal must not
+      // pull the keyboard off the control the pane is about.
+      if (event.target instanceof Element && event.target.closest('[role="slider"]') !== null) {
+        event.preventDefault()
+        return
+      }
       event.preventDefault()
       moveFocus(event.key === 'ArrowDown' ? 1 : -1)
     }
@@ -327,10 +348,6 @@ export function ModelSelect(
 
   const chooseEffort = (effort: string | undefined): void => {
     if (state.current === null) return
-    if (effectiveEffort === effort) {
-      close(true)
-      return
-    }
     const selection: ModelSelection = {
       provider: state.current.provider,
       model: state.current.model,
@@ -342,10 +359,6 @@ export function ModelSelect(
   }
   const chooseContextWindow = (value: number): void => {
     if (state.current === null) return
-    if (contextWindow === value) {
-      close(true)
-      return
-    }
     lastActionRef.current = 'select'
     const smaller = contextWindow !== undefined && value < contextWindow
     void select({
@@ -513,25 +526,21 @@ export function ModelSelect(
               )}
               {effortChoices.length === 0
                 ? <div className={css.empty}>{t('empty.efforts')}</div>
-                : effortChoices.map(level => (
-                  <button
-                    ref={itemRef()}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={effectiveEffort === level.effort}
-                    className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
-                    key={level.key}
-                    disabled={busy}
-                    onClick={() => { chooseEffort(level.effort) }}
-                  >
-                    <span className={css.optionCopy}>
-                      <span className={css.modelName}>{level.label}</span>
-                    </span>
-                    <span className={css.check}>
-                      {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
-                    </span>
-                  </button>
-                ))}
+                : (
+                  <div className={css.sliderPane}>
+                    <Slider
+                      steps={effortChoices.map(choice => choice.label)}
+                      value={Math.max(0, effortChoices.findIndex(choice => choice.effort === effectiveEffort))}
+                      label={t('menu.effort')}
+                      disabled={busy}
+                      onChange={(index) => {
+                        const choice = effortChoices[index]
+                        if (choice === undefined) return
+                        chooseEffort(choice.effort)
+                      }}
+                    />
+                  </div>
+                )}
             </>
           )}
 
@@ -544,25 +553,19 @@ export function ModelSelect(
                   onRetry={reload}
                 />
               )}
-              {CONTEXT_WINDOW_PRESETS.map(value => (
-                <button
-                  ref={itemRef()}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={contextWindow === value}
-                  className={clsx(css.option, contextWindow === value && css.selected)}
-                  key={value}
+              <div className={css.sliderPane}>
+                <Slider
+                  steps={contextSteps.map(contextStepLabel)}
+                  value={Math.max(0, contextSteps.indexOf(contextWindow ?? -1))}
+                  label={t('menu.contextWindow')}
                   disabled={busy}
-                  onClick={() => { chooseContextWindow(value) }}
-                >
-                  <span className={css.optionCopy}>
-                    <span className={css.modelName}>{t('context.preset', { value: value / 1000 })}</span>
-                  </span>
-                  <span className={css.check}>
-                    {contextWindow === value ? <IconCheckOutline16 /> : null}
-                  </span>
-                </button>
-              ))}
+                  onChange={(index) => {
+                    const next = contextSteps[index]
+                    if (next === undefined) return
+                    chooseContextWindow(next)
+                  }}
+                />
+              </div>
             </>
           )}
         </div>,

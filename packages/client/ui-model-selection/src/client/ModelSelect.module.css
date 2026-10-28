@@ -291,3 +291,9 @@
   flex: 0 0 auto;
   color: var(--dsw-alias-label-tertiary);
 }
+
+/* Drilled panes that carry a slider: the control fills the pane, and its own
+   step labels sit under the track. */
+.sliderPane {
+  padding: 10px;
+}

@@ -1,0 +1,86 @@
+/* The track is the whole hit surface: a tall transparent box carries the
+   pointer, the 4px line inside it is the visual. `touch-action: none` keeps a
+   drag from scrolling the page under the pointer. */
+.slider {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 12px 0 0;
+  outline: none;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.slider[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.slider:focus-visible .track {
+  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+}
+
+.track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--dsw-alias-border-l2);
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--dsw-alias-brand-primary);
+}
+
+/* Ticks mark the snap positions; the one in use reads as part of the fill. */
+.tick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--dsw-alias-border-l3);
+  transform: translate(-50%, -50%);
+}
+
+.tickCurrent {
+  background: var(--dsw-alias-brand-primary);
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dsw-alias-brand-primary);
+  transform: translate(-50%, -50%);
+}
+
+/* Labels share the track's coordinate system: each sits under its own tick,
+   so the first and last hug the ends without overflowing the card. */
+.labels {
+  position: relative;
+  height: 16px;
+  margin-top: 10px;
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.labelCurrent {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
