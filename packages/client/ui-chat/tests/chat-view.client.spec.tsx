@@ -4894,7 +4894,8 @@ describe('ChatView', () => {
     const icon = status?.querySelector('svg')?.parentElement
     expect(icon?.getAttribute('aria-hidden')).toBe('true')
     expect(icon?.firstElementChild?.tagName).toBe('svg')
-    expect(icon?.querySelectorAll('path')).toHaveLength(3)
+    expect(icon?.querySelectorAll('path')).toHaveLength(2)
+    expect(icon?.querySelectorAll('circle')).toHaveLength(2)
     expect(icon?.getAttribute('style')).toBeNull()
     expect(status?.querySelector('animate')).toBeNull()
     // The running bit clears before the Turn closes: the status keeps its slot unseen and unannounced.
