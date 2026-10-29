@@ -57,6 +57,19 @@ describe('Slider', () => {
     expect(stepLabel('320K').getAttribute('aria-current')).toBeNull()
   })
 
+  it('keeps the end names inside the track', () => {
+    render(<Slider steps={['320K', '640K', '960K']} value={1} label="Context window" onChange={() => {}} />)
+    expect(stepLabel('320K').className).toMatch(/labelFirst/)
+    expect(stepLabel('960K').className).toMatch(/labelLast/)
+    // A middle name stays centered on its own tick.
+    expect(stepLabel('640K').className).not.toMatch(/labelFirst|labelLast/)
+    // A lone step has no far end to pull in.
+    cleanup()
+    render(<Slider steps={['Only']} value={0} label="Context window" onChange={() => {}} />)
+    expect(stepLabel('Only').className).toMatch(/labelFirst/)
+    expect(stepLabel('Only').className).not.toMatch(/labelLast/)
+  })
+
   it('steps with the arrow keys and clamps at both ends', () => {
     const onChange = vi.fn()
     render(<Harness steps={['Off', 'High', 'Max']} initial={1} onChange={onChange} />)
@@ -163,25 +176,36 @@ describe('Slider', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('shows the value readout above the thumb while the pointer drags or the keyboard holds focus', () => {
+  it('holds the step the pointer asked for until the owner settles one', () => {
     const onChange = vi.fn()
-    render(<Harness steps={['320K', '640K', '960K']} initial={1} onChange={onChange} />)
-    // At rest the readout stays out of the DOM, so the step text appears once.
-    expect(screen.getAllByText('640K')).toHaveLength(1)
+    const { rerender } = render(<Slider steps={['320K', '640K', '960K']} value={0} label="Context window" onChange={onChange} />)
     const control = track()
     control.getBoundingClientRect = () => ({
       left: 0, top: 0, width: 300, height: 6, right: 300, bottom: 6, x: 0, y: 0,
       toJSON: () => ({}),
     })
     fireEvent.pointerDown(control, { clientX: 160, pointerId: 1 })
-    expect(screen.getAllByText('640K')).toHaveLength(2)
-    fireEvent.pointerUp(control, { clientX: 160, pointerId: 1 })
-    expect(screen.getAllByText('640K')).toHaveLength(1)
-    // The keyboard holds the readout open for as long as it holds the control.
-    fireEvent.focusIn(control)
-    expect(screen.getAllByText('640K')).toHaveLength(2)
-    fireEvent.focusOut(control)
-    expect(screen.getAllByText('640K')).toHaveLength(1)
+    // Nothing has come back from the owner yet, and the thumb reads the ask.
+    expect(onChange).toHaveBeenCalledWith(1)
+    expect(control.getAttribute('aria-valuenow')).toBe('1')
+    expect(control.getAttribute('aria-valuetext')).toBe('640K')
+    fireEvent.pointerMove(control, { clientX: 290, pointerId: 1 })
+    expect(onChange).toHaveBeenLastCalledWith(2)
+    expect(control.getAttribute('aria-valuenow')).toBe('2')
+    // Once the owner's value leaves where the drag started, the owner's step shows.
+    rerender(<Slider steps={['320K', '640K', '960K']} value={1} label="Context window" onChange={onChange} />)
+    expect(control.getAttribute('aria-valuenow')).toBe('1')
+  })
+
+  it('reports nothing to a track with no measured width', () => {
+    const onChange = vi.fn()
+    render(<Slider steps={['320K', '640K', '960K']} value={0} label="Context window" onChange={onChange} />)
+    const control = track()
+    // jsdom lays nothing out: the press cannot name a step it cannot measure.
+    fireEvent.pointerDown(control, { clientX: 290, pointerId: 1 })
+    fireEvent.pointerMove(control, { clientX: 290, pointerId: 1 })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(control.getAttribute('aria-valuenow')).toBe('0')
   })
 
   it('marks the maximum step with the success accent, and a lone step has no maximum', () => {

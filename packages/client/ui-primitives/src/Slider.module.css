@@ -1,13 +1,13 @@
 /* The track is the whole hit surface: a tall transparent box carries the
-   pointer, the 6px line inside it is the visual, and the room above it holds
-   the value readout that rides with the thumb. `touch-action: none` keeps a
-   drag from scrolling the page under the pointer. */
+   pointer, the 6px line inside it is the visual, and the step labels under it
+   name the step in use, so the control needs no room above the track.
+   `touch-action: none` keeps a drag from scrolling the page under the pointer. */
 .slider {
   position: relative;
   box-sizing: border-box;
   display: block;
   width: 100%;
-  padding: 34px 0 0;
+  padding: 6px 0 0;
   outline: none;
   touch-action: none;
   cursor: pointer;
@@ -36,7 +36,7 @@
   height: 100%;
   border-radius: 3px;
   background: var(--dsw-alias-brand-primary);
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition: width 90ms ease-out, background 160ms ease, box-shadow 160ms ease;
 }
 
 /* At the track's maximum step the fill takes the success accent with a soft
@@ -62,7 +62,9 @@
 }
 
 /* The disc carries a surface-colored ring so it stays legible where it
-   crosses the fill, and grows under the pointer while a drag runs. */
+   crosses the fill, and grows under the pointer while a drag runs. `left`
+   travels rather than jumps so a snapped step reads as motion across the
+   track; the step labels under it name the step in use the same instant. */
 .thumb {
   position: absolute;
   top: 50%;
@@ -72,7 +74,7 @@
   background: var(--dsw-alias-brand-primary);
   box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 1px 3px rgba(0, 0, 0, 0.25);
   transform: translate(-50%, -50%);
-  transition: transform 120ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: left 90ms ease-out, transform 120ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .slider:hover .thumb {
@@ -88,31 +90,13 @@
   box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 0 12px -2px var(--dsw-alias-state-success-primary);
 }
 
-/* The value readout names the step under the pointer; it is decorative, the
-   slider's own aria-valuetext already announces it. */
-.valueBubble {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: var(--dsw-specific-bubble);
-  box-shadow: var(--dsw-elevation-soft);
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 500;
-  white-space: nowrap;
-  pointer-events: none;
-  transform: translate(-50%, 2px);
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-
 /* Labels share the track's coordinate system: each sits under its own tick,
-   so the first and last hug the ends without overflowing the card. */
+   so the first and last hug the ends without overflowing the card. The step
+   in use reads as the control's value, so the track needs no readout above it. */
 .labels {
   position: relative;
   height: 16px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .label {
@@ -123,6 +107,16 @@
   line-height: 16px;
   white-space: nowrap;
   transform: translateX(-50%);
+}
+
+/* The end names align to the track's edges rather than centering on their tick:
+   a card that clips its overflow cuts a centered end name off. */
+.labelFirst {
+  transform: none;
+}
+
+.labelLast {
+  transform: translateX(-100%);
 }
 
 .labelCurrent {

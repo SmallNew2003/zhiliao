@@ -483,20 +483,55 @@ describe('ModelSelect single-panel navigation', () => {
     expect(screen.getByRole('menu')).toBeTruthy()
   })
 
-  it('prevents another submission while a selection is pending', () => {
+  it('leaves the rows and sliders usable while a slider write is open', () => {
     const { trigger, select } = mountOpen({ status: 'selecting' })
+    // A write the sliders have open spans the drag itself; dimming every model row
+    // behind it is what read as the panel stuttering.
     for (const option of screen.getAllByRole('menuitemradio')) {
-      expect((option as HTMLButtonElement).disabled).toBe(true)
-      fireEvent.click(option)
+      expect((option as HTMLButtonElement).disabled).toBe(false)
     }
-    // The sliders refuse input while a selection is in flight.
     for (const slider of screen.getAllByRole('slider')) {
-      expect(slider.getAttribute('aria-disabled')).toBe('true')
-      fireEvent.keyDown(slider, { key: 'ArrowRight' })
+      expect(slider.getAttribute('aria-disabled')).toBeNull()
     }
+    // The card still reports the write: aria-busy carries it, not the rows.
+    expect(screen.getByRole('menu').getAttribute('aria-busy')).toBe('true')
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-    expect(document.activeElement).toBe(trigger)
+    expect(document.activeElement).toBe(screen.getAllByRole('menuitemradio')[0])
     expect(select).not.toHaveBeenCalled()
+  })
+
+  it('refuses a second model row while the first row is still writing', async () => {
+    /** What the seat's `select` verb settles with. */
+    type Settled = { ok: true; value: undefined } | { ok: false; error: RemoteError<'session/writer-held'> }
+    let release: ((result: Settled) => void) | undefined
+    const select = vi.fn(() => new Promise<Settled>((resolve) => { release = resolve }))
+    const opened = state()
+    opened.groups = [{
+      ...opened.groups[0]!,
+      models: [opened.groups[0]!.models[0]!, { id: 'other', name: 'Other' }],
+    }]
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(opened)}
+      load={vi.fn()}
+      select={select}
+      t={t}
+    />)
+    const trigger = screen.getByRole('button', { name: /选择模型/ })
+    trigger.focus()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Other' }))
+    expect(select).toHaveBeenCalledTimes(1)
+    const second = screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })
+    expect((second as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(second)
+    expect(select).toHaveBeenCalledTimes(1)
+    release?.({ ok: false, error: new RemoteError('session/writer-held', 'writer held', { sessionId: SessionId('owned') }) })
+    // A refused row write leaves the panel open with every row usable again.
+    await waitFor(() => { expect((second as HTMLButtonElement).disabled).toBe(false) })
+    expect(screen.getByRole('menu')).toBeTruthy()
+    expect(select).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -593,15 +628,47 @@ describe('ModelSelect context window', () => {
     expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'other' })
   })
 
-  it.each(['selecting', 'locked'] as const)('disables context changes when %s', (status) => {
-    const { props, directory, rerender, select, initial } = mount()
-    if (status === 'selecting') directory.set({ ...initial, status: 'selecting' })
-    rerender(<ModelSelect {...props} locked={status === 'locked'} />)
+  it('disables context changes when locked', () => {
+    const { props, rerender, select } = mount()
+    rerender(<ModelSelect {...props} locked />)
     const slider = within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider')
     expect(slider.getAttribute('aria-disabled')).toBe('true')
     fireEvent.keyDown(slider, { key: 'ArrowRight' })
     fireEvent.pointerDown(slider, { clientX: 290, pointerId: 1 })
     expect(select).not.toHaveBeenCalled()
+  })
+
+  it('submits the step a drag ends on once an earlier window write settles', async () => {
+    const { props, directory, rerender, initial } = mount()
+    const calls: ModelSelection[] = []
+    let release: (() => void) | undefined
+    // The first write stays open, the way a slow Host does, so the steps a drag
+    // crosses after it queue rather than pile up as requests.
+    const deferred = vi.fn((selection: ModelSelection) => new Promise<{ ok: true; value: undefined }>((resolve) => {
+      calls.push(selection)
+      const settle = (): void => {
+        directory.set({ ...initial, current: selection })
+        resolve({ ok: true, value: undefined })
+      }
+      if (calls.length === 1) release = settle
+      else settle()
+    }))
+    rerender(<ModelSelect {...props} select={deferred} />)
+    const slider = within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider')
+    slider.getBoundingClientRect = () => ({
+      left: 0, top: 0, width: 300, height: 6, right: 300, bottom: 6, x: 0, y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent.pointerDown(slider, { clientX: 150, pointerId: 1 })
+    fireEvent.pointerMove(slider, { clientX: 290, pointerId: 1 })
+    expect(calls).toHaveLength(1)
+    // The step in view is the one the pointer holds, write open or not.
+    expect(slider.getAttribute('aria-valuetext')).toBe('960K')
+    release?.()
+    await waitFor(() => { expect(calls).toHaveLength(2) })
+    expect(calls[1]).toEqual({
+      provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 960_000,
+    })
   })
 
   it('announces a refused context change while retaining the current window', async () => {
@@ -667,5 +734,107 @@ describe('smaller context window feedback', () => {
     await waitFor(() => {
       expect(screen.queryByText('已调小窗口，继续对话前将按需压缩上下文。') !== null).toBe(notice)
     })
+  })
+})
+
+describe('ModelSelect enhancements: search, capability badges, recents, and action links', () => {
+  const fiveModelsState = () => state({
+    groups: [
+      {
+        id: 'deepseek-official',
+        name: 'DeepSeek',
+        models: [
+          { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', reasoning },
+          { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', reasoning },
+        ],
+      },
+      {
+        id: 'openai',
+        name: 'OpenAI',
+        models: [
+          { id: 'gpt-4o', name: 'GPT-4o' },
+          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+          { id: 'o1-preview', name: 'o1-preview', reasoning },
+        ],
+      },
+    ],
+  })
+
+  it('filters models by model name and provider name and clears search query', () => {
+    const directory = createSnapshotStore(fiveModelsState())
+    render(
+      <ModelSelect
+        locked={false}
+        available
+        directory={directory}
+        load={vi.fn()}
+        select={vi.fn().mockResolvedValue(undefined)}
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+
+    const searchBox = screen.getByRole('searchbox')
+    expect(searchBox).toBeTruthy()
+
+    // Filter by provider name
+    fireEvent.change(searchBox, { target: { value: 'openai' } })
+    expect(screen.getByRole('menuitemradio', { name: 'GPT-4o' })).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeNull()
+
+    // Clear search
+    const clearBtn = screen.getByRole('button', { name: '清除搜索' })
+    fireEvent.click(clearBtn)
+    expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+    expect(screen.getByRole('menuitemradio', { name: 'GPT-4o' })).toBeTruthy()
+  })
+
+  it('provides an actionable configure button on catalog failure', () => {
+    const directory = createSnapshotStore(state({
+      failures: [{ id: 'openai', name: 'OpenAI', message: 'invalid key' }],
+    }))
+    const listener = vi.fn()
+    window.addEventListener('dsh:open-settings', listener)
+    render(
+      <ModelSelect
+        locked={false}
+        available
+        directory={directory}
+        load={vi.fn()}
+        select={vi.fn().mockResolvedValue(undefined)}
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+
+    const configBtn = screen.getByRole('button', { name: '配置' })
+    expect(configBtn).toBeTruthy()
+    fireEvent.click(configBtn)
+    expect(listener).toHaveBeenCalledOnce()
+    window.removeEventListener('dsh:open-settings', listener)
+  })
+
+  it('records recent selections and renders recent models section when catalog has > 4 models', async () => {
+    localStorage.clear()
+    const directory = createSnapshotStore(fiveModelsState())
+    const select = vi.fn(async (selection: ModelSelection) => {
+      directory.set(state({ current: selection, groups: fiveModelsState().groups }))
+      return { ok: true as const, value: undefined }
+    })
+    const { unmount } = render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+
+    // Initially no recent group
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    expect(screen.queryByRole('group', { name: '最近使用' })).toBeNull()
+
+    // Select GPT-4o
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'GPT-4o' }))
+    expect(select).toHaveBeenCalledWith(expect.objectContaining({ provider: 'openai', model: 'gpt-4o' }))
+    unmount()
+
+    // Reopen menu: recent group is displayed
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    expect(screen.getByRole('group', { name: '最近使用' })).toBeTruthy()
   })
 })
