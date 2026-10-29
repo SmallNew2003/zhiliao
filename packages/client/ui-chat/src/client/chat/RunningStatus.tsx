@@ -66,7 +66,7 @@ export const RunningStatus = memo(function RunningStatus({ startTime, paused, ho
     return () => { clearInterval(timer) }
   }, [startTime, paused, holding])
   const activeIndex = variantIndex ?? selectRunningStatusVariant(startTime)
-  const variant = (activeIndex !== undefined ? RUNNING_STATUS_VARIANTS[activeIndex] : undefined) ?? RUNNING_STATUS_VARIANTS[0] ?? DEFAULT_RUNNING_VARIANT
+  const variant = RUNNING_STATUS_VARIANTS[activeIndex] ?? RUNNING_STATUS_VARIANTS[0] ?? DEFAULT_RUNNING_VARIANT
   const label = startTime === undefined ? t(variant.base) : t(variant.forDuration, {
     duration: formatRunDuration(Math.max(1000, now - startTime), t).map(part => part.text).join(''),
   })

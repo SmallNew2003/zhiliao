@@ -52,7 +52,12 @@ export { RiskConfirmation } from './RiskConfirmation.tsx'
 export type { RiskConfirmationProps } from './RiskConfirmation.tsx'
 export { ConnectionIndicator } from './ConnectionIndicator.tsx'
 export type { ConnectionIndicatorState } from './ConnectionIndicator.tsx'
-export { FishLogo, FISH_LOGO_PATH, FISH_LOGO_VIEWBOX } from './FishLogo.tsx'
+export {
+  FishLogo, BrandLogo, ZhiliaoLogo,
+  FISH_LOGO_PATH, FISH_LOGO_VIEWBOX,
+  ZHILIAO_MARK_TOP_PATH, ZHILIAO_MARK_HOOK_PATH,
+  ZHILIAO_DOT_CX, ZHILIAO_DOT_CY, ZHILIAO_DOT_R, ZHILIAO_ORANGE_COLOR,
+} from './FishLogo.tsx'
 export { BrandWordmark } from './BrandWordmark.tsx'
 export type { BrandWordmarkProps } from './BrandWordmark.tsx'
 export {

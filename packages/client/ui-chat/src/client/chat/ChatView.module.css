@@ -294,63 +294,88 @@
   transform-origin: 48px 48px;
 }
 
-.brandMarkStroke {
+.brandMarkTrack {
   opacity: 0.88;
+}
+
+.brandMarkFlowTop,
+.brandMarkFlowHook {
+  display: none;
 }
 
 .brandMarkDot {
   transform-origin: 85.5px 7.5px;
 }
 
-.brandMarkHalo {
-  transform-origin: 85.5px 7.5px;
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .brandMarkGroup {
-    animation: brandFloat 2.4s ease-in-out infinite alternate;
+  .brandMarkTrack {
+    opacity: 0.22;
+  }
+
+  .brandMarkFlowTop {
+    display: initial;
+    stroke-dasharray: 45 120;
+    stroke-dashoffset: 45;
+    animation: markFlowTop 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .brandMarkFlowHook {
+    display: initial;
+    stroke-dasharray: 20 45;
+    stroke-dashoffset: 20;
+    animation: markFlowHook 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
   .brandMarkDot {
-    animation: dotPulse 1.4s ease-in-out infinite;
-  }
-
-  .brandMarkHalo {
-    animation: haloExpand 1.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    animation: markDotBreathe 1.5s ease-in-out infinite;
   }
 }
 
-@keyframes brandFloat {
+@keyframes markFlowTop {
   0% {
-    transform: translateY(0.5px);
+    stroke-dashoffset: 45;
+    opacity: 0;
   }
-  100% {
-    transform: translateY(-0.8px);
+  15% {
+    opacity: 1;
+  }
+  75% {
+    stroke-dashoffset: -120;
+    opacity: 0.8;
+  }
+  85%, 100% {
+    stroke-dashoffset: -120;
+    opacity: 0;
   }
 }
 
-@keyframes dotPulse {
+@keyframes markFlowHook {
+  0%, 25% {
+    stroke-dashoffset: 20;
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  80% {
+    stroke-dashoffset: -35;
+    opacity: 0.7;
+  }
+  90%, 100% {
+    stroke-dashoffset: -35;
+    opacity: 0;
+  }
+}
+
+@keyframes markDotBreathe {
   0%, 100% {
     transform: scale(0.92);
-    filter: drop-shadow(0 0 1px rgba(242, 138, 46, 0.4));
+    opacity: 0.8;
   }
   50% {
-    transform: scale(1.22);
-    filter: drop-shadow(0 0 5px rgba(242, 138, 46, 0.95));
-  }
-}
-
-@keyframes haloExpand {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.85;
-  }
-  60% {
-    opacity: 0.3;
-  }
-  100% {
-    transform: scale(2.4);
-    opacity: 0;
+    transform: scale(1.18);
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(242, 138, 46, 0.8));
   }
 }
 
