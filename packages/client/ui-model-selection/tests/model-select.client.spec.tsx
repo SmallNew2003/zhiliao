@@ -737,7 +737,7 @@ describe('smaller context window feedback', () => {
   })
 })
 
-describe('ModelSelect enhancements: search, capability badges, recents, and action links', () => {
+describe('ModelSelect enhancements: search, recents, and action links', () => {
   const fiveModelsState = () => state({
     groups: [
       {

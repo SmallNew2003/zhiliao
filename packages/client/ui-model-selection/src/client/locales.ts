@@ -43,7 +43,6 @@ export const zh = {
   'search.clear': '清除搜索',
   'search.empty': '未找到匹配的模型。',
   'group.recent': '最近使用',
-  'badge.reasoning': '思考',
 } satisfies Record<string, string>
 
 /** The model namespace key union. */
@@ -84,5 +83,4 @@ export const en = {
   'search.clear': 'Clear search',
   'search.empty': 'No matching models found.',
   'group.recent': 'Recent',
-  'badge.reasoning': 'Thinking',
 } satisfies Record<ModelKey, string>

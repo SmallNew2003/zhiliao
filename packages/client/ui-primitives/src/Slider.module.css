@@ -1,5 +1,5 @@
 /* The track is the whole hit surface: a tall transparent box carries the
-   pointer, the 6px line inside it is the visual, and the step labels under it
+   pointer, the hairline inside it is the visual, and the step labels under it
    name the step in use, so the control needs no room above the track.
    `touch-action: none` keeps a drag from scrolling the page under the pointer. */
 .slider {
@@ -7,7 +7,7 @@
   box-sizing: border-box;
   display: block;
   width: 100%;
-  padding: 6px 0 0;
+  padding: 4px 0 0;
   outline: none;
   touch-action: none;
   cursor: pointer;
@@ -19,13 +19,14 @@
 }
 
 .slider:focus-visible .track {
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
 }
 
 .track {
   position: relative;
-  height: 6px;
-  border-radius: 3px;
+  height: 4px;
+  margin: 0 7px;
+  border-radius: 999px;
   background: var(--dsw-alias-border-l2);
 }
 
@@ -34,24 +35,22 @@
   top: 0;
   left: 0;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--dsw-alias-brand-primary);
-  transition: width 90ms ease-out, background 160ms ease, box-shadow 160ms ease;
+  transition: width 90ms ease-out;
 }
 
-/* At the track's maximum step the fill takes the success accent with a soft
-   glow, so a full track reads as full at a glance. */
+/* At maximum, the fill cleanly spans the track. */
 .fillAtMax {
-  background: linear-gradient(90deg, var(--dsw-alias-brand-primary), var(--dsw-alias-state-success-primary));
-  box-shadow: 0 0 10px -2px var(--dsw-alias-state-success-primary);
+  background: var(--dsw-alias-brand-primary);
 }
 
 /* Ticks mark the snap positions; the one in use reads as part of the fill. */
 .tick {
   position: absolute;
   top: 50%;
-  width: 3px;
-  height: 3px;
+  width: 2px;
+  height: 2px;
   border-radius: 50%;
   background: var(--dsw-alias-border-l3);
   transform: translate(-50%, -50%);
@@ -68,13 +67,13 @@
 .thumb {
   position: absolute;
   top: 50%;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--dsw-alias-brand-primary);
   box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 1px 3px rgba(0, 0, 0, 0.25);
   transform: translate(-50%, -50%);
-  transition: left 90ms ease-out, transform 120ms ease, background 160ms ease, box-shadow 160ms ease;
+  transition: left 90ms ease-out, transform 120ms ease;
 }
 
 .slider:hover .thumb {
@@ -86,37 +85,39 @@
 }
 
 .thumbAtMax {
-  background: var(--dsw-alias-state-success-primary);
-  box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 0 12px -2px var(--dsw-alias-state-success-primary);
+  background: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Labels share the track's coordinate system: each sits under its own tick,
-   so the first and last hug the ends without overflowing the card. The step
-   in use reads as the control's value, so the track needs no readout above it. */
+   so the first and last hug the ends without overflowing the card. */
 .labels {
   position: relative;
   height: 16px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .label {
   position: absolute;
   top: 0;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 16px;
   white-space: nowrap;
   transform: translateX(-50%);
 }
 
-/* The end names align to the track's edges rather than centering on their tick:
+/* The end names align to the edges rather than centering on their tick:
    a card that clips its overflow cuts a centered end name off. */
 .labelFirst {
+  left: 0 !important;
   transform: none;
 }
 
 .labelLast {
-  transform: translateX(-100%);
+  left: auto !important;
+  right: 0;
+  transform: none;
 }
 
 .labelCurrent {
@@ -124,8 +125,8 @@
   font-weight: 500;
 }
 
-/* The step in use at the maximum also carries the success accent. */
+/* The step in use at the maximum carries refined emphasis. */
 .labelAtMax {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-label-primary);
   font-weight: 600;
 }
