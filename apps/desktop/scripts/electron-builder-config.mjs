@@ -80,8 +80,8 @@ export function createElectronBuilderConfig(
   return {
     appId,
     extraMetadata: { dshDesktopAppId: appId, dshMandatoryUpdatePolicy: policy },
-    productName: 'DeepSeek Harness',
-    artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
+    productName: 'Zhiliao',
+    artifactName: 'zhiliao-${version}-${os}-${arch}.${ext}',
     directories: { output: unsigned ? join(buildPaths.root, 'unsigned-artifacts') : buildPaths.artifacts },
     asar: true,
     electronDist: buildPaths.electron,
@@ -131,6 +131,7 @@ export function createElectronBuilderConfig(
       notarize: !unsigned,
       target: ['dmg', 'zip'],
       extendInfo: {
+        CFBundleDisplayName: '知了',
         // macOS 10.14+ refuses the first notification without a purpose
         // string, so the announcement feature would be silent on a signed
         // build without it.

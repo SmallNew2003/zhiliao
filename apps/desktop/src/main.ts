@@ -582,12 +582,13 @@ async function main(): Promise<void> {
     updates.dispose()
   })
 
+  app.setName(currentDesktopLocale().messages.applicationName)
   app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
+    applicationName: currentDesktopLocale().messages.applicationName,
     applicationVersion: app.getVersion(),
     // The release has no separate build number; omit Electron's bundle version.
     version: '',
-    copyright: '',
+    copyright: `Copyright © ${new Date().getFullYear()} ${currentDesktopLocale().messages.applicationName}`,
     iconPath: development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
       : join(process.resourcesPath, 'icon.png'),
   })
