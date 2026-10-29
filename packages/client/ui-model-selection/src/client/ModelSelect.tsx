@@ -21,8 +21,8 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelCatalogModel, ModelProviderGroup } from '@deepseek-ai/dsh-api-session-controller/types'
 import {
-  IconBrowseOutline16, IconCheckOutline16, IconChevronDownOutline14, IconCloseFill14,
-  IconDataOutline16, IconSearchOutline16, IconThinkOutline14,
+  IconCheckOutline16, IconChevronDownOutline14, IconCloseFill14,
+  IconDataOutline16,
   IconWarningOutline16, Slider, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -452,26 +452,6 @@ export function ModelSelect(
     drainSteps(step)
   }
 
-  const renderCapabilityBadges = (model: ModelCatalogModel) => {
-    const isReasoning = model.reasoning !== undefined
-    const isVision = /(vision|vl|omni|4o)/i.test(`${model.id} ${model.name}`)
-    if (!isReasoning && !isVision) return null
-    return (
-      <span className={css.badges} aria-hidden>
-        {isReasoning && (
-          <span className={clsx(css.badge, css.badgeReasoning)} title={t('badge.reasoning')}>
-            <IconThinkOutline14 className={css.badgeIcon} size={14} />
-          </span>
-        )}
-        {isVision && (
-          <span className={clsx(css.badge, css.badgeVision)} title="Vision">
-            <IconBrowseOutline16 className={css.badgeIcon} size={14} />
-          </span>
-        )}
-      </span>
-    )
-  }
-
   const waiting = state.current === null && state.status === 'loading'
   const modelLabel = waiting
     ? t('trigger.loading')
@@ -541,9 +521,6 @@ export function ModelSelect(
           {showSearch && (
             <div className={css.searchRow}>
               <div className={css.search}>
-                <span className={css.searchIcon}>
-                  <IconSearchOutline16 size={14} />
-                </span>
                 <input
                   ref={searchRef}
                   type="text"
@@ -608,7 +585,6 @@ export function ModelSelect(
                     >
                       <span className={css.optionCopy}>
                         <span className={css.modelName}>{model.name}</span>
-                        {renderCapabilityBadges(model)}
                       </span>
                       <span className={css.check}>
                         {selected ? <IconCheckOutline16 /> : null}
@@ -639,7 +615,6 @@ export function ModelSelect(
                       >
                         <span className={css.optionCopy}>
                           <span className={css.modelName}>{model.name}</span>
-                          {renderCapabilityBadges(model)}
                         </span>
                         <span className={css.check}>
                           {selected ? <IconCheckOutline16 /> : null}

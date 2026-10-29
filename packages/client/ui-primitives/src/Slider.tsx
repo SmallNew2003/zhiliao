@@ -154,24 +154,26 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
         <div className={clsx(css.thumb, atMax && css.thumbAtMax)} style={{ left: position(shown) }} />
       </div>
       <div className={css.labels}>
-        {steps.map((step, index) => (
-          <span
-            key={step}
-            className={clsx(
-              css.label,
-              // The end labels hug the track ends rather than centering on their
-              // tick, so a wide name cannot run off the card that clips it.
-              index === 0 && css.labelFirst,
-              index === last && last > 0 && css.labelLast,
-              index === shown && css.labelCurrent,
-              atMax && index === shown && css.labelAtMax,
-            )}
-            style={{ left: position(index) }}
-            aria-current={index === shown || undefined}
-          >
-            {step}
-          </span>
-        ))}
+        {steps.map((step, index) => {
+          const isFirst = index === 0
+          const isLast = index === last && last > 0
+          return (
+            <span
+              key={step}
+              className={clsx(
+                css.label,
+                isFirst && css.labelFirst,
+                isLast && css.labelLast,
+                index === shown && css.labelCurrent,
+                atMax && index === shown && css.labelAtMax,
+              )}
+              style={isFirst || isLast ? undefined : { left: position(index) }}
+              aria-current={index === shown || undefined}
+            >
+              {step}
+            </span>
+          )
+        })}
       </div>
     </div>
   )
