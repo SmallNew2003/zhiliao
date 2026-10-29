@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-notification",
   "description": "Native OS notifications for session completion, pending approval, and agent-loop failure",
-  "version": "0.1.6-alpha.2",
+  "version": "0.1.6-alpha.2.20261023.1",
   "publishConfig": {
     "access": "public"
   },

@@ -209,7 +209,7 @@ export function parseDesktopPackageInvocation(
   })
   if (positionals.length > 1) throw new Error('desktop package: expected at most one target')
   const name = positionals[0] ?? hostTargetName(hostPlatform, hostArch)
-  if (values.unsigned && name !== 'win-x64') throw new Error('desktop package: --unsigned requires win-x64')
+  if (values.unsigned && !['win-x64','mac-arm64','mac-x64'].includes(name)) throw new Error('desktop package: --unsigned is unsupported for this target')
   if (values.unsigned && values['prepare-only']) throw new Error('desktop package: --unsigned cannot use --prepare-only')
   return {
     target: resolveDesktopPackageTarget(name, hostPlatform, hostArch),
@@ -292,7 +292,7 @@ async function main(): Promise<void> {
   if (run !== undefined) console.log(`DESKTOP_PACKAGING_RECORD ${run.directory}`)
   let success = false
   try {
-    if (target.platform === 'darwin') {
+    if (target.platform === 'darwin' && !invocation.unsigned) {
       await withMacOSSigningKeychain(environment, signingEnvironment => packageTarget(invocation, signingEnvironment, run))
     } else {
       await packageTarget(invocation, environment, run)
@@ -361,9 +361,9 @@ export async function packageTarget(
   await execute(['run', 'prepare:runtime', ...(signPrimaryRuntime ? ['--defer-primary-runtime-smoke'] : [])], targetEnv)
   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime'], electronBuilderEnv)
   await execute(['run', 'prepare:packages'], targetEnv)
-  await execute(['run', 'prepare:dsh'], targetEnv)
+  await execute(['run', 'prepare:dsh'], electronBuilderEnv)
   if (invocation.prepareOnly) return
-  if (target.platform === 'darwin' && !invocation.directory) {
+  if (target.platform === 'darwin' && !invocation.directory && !invocation.unsigned) {
     await execute([
       ...desktopElectronBuilderArguments(target, true),
       '--config.mac.notarize=false',
