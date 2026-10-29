@@ -1,12 +1,13 @@
 /* The track is the whole hit surface: a tall transparent box carries the
-   pointer, the 4px line inside it is the visual. `touch-action: none` keeps a
-   drag from scrolling the page under the pointer. */
+   pointer, the 6px line inside it is the visual, and the step labels under it
+   name the step in use, so the control needs no room above the track.
+   `touch-action: none` keeps a drag from scrolling the page under the pointer. */
 .slider {
   position: relative;
   box-sizing: border-box;
   display: block;
   width: 100%;
-  padding: 12px 0 0;
+  padding: 6px 0 0;
   outline: none;
   touch-action: none;
   cursor: pointer;
@@ -23,8 +24,8 @@
 
 .track {
   position: relative;
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--dsw-alias-border-l2);
 }
 
@@ -33,16 +34,24 @@
   top: 0;
   left: 0;
   height: 100%;
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--dsw-alias-brand-primary);
+  transition: width 90ms ease-out, background 160ms ease, box-shadow 160ms ease;
+}
+
+/* At the track's maximum step the fill takes the success accent with a soft
+   glow, so a full track reads as full at a glance. */
+.fillAtMax {
+  background: linear-gradient(90deg, var(--dsw-alias-brand-primary), var(--dsw-alias-state-success-primary));
+  box-shadow: 0 0 10px -2px var(--dsw-alias-state-success-primary);
 }
 
 /* Ticks mark the snap positions; the one in use reads as part of the fill. */
 .tick {
   position: absolute;
   top: 50%;
-  width: 2px;
-  height: 2px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: var(--dsw-alias-border-l3);
   transform: translate(-50%, -50%);
@@ -52,22 +61,42 @@
   background: var(--dsw-alias-brand-primary);
 }
 
+/* The disc carries a surface-colored ring so it stays legible where it
+   crosses the fill, and grows under the pointer while a drag runs. `left`
+   travels rather than jumps so a snapped step reads as motion across the
+   track; the step labels under it name the step in use the same instant. */
 .thumb {
   position: absolute;
   top: 50%;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 1px 3px rgba(0, 0, 0, 0.25);
   transform: translate(-50%, -50%);
+  transition: left 90ms ease-out, transform 120ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.slider:hover .thumb {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.slider:active .thumb {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.thumbAtMax {
+  background: var(--dsw-alias-state-success-primary);
+  box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 0 12px -2px var(--dsw-alias-state-success-primary);
 }
 
 /* Labels share the track's coordinate system: each sits under its own tick,
-   so the first and last hug the ends without overflowing the card. */
+   so the first and last hug the ends without overflowing the card. The step
+   in use reads as the control's value, so the track needs no readout above it. */
 .labels {
   position: relative;
   height: 16px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .label {
@@ -80,7 +109,23 @@
   transform: translateX(-50%);
 }
 
+/* The end names align to the track's edges rather than centering on their tick:
+   a card that clips its overflow cuts a centered end name off. */
+.labelFirst {
+  transform: none;
+}
+
+.labelLast {
+  transform: translateX(-100%);
+}
+
 .labelCurrent {
   color: var(--dsw-alias-label-primary);
   font-weight: 500;
+}
+
+/* The step in use at the maximum also carries the success accent. */
+.labelAtMax {
+  color: var(--dsw-alias-state-success-primary);
+  font-weight: 600;
 }

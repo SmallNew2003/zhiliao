@@ -57,6 +57,19 @@ describe('Slider', () => {
     expect(stepLabel('320K').getAttribute('aria-current')).toBeNull()
   })
 
+  it('keeps the end names inside the track', () => {
+    render(<Slider steps={['320K', '640K', '960K']} value={1} label="Context window" onChange={() => {}} />)
+    expect(stepLabel('320K').className).toMatch(/labelFirst/)
+    expect(stepLabel('960K').className).toMatch(/labelLast/)
+    // A middle name stays centered on its own tick.
+    expect(stepLabel('640K').className).not.toMatch(/labelFirst|labelLast/)
+    // A lone step has no far end to pull in.
+    cleanup()
+    render(<Slider steps={['Only']} value={0} label="Context window" onChange={() => {}} />)
+    expect(stepLabel('Only').className).toMatch(/labelFirst/)
+    expect(stepLabel('Only').className).not.toMatch(/labelLast/)
+  })
+
   it('steps with the arrow keys and clamps at both ends', () => {
     const onChange = vi.fn()
     render(<Harness steps={['Off', 'High', 'Max']} initial={1} onChange={onChange} />)
@@ -104,7 +117,7 @@ describe('Slider', () => {
     control.getBoundingClientRect = () => ({
       left: 0, top: 0, width: 300, height: 4, right: 300, bottom: 4, x: 0, y: 0,
       toJSON: () => ({}),
-    }) as DOMRect
+    })
     fireEvent.pointerDown(control, { clientX: 290, pointerId: 1 })
     expect(onChange).toHaveBeenCalledWith(2)
     onChange.mockClear()
@@ -125,7 +138,7 @@ describe('Slider', () => {
     control.getBoundingClientRect = () => ({
       left: 0, top: 0, width: 300, height: 4, right: 300, bottom: 4, x: 0, y: 0,
       toJSON: () => ({}),
-    }) as DOMRect
+    })
     fireEvent.pointerDown(control, { clientX: 10, pointerId: 1 })
     fireEvent.pointerUp(control, { clientX: 10, pointerId: 1 })
     onChange.mockClear()
@@ -155,12 +168,64 @@ describe('Slider', () => {
     control.getBoundingClientRect = () => ({
       left: 0, top: 0, width: 300, height: 4, right: 300, bottom: 4, x: 0, y: 0,
       toJSON: () => ({}),
-    }) as DOMRect
+    })
     fireEvent.pointerDown(control, { clientX: 290, pointerId: 1 })
     onChange.mockClear()
     rerender(<Slider steps={['320K', '640K', '960K']} value={2} label="Context window" disabled onChange={onChange} />)
     fireEvent.pointerMove(control, { clientX: 10, pointerId: 1 })
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('holds the step the pointer asked for until the owner settles one', () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<Slider steps={['320K', '640K', '960K']} value={0} label="Context window" onChange={onChange} />)
+    const control = track()
+    control.getBoundingClientRect = () => ({
+      left: 0, top: 0, width: 300, height: 6, right: 300, bottom: 6, x: 0, y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent.pointerDown(control, { clientX: 160, pointerId: 1 })
+    // Nothing has come back from the owner yet, and the thumb reads the ask.
+    expect(onChange).toHaveBeenCalledWith(1)
+    expect(control.getAttribute('aria-valuenow')).toBe('1')
+    expect(control.getAttribute('aria-valuetext')).toBe('640K')
+    fireEvent.pointerMove(control, { clientX: 290, pointerId: 1 })
+    expect(onChange).toHaveBeenLastCalledWith(2)
+    expect(control.getAttribute('aria-valuenow')).toBe('2')
+    // Once the owner's value leaves where the drag started, the owner's step shows.
+    rerender(<Slider steps={['320K', '640K', '960K']} value={1} label="Context window" onChange={onChange} />)
+    expect(control.getAttribute('aria-valuenow')).toBe('1')
+  })
+
+  it('reports nothing to a track with no measured width', () => {
+    const onChange = vi.fn()
+    render(<Slider steps={['320K', '640K', '960K']} value={0} label="Context window" onChange={onChange} />)
+    const control = track()
+    // jsdom lays nothing out: the press cannot name a step it cannot measure.
+    fireEvent.pointerDown(control, { clientX: 290, pointerId: 1 })
+    fireEvent.pointerMove(control, { clientX: 290, pointerId: 1 })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(control.getAttribute('aria-valuenow')).toBe('0')
+  })
+
+  it('marks the maximum step with the success accent, and a lone step has no maximum', () => {
+    const { container } = render(
+      <Slider steps={['320K', '640K', '960K']} value={2} label="Context window" onChange={() => {}} />,
+    )
+    expect(container.querySelector('[class*="fillAtMax"]')).toBeTruthy()
+    expect(container.querySelector('[class*="thumbAtMax"]')).toBeTruthy()
+    expect(container.querySelector('[class*="labelAtMax"]')).toBeTruthy()
+    // A step short of the maximum carries no accent.
+    const { container: middle } = render(
+      <Slider steps={['320K', '640K', '960K']} value={1} label="Context window" onChange={() => {}} />,
+    )
+    expect(middle.querySelector('[class*="fillAtMax"]')).toBeNull()
+    expect(middle.querySelector('[class*="thumbAtMax"]')).toBeNull()
+    // A single-step track has no maximum position to accent.
+    const { container: single } = render(
+      <Slider steps={['Only']} value={0} label="Context window" onChange={() => {}} />,
+    )
+    expect(single.querySelector('[class*="fillAtMax"]')).toBeNull()
   })
 
   it('keeps a caller class alongside its own so a render site can place it', () => {
