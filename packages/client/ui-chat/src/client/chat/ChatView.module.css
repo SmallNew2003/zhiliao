@@ -90,6 +90,7 @@
   flex: none;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   height: calc(26px + var(--dsh-content-font-delta, 0px));
   font: var(--dsw-font-s-strong-14);
   /* The status line reads at the body size: the fixed 14 token supplies the
@@ -248,4 +249,109 @@
 
 .contextGroup > .flowItem {
   margin: 8px 0 0 16px;
+}
+
+.runningIcon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: calc(16px + var(--dsh-content-font-delta, 0px));
+  height: calc(16px + var(--dsh-content-font-delta, 0px));
+  contain: strict;
+  overflow: hidden;
+}
+
+.runningMarkSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brandMarkGroup {
+  transform-origin: 48px 48px;
+}
+
+.brandMarkTrack {
+  opacity: 0.88;
+}
+
+.brandMarkFlowTop,
+.brandMarkFlowHook {
+  display: none;
+}
+
+.brandMarkDot {
+  transform-origin: 85.5px 7.5px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brandMarkTrack {
+    opacity: 0.22;
+  }
+
+  .brandMarkFlowTop {
+    display: initial;
+    stroke-dasharray: 45 120;
+    stroke-dashoffset: 45;
+    animation: markFlowTop 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .brandMarkFlowHook {
+    display: initial;
+    stroke-dasharray: 20 45;
+    stroke-dashoffset: 20;
+    animation: markFlowHook 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
+  .brandMarkDot {
+    animation: markDotBreathe 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes markFlowTop {
+  0% {
+    stroke-dashoffset: 45;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  75% {
+    stroke-dashoffset: -120;
+    opacity: 0.8;
+  }
+  85%, 100% {
+    stroke-dashoffset: -120;
+    opacity: 0;
+  }
+}
+
+@keyframes markFlowHook {
+  0%, 25% {
+    stroke-dashoffset: 20;
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  80% {
+    stroke-dashoffset: -35;
+    opacity: 0.7;
+  }
+  90%, 100% {
+    stroke-dashoffset: -35;
+    opacity: 0;
+  }
+}
+
+@keyframes markDotBreathe {
+  0%, 100% {
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(242, 138, 46, 0.8));
+  }
 }

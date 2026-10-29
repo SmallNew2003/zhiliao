@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { RunningCicada } from './RunningWhaleTail.tsx'
 import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import { Button, IconChevronDownOutline14, MarkdownDelegateProvider, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -206,7 +207,10 @@ function TurnStatus({ startTime, t }: {
   const showClock = elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      {t('chat.deepDiving')}
+      <div className={css.runningIcon}>
+        <RunningCicada />
+      </div>
+      <span>{t('chat.deepDiving')}</span>
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t)}
