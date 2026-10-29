@@ -707,7 +707,6 @@ describe('CI workflow', () => {
 
   it('redirects the Node compile cache to the data-volume runner temp before the first pnpm call', () => {
     const prWorkflow = loadWorkflow('.github/workflows/ci.yml')
-    const masterWorkflow = loadWorkflow('.github/workflows/ci-master.yml')
     const redirectLanes = [
       [prWorkflow, 'node-24'],
       [prWorkflow, 'node-24-coverage'],
