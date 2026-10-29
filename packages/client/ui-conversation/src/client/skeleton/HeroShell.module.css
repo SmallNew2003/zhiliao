@@ -32,15 +32,16 @@
      one centered line while they fit; squeezed, the fish takes its own line
      above the group. No breakpoint. */
   flex-wrap: wrap;
-  column-gap: 10px;
-  /* Wrapped, the fish sits on its own line; more air than the 10px side gap
+  column-gap: 12px;
+  /* Wrapped, the fish sits on its own line; more air than the 12px side gap
      keeps it reading as a mark above the title, not a squeezed inline glyph. */
   row-gap: 12px;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  line-height: 32px;
+  font-size: 28px;
+  line-height: 36px;
   font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -53,15 +54,15 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  /* Superscript sits 7 from the title. */
-  column-gap: 7px;
+  /* Superscript sits 8 from the title. */
+  column-gap: 8px;
   row-gap: 4px;
   min-width: 0;
 }
 
 .previewBadge {
   align-self: flex-start;
-  margin-top: 2px;
+  margin-top: 3px;
   padding: 1px 7px 0;
   border: 0.5px solid var(--dsw-alias-interactive-bg-hover);
   border-radius: 999px;
