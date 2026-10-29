@@ -33,6 +33,10 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
   const current = Math.min(Math.max(value, 0), last)
   const trackRef = useRef<HTMLDivElement | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [focused, setFocused] = useState(false)
+  // The value readout rides above the thumb while the pointer drags or the
+  // keyboard holds the control, naming the step under the pointer.
+  const showValue = dragging || focused
 
   // A drag keeps reporting after the pointer leaves the track, so the move and
   // release listeners live on the window for as long as the drag runs.
@@ -84,7 +88,11 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
     // The track itself is the hit surface: a press selects the step under the
     // pointer and starts a drag, so the keyboard follows the pointer.
     event.preventDefault()
+    // The press focuses the control so the keyboard follows the pointer, but a
+    // pointer-origin focus does not hold the readout open; only the keyboard
+    // arriving on the control does.
     event.currentTarget.focus()
+    setFocused(false)
     const rect = event.currentTarget.getBoundingClientRect()
     const next = Math.min(Math.max(Math.round(((event.clientX - rect.left) / rect.width) * last), 0), last)
     if (next !== current) onChange(next)
@@ -92,6 +100,9 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
   }
 
   const position = (index: number): string => `${(index / last) * 100}%`
+  // The track's last step is the maximum; a single-step track has none, so the
+  // accent stays reserved for a real full position.
+  const atMax = last > 0 && current === last
 
   return (
     <div
@@ -107,19 +118,30 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
       className={clsx(css.slider, className)}
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
+      onFocus={() => { setFocused(true) }}
+      onBlur={() => { setFocused(false) }}
     >
       <div className={css.track}>
-        <div className={css.fill} style={{ width: position(current) }} />
+        <div className={clsx(css.fill, atMax && css.fillAtMax)} style={{ width: position(current) }} />
         {steps.map((step, index) => (
           <div key={step} className={clsx(css.tick, index === current && css.tickCurrent)} style={{ left: position(index) }} />
         ))}
-        <div className={css.thumb} style={{ left: position(current) }} />
+        <div className={clsx(css.thumb, atMax && css.thumbAtMax)} style={{ left: position(current) }} />
+        {showValue && (
+          <div className={css.valueBubble} style={{ left: position(current) }} aria-hidden>
+            {steps[current]}
+          </div>
+        )}
       </div>
       <div className={css.labels}>
         {steps.map((step, index) => (
           <span
             key={step}
-            className={clsx(css.label, index === current && css.labelCurrent)}
+            className={clsx(
+              css.label,
+              index === current && css.labelCurrent,
+              atMax && index === current && css.labelAtMax,
+            )}
             style={{ left: position(index) }}
             aria-current={index === current || undefined}
           >

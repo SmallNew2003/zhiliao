@@ -473,10 +473,14 @@ describe('ModelSelect single-panel navigation', () => {
       toJSON: () => ({}),
     })
     fireEvent.pointerDown(slider, { clientX: 10, pointerId: 1 })
-    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
-    expect(select).toHaveBeenCalledWith({
-      provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'off',
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({
+        provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'off',
+      })
     })
+    // The step applies in place: the menu stays open so the pointer can keep
+    // travelling the track.
+    expect(screen.getByRole('menu')).toBeTruthy()
   })
 
   it('prevents another submission while a selection is pending', () => {
@@ -534,22 +538,31 @@ describe('ModelSelect context window', () => {
   })
 
   it('preserves effort when choosing a larger window and window when choosing effort', async () => {
-    const { select, trigger } = mount()
-    fireEvent.keyDown(within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider'), { key: 'ArrowRight' })
-    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
-    expect(select).toHaveBeenLastCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
-    fireEvent.click(trigger)
-    expect(within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider').getAttribute('aria-valuetext')).toBe('640K')
+    const { select } = mount()
+    const contextSlider = within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider')
+    fireEvent.keyDown(contextSlider, { key: 'ArrowRight' })
+    await waitFor(() => {
+      expect(select).toHaveBeenLastCalledWith({
+        provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+    })
+    // Neither step closes the menu, so the second slider is reached in place.
+    expect(screen.getByRole('menu')).toBeTruthy()
+    expect(contextSlider.getAttribute('aria-valuetext')).toBe('640K')
     fireEvent.keyDown(within(screen.getByRole('group', { name: '推理等级' })).getByRole('slider'), { key: 'Home' })
-    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
-    expect(select).toHaveBeenLastCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'off', contextWindow: 640_000 })
+    await waitFor(() => {
+      expect(select).toHaveBeenLastCalledWith({
+        provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'off', contextWindow: 640_000 })
+    })
+    expect(screen.getByRole('menu')).toBeTruthy()
   })
 
   it('keeps inherited effort absent when selecting a window', async () => {
     const { select } = mount({ provider: 'deepseek-official', model: 'deepseek-v4-flash' })
     fireEvent.keyDown(within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider'), { key: 'End' })
-    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
-    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 960_000 })
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 960_000 })
+    })
+    expect(screen.getByRole('menu')).toBeTruthy()
   })
 
   it('retains context when returning to provider-default effort', async () => {
@@ -562,8 +575,10 @@ describe('ModelSelect context window', () => {
     rerender(<ModelSelect {...props} />)
     // Home jumps to the provider-default step, the track's first step.
     fireEvent.keyDown(within(screen.getByRole('group', { name: '推理等级' })).getByRole('slider'), { key: 'Home' })
-    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
-    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 640_000 })
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 640_000 })
+    })
+    expect(screen.getByRole('menu')).toBeTruthy()
   })
 
   it('makes same-model clicks no-ops and clears overrides on another model', async () => {
@@ -603,14 +618,19 @@ describe('ModelSelect context window', () => {
     expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
   })
 
-  it('steps the context slider with the keyboard and closes on the settled value', async () => {
+  it('steps the context slider with the keyboard and applies the step in place', async () => {
     const { select } = mount()
     const slider = within(screen.getByRole('group', { name: '上下文窗口' })).getByRole('slider')
     // The slider opens on the step in use.
     expect(slider.getAttribute('aria-valuetext')).toBe('320K')
     fireEvent.keyDown(slider, { key: 'ArrowRight' })
-    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
-    expect(select).toHaveBeenCalledWith({ provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({
+        provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 640_000 })
+    })
+    // The menu stays open, and the thumb travels with the settled value.
+    expect(screen.getByRole('menu')).toBeTruthy()
+    expect(slider.getAttribute('aria-valuetext')).toBe('640K')
   })
 
   it('omits context selection until a current model is available', () => {

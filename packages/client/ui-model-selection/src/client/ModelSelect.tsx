@@ -4,7 +4,9 @@
  * panel, with a snapping slider over the effort levels and one over the context
  * presets. Arrow keys traverse the model rows; Tab selects, while Escape and Shift+Tab
  * close and restore the trigger. A focused slider keeps the arrow keys itself, so
- * the row traversal never pulls the keyboard off it. Catalog errors offer Retry in
+ * the row traversal never pulls the keyboard off it. A slider step applies its
+ * selection in place and leaves the menu open, so the pointer can keep travelling
+ * the track; choosing a model row settles and closes. Catalog errors offer Retry in
  * the panel; rejected selections use the composer-anchored Toast.
  */
 import {
@@ -238,10 +240,12 @@ export function ModelSelect(
     close()
   }
 
-  const settleSelection = (result: Awaited<ReturnType<ModelSelectInjected['select']>>): void => {
+  const settleSelection = (result: Awaited<ReturnType<ModelSelectInjected['select']>>, stayOpen = false): void => {
     if (result === undefined) return
     if (result.ok) {
-      if (rootRef.current !== null) close(true)
+      // A slider applies its step in place and leaves the menu open, so the
+      // pointer can keep travelling the track; a row settles and closes.
+      if (!stayOpen && rootRef.current !== null) close(true)
       return
     }
     const { error } = result
@@ -272,7 +276,7 @@ export function ModelSelect(
       ...state.current.contextWindow === undefined ? {} : { contextWindow: state.current.contextWindow },
     }
     lastActionRef.current = 'select'
-    void select(selection).then(settleSelection)
+    void select(selection).then((result) => { settleSelection(result, true) })
   }
 
   const chooseContextWindow = (value: number): void => {
@@ -280,7 +284,7 @@ export function ModelSelect(
     lastActionRef.current = 'select'
     const smaller = contextWindow !== undefined && value < contextWindow
     void select({ ...state.current, contextWindow: value }).then((result) => {
-      settleSelection(result)
+      settleSelection(result, true)
       if (result?.ok === true && smaller && rootRef.current !== null) {
         toastSeq.current += 1
         setToast({ seq: toastSeq.current, text: t('context.smaller') })

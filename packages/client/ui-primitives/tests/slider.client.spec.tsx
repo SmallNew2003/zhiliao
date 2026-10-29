@@ -163,6 +163,47 @@ describe('Slider', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('shows the value readout above the thumb while the pointer drags or the keyboard holds focus', () => {
+    const onChange = vi.fn()
+    render(<Harness steps={['320K', '640K', '960K']} initial={1} onChange={onChange} />)
+    // At rest the readout stays out of the DOM, so the step text appears once.
+    expect(screen.getAllByText('640K')).toHaveLength(1)
+    const control = track()
+    control.getBoundingClientRect = () => ({
+      left: 0, top: 0, width: 300, height: 6, right: 300, bottom: 6, x: 0, y: 0,
+      toJSON: () => ({}),
+    })
+    fireEvent.pointerDown(control, { clientX: 160, pointerId: 1 })
+    expect(screen.getAllByText('640K')).toHaveLength(2)
+    fireEvent.pointerUp(control, { clientX: 160, pointerId: 1 })
+    expect(screen.getAllByText('640K')).toHaveLength(1)
+    // The keyboard holds the readout open for as long as it holds the control.
+    fireEvent.focusIn(control)
+    expect(screen.getAllByText('640K')).toHaveLength(2)
+    fireEvent.focusOut(control)
+    expect(screen.getAllByText('640K')).toHaveLength(1)
+  })
+
+  it('marks the maximum step with the success accent, and a lone step has no maximum', () => {
+    const { container } = render(
+      <Slider steps={['320K', '640K', '960K']} value={2} label="Context window" onChange={() => {}} />,
+    )
+    expect(container.querySelector('[class*="fillAtMax"]')).toBeTruthy()
+    expect(container.querySelector('[class*="thumbAtMax"]')).toBeTruthy()
+    expect(container.querySelector('[class*="labelAtMax"]')).toBeTruthy()
+    // A step short of the maximum carries no accent.
+    const { container: middle } = render(
+      <Slider steps={['320K', '640K', '960K']} value={1} label="Context window" onChange={() => {}} />,
+    )
+    expect(middle.querySelector('[class*="fillAtMax"]')).toBeNull()
+    expect(middle.querySelector('[class*="thumbAtMax"]')).toBeNull()
+    // A single-step track has no maximum position to accent.
+    const { container: single } = render(
+      <Slider steps={['Only']} value={0} label="Context window" onChange={() => {}} />,
+    )
+    expect(single.querySelector('[class*="fillAtMax"]')).toBeNull()
+  })
+
   it('keeps a caller class alongside its own so a render site can place it', () => {
     render(<Slider steps={['Off', 'High', 'Max']} value={1} label="Effort" className="placed" onChange={() => {}} />)
     expect(track().classList.contains('placed')).toBe(true)
