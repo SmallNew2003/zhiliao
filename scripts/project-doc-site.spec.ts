@@ -775,10 +775,13 @@ describe('raw Markdown projection of the published manifest', () => {
   })
 
   it('emits home pages with their bodies instead of the frontmatter stub', () => {
+    // Each locale root carries its own product name: 知了 in the Chinese
+    // body, Zhiliao in the English one.
+    const homeTitles: Record<string, string> = { 'index.md': '# 知了', 'en/index.md': '# Zhiliao' }
     for (const route of ['index.md', 'en/index.md']) {
       const home = new TextDecoder().decode(readFileSync(join(mirror, route)))
       expect(home.startsWith('---'), route).toBe(false)
-      expect(home, route).toContain('# DeepSeek Harness')
+      expect(home, route).toContain(homeTitles[route])
     }
   })
 
