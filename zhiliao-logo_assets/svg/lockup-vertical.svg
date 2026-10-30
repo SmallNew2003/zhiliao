@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="224" viewBox="0 0 192 224" fill="none">
+  <g transform="translate(48 8)">
+    <path d="M16 25 L76 25 C76 40 63 51 30 53" stroke="#1F4A3D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M51 50 L51 62 C51 71 48 75.5 41.5 74.5" stroke="#1F4A3D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="85.5" cy="7.5" r="6.5" fill="#F28A2E"/>
+  </g>
+  <text x="96" y="176" text-anchor="middle" font-family="'PingFang SC','Hiragino Sans GB','Source Han Sans SC','Microsoft YaHei',sans-serif" font-size="46" font-weight="600" letter-spacing="6" fill="#1F4A3D">知了</text>
+  <text x="96" y="206" text-anchor="middle" font-family="'Avenir Next','Inter','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="600" letter-spacing="6" fill="#3FBE9E">ZHILIAO</text>
+</svg>
