@@ -69,11 +69,14 @@ export const RELEASED_V3_EVENT_TYPES: ReadonlySet<string> = new Set([
 
 /**
  * Keep unknown ignorable events opaque after header promotion.
+ * Pre-release informational extensions (such as MCP discovery snapshots and message edits)
+ * that omitted the ignorable envelope marker are safely treated as ignorable extensions.
  * @param event - original V3 event; this incoming identity conversion is applied once.
  * @returns the same event or an ignorable namespaced event retaining its payload and coordinates.
  */
 export function namespaceV3OpaqueEvent(event: SessionFormatEvent): SessionFormatEvent {
-  return event['ignorable'] === true && !RELEASED_V3_EVENT_TYPES.has(event.type)
+  const isPreReleaseExtension = event.type.startsWith('mcp/') || event.type === 'user/message-edit'
+  return (event['ignorable'] === true || isPreReleaseExtension) && !RELEASED_V3_EVENT_TYPES.has(event.type)
     ? { ...event, type: `plugin:${event.type}`, ignorable: true }
     : event
 }

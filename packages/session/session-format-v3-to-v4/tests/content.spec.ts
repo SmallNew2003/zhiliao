@@ -205,4 +205,19 @@ describe('unknown V3 event identities', () => {
     const known = event('turn/start', { turn: 1 })
     expect(namespaceV3OpaqueEvent(known)).toBe(known)
   })
+
+  it('safely namespaces pre-release informational extensions even when ignorable is omitted', () => {
+    const mcpSnapshot = event('mcp/request-snapshot', { tools: [] })
+    expect(namespaceV3OpaqueEvent(mcpSnapshot)).toEqual({
+      ...mcpSnapshot,
+      type: 'plugin:mcp/request-snapshot',
+      ignorable: true,
+    })
+    const messageEdit = event('user/message-edit', { targetSeq: 0 })
+    expect(namespaceV3OpaqueEvent(messageEdit)).toEqual({
+      ...messageEdit,
+      type: 'plugin:user/message-edit',
+      ignorable: true,
+    })
+  })
 })
