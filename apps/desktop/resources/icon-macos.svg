@@ -23,36 +23,34 @@
       <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.14"/>
     </filter>
 
-    <!-- Fresh 3A Spring Breeze Gradient -->
-    <linearGradient id="opt3a-bg" x1="100" y1="100" x2="924" y2="924" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#00D2FF"/>
-      <stop offset="48%" stop-color="#00E5A3"/>
+    <!-- 3B Apple Aurora Gradient: Sky Blue -> Emerald -> Forest Emerald -->
+    <linearGradient id="opt3b-bg" x1="100" y1="100" x2="924" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="48%" stop-color="#10B981"/>
       <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
-    <linearGradient id="rim-light" x1="100" y1="100" x2="100" y2="500" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+
+    <!-- Top-left 1.5px Crystalline Specular Chamfer Rim (3B-1) -->
+    <linearGradient id="m1-stroke" x1="100" y1="100" x2="620" y2="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="25%" stop-color="#FFFFFF" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#7DD3FC" stop-opacity="0.2"/>
+      <stop offset="70%" stop-color="#0EA5E9" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="opt3a-sun" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 260) scale(360 240)">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
-    </radialGradient>
   </defs>
 
   <!-- Grounded Squircle with macOS shadow -->
   <g filter="url(#mac-shadow)">
     <!-- Base Squircle: 824x824 at (100, 100), rx=185 -->
-    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#opt3a-bg)"/>
-    <!-- Top-left subtle ambient soft highlight -->
-    <ellipse cx="300" cy="260" rx="360" ry="240" fill="url(#opt3a-sun)"/>
-    <!-- Apple-style subtle frost top rim light -->
-    <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" stroke="url(#rim-light)" stroke-width="1.5" fill="none"/>
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#opt3b-bg)"/>
+    <!-- Top-left 1.5px Crystalline Chamfer Inset Stroke -->
+    <rect x="100.75" y="100.75" width="822.5" height="822.5" rx="184.25" stroke="url(#m1-stroke)" stroke-width="1.5" fill="none"/>
   </g>
 
   <!-- Zhiliao Vector Mark properly fitted & optically centered inside 824 container -->
   <g transform="translate(233 260) scale(5.8)" filter="url(#mark-depth)">
     <path d="M16 25 L76 25 C76 40 63 51 30 53" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <path d="M51 50 L51 62 C51 71 48 75.5 41.5 74.5" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <circle cx="85.5" cy="7.5" r="6.5" fill="#FF6D00"/>
+    <circle cx="85.5" cy="7.5" r="6.5" fill="#FF7A18"/>
   </g>
 </svg>

@@ -1,25 +1,27 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="opt3a-bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#00D2FF"/>
-      <stop offset="48%" stop-color="#00E5A3"/>
+    <linearGradient id="opt3b-bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="48%" stop-color="#10B981"/>
       <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
-    <radialGradient id="opt3a-sun" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(240 200) scale(400 300)">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
-    </radialGradient>
+    <linearGradient id="m1-stroke" x1="0" y1="0" x2="650" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="25%" stop-color="#FFFFFF" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#7DD3FC" stop-opacity="0.2"/>
+      <stop offset="70%" stop-color="#0EA5E9" stop-opacity="0"/>
+    </linearGradient>
     <filter id="mark-depth" x="-10%" y="-10%" width="120%" height="130%" filterUnits="userSpaceOnUse">
       <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.14"/>
     </filter>
   </defs>
 
-  <rect width="1024" height="1024" rx="200" fill="url(#opt3a-bg)"/>
-  <ellipse cx="240" cy="200" rx="400" ry="300" fill="url(#opt3a-sun)"/>
+  <rect width="1024" height="1024" rx="200" fill="url(#opt3b-bg)"/>
+  <rect x="1" y="1" width="1022" height="1022" rx="199" stroke="url(#m1-stroke)" stroke-width="2" fill="none"/>
 
   <g id="tray-glyph" transform="translate(163.75 225) scale(7)" filter="url(#mark-depth)">
     <path d="M16 25 L76 25 C76 40 63 51 30 53" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <path d="M51 50 L51 62 C51 71 48 75.5 41.5 74.5" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <circle cx="85.5" cy="7.5" r="6.5" fill="#FF6D00"/>
+    <circle cx="85.5" cy="7.5" r="6.5" fill="#FF7A18"/>
   </g>
 </svg>
