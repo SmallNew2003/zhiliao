@@ -20,4 +20,4 @@ Zhiliao is designed to be deeply customizable. We do not believe that packages i
 
 We have already seen exciting projects emerge from the community, and we hope to see the ecosystem continue to grow in its own directions.
 
-Into the unknown.
+Know deeply, build freely.
