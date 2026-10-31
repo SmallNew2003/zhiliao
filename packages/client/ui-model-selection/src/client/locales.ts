@@ -37,6 +37,12 @@ export const zh = {
   'empty.models': '没有可用的模型。',
   'blocked.composer': '当前模型不可用，请先选择模型',
   'empty.efforts': '当前模型未提供推理等级。',
+  'retry': '重试',
+  'action.configure': '配置',
+  'search.placeholder': '搜索模型或提供商…',
+  'search.clear': '清除搜索',
+  'search.empty': '未找到匹配的模型。',
+  'group.recent': '最近使用',
 } satisfies Record<string, string>
 
 /** The model namespace key union. */
@@ -71,4 +77,10 @@ export const en = {
   'empty.models': 'No models available.',
   'blocked.composer': 'This model is unavailable — select one to continue',
   'empty.efforts': 'This model provides no reasoning effort levels.',
+  'retry': 'Retry',
+  'action.configure': 'Configure',
+  'search.placeholder': 'Search models or providers…',
+  'search.clear': 'Clear search',
+  'search.empty': 'No matching models found.',
+  'group.recent': 'Recent',
 } satisfies Record<ModelKey, string>

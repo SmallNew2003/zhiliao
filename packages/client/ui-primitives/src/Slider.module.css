@@ -1,0 +1,154 @@
+/* The track is the whole hit surface: a tall transparent box carries the
+   pointer, the hairline inside it is the visual, and the step labels under it
+   name the step in use, so the control needs no room above the track.
+   `touch-action: none` keeps a drag from scrolling the page under the pointer. */
+.slider {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 4px 0 0;
+  outline: none;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.slider[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.slider:focus-visible .track {
+  box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+}
+
+.track {
+  position: relative;
+  height: 4px;
+  margin: 0 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-border-l2);
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dsw-alias-brand-primary);
+  transition: width 90ms ease-out;
+}
+
+/* At maximum, the fill takes an energetic brand-cyan to sky-blue gradient with ambient glow. */
+.fillAtMax {
+  background: linear-gradient(90deg, var(--dsw-alias-brand-primary) 0%, #14b8a6 55%, #38bdf8 100%);
+  box-shadow: 0 0 8px 1px rgba(20, 184, 166, 0.4), 0 0 16px -2px rgba(56, 189, 248, 0.3);
+}
+
+/* Ticks mark the snap positions; the one in use reads as part of the fill. */
+.tick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--dsw-alias-border-l3);
+  transform: translate(-50%, -50%);
+}
+
+.tickCurrent {
+  background: var(--dsw-alias-brand-primary);
+}
+
+/* The disc carries a surface-colored ring so it stays legible where it
+   crosses the fill, and grows under the pointer while a drag runs. `left`
+   travels rather than jumps so a snapped step reads as motion across the
+   track; the step labels under it name the step in use the same instant. */
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--dsw-alias-brand-primary);
+  box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 1px 3px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%);
+  transition: left 90ms ease-out, transform 120ms ease;
+}
+
+.slider:hover .thumb {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.slider:active .thumb {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.thumbAtMax {
+  background: linear-gradient(135deg, #14b8a6, #38bdf8);
+  box-shadow:
+    0 0 0 2px var(--dsw-specific-menu),
+    0 0 10px 1px rgba(56, 189, 248, 0.5),
+    0 2px 5px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.slider:hover .thumbAtMax {
+  transform: translate(-50%, -50%) scale(1.18);
+  box-shadow:
+    0 0 0 2px var(--dsw-specific-menu),
+    0 0 14px 2px rgba(56, 189, 248, 0.65),
+    0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.slider:active .thumbAtMax {
+  transform: translate(-50%, -50%) scale(1.22);
+  box-shadow:
+    0 0 0 2px var(--dsw-specific-menu),
+    0 0 16px 3px rgba(56, 189, 248, 0.75),
+    0 3px 7px rgba(0, 0, 0, 0.35);
+}
+
+/* Labels share the track's coordinate system: each sits under its own tick,
+   so the first and last hug the ends without overflowing the card. */
+.labels {
+  position: relative;
+  height: 16px;
+  margin-top: 6px;
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* The end names align to the edges rather than centering on their tick:
+   a card that clips its overflow cuts a centered end name off. */
+.labelFirst {
+  left: 0 !important;
+  transform: none;
+}
+
+.labelLast {
+  left: auto !important;
+  right: 0;
+  transform: none;
+}
+
+.labelCurrent {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+/* The step in use at the maximum carries refined brand accent, bold weight, and text glow. */
+.labelAtMax {
+  color: var(--dsw-alias-brand-primary);
+  font-weight: 600;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
