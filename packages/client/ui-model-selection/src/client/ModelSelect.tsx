@@ -22,7 +22,7 @@ import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-
 import type { ModelCatalogModel, ModelProviderGroup } from '@deepseek-ai/dsh-api-session-controller/types'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconCloseFill14,
-  IconDataOutline16,
+  IconDataOutline16, IconSearchOutline16,
   IconWarningOutline16, Slider, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -521,6 +521,9 @@ export function ModelSelect(
           {showSearch && (
             <div className={css.searchRow}>
               <div className={css.search}>
+                <span className={css.searchIcon} aria-hidden>
+                  <IconSearchOutline16 size={14} />
+                </span>
                 <input
                   ref={searchRef}
                   type="text"

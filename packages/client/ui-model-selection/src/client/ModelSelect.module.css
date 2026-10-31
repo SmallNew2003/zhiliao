@@ -294,23 +294,49 @@
 .searchRow {
   position: relative;
   flex-shrink: 0;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
+  padding: 0 2px;
 }
 
 .search {
   display: flex;
   align-items: center;
-  height: 28px;
-  padding: 0 8px;
+  height: 32px;
+  padding: 0 10px;
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-module-platform);
-  border: 1px solid transparent;
-  transition: background 120ms ease, border-color 120ms ease;
+  border: 1px solid var(--dsw-alias-border-l1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+@media (hover: hover) {
+  .search:hover:not(:focus-within) {
+    border-color: var(--dsw-alias-border-l2);
+    background: var(--dsw-alias-bg-layer-2);
+  }
 }
 
 .search:focus-within {
   background: var(--dsw-alias-bg-module-surface);
-  border-color: var(--dsw-alias-border-l3);
+  border-color: var(--dsw-alias-brand-primary);
+  box-shadow:
+    0 0 0 1px var(--dsw-alias-brand-primary),
+    0 0 10px -2px rgba(20, 184, 166, 0.25);
+}
+
+.searchIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 7px;
+  color: var(--dsw-alias-label-tertiary);
+  flex-shrink: 0;
+  transition: color 140ms ease;
+}
+
+.search:focus-within .searchIcon {
+  color: var(--dsw-alias-brand-primary);
 }
 
 .search input {
@@ -319,13 +345,14 @@
   border: none;
   background: transparent;
   color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 20px;
   outline: none;
 }
 
 .search input::placeholder {
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-tertiary);
+  opacity: 0.85;
 }
 
 .searchClear {
@@ -334,15 +361,18 @@
   justify-content: center;
   width: 18px;
   height: 18px;
+  margin-left: 4px;
   padding: 0;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
 .searchClear:hover {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-hover);
+  transform: scale(1.08);
 }

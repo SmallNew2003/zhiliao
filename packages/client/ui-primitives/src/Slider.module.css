@@ -40,9 +40,10 @@
   transition: width 90ms ease-out;
 }
 
-/* At maximum, the fill cleanly spans the track. */
+/* At maximum, the fill takes an energetic brand-cyan to sky-blue gradient with ambient glow. */
 .fillAtMax {
-  background: var(--dsw-alias-brand-primary);
+  background: linear-gradient(90deg, var(--dsw-alias-brand-primary) 0%, #14b8a6 55%, #38bdf8 100%);
+  box-shadow: 0 0 8px 1px rgba(20, 184, 166, 0.4), 0 0 16px -2px rgba(56, 189, 248, 0.3);
 }
 
 /* Ticks mark the snap positions; the one in use reads as part of the fill. */
@@ -85,8 +86,28 @@
 }
 
 .thumbAtMax {
-  background: var(--dsw-alias-brand-primary);
-  box-shadow: 0 0 0 2px var(--dsw-specific-menu), 0 1px 4px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #14b8a6, #38bdf8);
+  box-shadow:
+    0 0 0 2px var(--dsw-specific-menu),
+    0 0 10px 1px rgba(56, 189, 248, 0.5),
+    0 2px 5px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.slider:hover .thumbAtMax {
+  transform: translate(-50%, -50%) scale(1.18);
+  box-shadow:
+    0 0 0 2px var(--dsw-specific-menu),
+    0 0 14px 2px rgba(56, 189, 248, 0.65),
+    0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.slider:active .thumbAtMax {
+  transform: translate(-50%, -50%) scale(1.22);
+  box-shadow:
+    0 0 0 2px var(--dsw-specific-menu),
+    0 0 16px 3px rgba(56, 189, 248, 0.75),
+    0 3px 7px rgba(0, 0, 0, 0.35);
 }
 
 /* Labels share the track's coordinate system: each sits under its own tick,
@@ -125,8 +146,9 @@
   font-weight: 500;
 }
 
-/* The step in use at the maximum carries refined emphasis. */
+/* The step in use at the maximum carries refined brand accent, bold weight, and text glow. */
 .labelAtMax {
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-brand-primary);
   font-weight: 600;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
 }
