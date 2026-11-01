@@ -45,7 +45,7 @@ Status: implemented
 
 | 调用方 | 命令 | 聚合根程序检查 |
 |---|---|---|
-| `build`、`build:official`、`Makefile` `build`、`scripts/publish-npm-baseline.ts`、`apps/desktop/scripts/package-target.ts`、`scripts/dev-bundle-registry.ts`、`release-publish.yml`、`sandbox.yml`、`e2e.yml` 与 `release.yml` 的非 PR 分支 | `build` / `build:official` | 有 |
+| `build`、`build:official`、`Makefile` `build`、`scripts/publish-npm-baseline.ts`、`apps/desktop/scripts/package-target.ts`、`scripts/dev-bundle-registry.ts`、`sandbox.yml`、`e2e.yml` 与 `release.yml` 的非 PR 分支 | `build` / `build:official` | 有 |
 | `test:web`、`test:web:refresh`、`test:web:perf`、`test:web:stress`、`apps/desktop` `test:updates:local`、`test:bench` / `build:bench` | `build`；`build:bench` 运行 `build:native-system`、`build:lib` 与 benchmark tsdown | 有 |
 | `typecheck`（pre-push hook 运行它） | `build.ts --scope typecheck`：host-typert（只读源码的 Typert 生成 `generate-typert.ts`）→ 包编译，各 face 包编译后运行 `tsc -b tsconfig.{host,client}.json`；不含任何 bundle | 有 |
 | `dev:web`（[`scripts/dev-web.ts`](../../../../scripts/dev-web.ts)）、`dev:desktop`（`apps/desktop/scripts/dev.ts`） | `build:artifacts` | 启动前无；`dev:web` 启动后的 `tsc -b tsconfig.client.json --watch` 持续检查 Client 聚合根程序 |

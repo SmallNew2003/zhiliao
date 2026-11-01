@@ -45,7 +45,7 @@ Each command does only its own job.
 
 | Caller | Command | Aggregate root-program checks |
 |---|---|---|
-| `build`, `build:official`, `Makefile` `build`, `scripts/publish-npm-baseline.ts`, `apps/desktop/scripts/package-target.ts`, `scripts/dev-bundle-registry.ts`, `release-publish.yml`, `sandbox.yml`, and the non-PR branches of `e2e.yml` and `release.yml` | `build` / `build:official` | Yes |
+| `build`, `build:official`, `Makefile` `build`, `scripts/publish-npm-baseline.ts`, `apps/desktop/scripts/package-target.ts`, `scripts/dev-bundle-registry.ts`, `sandbox.yml`, and the non-PR branches of `e2e.yml` and `release.yml` | `build` / `build:official` | Yes |
 | `test:web`, `test:web:refresh`, `test:web:perf`, `test:web:stress`, `apps/desktop` `test:updates:local`, `test:bench` / `build:bench` | `build`; `build:bench` runs `build:native-system`, `build:lib`, and the benchmark tsdown | Yes |
 | `typecheck` (run by the pre-push hook) | `build.ts --scope typecheck`: host-typert (the source-only Typert pass `generate-typert.ts`) → package compilation, with `tsc -b tsconfig.{host,client}.json` after each face's package compilation; no bundle | Yes |
 | `dev:web` ([`scripts/dev-web.ts`](../../../../scripts/dev-web.ts)), `dev:desktop` (`apps/desktop/scripts/dev.ts`) | `build:artifacts` | None before launch; after `dev:web` launches, its `tsc -b tsconfig.client.json --watch` keeps checking the Client aggregate root program |
