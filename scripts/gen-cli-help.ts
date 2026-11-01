@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { PROFILE_TEMPLATES } from '@deepseek-ai/dsh-official-bundles'
+import { clearedProxyEnv } from '../packages/util/http-proxy/src/install.ts'
 import {
   computeTranslationPairingRecord,
   renderTranslationPairingRecord,
@@ -185,12 +186,15 @@ async function collectHelp(): Promise<HelpPage[]> {
     const home = mkdtempSync(join(directory, 'invocation-'))
     const environment = {
       ...process.env,
+      // A developer's exported SOCKS all_proxy makes the launcher report a rejected
+      // proxy on stderr, which this gate reads as unclean help output.
+      ...clearedProxyEnv(),
       DSH_HOME: join(home, 'harness'),
       DSH_AGENTS_HOME: join(home, 'agents'),
       DSH_TELEMETRY_DISABLED: '1',
       NO_COLOR: '1',
     }
-    for (const name of ['NODE_OPTIONS', 'FORCE_COLOR']) Reflect.deleteProperty(environment, name)
+    for (const name of ['NODE_OPTIONS', 'FORCE_COLOR', 'NODE_USE_ENV_PROXY']) Reflect.deleteProperty(environment, name)
     const help = execFileAsync(process.execPath, [
       '--import', 'tsx/esm', 'apps/cli/src/bin.ts', ...args, '--help',
     ], {
