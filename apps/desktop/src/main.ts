@@ -54,6 +54,7 @@ import { desktopErrorState } from './startup-error.ts'
 import { readDesktopLoginShellEnvironment, resolveDesktopLoginShellConfig } from './login-shell-environment.ts'
 import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig, type DesktopPolicyState } from './mandatory-update-policy.ts'
 import { desktopClientMetadata, desktopClientVersion } from './client-metadata.ts'
+import { UPSTREAM_BASE_VERSION } from './upstream-base.ts'
 import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
 import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
 import { readDesktopSettings } from './settings.ts'
@@ -456,7 +457,10 @@ async function main(): Promise<void> {
   // chrome and its content never mix languages.
   const showAbout = async (): Promise<void> => {
     await ordinaryMessageBox({ type: 'info', title: locale.messages.aboutMenu, message: locale.messages.aboutProduct,
-      detail: formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+      detail: [
+        formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+        formatDesktopMessage(locale.messages.aboutUpstreamBase, { version: UPSTREAM_BASE_VERSION }),
+      ].join('\n'),
       buttons: [locale.messages.updateAcknowledge], cancelId: 0 })
   }
   const commandManager = new DesktopCommandManager({

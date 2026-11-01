@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for 2026-10-31-zhiliao-own-version-line.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-31-zhiliao-own-version-line.md
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline:
+  en: 51e1d16c46925e25
+  zh: 3f5bf6faed586c0f
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/problem:
+  en: b9b2708429c38a59
+  zh: 8075b5d40edf3f34
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-version-line-starts-at-0-1-0:
+  en: 34db222dacf10219
+  zh: f45f3bce3cb54efd
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-release-tag-prefix-is-zhiliao-v:
+  en: c4a80debe95b9ee3
+  zh: 3ecd9a01bee9b43e
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-dsh-sequence-stops-publishing-to-npm:
+  en: 899ef50dc3f10ef9
+  zh: 35f4e7013fa7964b
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-upstream-baseline-is-recorded-beside-the-version:
+  en: b446a718e4fe96cd
+  zh: 9ac3035c4485e7ea
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/a-synchronization-restores-the-version-line:
+  en: d3e0430dcbd1d3d5
+  zh: a3b787adcc901d92
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/consequences:
+  en: 8bde74ebff6f2718
+  zh: fbbe22e2098fd3ea
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/alternatives-considered:
+  en: e92ca74eebc32896
+  zh: c1d0eb355efb9170

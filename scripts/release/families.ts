@@ -351,7 +351,7 @@ class DshFamily extends ReleaseFamily {
     'packages/*/*/package.json',
     'apps/*/package.json',
   ] as const
-  readonly tagPrefix = 'dsh-v'
+  readonly tagPrefix = 'zhiliao-v'
 
   /** Require current artifacts from a complete official client build. */
   override verifyBuildArtifacts(root: string): void {
@@ -372,7 +372,7 @@ class DshFamily extends ReleaseFamily {
 
   /**
    * The single family prefix: every member shares one version, so one tag names it.
-   * @returns `dsh-v`.
+   * @returns `zhiliao-v`.
    */
   tagPrefixFor(): string {
     return this.tagPrefix

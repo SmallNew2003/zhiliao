@@ -137,7 +137,6 @@ describe('CI workflow', () => {
       expect(job.steps).toContainEqual(expect.objectContaining({ run: command }))
     }
     for (const [file, command] of [
-      ['release-publish.yml', 'pnpm run build:official --serial'],
       ['release-vendor-publish.yml', 'pnpm run build:lib:host'],
     ] as const) {
       expect(workflowJob(loadWorkflow('.github/workflows/' + file), 'pack').steps)
@@ -230,7 +229,7 @@ describe('CI workflow', () => {
   })
 
   it('does not cancel protected publication or deployment transactions', () => {
-    for (const name of ['release-publish.yml', 'release-vendor-publish.yml']) {
+    for (const name of ['release-vendor-publish.yml']) {
       const publish = workflowJob(loadWorkflow('.github/workflows/' + name), 'publish')
       expect(publish.concurrency).toMatchObject({ 'cancel-in-progress': false })
     }
@@ -1433,7 +1432,7 @@ describe('npm release workflows', () => {
 
     // publication is workflow_dispatch-only (never a PR check) and keeps the
     // npm-publish environment plus the shared dist-tag group.
-    for (const file of ['release-publish.yml', 'release-vendor-publish.yml']) {
+    for (const file of ['release-vendor-publish.yml']) {
       const workflow = loadWorkflow(`.github/workflows/${file}`)
       if (!isRecord(workflow.on) || !isRecord(workflow.jobs)) throw new TypeError(`${file} must define on and jobs`)
       expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
