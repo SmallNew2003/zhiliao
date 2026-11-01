@@ -26,7 +26,7 @@
 - banner:
   - button "Open right sidebar":
     - img
-- text: Into the Unknown Preview
+- text: Know Deeply, Build Freely Preview
 - button "Choose workspace":
   - img
   - text: workspace

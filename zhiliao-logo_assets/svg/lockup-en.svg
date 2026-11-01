@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="308" height="96" viewBox="0 0 308 96" fill="none">
+  <path d="M16 25 L76 25 C76 40 63 51 30 53" stroke="#1F4A3D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M51 50 L51 62 C51 71 48 75.5 41.5 74.5" stroke="#1F4A3D" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="85.5" cy="7.5" r="6.5" fill="#F28A2E"/>
+  <text x="104" y="56" font-family="'Avenir Next','Inter','Helvetica Neue',Helvetica,Arial,sans-serif" font-size="44" font-weight="600" letter-spacing="0.5" fill="#1F4A3D">zhiliao</text>
+</svg>

@@ -12,6 +12,8 @@
   ],
   "include": [
     "apps/web/product-isolation.ts",
+    "apps/web/tests/connection-recovery.e2e.ts",
+    "apps/web/tests/session-replay-reload.e2e.ts",
     "apps/web/tests/default-product-isolation.e2e.ts",
     "apps/web/tests/diff-context.e2e.ts",
     "apps/web/tests/scaffold.ts",
