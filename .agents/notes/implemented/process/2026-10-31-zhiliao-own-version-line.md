@@ -40,7 +40,7 @@ The version number no longer encodes which upstream commit the tree contains, so
 | Synchronization commit | `5dbcf33775` |
 | Synchronization branch | `chore/upstream-sync-20261028` |
 
-The desktop application's about dialog shows the product version alone, so this record is where a reader learns which upstream code a build contains.
+The desktop application's About dialog shows the upstream base beside the product version, so a reader can tell which upstream code a build contains without this record. The value it shows is `UPSTREAM_BASE_VERSION` in `apps/desktop/src/upstream-base.ts`; a synchronization updates that constant and the table above together.
 
 ### A synchronization restores the version line
 
@@ -48,7 +48,7 @@ An upstream synchronization carries upstream's own version bump, so the merged t
 
 ## Consequences
 
-A reader cannot order this product's version against upstream's: `0.1.0` is lower than `0.2.2-alpha.2` while the tree contains it. This record carries the mapping.
+A reader cannot order this product's version against upstream's: `0.1.0` is lower than `0.2.2-alpha.2` while the tree contains it. The About dialog and this record carry the mapping.
 
 `npm install @deepseek-ai/dsh-session` resolves to upstream's publication, not to this product's build. The desktop application, the installer, and the Web deployment are the distribution channels; nothing in the documentation directed readers to the registry for this product's packages, so no documented install path changes.
 
