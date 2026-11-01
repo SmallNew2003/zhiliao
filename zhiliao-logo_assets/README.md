@@ -1,41 +1,43 @@
-# 知了（zhiliao）Logo 资产
+# Zhiliao logo assets
 
-主标志由 6 个 AI 概念图（`zhiliao-logo.miora` 看板）收敛重绘为单线矢量「了」字 + 橙点。三重含义：产品名「知了」（蝉）、口语「知道了」（听懂）、句读「了·」（任务完成）。右上橙点为蝉首 / 任务完成句点。
+English | [中文](README.zh.md)
 
-## 文件清单（`svg/`）
+The primary mark condenses six AI concept images (the `zhiliao-logo.miora` board) into a single-line vector `了` glyph plus an orange dot. It carries three meanings: the product name Zhiliao (cicada), the spoken "got it", and the punctuation that ends a finished task. The orange dot in the upper right is the cicada's head and the period that closes a task.
 
-| 文件 | 用途 |
+## File inventory (`svg/`)
+
+| File | Purpose |
 | --- | --- |
-| `mark.svg` | 主标志，浅色表面（透明底，深林绿笔画 + 橙点） |
-| `mark-on-dark.svg` | 主标志，深色表面（米白笔画 + 橙点） |
-| `mark-mono.svg` | 单色版（全 #111，用于盖章/水印/单色印刷） |
-| `icon.svg` | 应用图标 1024×1024 squircle（夜林渐变底 + 米白标志） |
-| `favicon.svg` | 站点 favicon（96 viewBox；含 `prefers-color-scheme: dark` 自动反白） |
-| `lockup-zh.svg` | 横排组合：标志 + 「知了」 |
-| `lockup-en.svg` | 横排组合：标志 + `zhiliao` |
-| `lockup-vertical.svg` | 竖排组合：标志 + 「知了」 + `ZHILIAO` |
+| `mark.svg` | Primary mark for light surfaces (transparent background, deep forest green strokes plus orange dot) |
+| `mark-on-dark.svg` | Primary mark for dark surfaces (eggshell strokes plus orange dot) |
+| `mark-mono.svg` | Monochrome version (all `#111`, for stamps, watermarks, and monochrome print) |
+| `icon.svg` | App icon, 1024×1024 squircle (night forest gradient background plus eggshell mark) |
+| `favicon.svg` | Site favicon (96 viewBox; includes `prefers-color-scheme: dark` auto-inversion) |
+| `lockup-zh.svg` | Horizontal lockup: mark plus the Chinese wordmark |
+| `lockup-en.svg` | Horizontal lockup: mark plus `zhiliao` |
+| `lockup-vertical.svg` | Vertical lockup: mark plus the Chinese wordmark plus `ZHILIAO` |
 
-lockup 中的中英文字体已全部完成「单线等宽同构体 (Monoline Minimalist)」纯矢量转曲（outline）固化，不再依赖系统字体，实现全平台 100% 像素级对齐与 0 依赖。
+The Chinese and English lockup text is fully converted to the Monoline Minimalist outline format, so it no longer depends on system fonts and renders pixel-identically on every platform.
 
-## 色板
+## Palette
 
-| 名称 | 色值 | 用途 |
+| Name | Value | Use |
 | --- | --- | --- |
-| 深林绿 Deep Forest | `#1F4A3D` | 笔画主墨 |
-| 夜林渐变 Night Forest | `#265543 → #1B4334` | 图标底 |
-| 薄荷青 Mint | `#3FBE9E` | 辅助点缀（次级强调） |
-| 知了橙 Cicada | `#F28A2E` | 点睛（圆点专用，勿大面积使用） |
-| 米白 Eggshell | `#F5F2EC` / 笔画反白 `#F2EFE8` | 浅底 / 深底上的笔画色 |
+| Deep Forest | `#1F4A3D` | Primary stroke ink |
+| Night Forest | `#265543 → #1B4334` | Icon background |
+| Mint | `#3FBE9E` | Secondary accent |
+| Cicada Orange | `#F28A2E` | Finishing dot (the circle only; never large areas) |
+| Eggshell | `#F5F2EC` / inverted strokes `#F2EFE8` | Light backgrounds / stroke color on dark backgrounds |
 
-## 使用规则
+## Usage rules
 
-- 标志最小尺寸：favicon 16px、图标 24px；再小请只用绿色笔画去掉橙点。
-- 橙点位置与大小是标志的一部分，不得单独移动、放大或改色。
-- 深色表面上用 `mark-on-dark.svg`；笔画色 `#F2EFE8`，不要用纯白。
-- 单色场景统一使用 `mark-mono.svg`（橙点同为单色），不保留双色。
-- 标志周围留白不小于标志宽度的 25%。
+- Minimum mark sizes: 16px for the favicon and 24px for the icon; below that, use only the green strokes without the orange dot.
+- The orange dot's position and size are part of the mark; never move, scale, or recolor it on its own.
+- On dark surfaces use `mark-on-dark.svg`; the stroke color is `#F2EFE8`, not pure white.
+- Monochrome contexts use `mark-mono.svg` (the orange dot becomes monochrome too); the two-color version does not survive.
+- Keep clear space around the mark of at least 25% of the mark's width.
 
-## 接入应用（后续 PR，尚未执行）
+## Application integration (follow-up PRs, not yet executed)
 
-- Web favicon：替换 `apps/web/public/favicon.svg`（注意同步 `apps/web/dist/` 与相关 expected 快照）。
-- 桌面端：`apps/desktop/resources/icon*.svg/png` 需从 `icon.svg` 导出各平台尺寸（macOS 圆角遮罩沿用现有 icon-macos 结构）。
+- Web favicon: replace `apps/web/public/favicon.svg` (also sync `apps/web/dist/` and the related expected snapshots).
+- Desktop: export the platform sizes under `apps/desktop/resources/icon*.svg/png` from `icon.svg` (the macOS rounded-corner mask keeps the existing icon-macos structure).
