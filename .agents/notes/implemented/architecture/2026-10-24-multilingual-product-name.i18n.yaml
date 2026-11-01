@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-10-24-multilingual-product-name.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-10-24-multilingual-product-name.md
-2026-10-24-multilingual-product-name.md: 9fb85dd5f3afaeb828b4afbe681a70dadb05535f
-2026-10-24-multilingual-product-name.zh.md: e77e0e0a23bfac3b5032ed22114e8ddb88dac514
+/agent-note-multilingual-product-name:
+  en: abc9a6f14e2b737f
+  zh: 66d7cc16e93ba2ad
+/agent-note-multilingual-product-name/problem:
+  en: 5fac8a0e44b4a017
+  zh: b4cafaa0d3d6e7c1
+/agent-note-multilingual-product-name/decision:
+  en: 3695f364c87fc1d7
+  zh: ceefb27169f3e413
+/agent-note-multilingual-product-name/alternatives-considered:
+  en: 78afd3f4ec5a5ac1
+  zh: 1a731e3bd1dbdd6c
+/agent-note-multilingual-product-name/consequences:
+  en: c5705472498ba14d
+  zh: 0924aea3647c6cda
