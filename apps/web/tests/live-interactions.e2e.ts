@@ -27,7 +27,7 @@ import {
   compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, RUNNING_STATUS_COPY_TOKENS, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/live-interactions', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.v3.jsonl')
@@ -159,13 +159,13 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     // hang (prefix chunks delivered to the loop) before the stop click.
     await expect.poll(() => existsSync(marker), { timeout: 15_000 }).toBe(true)
     await expect.poll(
-      () => page.getByRole('status').filter({ hasText: 'Deep diving' }).isVisible(),
+      () => page.locator('[data-chat-running]').isVisible(),
       { timeout: 10_000 },
     ).toBe(true)
     await page.locator('[data-streaming="true"]:not([inert] *)')
       .getByText('partial', { exact: true })
       .waitFor({ timeout: 30_000 })
-    const loadingSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
+    const loadingSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
     await compareOrRefreshGolden(LOADING_EXPECTED, loadingSnapshot, MODE)
 
     const input = page.locator('[data-composer-input]').first()
@@ -176,7 +176,7 @@ describe('web e2e: live-turn interactions (cancel / error / retry)', () => {
     await send.waitFor({ timeout: 10_000 })
     expect(await page.getByRole('button', { name: 'Stop generating', exact: true }).count()).toBe(0)
     expect(await page.getByRole('button', { name: 'Send message', exact: true }).count()).toBe(0)
-    const runningDraftSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd)
+    const runningDraftSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold!.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
     await compareOrRefreshGolden(RUNNING_DRAFT_EXPECTED, runningDraftSnapshot, MODE)
     await send.click()
     await expect.poll(() => input.textContent(), { timeout: 10_000 }).toBe('')
