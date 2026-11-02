@@ -4417,6 +4417,7 @@ describe('ChatView', () => {
 
       observe = observe
       disconnect = vi.fn()
+      unobserve = vi.fn()
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
     const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
