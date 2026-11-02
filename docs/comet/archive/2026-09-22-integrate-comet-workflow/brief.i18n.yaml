@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write docs/comet/changes/integrate-comet-workflow/brief.md
-brief.md: 03faf749738c2fcc89045244a5941dfbcec1cca2
-brief.zh.md: a603a71b9d2cd4806c056b9f8846fe7a76533a91
+# Bilingual-pair consistency record for brief.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/comet/archive/2026-09-22-integrate-comet-workflow/brief.md
+/goal:
+  en: b06e4a7f1ec84e02
+  zh: 70b4d9ef044e3dd0
+/scope:
+  en: 10853cfc6641ef92
+  zh: 44f276b47cc52a80
+/non-goals:
+  en: ce3cb467a5c88372
+  zh: f8754c44fac1515f
+/acceptance-examples:
+  en: c11bae3e476cca6c
+  zh: 7a8adb6e47de021c
+/constraints-and-invariants:
+  en: 6384bf5b940c12d4
+  zh: 19f07f1a653254cd
+/decisions:
+  en: 5e99a6cc75f71fd2
+  zh: 959db87d291d3f59
+/open-questions:
+  en: 8c0ee499f66b423e
+  zh: 6f236267996b8cf7
+/verification-expectations:
+  en: 577d9f67fb061bde
+  zh: 6a6ba27cb244067e
