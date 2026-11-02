@@ -4,12 +4,21 @@ import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { chromium, type Page } from 'playwright'
 import {
-  APP_ICON_VARIANTS, ICON_OUTPUT_DIRECTORY, MASKABLE_ARTWORK_SCALE, MASKABLE_SAFE_RADIUS_RATIO,
+  APP_ICON_VARIANTS, ICON_OUTPUT_DIRECTORY, MASKABLE_SAFE_RADIUS_RATIO,
   TILE_SOURCE, renderAppIcons, tileDocument,
 } from '../scripts/render-app-icons.ts'
 
 const DIST_ROOT = fileURLToPath(new URL('../dist', import.meta.url))
 
+/**
+ * Ink is the mark's white strokes and orange dot against the tile's gradient.
+ * The browser-side predicate inlines its calibration, which an `evaluate`
+ * callback cannot close over: a sum of 700 separates the white strokes from
+ * the gradient and the rim light, the dot's channels separate it from every
+ * gradient stop, and an alpha of 128 excludes the rounded corner's
+ * antialiasing fringe, where a Lanczos reduction rings the color channels to
+ * white at alpha 1-4.
+ */
 async function pixels(page: Page, url: string, size: number) {
   return page.evaluate(async ({ url, size }) => {
     const image = new Image()
@@ -25,7 +34,11 @@ async function pixels(page: Page, url: string, size: number) {
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
         const at = (y * size + x) * 4
-        if (data[at + 3] === 0 || data[at]! + data[at + 1]! + data[at + 2]! >= 384) continue
+        if (data[at + 3]! < 128) continue
+        const red = data[at]!
+        const green = data[at + 1]!
+        const blue = data[at + 2]!
+        if (red + green + blue < 700 && !(red > 220 && green < 170 && blue < 90)) continue
         ink += 1
         radius = Math.max(radius, Math.hypot(x - (size - 1) / 2, y - (size - 1) / 2))
       }
@@ -79,7 +92,7 @@ it('ships install metadata with the built web application', async () => {
   })
 })
 
-it('decodes every generated and shipped icon with its full artwork and opaque corners', async () => {
+it('decodes every generated and shipped icon with its full artwork and per-kind corners', async () => {
   const browser = await chromium.launch({ headless: true })
   try {
     const page = await browser.newPage()
@@ -94,15 +107,18 @@ it('decodes every generated and shipped icon with its full artwork and opaque co
     for (const { variant, png } of generated) {
       const reference = await pixels(page, svgUrl(tileDocument(source)), variant.size)
       expect(reference.ink).toBeGreaterThan(0)
-      const scale = variant.kind === 'maskable' ? MASKABLE_ARTWORK_SCALE : 1
+      // The tile and the touch icon ship the design's rounded corners; the
+      // maskable icon squares its background so a platform mask meets the
+      // gradient instead of transparency.
+      const corners = variant.kind === 'maskable' ? [255, 255, 255, 255] : [0, 0, 0, 0]
       for (const bytes of [png, await readFile(join(DIST_ROOT, variant.file))]) {
         const image = await pixels(page, pngUrl(bytes), variant.size)
         expect([image.width, image.height], variant.file).toEqual([variant.size, variant.size])
-        expect(image.corners, variant.file).toEqual([255, 255, 255, 255])
+        expect(image.corners, variant.file).toEqual(corners)
         expect(image.ink, variant.file).toBeGreaterThan(0)
         // Two pixels allow rasterizer and downsampling differences without
         // accepting missing or undersized artwork in the published PNG.
-        expect(Math.abs(image.radius - reference.radius * scale), variant.file).toBeLessThan(2)
+        expect(Math.abs(image.radius - reference.radius), variant.file).toBeLessThan(2)
       }
     }
   } finally { await browser.close() }
@@ -143,14 +159,15 @@ it('preserves fractional coverage along the Apple icon curves', async () => {
       for (let y = 1; y < 179; y += 1) {
         for (let x = 1; x < 179; x += 1) {
           const value = brightness(x, y)
-          if (value <= 85 || value >= 200) continue
-          // Neighboring ink and background distinguish edge coverage from the
-          // source's gradients and shadows, which remain in both renderings.
+          if (value <= 205 || value >= 250) continue
+          // Neighboring mark and gradient distinguish edge coverage from the
+          // source's gradients and the mark's shadow, which stay outside the
+          // band in both renderings.
           const neighbors: number[] = []
           for (let dy = -1; dy <= 1; dy += 1) {
             for (let dx = -1; dx <= 1; dx += 1) neighbors.push(brightness(x + dx, y + dy))
           }
-          if (Math.min(...neighbors) < 70 && Math.max(...neighbors) > 220) partial += 1
+          if (Math.min(...neighbors) < 205 && Math.max(...neighbors) > 250) partial += 1
         }
       }
       return partial
@@ -168,10 +185,15 @@ it('keeps the shipped maskable artwork inside its opaque platform safe zone', as
     const size = APP_ICON_VARIANTS.find(variant => variant.kind === 'maskable')!.size
     const scaled = await pixels(page, pngUrl(maskable), size)
     const unscaled = await pixels(page, svgUrl(tile), size)
+    // The mark reaches 0.379 of the edge from the centre, inside the 0.4
+    // radius a platform mask is guaranteed to show, so the maskable variant
+    // ships the tile's artwork at its own scale.
+    expect(unscaled.radius).toBeLessThanOrEqual(MASKABLE_SAFE_RADIUS_RATIO * size)
     expect(scaled.radius).toBeLessThanOrEqual(MASKABLE_SAFE_RADIUS_RATIO * size)
-    expect(scaled.radius).toBeGreaterThan(unscaled.radius * MASKABLE_ARTWORK_SCALE - 2)
+    // Two pixels allow rasterizer and downsampling differences; a rescaled or
+    // clipped artwork fails here.
+    expect(Math.abs(scaled.radius - unscaled.radius)).toBeLessThan(2)
     expect(scaled.corners).toEqual([255, 255, 255, 255])
-    expect(unscaled.radius).toBeGreaterThan(MASKABLE_SAFE_RADIUS_RATIO * size)
   } finally {
     await browser.close()
   }
