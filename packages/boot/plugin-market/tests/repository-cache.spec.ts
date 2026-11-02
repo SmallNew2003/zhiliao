@@ -31,7 +31,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
-  rmSync(root, { recursive: true, force: true })
+  // A shallow local fetch leaves Git updating the served repository's server info after the fetch
+  // command ended, so the tree can gain an entry while this cleanup walks it; ENOTEMPTY then retries.
+  rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
 })
 
 function git(cwd: string, ...args: string[]): string {
