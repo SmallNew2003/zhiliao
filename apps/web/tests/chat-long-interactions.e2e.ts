@@ -233,29 +233,34 @@ describe('web e2e: long Chat interaction contract', () => {
     expect(await markPitch()).toBe(10)
 
     const loadedMarks = turnNavigation.getByRole('button', { name: /^Jump to turn / })
+    const loadedRows = page.locator('[data-chat-flow-key]')
     const loadedBefore = await loadedMarks.count()
-    // Auto paging starts when the reader enters the history headroom.
+    const rowsBefore = await loadedRows.count()
+    // The manual row stays at the history head while older history remains.
+    const loadEarlier = page.locator('[data-conversation-scroll]')
+      .getByRole('button', { name: 'Load earlier', exact: true })
+    expect(await loadEarlier.count()).toBe(1)
+    // Auto paging starts when the reader enters the history headroom: the
+    // next older page pulls on its own and chains while the reader stays
+    // there, so the transcript grows without touching that row.
     await wheelToHistoryStart(page)
     // Paging converts marks to their loaded form without moving the
     // fixed-pitch ladder.
     await expect.poll(() => loadedMarks.count(), { timeout: 15_000 }).toBeGreaterThan(loadedBefore)
-    // The manual control remains the fallback while history is still available.
-    const loadEarlier = page.getByRole('button', { name: 'Load earlier', exact: true })
-    const loadedRows = page.locator('[data-chat-flow-key]')
-    const rowsBefore = await loadedRows.count()
-    await loadEarlier.click()
     await expect.poll(() => loadedRows.count(), { timeout: 15_000 }).toBeGreaterThan(rowsBefore)
+    // The whole log is paged in, so the head row is gone: no dead manual
+    // control remains once no older history is left.
+    await expect.poll(() => loadEarlier.count(), { timeout: 15_000 }).toBe(0)
     await railScroller.hover()
     await page.mouse.wheel(0, -FIXTURE_TURNS * 10)
     await expect.poll(() => railScroller.evaluate(element => element.scrollTop)).toBe(0)
-    await firstTurnButton.waitFor({ state: 'visible' })
     expect(await markPitch()).toBe(10)
-    // Activating the still-unloaded oldest mark pages the rest in and lands
-    // on the turn's own row.
-    await firstTurnButton.focus()
-    await firstTurnButton.press('Enter')
+    // Auto paging loaded the whole log, so the oldest mark is an ordinary
+    // loaded jump: activating it lands on the turn's own row.
     const firstLoaded = turnNavigation.getByRole('button', { name: 'Jump to turn 1', exact: true })
-    await firstLoaded.waitFor({ timeout: 60_000 })
+    await firstLoaded.waitFor({ state: 'visible' })
+    await firstLoaded.focus()
+    await firstLoaded.press('Enter')
     await expect.poll(() => firstLoaded.getAttribute('aria-current'), { timeout: 15_000 }).toBe('true')
     await expect.poll(
       () => page.locator('[data-chat-turn="1"][data-chat-flow-kind="user"]').count(),
