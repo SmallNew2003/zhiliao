@@ -11,8 +11,8 @@
 - button "Copy"
 - text: Running
 - button "Ask question waiting"
-- status: Zhiliao is exploring
-- text: "Zhiliao is exploring, {{duration}} ··· Interjection: include the word BANANA in your final reply."
+- status: {{runningStatus}}
+- text: "{{runningStatus}}, {{duration}} ··· Interjection: include the word BANANA in your final reply."
 - button "Copy"
 - region "Ready to continue?":
   - text: Checkpoint

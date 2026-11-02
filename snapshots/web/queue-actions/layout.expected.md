@@ -13,8 +13,8 @@
   - text: Continuing goal
   - time: {{clock}}
 - paragraph: partial
-- status: Zhiliao is exploring
-- text: Zhiliao is exploring, {{duration}} ···
+- status: {{runningStatus}}
+- text: {{runningStatus}}, {{duration}} ···
 - region "To-dos":
   - button "To-dos 1 completed · 1 in progress"
 - text: Ongoing Goal Keep the composer context panels aligned

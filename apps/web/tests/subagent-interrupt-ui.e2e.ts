@@ -25,7 +25,7 @@ import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, readPersistedEvents, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, RUNNING_STATUS_COPY_TOKENS, saveFailureShot } from './support.ts'
 
 const BASE_FIXTURE = fileURLToPath(new URL('../../../snapshots/web/live-interactions/session.v3.jsonl', import.meta.url))
 
@@ -240,7 +240,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
       expect(await page.getByRole('button', { name: 'Steer queued message' }).count()).toBe(1)
       await compareOrRefreshGolden(
         OFFLINE_COMPOSER_EXPECTED,
-        await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd),
+        await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS }),
         MODE,
       )
 
@@ -335,7 +335,7 @@ describe.skipIf(MODE === 'record')('web e2e: composer interrupt for a running co
     await expect.poll(() => thumbnail.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
     await compareOrRefreshGolden(
       IMAGE_QUEUE_EXPECTED,
-      await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd),
+      await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS }),
       MODE,
     )
 

@@ -16,7 +16,7 @@ import {
   assertFixtureInventory, captureExpandedTurnProcessAria, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, expectTooltipOnTop, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, expectTooltipOnTop, newEnglishPage, RUNNING_STATUS_COPY_TOKENS, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/queue-actions', import.meta.url))
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/live-interactions/session.v3.jsonl', import.meta.url))
@@ -131,7 +131,7 @@ describe('web e2e: queue row actions', () => {
       expect(await input.textContent()).toBe(REMOVE)
       expect(await input.getAttribute('contenteditable')).toBe('false')
       expect(await page.locator('[data-queue-dock] [data-submission-echo]').count()).toBe(0)
-      const sending = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+      const sending = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
       await compareOrRefreshGolden(SENDING_EXPECTED, sending, MODE)
     } finally {
       release.resolve(undefined)
@@ -152,6 +152,7 @@ describe('web e2e: queue row actions', () => {
       page,
       '[class*="centerCol"]',
       scaffold.workspaceCwd,
+      { replacements: RUNNING_STATUS_COPY_TOKENS },
     )
     await compareOrRefreshGolden(COLLAPSED_EXPECTED, collapsedSnapshot, MODE)
     await queueHeader.click()
@@ -210,7 +211,7 @@ describe('web e2e: queue row actions', () => {
     expect(tooltipGeometry).not.toBeNull()
     expect(Math.abs(tooltipGeometry!.tooltipCenter - tooltipGeometry!.declaredLeft)).toBeLessThan(2)
     expect(Math.abs(tooltipGeometry!.tooltipTop - tooltipGeometry!.declaredTop)).toBeLessThan(2)
-    const editingSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+    const editingSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
     await compareOrRefreshGolden(EDITING_EXPECTED, editingSnapshot, MODE)
     await settleQueueAction(() => save.click(), EDITED)
     await page.getByText(EDITED, { exact: true }).waitFor()
@@ -226,7 +227,7 @@ describe('web e2e: queue row actions', () => {
     await editTooltip.waitFor()
     await expectTooltipOnTop(editTooltip)
 
-    const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+    const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(sessionEvents.filter(event => event.type === 'user/message' && event.data.source.kind === 'user')).toHaveLength(1)
     await page.route('**/api/session/prompt', async (route) => {
@@ -376,6 +377,7 @@ describe('web e2e: queue row actions', () => {
       page,
       '[class*="centerCol"]',
       scaffold.workspaceCwd,
+      { replacements: RUNNING_STATUS_COPY_TOKENS },
     )
     await compareOrRefreshGolden(LAYOUT_EXPECTED, layoutSnapshot, MODE)
 

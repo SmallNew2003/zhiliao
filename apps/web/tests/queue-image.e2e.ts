@@ -18,7 +18,7 @@ import {
   captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, RUNNING_STATUS_COPY_TOKENS, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/queued-image', import.meta.url))
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/live-interactions/session.v3.jsonl', import.meta.url))
@@ -145,7 +145,7 @@ describe('web e2e: queued image submission', () => {
       await durableThumb.waitFor({ timeout: 15_000 })
       await expect.poll(() => durableThumb.getAttribute('src'), { timeout: 15_000 }).toMatch(/^blob:/)
       await expect.poll(() => durableThumb.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
-      const queuedSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+      const queuedSnapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
       await compareOrRefreshGolden(QUEUED_EXPECTED, queuedSnapshot, MODE)
     } finally {
       await cleanup()
