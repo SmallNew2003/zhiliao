@@ -1,12 +1,9 @@
 // The composer remains in ConversationRoot so switching out of the blank-draft
 // phase does not remount its textarea.
 
-import { useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import {
-  IconChevronDownOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
-  ZHILIAO_MARK_TOP_PATH, ZHILIAO_MARK_HOOK_PATH,
-  ZHILIAO_DOT_CX, ZHILIAO_DOT_CY, ZHILIAO_DOT_R, ZHILIAO_ORANGE_COLOR,
+  FishLogo, IconChevronDownOutlineRegular, IconFolderCloseRegular, IconFolderOpenRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ConversationContentProps } from '../contract/slots.ts'
@@ -74,69 +71,19 @@ export interface HeroShellProps {
 }
 
 /**
- * The hero brand mark (34px square), static at rest. Decorative — hidden
- * from the accessibility tree.
- * @param props.hovering - driven by the hitbox parent's pointer state.
- * @returns the brand svg element.
- */
-function HeroFish({ hovering: _hovering }: { hovering: boolean }) {
-  return (
-    <svg
-      className={css.fish}
-      width={34}
-      height={34}
-      viewBox="0 0 96 96"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d={ZHILIAO_MARK_TOP_PATH}
-        stroke="currentColor"
-        strokeWidth={12}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d={ZHILIAO_MARK_HOOK_PATH}
-        stroke="currentColor"
-        strokeWidth={12}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx={ZHILIAO_DOT_CX}
-        cy={ZHILIAO_DOT_CY}
-        r={ZHILIAO_DOT_R}
-        fill={ZHILIAO_ORANGE_COLOR}
-      />
-    </svg>
-  )
-}
-
-/**
  * Render the hero chrome (headline only; no composer, no workspace row).
  * @param props - see {@link HeroShellProps}.
  * @returns the centered hero element tree.
  */
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
-  const [hovering, setHovering] = useState(false)
   return (
     <div className={css.root}>
       <div className={css.stack}>
         <div className={css.headline}>
           {/* figma 34:10412: fish 34×25 leading the headline, gap 10. */}
-          <span
-            className={css.fishHitbox}
-            onPointerEnter={(event) => {
-              if (event.pointerType !== 'touch'
-                && window.matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)').matches) {
-                setHovering(true)
-              }
-            }}
-            onPointerLeave={() => { setHovering(false) }}
-          >
+          <span className={css.fishHitbox}>
             {renderSlot('conversation.hero.brand.mark', { size: 34, className: css.fish }, {
-              fallback: <HeroFish hovering={hovering} />,
+              fallback: <FishLogo size={34} className={css.fish} />,
             })}
           </span>
           <span className={css.titleGroup}>
