@@ -661,7 +661,7 @@ describe('CI workflow', () => {
       || !isRecord(master.on.workflow_dispatch.inputs) || !isRecord(master.on.workflow_dispatch.inputs.suite)
       || !isRecord(master.jobs)) throw new TypeError('CI master must define manual suites and jobs')
     expect(master.on.workflow_dispatch.inputs.suite.options).toEqual([
-      'larger-runner-benchmark', 'consolidated-runner-benchmark', 'ssh-helper', 'wine',
+      'serial-macos', 'python-runtime', 'wine',
     ])
     const wine = workflowJob(master, 'windows')
     if (typeof wine.if !== 'string') throw new TypeError('Wine must define a trigger condition')
