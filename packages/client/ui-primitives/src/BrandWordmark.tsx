@@ -12,7 +12,7 @@ import {
 export interface BrandWordmarkProps extends IconProps {
   /** Whether to include the leading brand mark; defaults to true. */
   includeMark?: boolean | undefined
-  /** Explicit language code or override text. */
+  /** Language code; defaults to the host document's language. */
   locale?: string | undefined
 }
 
@@ -29,9 +29,7 @@ export function BrandWordmark({
 }: BrandWordmarkProps) {
   const isZh = locale !== undefined
     ? locale.startsWith('zh')
-    : (typeof document !== 'undefined'
-      ? (document.documentElement.lang ? document.documentElement.lang.startsWith('zh') : true)
-      : true)
+    : (document.documentElement.lang ? document.documentElement.lang.startsWith('zh') : true)
 
   const width = includeMark
     ? (isZh ? 248 : 308)
