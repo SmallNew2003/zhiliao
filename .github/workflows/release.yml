@@ -3,8 +3,8 @@
 # separate sequences with their own workflows and version lines.
 #
 # Pack and dependency-layout verification run without credentials on every pull
-# request and master push. The dsh sequence publishes nothing, so pack is the
-# whole sequence: it proves the release set still packs and installs.
+# request and master push. Publication is a manual workflow_dispatch of
+# release-publish.yml from a dsh-v* tag.
 name: Release (dsh)
 
 on:
