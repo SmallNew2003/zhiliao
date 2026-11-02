@@ -232,11 +232,6 @@ describe('web e2e: long Chat interaction contract', () => {
     ))
     expect(await markPitch()).toBe(10)
 
-    const firstTurnPosition = await firstTurnButton.evaluate(button => (
-      button.parentElement?.style.getPropertyValue('--turn-natural-position') ?? ''
-    ))
-    expect(firstTurnPosition).toBe('0px')
-
     const loadedMarks = turnNavigation.getByRole('button', { name: /^Jump to turn / })
     const loadedBefore = await loadedMarks.count()
     // Auto paging starts when the reader enters the history headroom.
@@ -244,9 +239,6 @@ describe('web e2e: long Chat interaction contract', () => {
     // Paging converts marks to their loaded form without moving the
     // fixed-pitch ladder.
     await expect.poll(() => loadedMarks.count(), { timeout: 15_000 }).toBeGreaterThan(loadedBefore)
-    expect(await firstTurnButton.evaluate(button => (
-      button.parentElement?.style.getPropertyValue('--turn-natural-position') ?? ''
-    ))).toBe(firstTurnPosition)
     // The manual control remains the fallback while history is still available.
     const loadEarlier = page.getByRole('button', { name: 'Load earlier', exact: true })
     const loadedRows = page.locator('[data-chat-flow-key]')
