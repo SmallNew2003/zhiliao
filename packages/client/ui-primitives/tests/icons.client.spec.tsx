@@ -227,4 +227,27 @@ describe('BrandWordmark', () => {
     expect(svg.getAttribute('viewBox')).toBe('96 0 212 96')
     expect(view.container.querySelector('text')).toBeNull()
   })
+
+  it('falls back to the host document language when no locale is given', () => {
+    const served = document.documentElement.lang
+    const view = render(<primitives.BrandWordmark />)
+    try {
+      const svg = view.container.querySelector('svg')!
+
+      document.documentElement.lang = 'zh-CN'
+      view.rerender(<primitives.BrandWordmark />)
+      expect(svg.getAttribute('viewBox')).toBe('0 0 248 96')
+
+      document.documentElement.lang = 'en'
+      view.rerender(<primitives.BrandWordmark />)
+      expect(svg.getAttribute('viewBox')).toBe('0 0 308 96')
+
+      // Markup that declares no language keeps the Chinese artwork.
+      document.documentElement.lang = ''
+      view.rerender(<primitives.BrandWordmark />)
+      expect(svg.getAttribute('viewBox')).toBe('0 0 248 96')
+    } finally {
+      document.documentElement.lang = served
+    }
+  })
 })
