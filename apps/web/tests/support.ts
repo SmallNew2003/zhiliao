@@ -53,6 +53,25 @@ export const ZH_BROWSER_LOCALE = 'zh-CN'
 export const WEB_FIXTURE_TIME = Date.parse('2026-01-15T12:00:00+08:00')
 
 /**
+ * Every running-status copy the chat lane can show, collapsed to one token for
+ * `captureStableAria`'s `replacements`. The copy rotates per Turn start
+ * timestamp, and a scenario that sends its own prompt creates that Turn at the
+ * host's wall clock, so no fixture supplies a stable variant — the same class
+ * of run-local value as durations and throughput. Pass this list only for a
+ * capture taken while a Turn runs; a settled capture carries no status row.
+ */
+export const RUNNING_STATUS_COPY_TOKENS: readonly (readonly [value: string, token: string])[] = [
+  ['Zhiliao is thinking', '{{runningStatus}}'],
+  ['Zhiliao is reasoning', '{{runningStatus}}'],
+  ['Zhiliao is exploring', '{{runningStatus}}'],
+  // The duration form drops this variant's ', reasoning' suffix, so the longer
+  // status spelling must be replaced before its prefix.
+  ['Discerning details, reasoning', '{{runningStatus}}'],
+  ['Discerning details,', '{{runningStatus}},'],
+  ['Connecting the dots', '{{runningStatus}}'],
+]
+
+/**
  * Budget for a plugin-manager switch to republish its state after a click: the
  * click starts a Host profile write, and the store's follow-up `load()` re-reads
  * its inventory before the switch shows the new value. That chain measured
