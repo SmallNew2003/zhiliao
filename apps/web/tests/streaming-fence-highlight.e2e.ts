@@ -16,7 +16,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot, writeComposerDraft } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, RUNNING_STATUS_COPY_TOKENS, saveFailureShot, writeComposerDraft } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/streaming-fence-highlight', import.meta.url))
 const MID_EXPECTED = fileURLToPath(new URL('./snapshots/streaming-fence-highlight/mid-stream.expected.md', import.meta.url))
@@ -161,7 +161,7 @@ describe.skipIf(MODE === 'record')('web e2e: streaming code-fence highlighting',
     expect(midTree.lines).toHaveLength(3)
     expect(midTree.lines.flat().map(span => span.style)).toContain('color: var(--shiki-token-keyword);')
 
-    const aria = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+    const aria = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, { replacements: RUNNING_STATUS_COPY_TOKENS })
     await compareOrRefreshGolden(
       MID_EXPECTED,
       `${aria}\n\n---\n\n${JSON.stringify(midTree, null, 2)}`,
