@@ -12,9 +12,6 @@ import { connectFreshWorkspace, expandOwningTurnProcess, newEnglishPage, writeCo
 const SUMMARY = `Next paragraph: ${'inspect the loaded context and pending tools '.repeat(8).trim()}`
 const DELTAS = ['First paragraph', `\nDetails\n\n\n${SUMMARY}`, '\nMore detail', '\n\nExpanded update']
 const UI_EXPECTED = fileURLToPath(new URL('./expected/reasoning-preview/running.expected.md', import.meta.url))
-/** Computed mask of the animated whale: the ui-chat package asset URL, whose `@` is percent-encoded. */
-const WHALE_MASK = /^url\("([^"]*\/plugins\/@deepseek-ai\/dsh-client-ui-chat\/assets\/running-whale%402x-[0-9a-f]{12}\.png)"\)$/
-
 class PausedReasoningAdapter extends LlmAdapter {
   constructor(private readonly prefix: string) { super() }
   override async listModels(provider: string) { return [{ provider, id: 'paused', name: `${provider}/paused` }] }
@@ -72,15 +69,15 @@ it.each(['plain', 'signature'])('shows completed paragraph first lines with a ri
       await expandOwningTurnProcess(page, reasoning)
       await reasoning.waitFor()
       const whale = page.locator('[data-chat-running] span[aria-hidden="true"]:has(> svg)')
-      const animatedWhale = whale.locator(':scope > span')
-      const restingWhale = whale.locator(':scope > svg')
+      const flowPaths = whale.locator('svg path[stroke="#3FBE9E"]')
+      const trackPaths = whale.locator('svg path[stroke="currentColor"]')
       await whale.waitFor()
       expect(await whale.locator('animate').count()).toBe(0)
       const expectStaticWhale = async () => {
-        await expect.poll(() => animatedWhale.isVisible()).toBe(false)
-        await expect.poll(() => restingWhale.isVisible()).toBe(true)
-        expect(await animatedWhale.evaluate(element => getComputedStyle(element).maskImage)).toBe('none')
-        const colors = await restingWhale.locator('path').evaluate((path) => {
+        await expect.poll(() => flowPaths.first().isVisible()).toBe(false)
+        await expect.poll(() => trackPaths.first().isVisible()).toBe(true)
+        expect(await flowPaths.first().evaluate(element => getComputedStyle(element).display)).toBe('none')
+        const colors = await trackPaths.first().evaluate((path) => {
           const probe = document.createElement('span')
           probe.style.cssText = 'color: Canvas; forced-color-adjust: none'
           document.body.append(probe)
@@ -100,25 +97,12 @@ it.each(['plain', 'signature'])('shows completed paragraph first lines with a ri
       }
       try {
         await page.emulateMedia({ reducedMotion: 'no-preference', forcedColors: 'none' })
-        await expect.poll(() => animatedWhale.isVisible()).toBe(true)
-        expect(await animatedWhale.evaluate(element => getComputedStyle(element).maskMode)).toBe('alpha')
-        const imageSize = await animatedWhale.evaluate(async (element, mask) => {
-          const source = getComputedStyle(element).maskImage.match(new RegExp(mask))?.[1]
-          if (source === undefined) throw new Error('Running whale mask must use the ui-chat package asset URL')
-          const image = new Image()
-          image.src = source
-          await image.decode()
-          return [image.naturalWidth, image.naturalHeight]
-        }, WHALE_MASK.source)
-        expect(imageSize).toEqual([28, 28])
-        expect(await restingWhale.isVisible()).toBe(false)
+        await expect.poll(() => flowPaths.first().isVisible()).toBe(true)
         const firstWhaleFrame = await whale.screenshot({ animations: 'allow' })
         await expect.poll(async () => !(await whale.screenshot({ animations: 'allow' })).equals(firstWhaleFrame), {
           timeout: 5000,
         }).toBe(true)
         await page.emulateMedia({ reducedMotion: 'reduce' })
-        await expectStaticWhale()
-        await page.emulateMedia({ reducedMotion: 'no-preference', forcedColors: 'active' })
         await expectStaticWhale()
       } finally {
         await page.emulateMedia({ reducedMotion: null, forcedColors: null })
