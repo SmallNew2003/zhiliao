@@ -4203,13 +4203,14 @@ describe('ChatView', () => {
 
   it('settles pinned deliveries before observer growth without reading row geometry', () => {
     let notify: (() => void) | undefined
-    class ResizeObserverStub {
+    class ResizeObserverStub implements ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
-        notify = () => { callback([], this as unknown as ResizeObserver) }
+        notify = () => { callback([], this) }
       }
 
       observe = vi.fn()
       disconnect = vi.fn()
+      unobserve = vi.fn()
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
     const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
@@ -4241,13 +4242,14 @@ describe('ChatView', () => {
 
   it('lets small reader movements accumulate past the follow threshold during growth', () => {
     let notify: (() => void) | undefined
-    class ResizeObserverStub {
+    class ResizeObserverStub implements ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
-        notify = () => { callback([], this as unknown as ResizeObserver) }
+        notify = () => { callback([], this) }
       }
 
       observe = vi.fn()
       disconnect = vi.fn()
+      unobserve = vi.fn()
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
     const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
@@ -4408,9 +4410,9 @@ describe('ChatView', () => {
   it('one ResizeObserver owns pinned dynamic-height follow and ignores growth while away', () => {
     let notify: (() => void) | undefined
     const observe = vi.fn<(element: Element) => void>()
-    class ResizeObserverStub {
+    class ResizeObserverStub implements ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
-        notify = () => { callback([], this as unknown as ResizeObserver) }
+        notify = () => { callback([], this) }
       }
 
       observe = observe
@@ -4696,14 +4698,15 @@ describe('ChatView', () => {
   it('leaves older history alone while the reader is pinned to the live tail, however short the window is', () => {
     let notify: (() => void) | undefined
     let fires = 0
-    class ResizeObserverStub {
+    class ResizeObserverStub implements ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
         // The shared jsdom shim never calls back, so the stub owns delivery.
-        notify = () => { fires += 1; callback([], this as unknown as ResizeObserver) }
+        notify = () => { fires += 1; callback([], this) }
       }
 
       observe = vi.fn()
       disconnect = vi.fn()
+      unobserve = vi.fn()
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
     const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
@@ -4730,14 +4733,15 @@ describe('ChatView', () => {
   it('offers no route to older history when the loaded window has no scrollable range', () => {
     let notify: (() => void) | undefined
     let fires = 0
-    class ResizeObserverStub {
+    class ResizeObserverStub implements ResizeObserver {
       constructor(callback: ResizeObserverCallback) {
         // The shared jsdom shim never calls back, so the stub owns delivery.
-        notify = () => { fires += 1; callback([], this as unknown as ResizeObserver) }
+        notify = () => { fires += 1; callback([], this) }
       }
 
       observe = vi.fn()
       disconnect = vi.fn()
+      unobserve = vi.fn()
     }
     vi.stubGlobal('ResizeObserver', ResizeObserverStub)
     const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
