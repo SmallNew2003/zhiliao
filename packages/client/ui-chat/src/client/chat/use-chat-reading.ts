@@ -4,6 +4,7 @@ import type { ChatScrollPosition, ChatViewSlotProps } from '../contract/slots.ts
 import type { ChatViewport, ViewportLanding, ViewportScroll } from './use-chat-viewport.ts'
 import { useScrollFollow, type ScrollFollow } from './use-scroll-follow.ts'
 
+/** Accepted distance from the scrollport floor, in pixels, that still counts as following the tail. */
 export const FOLLOW_THRESHOLD = 24
 const SCROLL_SAMPLE_INTERVAL_MS = 500
 
