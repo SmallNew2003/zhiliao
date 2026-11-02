@@ -127,7 +127,9 @@ const sources = [...files].filter(f => f.endsWith('.md') && !f.endsWith('.zh.md'
 
 if (request.scope === 'pairs') {
   const anchors = indexMode
-    ? request.anchors.filter(anchor => isTranslationScopeFile(anchor) && [translationPairPaths(anchor).source, translationPairPaths(anchor).zh, translationPairPaths(anchor).meta].some(repositoryFileExists))
+    ? request.anchors.filter(anchor => isTranslationScopeFile(anchor)
+      && [translationPairPaths(anchor).source, translationPairPaths(anchor).zh, translationPairPaths(anchor).meta]
+        .some(repositoryFileExists))
     : request.anchors
   const rejected = anchors.filter(anchor => !isTranslationScopeFile(anchor) || isExcluded(anchor))
   const absent = anchors.filter((anchor) => {
