@@ -15,7 +15,7 @@
 | `lockup-en.svg` | 横排组合：标志 + `zhiliao` |
 | `lockup-vertical.svg` | 竖排组合：标志 + 「知了」 + `ZHILIAO` |
 
-lockup 中的文字依赖系统字体（PingFang SC / Avenir Next 等），正式发布前应转曲（outline）固化。
+lockup 中的中英文字体已全部完成「单线等宽同构体 (Monoline Minimalist)」纯矢量转曲（outline）固化，不再依赖系统字体，实现全平台 100% 像素级对齐与 0 依赖。
 
 ## 色板
 

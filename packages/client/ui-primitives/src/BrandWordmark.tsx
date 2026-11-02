@@ -75,29 +75,51 @@ export function BrandWordmark({
         </g>
       )}
       {isZh ? (
-        <text
-          x="106"
-          y="62"
-          fontFamily="'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'Microsoft YaHei', sans-serif"
-          fontSize="52"
-          fontWeight="600"
-          letterSpacing="4"
-          fill="currentColor"
+        <g
+          stroke="currentColor"
+          strokeWidth={6.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
         >
-          知了
-        </text>
+          {/* 知: 矢 */}
+          <path d="M125 21 L116 35" />
+          <path d="M111 37 L138 37" />
+          <path d="M106 51 L143 51" />
+          <path d="M124 37 L124 51 C124 64 117 73 107 77" />
+          <path d="M130 57 L141 74" />
+          {/* 知: 口 */}
+          <rect x="151" y="36" width="26" height="30" rx="4" />
+          {/* 了 */}
+          <path d="M192 29 L232 29 C232 42 220 50 204 52" />
+          <path d="M213 51 L213 63 C213 72 208 77 200 76" />
+        </g>
       ) : (
-        <text
-          x="104"
-          y="56"
-          fontFamily="'Avenir Next', 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif"
-          fontSize="44"
-          fontWeight="600"
-          letterSpacing="0.5"
-          fill="currentColor"
+        <g
+          stroke="currentColor"
+          strokeWidth={6.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
         >
-          zhiliao
-        </text>
+          {/* z */}
+          <path d="M108 38 H126 L110 62 H126" />
+          {/* h */}
+          <path d="M138 22 V62" />
+          <path d="M138 44 C138 38 143 37.5 148 37.5 C154 37.5 158 41 158 46.5 V62" />
+          {/* i */}
+          <path d="M175 38 V62" />
+          <circle cx="175" cy="27" r="3.25" fill="currentColor" stroke="none" />
+          {/* l */}
+          <path d="M193 22 V62" />
+          {/* i */}
+          <path d="M211 38 V62" />
+          <circle cx="211" cy="27" r="3.25" fill="currentColor" stroke="none" />
+          {/* a */}
+          <path d="M246 43 C243 38 236 37.5 231 41 C226 45 226 54 231 58.5 C236 62.5 243 62.5 246 58 M246 38 V62" />
+          {/* o */}
+          <circle cx="272" cy="50" r="12" />
+        </g>
       )}
     </svg>
   )
