@@ -18,6 +18,13 @@ overrides:
   'extract-zip>yauzl': '3.4.0'
   '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
+  # `pnpm deploy --legacy --config.node-linker=hoisted` resolves the deployed
+  # closure from the registry instead of the workspace lockfile, so a caret
+  # range inside it can drift to a version the lockfile never reviewed. The
+  # Office sidecar gate rejects any such version, which is how tslib 2.9.1
+  # broke the Python runtime wheel build. fontkit is the only consumer of
+  # @swc/helpers, and the lockfile already pins its tslib to 2.8.1.
+  '@swc/helpers>tslib': '2.8.1'
 
 peerDependencyRules:
   allowedVersions:
