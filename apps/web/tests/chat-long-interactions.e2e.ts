@@ -239,23 +239,21 @@ describe('web e2e: long Chat interaction contract', () => {
     // Paging converts marks to their loaded form without moving the
     // fixed-pitch ladder.
     await expect.poll(() => loadedMarks.count(), { timeout: 15_000 }).toBeGreaterThan(loadedBefore)
-    // The manual control remains the fallback while history is still available.
-    const loadEarlier = page.getByRole('button', { name: 'Load earlier', exact: true })
+    // Auto paging has already consumed the rest of the history, so the
+    // manual "Load earlier" control is gone; the rows it would have paged in
+    // are the same ones the marks above now address.
     const loadedRows = page.locator('[data-chat-flow-key]')
-    const rowsBefore = await loadedRows.count()
-    await loadEarlier.click()
-    await expect.poll(() => loadedRows.count(), { timeout: 15_000 }).toBeGreaterThan(rowsBefore)
+    expect(await loadedRows.count()).toBeGreaterThan(0)
     await railScroller.hover()
     await page.mouse.wheel(0, -FIXTURE_TURNS * 10)
     await expect.poll(() => railScroller.evaluate(element => element.scrollTop)).toBe(0)
-    await firstTurnButton.waitFor({ state: 'visible' })
-    expect(await markPitch()).toBe(10)
-    // Activating the still-unloaded oldest mark pages the rest in and lands
-    // on the turn's own row.
-    await firstTurnButton.focus()
-    await firstTurnButton.press('Enter')
+    // Auto paging already loaded the first turn, so its mark jumps directly
+    // instead of paging the rest in when activated.
     const firstLoaded = turnNavigation.getByRole('button', { name: 'Jump to turn 1', exact: true })
-    await firstLoaded.waitFor({ timeout: 60_000 })
+    await firstLoaded.waitFor({ state: 'visible', timeout: 15_000 })
+    expect(await markPitch()).toBe(10)
+    await firstLoaded.focus()
+    await firstLoaded.press('Enter')
     await expect.poll(() => firstLoaded.getAttribute('aria-current'), { timeout: 15_000 }).toBe('true')
     await expect.poll(
       () => page.locator('[data-chat-turn="1"][data-chat-flow-kind="user"]').count(),

@@ -1586,6 +1586,10 @@ function normalizeAria(snapshot: string, workspaceCwd: string, age: boolean): st
       duration => duration.startsWith('~') ? duration : '{{duration}}',
     )
     .replace(/\b\d[\d,]*(?:\.\d+)? ms\b/g, '{{duration}}')
+    // The running status rotates decorative copy on a timer, so a capture
+    // names whichever phrase the clock landed on rather than a stable state.
+    .replace(/(?<=^- status: ).+$/gm, '{{status}}')
+    .replace(/(?<=^- text: ).+(?=, \{\{duration\}\} ···$)/gm, '{{status}}')
     .replace(
       /约\d+(?:年(?:\d+个月)?|个月(?:\d+天)?)|\d+(?:天(?:\d+小时(?:\d+分\d+秒)?)?|小时\d+分\d+秒|分\d+秒|(?:\.\d+)?秒)/g,
       duration => duration.startsWith('约') ? duration : '{{duration}}',

@@ -368,7 +368,10 @@ async function flingTranscript(page: Page, deltaY: number): Promise<void> {
 }
 
 async function wheelToHistoryStart(page: Page): Promise<void> {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  // Reaching the head pages older history in without a click, and each page
+  // re-anchors the transcript, so the loop must outlast the page loads rather
+  // than assume a fixed number of wheel steps reaches the first turn.
+  for (let attempt = 0; attempt < 48; attempt += 1) {
     if ((await scrollGeometry(page)).scrollTop <= 1) break
     await wheelTranscript(page, -2_400)
   }
