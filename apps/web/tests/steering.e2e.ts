@@ -17,7 +17,7 @@ import {
   compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { openSettings, connectFreshWorkspace, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot } from './support.ts'
+import { RUNNING_STATUS_COPY_TOKENS, openSettings, connectFreshWorkspace, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/steering', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.v3.jsonl')
@@ -151,7 +151,9 @@ describe('web e2e: mid-turn steering lands durably and visibly', () => {
       expect(await page.getByText(STEER, { exact: true }).count()).toBe(1)
       expect(await pendingSteering.count()).toBe(1)
       expect(await page.getByRole('button', { name: 'Edit queued message' }).count()).toBe(0)
-      const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+      const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, {
+        replacements: RUNNING_STATUS_COPY_TOKENS,
+      })
       await compareOrRefreshGolden(MID_EXPECTED, snapshot, MODE)
     }
 
@@ -632,7 +634,9 @@ describe('web e2e: empty-draft Cmd+Enter steers the whole queue', () => {
     // arguments stay gated so the mid snapshot cannot acquire a preparation row.
     await page.locator('[data-variant="think"][data-state="ok"]').first().waitFor({ state: 'attached', timeout: 10_000 })
     expect(await page.locator('[data-tool="ask_user_question"][data-state="preparing"]').count()).toBe(0)
-    const mid = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
+    const mid = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd, {
+      replacements: RUNNING_STATUS_COPY_TOKENS,
+    })
     await compareOrRefreshGolden(STEER_ALL_MID, mid, MODE)
 
     // Answer the question; the step closes, the loop drains both steerings
