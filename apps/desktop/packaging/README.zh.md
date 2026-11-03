@@ -1,5 +1,5 @@
 ---
-description: "在本地或 Windows／macOS Actions 中生成 Desktop 安装包，选择部署与签名模式，并获取产物和诊断。本指南区分构建操作、发布与已安装应用验收。使用硬件凭据前，必须检查平台签名要求与共享 runner 风险。"
+description: "在本地或 macOS Actions 中生成 Desktop 安装包，选择部署与签名模式，并获取产物和诊断。本指南区分构建操作、发布与已安装应用验收。使用硬件凭据前，必须检查平台签名要求与共享 runner 风险。"
 ---
 
 # Desktop 打包
@@ -8,16 +8,14 @@ description: "在本地或 Windows／macOS Actions 中生成 Desktop 安装包�
 
 ## 概述
 
-在本地或 Windows／macOS Actions 中生成 Desktop 安装包，选择部署与签名模式，并获取产物和诊断。本指南区分构建操作、发布与已安装应用验收。使用硬件凭据前，必须检查平台签名要求与共享 runner 风险。
+在本地或 macOS Actions 中生成 Desktop 安装包，选择部署与签名模式，并获取产物和诊断。本指南区分构建操作、发布与已安装应用验收。使用硬件凭据前，必须检查平台签名要求与共享 runner 风险。
 
 ## 目录
 
 - [选择打包方式](#choose-a-build)
 - [发布版本](#release-versions)
 - [配置与本地构建](#configuration-and-local-builds)
-- [Windows Actions 打包](#windows-actions)
 - [macOS 自托管打包](#macos-actions)
-- [未签名 Windows 测试安装包](#unsigned-windows-test-installer)
 - [无发布签名的本地 macOS DMG](#local-macos-dmg-without-release-signing)
 - [macOS 发布签名与诊断](#macos-release-signing)
 - [目录构建与准备](#directory-and-preparation)
@@ -103,31 +101,13 @@ macOS 正式发布和本地未签名 DMG 都通过 [electron-builder 配置](../
 
 每个目标都在 `apps/desktop/.desktop-build/targets/<target>/` 下持有自己的打包输入、已准备运行时、包集合、dsh 依赖树、pnpm 准备状态、未打包应用、更新元数据和最终产物。Electron 归档缓存继续由 `.desktop-build/downloads` 共享，因为每个归档文件名都包含版本、平台和架构，并且在解包前经过验证。目标构建绝不读取其他目标的可变准备状态。
 
-<a id="windows-actions"></a>
-
-## Windows Actions 打包
-
-runner 的受监督启动和恢复见 [Windows runner 机器准备](../windows-signing/README.zh.md#machine-setup)。
-
-`Package Desktop · Windows · x64` [手动工作流](../../../.github/workflows/windows-package.yml) 选择专用 Windows x64 runner 标签 `dsh-win-package-trial`，并使用机器 preset `test` 或 `production`。选择 `signed`（默认）或 `unsigned`；签名模式复用现有 EV token 预检、签名缓存与失败 interlock，不发布或上传 release。`build_version` 默认为 `auto`，使用[发布版本](#release-versions)中的 CI 标识；显式值可以是源码产品版本，或扩展构建版本，例如产品 `0.2.1-alpha.1` 对应 `0.2.1-alpha.1.20261009.1`。版本前缀必须匹配所选源码；校验错误显示其当前示例。manifest 保持不变。
-
-在 Actions 选择工作流、源码分支、preset、签名模式和版本，再点击 Run workflow。输入变更合并前，用 `gh workflow run windows-package.yml --ref <branch> -f preset=test -f signing=unsigned -f build_version=auto` 测试已推送分支；合并后验证网页表单。它不监听 push 或 PR。日志和成功生成的 EXE 保留 14 天。依赖打包流程前检查日志和安装包；安装是独立操作。检出前，Node 删除 runner 专用源码目录，不跟随依赖 junction；工作流校验目标位置并拒绝链接祖先目录。不得指向日常开发目录。运行共享一个并发组，不取消正在进行的构建；最多保留一个待运行任务，新触发会替换它。仅在成功完成干净检出后上传诊断。机器配置位于 checkout 之外，不作为产物上传。
-
-在 Actions 打开完成的运行并下载 Artifacts。`windows-x64-signed-<version>-<run_id>-<run_attempt>` 与 `windows-x64-unsigned-<version>-<run_id>-<run_attempt>` 包含对应 EXE；`windows-package-logs-<run_id>-<run_attempt>` 包含打包诊断。上传步骤名为 `Retain verified signed installer`、`Retain verified unsigned installer` 和 `Retain packaging diagnostics`；步骤耗时与带时间戳的日志显示上传用时。这些产物不等于发布 Release 或下载站内容。
-
-测量缓存时，`cache_namespace` 为两个依赖 store 和上游下载选择保留的子目录；留空使用正常共享缓存。新名称用于冷缓存采样，再次使用同名用于热缓存采样。名称由 1–64 个小写字母、数字或连字符组成，以字母或数字开头，且不能为 Windows 设备名。这不会重置独立的签名缓存或操作系统文件缓存；应将其状态、Job 开始至完成的总耗时与阶段耗时和产物体积一并报告。workflow 在依赖安装前记录 Node 版本、可用 CPU 并行数、逻辑 CPU 数及总内存和空闲内存。
-
-依赖安装和打包步骤在启动子进程前，将自身 shell 的 CPU、I/O 和内存优先级调整为普通值。优先级辅助脚本从 workflow 的精确提交复制到本轮临时目录，与选中的产品源码分离。缺失辅助脚本会终止 CI 准备；无法调整优先级时明确告警并标记调度条件不适合性能对比，但继续打包。这不会修改 runner 任务或其他进程。版本、preset 和产物留存适配器仍跟随产品源码及其格式。
-
-安装器上传直接存储已经压缩的发布文件，不再进行 ZIP 二次压缩；安装器字节和签名保持不变。诊断日志上传保留通常的压缩方式。
-
 <a id="macos-actions"></a>
 
 ## macOS 自托管打包
 
 [Apple Silicon 工作流](../../../.github/workflows/macos-package.yml)与 [Intel 工作流](../../../.github/workflows/macos-intel-package.yml)在带有 `dsh-mac-package-trial` 标签的 Apple Silicon runner 上分别生成 arm64 和 x64 安装包，两者共用一个并发组。Intel 工作流在安装依赖前检查 Rosetta 能否执行；所选源码必须包含按目标架构校验的 macOS CI 适配脚本。两者均选择 `test` 或 `production`，并复用现有签名、公证和打包运行时检查。成功的 DMG／ZIP 与诊断日志保留 14 天，不发布 release；安装包上传关闭重复 ZIP 压缩。操作人员须验收完整 Actions 运行及目标架构上的安装，才能确认可交付。`compression_level` 下拉选项默认为 `3`，也可选择 `7`；本次运行以该选项覆盖机器预设，只影响 ZIP 和自动升级下载，不影响 DMG。
 
-三个平台的表单均依次展示源码、环境、升级通道、版本模式、手动版本号、测试 release ID 和压缩等级，默认值一致。macOS 公证选项和 Windows 签名、缓存测量选项位于公共字段之后。
+两个 macOS 平台的表单均依次展示源码、环境、升级通道、版本模式、手动版本号、测试 release ID 和压缩等级，默认值一致。macOS 公证选项位于公共字段之后。
 
 运行 `node apps/desktop/scripts/setup-macos-packaging.mjs "$HOME/dsh-ci"` 创建私有 `runner/`、`packaging/{presets,secrets,certificates}` 和 `cache/macos-signatures` 目录，不覆盖已有文件；追加 `--check` 仅检查。在 checkout 外填写 [preset](../config/macos-packaging/test.env.example) 和[签名](../config/macos-packaging/macos-signing.env.example)模板，将秘密和证书文件权限设为 `0600`。`DSH_PACKAGING_CONFIG_DIR` 指定 `packaging` 的绝对目录，`DSH_PACKAGING_PRESET` 选择其中的 preset；缺少文件立即失败，不回退到 `.env.macos`。Mac 签名和仅准备构建读取 `secrets/macos-signing.env`，相对凭据路径以该文件所在目录为基准。公开 preset 拒绝签名凭据，签名文件不能覆盖公开配置。本地未签名 Mac 构建保留无需配置的行为。
 
@@ -144,20 +124,6 @@ bash apps/desktop/scripts/macos-runner-service.sh status "$HOME/dsh-ci/runner"
 ```
 
 安装脚本将启动脚本复制到 `runner/dsh-service`，将服务 PATH 设为 Node 24 和系统工具，并使用 GitHub 的 `svc.sh` 与 `runsvc.sh`。LaunchAgent 在 SSH 断开后继续运行，但重启后需要该账户登录桌面，注销桌面时停止。FileVault 磁盘解锁仍由操作人员完成，这不提供无人值守开机。日志位于 `runner/dsh-service/stdout.log` 和 `stderr.log`；验收时确认出现 `Connected to GitHub` 与 `Listening for Jobs`。更新已安装的启动脚本或工具路径时，等待 runner 空闲，依次执行 `stop`、`uninstall`，再重新安装。这两个操作都不会注销 runner 或删除打包凭据。卸载保留 `runner/dsh-service`（包括日志）和显式 `.path`；重新安装会替换启动快照和 PATH。
-
-<a id="unsigned-windows-test-installer"></a>
-
-## 未签名 Windows 测试安装包
-
-在 Windows x64 上，使用完整的未签名打包命令进行本地安装测试：
-
-```sh
-pnpm run package:desktop:win:x64:unsigned
-```
-
-该命令读取 `.env.windows`，要求设置 `DSH_DESKTOP_APP_ID` 和[强制更新策略配置](../README.zh.md#mandatory-update-policy)，包括真实的 HTTPS 服务 origin。本机验收和 CI 使用 Node 24；其他工具为根 `packageManager` 固定版本的 pnpm、Git、PowerShell 7（`pwsh`）、tar、Python、Visual C++ Build Tools 和 Windows SDK。Python 不在 `PATH` 中时设置 `PYTHON`。命令将安装包写入 `.desktop-build/targets/win-x64/unsigned-artifacts/`，省略普通自动更新配置，清除签名凭据，且不生成发布完成记录。无需 EV 或上传凭据。签名打包和上传仍遵循正式发布要求。
-
-先运行 `pnpm install --frozen-lockfile`，再运行 `pnpm run package:desktop:win:x64:unsigned --check` 校验配置和工具，最后执行上面的完整命令。打包自行执行完整构建和隔离的运行时 smoke，不调用在线模型。阶段日志保留在 `.desktop-build/packaging-runs/`；仅构建成功不代表安装包验证通过。依赖安装和运行时准备需要访问 npm、GitHub release 资源和 nodejs.org；网络需要时使用现有 registry 和代理配置。缓存与工具位置属于构建机器配置，不在跟踪文件中固定个人路径。
 
 <a id="local-macos-dmg-without-release-signing"></a>
 
