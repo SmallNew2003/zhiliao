@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write docs/comet/changes/integrate-comet-workflow/specs/comet-workflow-integration/spec.md
-spec.md: 330eb1a094525f51eda8fbd8b993ebc8f268808b
-spec.zh.md: 0fe30027cb242f147e3355f3ec27f43668ed5fcf
+# Bilingual-pair consistency record for spec.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/comet/archive/2026-09-22-integrate-comet-workflow/specs/comet-workflow-integration/spec.md
+/comet-workflow-integration:
+  en: 61aeadcf80a28745
+  zh: a4ae3b114a12f5a9
+/comet-workflow-integration/dual-workflow-configuration:
+  en: d62f1d6c13d49b1f
+  zh: ee20be933bc00254
+/comet-workflow-integration/dual-workflow-configuration/scenario-resolving-the-committed-project-workflow:
+  en: f615ec98679b7008
+  zh: dcc1baeb09d69691
+/comet-workflow-integration/client-write-adaptation:
+  en: b83af394ecd348ff
+  zh: d350bd15fc42334b
+/comet-workflow-integration/client-write-adaptation/scenario-a-client-calls-the-portable-router:
+  en: bfcfc022bdbdddaf
+  zh: 682e6872750d1b08
+/comet-workflow-integration/dsh-hook-adaptation:
+  en: c3e2da75181bb7f4
+  zh: 1f4f846f837aeeb8
+/comet-workflow-integration/dsh-hook-adaptation/scenario-dsh-reuses-comet-s-write-constraints:
+  en: 1eb32c90c3a4bef4
+  zh: ba48ea852841a46f
+/comet-workflow-integration/dsh-bridge-argument-compatibility:
+  en: a3c071617f6b7587
+  zh: 25fac9eb9ec879db
+/comet-workflow-integration/dsh-bridge-argument-compatibility/scenario-the-existing-payload-is-retained-when-argument-passing-is-off:
+  en: 7ef951b98db0fdaa
+  zh: 0c833a4f4d7bede4
+/comet-workflow-integration/dsh-bridge-argument-compatibility/scenario-the-comet-overlay-enables-argument-passing:
+  en: 6c0b4c8ea503125b
+  zh: 9c2a10b173f11977
+/comet-workflow-integration/committable-state:
+  en: 9ad579fa243263f1
+  zh: 53e18205286d3b86
+/comet-workflow-integration/committable-state/scenario-a-clean-checkout-holds-no-local-state:
+  en: 06e9ba643bdd6ed6
+  zh: 60815c5daa34775d

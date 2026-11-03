@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for verification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/comet/archive/2026-09-22-integrate-comet-workflow/verification.md
-verification.md: 801f2a3e4ac2a828027c9f94163cf86264f9e769
-verification.zh.md: 76d44dd75819111b49cf5efec5c7e5984f8ba3ab
+/:
+  en: 8432cd6a7ef73bab
+  zh: 8432cd6a7ef73bab
+/section:
+  en: 447b28c22ff52f25
+  zh: 03fdb46664c86c20
+/section/section:
+  en: 4c9ace9f02112f23
+  zh: 4c9ace9f02112f23
+/section/section~2:
+  en: a982058ad7a7c3f0
+  zh: a982058ad7a7c3f0
+/section/section~3:
+  en: 6a95447f0fd6d233
+  zh: 6a95447f0fd6d233
+/section/section/builder:
+  en: edff633c8e2320ee
+  zh: edff633c8e2320ee
+/section/section~4:
+  en: b370374cf0b23ceb
+  zh: b370374cf0b23ceb
+/section/section~5:
+  en: 111aa0c143aed0e4
+  zh: 111aa0c143aed0e4
+/section/section~6:
+  en: 42c091336772f426
+  zh: 42c091336772f426
+/section/section~7:
+  en: c8359b993c54fe74
+  zh: c8359b993c54fe74
