@@ -36,7 +36,7 @@ Status: implemented
 
 ## 相关
 
-- 基线合并：`master` 以一个合并提交纳入上游 `master` 的 HEAD，该 HEAD 晚于上游最后一个发布 tag `dsh-v0.2.2-alpha.2` 共 351 笔，且该合并提交的第二父即此上游 HEAD；基线 tag 为 `zhiliao-v0.1.0-alpha.1`。同步分支对应的 PR #45 至今未合并。
+- 基线合并：`master` 以一个合并提交纳入上游 `master` 的 HEAD，该 HEAD 处可达的上游最新发布 tag 为 `dsh-v0.2.2-alpha.2`（基线之后上游还发布了 `dsh-v0.2.2-alpha.3`，不在本基线内），该合并提交的第二父即此上游 HEAD；基线 tag 为 `zhiliao-v0.1.0-alpha.1`。同步分支对应的 PR #45 至今未合并。
 - 撤回记录：Windows 移除随 `chore(ci): 移除 Windows 门禁与打包工作流` 落地。
-- 遗留项：`apps/desktop/README.md` 仍有 49 处 Windows 提及未清理；`apps/desktop/packaging/README.md` 随本次撤回从 37 处降到 21 处（删除的段落链向已移除的 `windows-package.yml`），余下部分与 `apps/desktop/publishing/ci/README.md` 的 Windows 流程描述留待单独 change。
+- 遗留项：`apps/desktop/README.md` 仍有 49 处 Windows 提及未清理；`apps/desktop/packaging/README.md` 随本次撤回从 37 处降到 21 处（删除的段落链向已移除的 `windows-package.yml`）；`apps/desktop/publishing/ci/README.md` 从 12 处降到 11 处（删掉的是 `Windows uses target win-x64` 一句），余下部分留待单独 change。
 - 不写升级指南：本产品线在 `origin` 上无已发布 tag，且 `windows-package.yml` 是手动触发、走自托管 `dsh-win-package-trial` label 的工作流，没有已发布表面被破坏。

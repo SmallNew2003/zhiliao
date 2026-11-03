@@ -36,7 +36,7 @@ The mainline no longer carries future upstream commits; absorbing any of them be
 
 ## Related
 
-- Baseline merge: `master` takes in the upstream `master` HEAD through one merge commit whose second parent is that HEAD; the HEAD sits 351 commits past upstream's last release tag `dsh-v0.2.2-alpha.2`. The baseline tag is `zhiliao-v0.1.0-alpha.1`. The sync branch's pull request #45 remains unmerged.
+- Baseline merge: `master` takes in the upstream `master` HEAD through one merge commit whose second parent is that HEAD. The latest upstream release tag reachable at that HEAD is `dsh-v0.2.2-alpha.2`; upstream later published `dsh-v0.2.2-alpha.3`, which is outside this baseline. The baseline tag is `zhiliao-v0.1.0-alpha.1`. The sync branch's pull request #45 remains unmerged.
 - Withdrawal record: the Windows removal shipped in `chore(ci): 移除 Windows 门禁与打包工作流`.
-- Outstanding item: `apps/desktop/README.md` still carries 49 Windows mentions untouched; `apps/desktop/packaging/README.md` dropped from 37 to 21 mentions with this withdrawal (the removed sections linked the now-deleted `windows-package.yml`), and its remainder plus the Windows flow described in `apps/desktop/publishing/ci/README.md` belong to a separate change.
+- Outstanding item: `apps/desktop/README.md` still carries 49 Windows mentions untouched; `apps/desktop/packaging/README.md` dropped from 37 to 21 mentions with this withdrawal (the removed sections linked the now-deleted `windows-package.yml`); `apps/desktop/publishing/ci/README.md` dropped from 12 to 11 (the removed sentence was `Windows uses target win-x64`). The remainder belongs to a separate change.
 - No upgrade guide: this product line has no published tag on `origin`, and `windows-package.yml` was a manual workflow on the self-hosted `dsh-win-package-trial` label, so no published surface was broken.
