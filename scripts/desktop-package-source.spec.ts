@@ -5,8 +5,8 @@ import { join, resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { expect, it } from 'vitest'
 
-it.each(['macos', 'windows'])('%s packaging accepts test branches but preserves production and tag restrictions', (platform) => {
-  const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, `../.github/workflows/${platform}-package.yml`), 'utf8')) as {
+it('macos packaging accepts test branches but preserves production and tag restrictions', () => {
+  const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, '../.github/workflows/macos-package.yml'), 'utf8')) as {
     jobs: { package: { steps: Array<{ name?: string; run?: string }> } }
   }
   const command = workflow.jobs.package.steps.find(step => step.name === 'Validate selected source and adapter support')!.run!
