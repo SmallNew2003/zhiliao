@@ -1,24 +1,50 @@
 {
-  "en-US": {
+  "darwin:en-US": {
     "menu": [
-      { "label": "About DeepSeek Harness", "role": "about" },
+      { "label": "About Zhiliao", "role": "about" },
       { "type": "separator" }
     ],
     "options": {
-      "applicationName": "DeepSeek Harness",
+      "applicationName": "Zhiliao",
       "applicationVersion": "1.0.0",
       "version": "",
       "copyright": "",
       "iconPath": "<app icon>"
     }
   },
-  "zh-CN": {
+  "darwin:zh-CN": {
     "menu": [
-      { "label": "关于 DeepSeek Harness", "role": "about" },
+      { "label": "关于 知了", "role": "about" },
       { "type": "separator" }
     ],
     "options": {
-      "applicationName": "DeepSeek Harness",
+      "applicationName": "知了",
+      "applicationVersion": "1.0.0",
+      "version": "",
+      "copyright": "",
+      "iconPath": "<app icon>"
+    }
+  },
+  "win32:zh-CN": {
+    "menu": [
+      { "label": "关于 知了" },
+      { "type": "separator" }
+    ],
+    "options": {
+      "applicationName": "知了",
+      "applicationVersion": "1.0.0",
+      "version": "",
+      "copyright": "",
+      "iconPath": "<app icon>"
+    }
+  },
+  "win32:en-US": {
+    "menu": [
+      { "label": "About Zhiliao" },
+      { "type": "separator" }
+    ],
+    "options": {
+      "applicationName": "Zhiliao",
       "applicationVersion": "1.0.0",
       "version": "",
       "copyright": "",

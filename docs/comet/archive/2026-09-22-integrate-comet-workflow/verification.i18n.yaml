@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for verification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/comet/archive/2026-09-22-integrate-comet-workflow/verification.md
-verification.md: 801f2a3e4ac2a828027c9f94163cf86264f9e769
-verification.zh.md: 76d44dd75819111b49cf5efec5c7e5984f8ba3ab
+/:
+  en: 8432cd6a7ef73bab
+  zh: 8432cd6a7ef73bab
+/verification:
+  en: 45a9319a5a0fbfbd
+  zh: 03fdb46664c86c20
+/verification/current-result:
+  en: 2114475f2a157115
+  zh: 4c9ace9f02112f23
+/verification/acceptance:
+  en: 63e07a79659359d3
+  zh: a982058ad7a7c3f0
+/verification/checks:
+  en: 226ba37cb15679a6
+  zh: 6a95447f0fd6d233
+/verification/checks/evidence-from-the-builder-report:
+  en: 346ae525b2c20404
+  zh: edff633c8e2320ee
+/verification/blockers:
+  en: 893f0962aafe88ff
+  zh: b370374cf0b23ceb
+/verification/risks-and-skipped-work:
+  en: 0b14ecb5b613d56e
+  zh: 111aa0c143aed0e4
+/verification/previous-iterations:
+  en: c771ad495e4318ca
+  zh: 42c091336772f426
+/verification/conclusion:
+  en: 4e777ba2ce0ad771
+  zh: c8359b993c54fe74

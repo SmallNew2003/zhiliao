@@ -1,62 +1,62 @@
-# Comet 工作流接入
+# Comet workflow integration
 
 English | [中文](spec.zh.md)
 
-## 双工作流配置
+## Dual workflow configuration
 
-仓库必须将 Native 和 Classic 同时列为可用的 Comet 工作流，且项目本地的默认工作流选择必须可由 Comet CLI 解析。
+The repository must list Native and Classic as available Comet workflows at the same time, and the project-local default workflow choice must be resolvable by the Comet CLI.
 
-### Scenario: 解析已提交的项目工作流
+### Scenario: resolving the committed project workflow
 
-- **WHEN** 开发者在仓库根目录执行 Comet 工作流解析命令
-- **THEN** 命令返回项目保存的有效配置
-- **AND** 返回的可用工作流包含 Native 和 Classic
+- **WHEN** a developer runs the Comet workflow resolution command in the repository root
+- **THEN** the command returns the valid configuration saved for the project
+- **AND** the returned available workflows include Native and Classic
 
-## 客户端写入适配
+## Client write adaptation
 
-仓库必须提供 Codex 与 WorkBuddy 的 Comet 写入钩子。每个钩子必须执行仓库内的 Comet 路由器，不得依赖开发者机器上的绝对路径。GitHub Copilot 和 Trae 适配层不属于该项目的已提交配置。
+The repository must provide Comet write hooks for Codex and WorkBuddy. Each hook must run the in-repository Comet router and must not depend on an absolute path on the developer's machine. The GitHub Copilot and Trae adaptation layers are not part of this project's committed configuration.
 
-### Scenario: 客户端调用可移植路由器
+### Scenario: a client calls the portable router
 
-- **WHEN** Codex 或 WorkBuddy 在仓库检出中调用已提交的写入钩子
-- **THEN** 钩子调用仓库内可解析的 Comet 路由器
-- **AND** 该调用不包含特定开发者的绝对项目路径
+- **WHEN** Codex or WorkBuddy calls the committed write hook in a repository checkout
+- **THEN** the hook invokes the Comet router resolvable inside the repository
+- **AND** the call carries no absolute project path specific to a developer
 
-## DSH 钩子适配
+## DSH hook adaptation
 
-仓库必须提供一个显式启用的 DSH overlay。该 overlay 挂载 `dsh-hooks-codex` 并引用共享的 Codex 钩子配置，使 DSH 在 `PreToolUse` 时调用 Comet 路由器。overlay 必须显式开启 bridge 的原始工具参数传递，使路由器能够识别 DSH 文件操作目标。共享配置必须匹配每个 DSH 工具调用；路由器自行放行非写入调用，在 Native Build 阶段允许实现写入，在 Shape 阶段拒绝实现写入，并在 Verify 阶段使写入候选失效并返回 Build。
+The repository must provide an explicitly enabled DSH overlay. The overlay mounts `dsh-hooks-codex` and references the shared Codex hook configuration, so DSH calls the Comet router on `PreToolUse`. The overlay must explicitly enable the bridge's raw tool-argument passing so the router can identify DSH file-operation targets. The shared configuration must match every DSH tool call; the router passes non-write calls through on its own, allows implementation writes during the Native Build phase, rejects implementation writes during the Shape phase, and invalidates write candidates during the Verify phase and returns to Build.
 
-### Scenario: DSH 复用 Comet 写入约束
+### Scenario: DSH reuses the Comet write constraints
 
-- **WHEN** DSH 使用项目的 Comet overlay 运行工具调用
-- **THEN** `dsh-hooks-codex` 在 `PreToolUse` 时调用 Comet 路由器
-- **AND** bridge 将工具参数传递给路由器以识别文件操作目标
-- **AND** 非写入调用继续执行
-- **AND** Native Build 阶段的实现写入继续执行
-- **AND** Native Shape 阶段的实现写入被拒绝
-- **AND** Native Verify 阶段的实现写入使候选失效并返回 Build
+- **WHEN** DSH runs a tool call with the project's Comet overlay
+- **THEN** `dsh-hooks-codex` calls the Comet router on `PreToolUse`
+- **AND** the bridge passes tool arguments to the router to identify file-operation targets
+- **AND** non-write calls continue to execute
+- **AND** implementation writes during the Native Build phase continue to execute
+- **AND** implementation writes during the Native Shape phase are rejected
+- **AND** implementation writes during the Native Verify phase invalidate the candidate and return to Build
 
-## DSH bridge 参数兼容性
+## DSH bridge argument compatibility
 
-`dsh-hooks-codex` 必须将完整工具参数传递定义为默认关闭的配置选项。未启用时，bridge 必须继续提供仅含 `command` 的 Codex `tool_input`；启用时，bridge 必须保留原始工具参数，并保持 `command` 为字符串。
+`dsh-hooks-codex` must define full tool-argument passing as a configuration option that is off by default. When it is not enabled, the bridge must continue to provide a Codex `tool_input` that contains only `command`; when it is enabled, the bridge must preserve the raw tool arguments and keep `command` a string.
 
-### Scenario: 未启用参数传递时保留现有 payload
+### Scenario: the existing payload is preserved when argument passing is off
 
-- **WHEN** `dsh-hooks-codex` 未启用工具参数传递
-- **THEN** 每个 Codex tool payload 的 `tool_input` 仅包含字符串 `command`
+- **WHEN** `dsh-hooks-codex` does not have tool-argument passing enabled
+- **THEN** each Codex tool payload's `tool_input` contains only the string `command`
 
-### Scenario: Comet overlay 启用参数传递
+### Scenario: the Comet overlay enables argument passing
 
-- **WHEN** DSH 使用 Comet overlay 调用带文件路径的工具
-- **THEN** Codex hook payload 保留该文件路径
-- **AND** `tool_input.command` 仍为字符串
+- **WHEN** DSH calls a tool with a file path under the Comet overlay
+- **THEN** the Codex hook payload preserves that file path
+- **AND** `tool_input.command` remains a string
 
-## 可提交状态
+## Committable state
 
-仓库必须跟踪项目级 Comet 配置、所选客户端适配层、DSH overlay 与正式变更工件，并忽略 Comet 的机器本地运行时状态。
+The repository must track the project-level Comet configuration, the selected client adaptation layer, the DSH overlay, and the formal change artifacts, and must ignore Comet's machine-local runtime state.
 
-### Scenario: 干净检出不含本机状态
+### Scenario: a clean checkout carries no local state
 
-- **WHEN** 开发者在另一台机器检出该仓库
-- **THEN** 所有已跟踪的 Comet 配置和适配文件可用
-- **AND** 本机运行时状态不在 Git 跟踪中
+- **WHEN** a developer checks out the repository on another machine
+- **THEN** all tracked Comet configuration and adaptation files are available
+- **AND** the local runtime state is not tracked in Git

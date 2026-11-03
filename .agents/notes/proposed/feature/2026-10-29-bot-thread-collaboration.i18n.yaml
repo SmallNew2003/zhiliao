@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for 2026-10-29-bot-thread-collaboration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-10-29-bot-thread-collaboration.md
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus:
+  en: 7aeacecaf9323bfb
+  zh: 57383d304113a845
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/problem:
+  en: 536ebe0da1b8ffe4
+  zh: 222e67cecd391c09
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal:
+  en: f6f1926cc81364e3
+  zh: d967a124258cdf91
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/packages:
+  en: 93b72472df679648
+  zh: e432252a66875130
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/thread-model:
+  en: 9578f1ac403871a3
+  zh: 8c614403d33b8990
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/routing-and-wake-up:
+  en: f7908e27ad9a5c50
+  zh: 625757705f4c9534
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/bot-sessions:
+  en: 1ebfb8d000cf5500
+  zh: ac423fc52199f81e
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/project-task-domain:
+  en: e085a6bb63c2060d
+  zh: 9fe2aa7a6ee8363d
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/session-log:
+  en: e786ba96f44cc46b
+  zh: adbad5679fef01b1
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/channel-seam:
+  en: b3fc4343f832befb
+  zh: 3a72940b25b943cb
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/multi-tenancy-and-authorization:
+  en: a73239421e3c43c0
+  zh: eb6bccf8553fd38b
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/proposal/streaming-back-projection:
+  en: 63609debd08f63af
+  zh: 982f91a645e0f395
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/reference-implementation-comparison:
+  en: 2dd1d741a4e7fb3b
+  zh: aee329ba5e4ac892
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/alternatives-considered:
+  en: 90eb413b1ea5df9b
+  zh: cfb4691405214966
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/acceptance-criteria:
+  en: 5dd80c3f338f859b
+  zh: 88e199f0a6e8cb0c
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/risks:
+  en: cd1ecf3201f86438
+  zh: c987d76403aeb4c8
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/related:
+  en: f8821402ec1e0368
+  zh: ed4c9ac07de3abcf
+/agent-note-multi-bot-group-collaboration-over-a-thread-bus/revision-note:
+  en: f351566778c409ea
+  zh: 481d7bf28fc8443f

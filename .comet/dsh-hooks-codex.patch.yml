@@ -1,0 +1,6 @@
+- insert:
+    - id: comet-hooks-codex
+      name: '@deepseek-ai/dsh-hooks-codex'
+      config:
+        configPath: ./.codex/hooks.json
+        exposeToolArguments: true
