@@ -442,10 +442,9 @@ jobs:
   # Single stable required check for branch protection: require "all checks
   # passed" instead of enumerating matrix legs whose names change as lanes and
   # node versions evolve. Every blocking job in THIS workflow must be listed in
-  # `needs`. `needs` cannot cross workflow files: native Windows jobs report
-  # the separate "windows checks passed" verdict from ci-windows.yml, Python
-  # jobs report "python checks passed" from ci-python.yml, and Wine plus the
-  # master-only runtime targets live in ci-master.yml.
+  # `needs`. `needs` cannot cross workflow files: Python jobs report
+  # "python checks passed" from ci-python.yml, and the master-only runtime
+  # targets live in ci-master.yml.
   # An explicit status function runs the verdict after failed/skipped needs
   # without keeping a cancelled workflow alive for an obsolete verdict.
   all-checks-passed:
