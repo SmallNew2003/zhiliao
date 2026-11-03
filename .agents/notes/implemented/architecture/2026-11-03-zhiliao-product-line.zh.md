@@ -20,7 +20,7 @@ Status: implemented
 
 吸收判定：能单独 pick、不触碰品牌资产与 client 文案、不改变 CI 与发布拓扑、不引入 Windows 环境假设 → 吸收；否则拒绝，或先改写再吸收。吸收流程：拉取上游 → 把该提交 pick 到短期分支 → 跑受影响包的最小验证面（对应 vitest、`build:check`、`doc-sync`）→ 单独开 PR 进 `master`。
 
-上游的 Windows 结构已撤回：删除 `ci-windows.yml`、`windows-package.yml`、`scripts/wine-windows-gates.sh`、`scripts/windows-package-workflow.spec.ts` 与三个 `check:ci:windows-*` 入口加 `check:windows-wine`，并移除 `ci-master.yml` 的 windows 作业与 Wine 门禁调用、`ci.yml` 的 Windows 判定段；`ci-python.yml` 只保留 `node24-linux-x64` 目标，桌面发布只保留 `mac-arm64` 与 `mac-x64`。该撤回取代 [跨平台 CI 参考](../process/2026-07-21-serial-cross-platform-ci-reference.zh.md)、[原生 Windows PR CI](../process/2026-08-08-native-windows-pull-request-ci.zh.md)、[托管 Windows Python 运行时](../process/2026-09-06-python-runtime-windows-hosted.zh.md) 与 [Blacksmith 故障切换支路](../process/2026-09-09-blacksmith-failover-leg.zh.md) 中与 Windows 有关的段落；它们其余内容——master 平台分工、Linux 故障切换、发布链——仍然生效。Windows 运行时源码与签名文档不在撤回范围内，`apps/desktop` 的打包与签名 README 仍描述 Windows 流程，清理留待单独 change。
+上游的 Windows 结构已撤回：删除 `ci-windows.yml`、`windows-package.yml`、`scripts/wine-windows-gates.sh`、`scripts/windows-package-workflow.spec.ts` 与三个 `check:ci:windows-*` 入口加 `check:windows-wine`，并移除 `ci-master.yml` 的 windows 作业与 Wine 门禁调用、`ci.yml` 中提及 Windows 判定名的注释；`ci-python.yml` 只保留 `node24-linux-x64` 目标，桌面发布只保留 `mac-arm64` 与 `mac-x64`。该撤回取代 [跨平台 CI 参考](../process/2026-07-21-serial-cross-platform-ci-reference.zh.md)、[原生 Windows PR CI](../process/2026-08-08-native-windows-pull-request-ci.zh.md)、[托管 Windows Python 运行时](../process/2026-09-06-python-runtime-windows-hosted.zh.md) 与 [Blacksmith 故障切换支路](../process/2026-09-09-blacksmith-failover-leg.zh.md) 中与 Windows 有关的段落；它们其余内容——master 平台分工、Linux 故障切换、发布链——仍然生效。Windows 运行时源码与签名文档不在撤回范围内，`apps/desktop` 的打包与签名 README 仍描述 Windows 流程，清理留待单独 change。
 
 ## 考虑过的替代方案
 
@@ -36,7 +36,7 @@ Status: implemented
 
 ## 相关
 
-- 基线合并：`master` 以一个合并提交纳入上游 `0.2.2-alpha.2`（`dsh-v0.2.2-alpha.2`），该提交的第二父即上游 HEAD；基线 tag 为 `zhiliao-v0.1.0-alpha.1`。同步分支对应的 PR #45 至今未合并。
+- 基线合并：`master` 以一个合并提交纳入上游 `master` 的 HEAD，该 HEAD 晚于上游最后一个发布 tag `dsh-v0.2.2-alpha.2` 共 351 笔，且该合并提交的第二父即此上游 HEAD；基线 tag 为 `zhiliao-v0.1.0-alpha.1`。同步分支对应的 PR #45 至今未合并。
 - 撤回记录：Windows 移除随 `chore(ci): 移除 Windows 门禁与打包工作流` 落地。
-- 遗留项：`apps/desktop/README.md`、`apps/desktop/packaging/README.md`、`apps/desktop/publishing/ci/README.md` 仍描述 Windows 打包与签名流程，清理留待单独 change。
+- 遗留项：`apps/desktop/README.md` 仍有 49 处 Windows 提及未清理；`apps/desktop/packaging/README.md` 随本次撤回从 37 处降到 21 处（删除的段落链向已移除的 `windows-package.yml`），余下部分与 `apps/desktop/publishing/ci/README.md` 的 Windows 流程描述留待单独 change。
 - 不写升级指南：本产品线在 `origin` 上无已发布 tag，且 `windows-package.yml` 是手动触发、走自托管 `dsh-win-package-trial` label 的工作流，没有已发布表面被破坏。
