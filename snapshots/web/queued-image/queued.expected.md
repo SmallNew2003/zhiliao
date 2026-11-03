@@ -10,8 +10,8 @@
 - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy"
 - paragraph: partial
-- status: {{status}}
-- text: {{status}}, {{duration}} ···
+- status: {{runningStatus}}
+- text: {{runningStatus}}, {{duration}} ···
 - list:
   - listitem:
     - img "Queued message image"

@@ -85,7 +85,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { startPrefixProxy, type PrefixProxy } from './prefix-proxy.ts'
-import { REPO_ROOT, requireBuilt, requireDist } from './support.ts'
+import { RUNNING_STATUS_COPY_TOKENS, REPO_ROOT, requireBuilt, requireDist } from './support.ts'
 
 type AppBoot = typeof import('@deepseek-ai/dsh-app-boot')
 let builtAppBoot: AppBoot | undefined
@@ -1574,7 +1574,12 @@ function normalizeAria(snapshot: string, workspaceCwd: string, age: boolean): st
   // The session heading renders the workspace's basename, not the full
   // path, so both spellings must collapse to the token.
   const base = workspaceCwd.split('/').pop()!
-  return (age ? snapshot.replace(ARIA_AGE, '{{age}}') : snapshot)
+  // The running status rotates decorative copy on a timer, so a capture names
+  // whichever phrase the clock landed on. Only the rotating phrases tokenize;
+  // terminal states (`Completed`, `已完成`) stay literal assertions.
+  let text = snapshot
+  for (const [value, token] of RUNNING_STATUS_COPY_TOKENS) text = text.split(value).join(token)
+  return (age ? text.replace(ARIA_AGE, '{{age}}') : text)
     .split(workspaceCwd).join('{{cwd}}')
     .split(base).join('{{workspace}}')
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{{uuid}}')
@@ -1586,10 +1591,6 @@ function normalizeAria(snapshot: string, workspaceCwd: string, age: boolean): st
       duration => duration.startsWith('~') ? duration : '{{duration}}',
     )
     .replace(/\b\d[\d,]*(?:\.\d+)? ms\b/g, '{{duration}}')
-    // The running status rotates decorative copy on a timer, so a capture
-    // names whichever phrase the clock landed on rather than a stable state.
-    .replace(/(?<=^- status: ).+$/gm, '{{status}}')
-    .replace(/(?<=^- text: ).+(?=, \{\{duration\}\} ···$)/gm, '{{status}}')
     .replace(
       /约\d+(?:年(?:\d+个月)?|个月(?:\d+天)?)|\d+(?:天(?:\d+小时(?:\d+分\d+秒)?)?|小时\d+分\d+秒|分\d+秒|(?:\.\d+)?秒)/g,
       duration => duration.startsWith('约') ? duration : '{{duration}}',

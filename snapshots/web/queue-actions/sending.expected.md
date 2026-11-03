@@ -10,8 +10,8 @@
 - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy"
 - paragraph: partial
-- status: {{status}}
-- text: {{status}}, {{duration}} ···
+- status: {{runningStatus}}
+- text: {{runningStatus}}, {{duration}} ···
 - textbox "Message or run a task, / commands, @ files or sessions":
   - paragraph: Queue item to remove
 - button "Add files or run commands"

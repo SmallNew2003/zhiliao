@@ -10,8 +10,8 @@
 - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy"
 - paragraph: partial
-- status: {{status}}
-- text: {{status}}, {{duration}} ···
+- status: {{runningStatus}}
+- text: {{runningStatus}}, {{duration}} ···
 - button "2 queued messages"
 - textbox "Cmd/Ctrl+Enter steers all queued messages"
 - button "Add files or run commands"

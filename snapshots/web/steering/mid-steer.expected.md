@@ -11,7 +11,7 @@
 - button "Copy"
 - text: Running
 - button "Ask question waiting"
-- status: {{status}}
+- status: {{runningStatus}}
 - text: "{{runningStatus}}, {{duration}} ··· Interjection: include the word BANANA in your final reply."
 - button "Copy"
 - region "Ready to continue?":

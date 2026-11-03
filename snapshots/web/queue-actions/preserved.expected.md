@@ -9,7 +9,7 @@
   - button "More conversation views"
 - text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy"
-- status: {{status}}
+- status: Stopped
 - button "Stopped" [disabled]
 - paragraph: partial
 - text: Stopped
