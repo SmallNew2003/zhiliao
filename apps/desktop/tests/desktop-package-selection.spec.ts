@@ -28,14 +28,6 @@ it('pins the latest successful attempt and finds the package job across pages', 
   expect(f.calls).toContain('repos/owner/repo/actions/runs/42/attempts/2')
 })
 
-it('routes a Windows package through its own configured machine target', () => {
-  const f = fixture()
-  f.run.path = '.github/workflows/windows-package.yml'
-  const routes = { mini: { label: 'dsh-windows', target: 'win-x64' } }
-  expect(selectDesktopPackage('owner/repo', { package_run_id: '42' }, routes, f.api)).toMatchObject({ runnerLabel: 'dsh-windows' })
-  expect(() => selectDesktopPackage('owner/repo', { package_run_id: '42' }, f.routes, f.api)).toThrow(/no configured/u)
-})
-
 it('selects an explicit old attempt without consulting the latest attempt', () => {
   const f = fixture()
   f.run.run_attempt = 1

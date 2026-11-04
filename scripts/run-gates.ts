@@ -27,9 +27,6 @@ export type Mode =
   | 'ci-snapshot'
   | 'ci-artifacts'
   | 'ci-consumers'
-  | 'ci-windows-blocking'
-  | 'ci-windows-complete'
-  | 'ci-windows-observational-ready'
   | 'node-compat'
   | 'check-all'
   | 'hygiene'
@@ -163,9 +160,6 @@ function parseMode(raw: string | undefined): Mode {
     case 'ci-snapshot':
     case 'ci-artifacts':
     case 'ci-consumers':
-    case 'ci-windows-blocking':
-    case 'ci-windows-complete':
-    case 'ci-windows-observational-ready':
     case 'node-compat':
     case 'check-all':
     case 'hygiene':
@@ -175,7 +169,7 @@ function parseMode(raw: string | undefined): Mode {
       return raw
     default:
       throw new Error(
-        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-unit | ci-bench | ci-snapshot | ci-artifacts | ci-consumers | ci-windows-blocking | ci-windows-complete | ci-windows-observational-ready | node-compat | check-all | hygiene | doc-sync | doc-quick | i18n, got ${JSON.stringify(raw)}.`,
+        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-unit | ci-bench | ci-snapshot | ci-artifacts | ci-consumers | node-compat | check-all | hygiene | doc-sync | doc-quick | i18n, got ${JSON.stringify(raw)}.`,
       )
   }
 }
@@ -330,19 +324,6 @@ export function gatesForMode(selected: Mode): Gate[] {
       return ciArtifactGates()
     case 'ci-consumers':
       return ciConsumerGates()
-    case 'ci-windows-blocking':
-      return ciWindowsBlockingGates()
-    case 'ci-windows-complete':
-      return ciWindowsCompleteGates()
-    case 'ci-windows-observational-ready':
-      // The caller owns the successful workspace build; all diagnostics remain.
-      return ciWindowsObservationalGates()
-        .filter(gate => gate.id !== 'build')
-        .map(gate => ({
-          ...gate,
-          ...gate.needs === undefined ? {} : { needs: gate.needs.filter(id => id !== 'build') },
-          ...gate.after === undefined ? {} : { after: gate.after.filter(id => id !== 'build') },
-        }))
     case 'node-compat':
       return nodeCompatGates()
     case 'check-all':
@@ -593,39 +574,6 @@ function webSnapshotGate(needs: string[], after?: string[]): Gate {
   })
 }
 
-function ciWindowsBlockingGates(): Gate[] {
-  return [
-    ciBuildGate('windows-build', { label: 'build' }),
-    pnpmScript('windows-site', 'docs:build', { label: 'production site' }),
-  ]
-}
-
-function ciWindowsCompleteGates(): Gate[] {
-  const coverage = coverageGates('win32').map(gate => gate.id === 'electron-install' ? gate : {
-    ...gate,
-    needs: [...new Set(['build', ...(gate.needs ?? [])])],
-  })
-  const coverageAfter = coverage.map(gate => gate.id)
-  const observational = ciWindowsObservationalGates()
-    // Coverage owns Electron preparation. The required production site replaces
-    // the MPA build, which writes to the same output directory.
-    .filter(gate => gate.id !== 'build' && gate.id !== 'docs-site-build' && gate.id !== 'electron-install')
-    .map(gate => ({
-      ...gate,
-      allowFailure: true,
-      after: [...new Set([
-        ...coverageAfter,
-        ...(gate.after ?? []).map(id => id === 'docs-site-build' ? 'windows-site' : id),
-      ])],
-    }))
-  return [
-    ciBuildGate(),
-    pnpmScript('windows-site', 'docs:build', { label: 'production site' }),
-    ...coverage,
-    ...observational,
-  ]
-}
-
 // Native Electron fixtures need the locked binary before Vitest removes ambient proxies.
 function electronInstallGate(): Gate {
   return {
@@ -635,29 +583,6 @@ function electronInstallGate(): Gate {
     ...pnpmInvocation(['--filter', '@deepseek-ai/dsh-desktop', 'exec', 'install-electron']),
     env: { ELECTRON_GET_USE_PROXY: '1' },
   }
-}
-
-function ciWindowsObservationalGates(): Gate[] {
-  const predecessors = [
-    ...ciStaticGates({ ownsBuild: true }),
-    electronInstallGate(),
-    // Linux owns required lint and snapshots; Windows omits those duplicates.
-    pnpmScript('duplication', 'duplication'),
-    pnpmScript('publint', 'publint', { needs: ['build'] }),
-    pnpmScript('node-next-types', 'verify-node-next-types', {
-      label: 'node-next types',
-      needs: ['build'],
-    }),
-  ]
-  return [
-    ...predecessors,
-    {
-      ...builtBinSmokeGate(['build', 'electron-install']),
-      // This smoke starts real application children with bounded startup
-      // deadlines. Let other Windows processes settle before measuring startup.
-      after: predecessors.map(gate => gate.id),
-    },
-  ]
 }
 
 // Host package compilation and the bundle-free Typert pass produce the

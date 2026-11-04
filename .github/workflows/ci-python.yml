@@ -4,8 +4,7 @@ name: CI Python
 # does not keep the CI run in progress: GitHub re-runs failed jobs only after
 # every job of a run finishes, so each workflow can be re-run without waiting
 # for the others. Branch protection requires this workflow's "python checks
-# passed" verdict beside CI's "all checks passed" and CI Windows' "windows
-# checks passed".
+# passed" verdict beside CI's "all checks passed".
 on:
   pull_request:
 permissions:
@@ -49,16 +48,15 @@ jobs:
         run: uv run --python 3.10 --group test --project python/sdk pytest
 
   # The reusable builder owns each published executable, wheel, clean-install,
-  # keyless black-box, and trusted real-API path. Linux and Windows x64 block
-  # pull requests; Linux ARM64 and both macOS architectures run in
-  # ci-master.yml.
+  # keyless black-box, and trusted real-API path. Linux x64 blocks pull
+  # requests; Linux ARM64 and both macOS architectures run in ci-master.yml.
   python-runtime:
     if: github.event_name == 'pull_request'
     needs: python-sdk
     name: python runtime / release-shaped matrix
     uses: ./.github/workflows/build-exe-for-python-sdk.yml
     with:
-      targets: node24-linux-x64,node24-win-x64
+      targets: node24-linux-x64
       ci: true
     secrets:
       DEEPSEEK_API_KEY_EXTERNAL: ${{ secrets.DEEPSEEK_API_KEY_EXTERNAL }}

@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-11-03-zhiliao-product-line.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-03-zhiliao-product-line.md
+/agent-note-zhiliao-product-line:
+  en: 9aeefb2922db6d9c
+  zh: a3105012404f4027
+/agent-note-zhiliao-product-line/problem:
+  en: 44e7b9845862adc5
+  zh: d04428f46d971a0d
+/agent-note-zhiliao-product-line/decision:
+  en: af0ec941c55e0d0f
+  zh: 16d99781c602622c
+/agent-note-zhiliao-product-line/alternatives-considered:
+  en: 30ed529c86a56738
+  zh: e1728309af3e603b
+/agent-note-zhiliao-product-line/consequences:
+  en: 4d48c4ebf3e6847c
+  zh: dab2b3352e448949
+/agent-note-zhiliao-product-line/related:
+  en: e32a629e0e96b147
+  zh: ab2352547f2e3cff
