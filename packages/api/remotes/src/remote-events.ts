@@ -9,6 +9,7 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/remote-events'
 import type {} from '@deepseek-ai/dsh-permission-presets/types'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
+import type {} from '@deepseek-ai/dsh-assistant-task/client'
 import type { TypertForwardableEventEntry } from '@deepseek-ai/dsh-typert-protocol'
 
 /**
@@ -38,5 +39,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   { event: 'plugin-manager/install-log', mode: 'emit' },
   { event: 'plugin-manager/install-state', mode: 'emit' },
   { event: 'settings/document-updated', mode: 'emit' },
+  { event: 'assistant-task/changed', mode: 'emit' },
+  { event: 'assistant/changed', mode: 'emit' },
   { event: 'user-questions/request', mode: 'waterfall' },
 ] as const satisfies readonly TypertForwardableEventEntry[]

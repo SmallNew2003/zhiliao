@@ -57,6 +57,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../assistant/task"
+    },
+    {
       "path": "../../preset/agent-presets"
     },
     {

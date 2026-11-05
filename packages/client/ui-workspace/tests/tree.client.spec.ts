@@ -7,7 +7,7 @@ import type {
 import type { ScheduleId, ScheduleRecord } from '@deepseek-ai/dsh-schedule/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
+  deriveFlat, deriveGroups, deriveSearchResults, omitSessions, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, visibleSessionIds, workspaceLabel, UNGROUPED_KEY,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
@@ -660,5 +660,35 @@ describe('parent folder membership', () => {
     ['/Git/app', ['/git'], undefined],
   ])('groups %s under its nearest registered ancestor', (path, parents, expected) => {
     expect(owningParentFolder(path, parents)).toBe(expected)
+  })
+})
+
+describe('omitSessions', () => {
+  it('removes separated Sessions from Workspace groups and ordinary search', () => {
+    const hidden = new Set([sid('assistant-task-1')])
+    const sessions = list(summary('user-1', 1), summary('assistant-task-1', 2))
+    const filtered = omitSessions(sessions, hidden)
+    expect(filtered.ids).toEqual([sid('user-1')])
+    expect(filtered.byId[sid('assistant-task-1')]).toBeUndefined()
+
+    const groups = deriveGroups(
+      filtered,
+      [workspace('w1', ['user-1', 'assistant-task-1'])],
+      noArchive,
+      noAttention,
+      view(['w1']),
+    )
+    expect(groups[0]?.sessions.map(session => session.id)).toEqual([sid('user-1')])
+
+    const results = deriveSearchResults(
+      filtered,
+      [workspace('w1', ['user-1', 'assistant-task-1'])],
+      'assistant',
+      noArchive,
+      noAttention,
+      { items: [{ sessionId: sid('assistant-task-1'), snippet: 'assistant task' }], hasMore: false },
+      20,
+    )
+    expect(results.items.map(item => item.id)).not.toContain(sid('assistant-task-1'))
   })
 })

@@ -1,5 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
   ISessions, SessionListState, SessionReference, SessionSummary,
 } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -634,5 +635,23 @@ describe('UiWorkspaceService', () => {
     await expect(b.uiWorkspace.createDirectory('/home/u', 'new')).rejects.toMatchObject({
       rpcError: { code: 'directory-picker/exists' },
     })
+  })
+})
+
+describe('hidden Session sources', () => {
+  it('republishes the union when a registered source changes', () => {
+    const b = bench()
+    const hidden = createSnapshotStore<readonly SessionId[]>([sid('hidden-1')])
+    const dispose = b.uiWorkspace.registerHiddenSessionSource(hidden)
+    expect([...b.uiWorkspace.hiddenSessionIds.getSnapshot()]).toEqual([sid('hidden-1')])
+
+    hidden.set([sid('hidden-1'), sid('hidden-2')])
+    expect([...b.uiWorkspace.hiddenSessionIds.getSnapshot()].sort()).toEqual(
+      [sid('hidden-1'), sid('hidden-2')].sort(),
+    )
+
+    hidden.set([])
+    expect(b.uiWorkspace.hiddenSessionIds.getSnapshot().size).toBe(0)
+    dispose()
   })
 })

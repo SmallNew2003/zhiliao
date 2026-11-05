@@ -90,6 +90,14 @@ export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']
 export type WorkspaceBrowserInjected = {
   hooks: DirectoryPickingInjected['hooks'] & {
     /**
+     * Session ids a feature surface separates from ordinary user browsing.
+     * Sources register an observable through `uiWorkspace.registerHiddenSessionSource`;
+     * its updates republish the union, and the browser removes the ids from the
+     * tree, ungrouped bucket, flat list, and search results without changing
+     * Workspace membership or persistence.
+     */
+    hiddenSessionIds: HostObservable<ReadonlySet<SessionId>>
+    /**
      * Fixed Host facts, reached through a hook rather than injected as values:
      * the renderer memoizes an entry's inject result for the registration's
      * lifetime, so facts read there would freeze at whatever the first render

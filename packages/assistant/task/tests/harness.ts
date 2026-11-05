@@ -1,0 +1,61 @@
+/** Assistant task tests use real domain storage and explicit fake Session services. */
+import { Context } from '@deepseek-ai/cordis'
+import AgentRegistry from '@deepseek-ai/dsh-agent'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
+import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
+import { SessionPersistenceRevision } from '@deepseek-ai/dsh-session-persistence'
+import Storage from '@deepseek-ai/dsh-storage'
+import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
+import { vi } from 'vitest'
+import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
+import AssistantTaskService, { type Config } from '../src/index.ts'
+
+/** Build a stored Session view with a working directory. */
+export function storedSession(sessionId: SessionId, cwd = '/tmp/project'): SessionPersistenceSnapshot {
+  return {
+    header: { version: SESSION_FORMAT_VERSION, id: sessionId, createdAt: 0, cwd, isSeeded: false },
+    revision: SessionPersistenceRevision(`test:${sessionId}`),
+  }
+}
+
+/** Create an isolated assistant task service with fake Session control and Workspace facts. */
+export async function harness(options: {
+  config?: Config
+  sessions?: Map<string, SessionPersistenceSnapshot>
+  workspaces?: Map<string, { id: string; path: string; title: string }>
+} = {}) {
+  const ctx = new Context()
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(AgentRegistry)
+  await ctx.plugin(Storage)
+  const pool = new MemoryMediaPool()
+  const backend = new MemoryStorageBackend(pool)
+  ctx.effect(() => ctx.storage.backend.register('fixture', backend))
+  const facility = new DomainFacility(ctx, { backend: 'fixture' })
+  ctx.effect(() => {
+    const unmount = ctx.storage.mount('domain', facility)
+    ctx.provide('storageDomain', facility)
+    return async () => { await facility.closeAll(); unmount() }
+  })
+  const sessions = options.sessions ?? new Map()
+  const workspaces = options.workspaces ?? new Map()
+  const create = vi.fn(async (request: { sessionId?: SessionId; cwd?: string; agentPreset?: string }) => ({
+    sessionId: request.sessionId ?? SessionId('created-session'),
+    agentPreset: request.agentPreset,
+  }))
+  const prompt = vi.fn(async () => ({ accepted: true }))
+  const cancel = vi.fn(() => ({ accepted: true }))
+  ctx.provide('sessionController', { create, prompt, cancel, resolveAgent: vi.fn() } as never)
+  ctx.provide('sessionPersistence', {
+    stat: vi.fn(async (id: SessionId) => sessions.get(id)),
+  } as never)
+  ctx.provide('workspaceRegistry', {
+    get: (id: string) => workspaces.get(id),
+    list: () => [...workspaces.values()],
+    archivedSessionIds: [],
+  } as never)
+  await ctx.plugin(AssistantTaskService, options.config ?? {})
+  return { ctx, service: ctx.assistantTasks, create, prompt, cancel, sessions, workspaces }
+}

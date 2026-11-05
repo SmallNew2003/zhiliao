@@ -28,6 +28,14 @@
     // not declaration path aliases, keep each package/vendor source compiled
     // under its own tsconfig boundary.
     "paths": {
+      "@deepseek-ai/dsh-assistant-task": ["./packages/assistant/task/src/index.ts"],
+      "@deepseek-ai/dsh-assistant-task/client": ["./packages/assistant/task/src/client.ts"],
+      "@deepseek-ai/dsh-assistant-task/src/*": ["./packages/assistant/task/src/*"],
+      "@deepseek-ai/dsh-tool-assistant-task": ["./packages/assistant/tool-task/src/index.ts"],
+      "@deepseek-ai/dsh-tool-assistant-task/src/*": ["./packages/assistant/tool-task/src/*"],
+      "@deepseek-ai/dsh-client-ui-assistant": ["./packages/client/ui-assistant/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-assistant/client": ["./packages/client/ui-assistant/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-assistant/src/*": ["./packages/client/ui-assistant/src/*"],
       "@deepseek-ai/dsh/profile-boot": ["./apps/cli/src/profile-boot.ts"],
       "@deepseek-ai/dsh-memory": ["./packages/memory/memory/src/index.ts"],
       "@deepseek-ai/dsh-memory/types": ["./packages/memory/memory/src/types.ts"],

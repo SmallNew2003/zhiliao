@@ -422,6 +422,21 @@ export function deriveGroups(
 }
 
 /**
+ * Remove Sessions owned by a separated surface from every list view.
+ * @param list - complete Session list snapshot.
+ * @param hidden - Session ids the separated surface owns.
+ * @returns the same snapshot without those ids in `ids` or `byId`.
+ */
+export function omitSessions(list: SessionListState, hidden: ReadonlySet<SessionId>): SessionListState {
+  if (hidden.size === 0) return list
+  const byId: SessionListState['byId'] = {}
+  for (const [id, summary] of Object.entries(list.byId)) {
+    if (!hidden.has(id as SessionId)) byId[id as SessionId] = summary
+  }
+  return { ...list, ids: list.ids.filter(id => !hidden.has(id)), byId }
+}
+
+/**
  * Select flat-list members without deriving row presentation or ordering.
  * @param list - sessions list snapshot.
  * @param archivedSessionIds - registry-global archive set.

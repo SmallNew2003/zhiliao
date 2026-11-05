@@ -36,6 +36,9 @@
       "path": "../../goal/goal"
     },
     {
+      "path": "../../assistant/task"
+    },
+    {
       "path": "../../preset/agent-presets"
     },
     {

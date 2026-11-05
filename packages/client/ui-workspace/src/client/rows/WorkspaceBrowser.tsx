@@ -24,7 +24,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { GroupNode, SessionNode, SessionOrderBy } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
+  deriveFlat, deriveGroups, deriveSearchResults, omitSessions, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, UNGROUPED_KEY, visibleSessionIds,
 } from '../tree.ts'
 import {
@@ -728,6 +728,7 @@ interface RemoteSearchState {
 function SearchResults({
   useSessions,
   useSessionStatus,
+  useHiddenSessionIds,
   open,
   workspaces,
   archivedSessionIds,
@@ -736,7 +737,7 @@ function SearchResults({
   resultLimit,
   usePanelInfo,
   t,
-}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo'> & {
+}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'useHiddenSessionIds' | 'open' | 't' | 'usePanelInfo'> & {
   workspaces: readonly WorkspaceView[]
   archivedSessionIds: readonly SessionNode['id'][]
   query: string
@@ -744,7 +745,7 @@ function SearchResults({
   resultLimit: number
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
-  const list = useSessions(s => s)
+  const list = omitSessions(useSessions(s => s), useHiddenSessionIds(s => s))
   const statuses = useSessionStatus(s => s)
   const currentRemote = remote.query === query
     ? remote
@@ -840,12 +841,18 @@ export function WorkspaceBrowser({
   searchResultLimit,
   useDirectoryFlow,
   useHostInfo,
+  useHiddenSessionIds,
   renderSlot,
   t,
 }: WorkspaceBrowserProps) {
   const home = useHostInfo(info => info.home)
   // Ordering remains live while the rail or search replaces the list body.
-  const list = useSessions(state => state)
+  const rawList = useSessions(state => state)
+  const hiddenSessionIds = useHiddenSessionIds(state => state)
+  const list = useMemo(
+    () => omitSessions(rawList, hiddenSessionIds),
+    [rawList, hiddenSessionIds],
+  )
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
@@ -1313,6 +1320,7 @@ export function WorkspaceBrowser({
               usePanelInfo={usePanelInfo}
               useSessions={useSessions}
               useSessionStatus={useSessionStatus}
+              useHiddenSessionIds={useHiddenSessionIds}
               open={openSearchResult}
               workspaces={workspaces}
               archivedSessionIds={archivedSessionIds}
