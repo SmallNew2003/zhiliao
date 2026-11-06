@@ -1,3 +1,4 @@
+import './scripts/test-memory-environment.ts'
 import ts from 'typescript'
 
 const decoratorSyntax = /^\s*@[A-Za-z_$][\w$]*/m
