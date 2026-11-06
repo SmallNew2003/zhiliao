@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write zhiliao-logo_assets/README.md
+/zhiliao-logo-assets:
+  en: 97de5dc6055b3abd
+  zh: 12bca2c627e455fb
+/zhiliao-logo-assets/file-inventory-svg:
+  en: cea1abea8f0ddb1f
+  zh: af6165c6b43a3fcc
+/zhiliao-logo-assets/palette:
+  en: d3fdf871284249d9
+  zh: 9f73118df632c548
+/zhiliao-logo-assets/usage-rules:
+  en: 5dfc886de0c2eaa2
+  zh: f94510f61303bad2
+/zhiliao-logo-assets/application-integration:
+  en: 78212e9ad0179a3c
+  zh: 14ed7e1b918711ab

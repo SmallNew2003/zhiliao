@@ -1,53 +1,53 @@
-# 目标
+# Goal
 
 English | [中文](brief.zh.md)
 
-将 Comet 作为本仓库可复用、可提交的协作工作流接入，使团队成员能从项目配置中解析相同的工作流，并由本地适配层在支持的客户端约束写入操作。
+Integrate Comet as a reusable, committable collaboration workflow so team members resolve the same project workflow from the project configuration, with a local adaptation layer constraining write operations for supported clients.
 
-# 范围
+# Scope
 
-- 提交 Comet 项目配置、工作流适配层、客户端钩子配置和 Native 工作流文档根目录。
-- 提交用于 DSH 的项目级 overlay；它挂载 `dsh-hooks-codex` 并复用 Comet 的 Codex 钩子定义。
-- 扩展 `dsh-hooks-codex`：通过显式配置选择将原始工具参数提供给 Codex hook，使 Comet 能识别 DSH 的文件操作目标。
-- 校验接入后的配置在本仓库可解析，且不改变未启用该配置的 DSH bridge 行为。
+- Commit the Comet project configuration, the workflow adaptation layer, client hook configuration, and the Native workflow documentation root.
+- Commit the project-level overlay for DSH; it mounts `dsh-hooks-codex` and reuses Comet's Codex hook definitions.
+- Extend `dsh-hooks-codex`: expose raw tool arguments to the Codex hook through an explicit configuration choice, so Comet can recognize DSH's file-operation targets.
+- Verify that the integrated configuration resolves in this repository and does not change DSH bridge behavior when the configuration is not enabled.
 
-# 非目标
+# Non-goals
 
-- 不修改 `dsh-hooks-codex` 以外的 DeepSeek Harness 运行时代码、默认 profile 或发布流程。
-- 不实现业务功能，也不把当前 Native 变更的运行时状态作为团队共享配置提交。
-- 不把 WorkBuddy 接入 DSH；它作为独立客户端使用相同的 Comet 路由器。
+- Do not modify DeepSeek Harness runtime code, package configuration, test behavior, or release flow beyond `dsh-hooks-codex`.
+- Do not implement business functionality, and do not commit the current Native change's runtime state as team-shared configuration.
+- Do not integrate WorkBuddy into DSH; it uses the same Comet router as an independent client.
 
-# 验收示例
+# Acceptance examples
 
-- 在干净检出中执行 `comet workflow resolve . --activate --json` 时，返回本仓库保存的工作流选择及有效的 Comet 配置。
-- 已纳入范围的客户端写入钩子调用仓库内的 Comet 路由器，不引用开发者机器上的绝对路径。
-- DSH 通过项目 overlay 加载 `dsh-hooks-codex` 后，bridge 将原始工具参数提供给 Comet 路由器；非写入调用继续执行，Native Build 阶段允许实现写入，Shape 阶段拒绝实现写入，Verify 阶段写入使候选失效并返回 Build。
-- 未启用工具参数传递的 DSH bridge 继续仅向 Codex hook 提供 `tool_input.command`。
-- Git 仅跟踪项目级 Comet 配置、适配层、DSH overlay 和正式文档工件，忽略本机运行时状态。
+- Running `comet workflow resolve . --activate --json` in a clean checkout returns the workflow selection stored in this repository and a valid Comet configuration.
+- In-scope client write hooks call the in-repository Comet router and do not reference absolute paths on a developer machine.
+- After DSH loads `dsh-hooks-codex` through the project overlay, the bridge provides raw tool arguments to the Comet router; non-write calls continue to execute, the Native Build phase permits implementation writes, the Shape phase rejects implementation writes, and a Verify-phase write invalidates the candidate and returns to Build.
+- A DSH bridge without tool-argument passing continues to provide only `tool_input.command` to the Codex hook.
+- Git tracks only the project-level Comet configuration, the adaptation layer, the DSH overlay, and formal documentation artifacts, ignoring local runtime state.
 
-# 约束与不变量
+# Constraints and invariants
 
-- 根目录 AGENTS.md、现有开发命令和 `dsh-hooks-codex` 之外的 DeepSeek Harness 运行时代码保持不变。
-- 所有新建的可提交路径在其他开发者克隆仓库后仍有效。
-- DSH 的适配只使用其已发布的 `dsh-hooks-codex` 插件和 Codex 的 `PreToolUse` 协议子集。
-- 工具参数传递必须由 `dsh-hooks-codex` 的显式配置启用，默认行为保持兼容。
+- The root AGENTS.md, existing development commands, and DeepSeek Harness runtime code outside `dsh-hooks-codex` stay unchanged.
+- Every new committable path stays valid after another developer clones the repository.
+- The DSH adaptation uses only its published `dsh-hooks-codex` plugin and the `PreToolUse` protocol subset of Codex.
+- Tool-argument passing must be enabled by explicit configuration in `dsh-hooks-codex`; the default behavior stays compatible.
 
-# 决策
+# Decisions
 
-- 当前仓库干净，未发现其他 Native 变更；本变更在 `master` 的当前目录中进行，不新建工作树。
-- 保留 Native 与 Classic 两套 Comet 工作流，使团队可按任务选择相应流程。
-- 提交 Codex 与 WorkBuddy 适配层；不提交 GitHub Copilot 和 Trae 适配层。
-- DSH 通过 `dsh-hooks-codex` 复用 Codex 配置；WorkBuddy 不进入 DSH 运行时。
-- 共享 Codex 配置匹配所有工具调用，由 Comet 路由器识别并约束写入操作，以兼容 DSH 与 Codex 的不同工具名。
-- `dsh-hooks-codex` 新增默认关闭的工具参数传递配置；Comet overlay 显式开启它。
-- Verify 阶段的实现写入遵循 Comet 的候选失效和修复行为，不走拒绝路径。
+- The repository is currently clean with no other Native change found; this change proceeds in the current directory of `master` without creating a new worktree.
+- Keep both the Native and Classic Comet workflows so the team can choose the matching flow per task.
+- Commit the Codex and WorkBuddy adaptation layers; do not commit the GitHub Copilot and Trae adaptation layers.
+- DSH reuses the Codex configuration through `dsh-hooks-codex`; WorkBuddy does not enter the DSH runtime.
+- The shared Codex configuration matches every tool call, which the Comet router recognizes and constrains for write operations, accommodating the different tool names of DSH and Codex.
+- `dsh-hooks-codex` adds a tool-argument passing configuration that is off by default; the Comet overlay enables it explicitly.
+- Implementation writes in the Verify phase follow Comet's candidate invalidation and repair behavior rather than a rejection path.
 
-# 待解决问题
+# Open questions
 
-无。
+None.
 
-# 验证预期
+# Verification expectations
 
-- 运行 Comet 的配置解析命令，并检查已提交配置中不存在机器特定的绝对项目路径。
-- 载入 DSH overlay，确认 `dsh-hooks-codex` 可读取共享 Codex 配置，并以可重放的检查覆盖允许与拒绝的工具调用。
-- 覆盖默认 bridge 的兼容 payload，以及 Comet overlay 开启参数传递后的 DSH 文件写入守卫。
+- Run Comet's configuration resolution command and check that the committed configuration contains no machine-specific absolute project paths.
+- Load the DSH overlay, confirm that `dsh-hooks-codex` can read the shared Codex configuration, and cover allowed and rejected tool calls with replayable checks.
+- Cover the default bridge's compatible payload, as well as the DSH file-write guard after the Comet overlay enables argument passing.

@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write apps/desktop/packaging/README.md
+/:
+  en: 130e6729c4ff5799
+  zh: 28c10053aed5fa23
+/desktop-packaging:
+  en: b35e10c88ade04fe
+  zh: a2d09add03407b91
+/desktop-packaging/summary:
+  en: 757b98cf1b8a7df3
+  zh: 72eadba2bc5b4c6b
+/desktop-packaging/table-of-contents:
+  en: 373913377982f1ae
+  zh: 7d92c4d138240fb6
+/desktop-packaging/choose-a-build-path:
+  en: 0b35c7471c09b27a
+  zh: cc4a382b99fc3210
+/desktop-packaging/release-versions:
+  en: 3f38ab26ee195b39
+  zh: f00eddafa8f3b9ca
+/desktop-packaging/configuration-and-local-builds:
+  en: f381908abc555419
+  zh: a4e79ef2a1f93d15
+/desktop-packaging/macos-self-hosted-packaging:
+  en: 9aece38d8051c567
+  zh: 93e7ea39777a1f4f
+/desktop-packaging/local-macos-dmg-without-release-signing:
+  en: 2feaa0412247d81f
+  zh: 461dde8e13fd4734
+/desktop-packaging/macos-release-signing-and-diagnostics:
+  en: 29fa6bd8919f3ec0
+  zh: 9e31e037fa3d9378
+/desktop-packaging/directory-builds-and-preparation:
+  en: 5860c306375ddd63
+  zh: a76e3cdbbe25c79e
+/desktop-packaging/local-official-bundles-from-a-loopback-registry:
+  en: b42f103358d0dfd7
+  zh: a534164ad9eb00da
+/desktop-packaging/runtime-file-selection-and-installation-checks:
+  en: 83e1075417039410
+  zh: 3088a7ae0a2cc3c5
+/desktop-packaging/desktop-runtime-preparation:
+  en: ab73b67d899e611d
+  zh: d77b0525c6b81e91
+/desktop-packaging/installation-and-release-verification:
+  en: eb35eb973b796643
+  zh: c1c52311632b7296
+/desktop-packaging/dev-note:
+  en: 691194744993dfaa
+  zh: e5798faf99546ff8
