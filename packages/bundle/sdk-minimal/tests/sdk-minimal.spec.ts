@@ -54,6 +54,7 @@ describe('dsh-sdk-minimal bundle', () => {
       ['system-prompt', '@deepseek-ai/dsh-system-prompt'],
       ['tools', '@deepseek-ai/dsh-tools'],
       ['tool-executor-native', '@deepseek-ai/dsh-tool-executor-native'],
+      ['mcp-discovery', '@deepseek-ai/dsh-mcp-discovery'],
       ['mcp-resources', '@deepseek-ai/dsh-mcp-resources'],
       ['agent', '@deepseek-ai/dsh-agent'],
       ['llm-retry', '@deepseek-ai/dsh-llm-retry'],

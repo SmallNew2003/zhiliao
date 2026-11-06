@@ -13,11 +13,12 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: pulls the `agentPreset` Session projection value into this program.
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type {
   IWorkspaces, WorkspaceId, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { DraftInitializationOptions } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -38,6 +39,19 @@ export interface StartSessionOptions extends DraftInitializationOptions {
 
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
+  /**
+   * Session ids a feature surface separates from ordinary user browsing.
+   * Sources register an observable through `registerHiddenSessionSource`; its
+   * updates republish the union.
+   */
+  readonly hiddenSessionIds: SnapshotStore<ReadonlySet<SessionId>>
+  /**
+   * Register one source of separated Session ids.
+   * @param source - caller-owned observable of the current separated ids.
+   * @returns a disposer that unsubscribes, removes the source, and republishes the union.
+   */
+  registerHiddenSessionSource(source: HostObservable<readonly SessionId[]>): () => void
+
   /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
@@ -164,6 +178,8 @@ export class DirectoryBrowseError extends Error {
 
 /** Implements Workspace archive and directory UI operations. */
 class UiWorkspaceService extends Service implements UiWorkspace {
+  readonly hiddenSessionIds = createSnapshotStore<ReadonlySet<SessionId>>(new Set())
+  private readonly hiddenSources = new Set<HostObservable<readonly SessionId[]>>()
   /** The latest in-flight connection per Workspace; a request joins it only when both name the same preset. */
   private readonly connecting = new Map<WorkspaceId, {
     readonly agentPreset: string | undefined
@@ -203,6 +219,27 @@ class UiWorkspaceService extends Service implements UiWorkspace {
         reference?.release()
       }
     }, 'ui-workspace: Workspace navigation policy')
+  }
+
+  registerHiddenSessionSource(source: HostObservable<readonly SessionId[]>): () => void {
+    this.hiddenSources.add(source)
+    const stop = source.subscribe(() => { this.refreshHiddenSessionIds() })
+    this.refreshHiddenSessionIds()
+    return () => {
+      stop()
+      if (!this.hiddenSources.delete(source)) return
+      this.refreshHiddenSessionIds()
+    }
+  }
+
+  private refreshHiddenSessionIds(): void {
+    const next = new Set<SessionId>()
+    for (const source of this.hiddenSources) {
+      for (const id of source.getSnapshot()) next.add(id)
+    }
+    const current = this.hiddenSessionIds.getSnapshot()
+    if (current.size === next.size && [...next].every(id => current.has(id))) return
+    this.hiddenSessionIds.set(next)
   }
 
   connectWorkspace(workspaceId: WorkspaceId, options: Pick<StartSessionOptions, 'agentPreset'> = {}): Promise<SessionId> {

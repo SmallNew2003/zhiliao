@@ -141,6 +141,10 @@ export function createAssembledRemote(options: AssembledRemoteOptions = {}): Ass
     throw new Error('assembled fixture: blank Session projections missing')
   }
   let nextSession = 1
+  const globalAssistant = {
+    id: 'fx-global-assistant', kind: 'global', sessionId: 'fx-assistant-conversation',
+    retiredSessionIds: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+  }
 
   const mock = RemoteMock.create().load(remoteDefaultResponses)
   mock.load({
@@ -161,6 +165,10 @@ export function createAssembledRemote(options: AssembledRemoteOptions = {}): Ass
       'subagents/list': ok({ entries: [], parentAvailable: true }),
       'terminal/list': ok([]),
       'skills/list': ok({ skills: [] }),
+      'assistantTasks/ensureAssistant': ok(globalAssistant),
+      'assistantTasks/assistants': ok([globalAssistant]),
+      'assistantTasks/tasks': ok([]),
+      'assistantTasks/visibility': ok({ sessionIds: [globalAssistant.sessionId], conversations: [], executions: [] }),
       'session/canOpenWorkspacePath': ok(true),
       'session/openWorkspacePath': ok({ opened: true }),
       'session/updateQueue': {

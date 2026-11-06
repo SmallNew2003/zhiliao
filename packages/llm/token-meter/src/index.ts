@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-token-meter
  */
 
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction-image-offload/projection'
 import z from '@deepseek-ai/schemastery'
@@ -36,7 +37,7 @@ import type { ContextPressureState } from './usage-projection.ts'
 import { estimateMessage, estimateToolsTokens } from './estimate.ts'
 import { advanceMeasurement, measurementProjectionDefinition } from './measurement-projection.ts'
 import type { MeasurementState } from './measurement-projection.ts'
-import { commitSurfaceTokens, planSurfaceTokens } from './surface-fold.ts'
+import { analyzeNode, commitSurfaceTokens, planSurfaceTokens } from './surface-fold.ts'
 import type { MeterSurfaceNode } from './surface-fold.ts'
 import { priceSurface } from './route-pricing.ts'
 
@@ -49,6 +50,14 @@ interface ReplayState {
   header: { seq: SessionSeqType | null; value: EpochHeader } | undefined
   anchorHeader: { seq: SessionSeqType | null; value: EpochHeader } | undefined
   anchorNodes: readonly MeterSurfaceNode[]
+  latestInput?: {
+    seq: SessionSeqType
+    messageId: Message['id']
+    edited: boolean
+    surface: readonly MeterSurfaceNode[]
+    anchorHeader: ReplayState['anchorHeader']
+    anchorNodes: readonly MeterSurfaceNode[]
+  }
   /** Preserve synchronous construction-time reads before registration completes. */
   pendingMeasurement: MeasurementState
 }
@@ -67,7 +76,9 @@ function optionalHeaderEquals(
   right: EpochHeader | undefined,
 ): boolean {
   if (left === undefined || right === undefined) return left === right
-  return headerEquals(left, right)
+  const { contextWindow: _leftBudget, ...leftConfig } = left.config
+  const { contextWindow: _rightBudget, ...rightConfig } = right.config
+  return headerEquals({ ...left, config: leftConfig }, { ...right, config: rightConfig })
 }
 
 /** Reject stale or misspelled keys before defaults can hide them. */
@@ -271,7 +282,32 @@ export class TokenMeter extends Service {
   }
 
   /** Update only discardable positional prices and the pre-assistant view. */
-  private _foldEvent(state: ReplayState, event: SessionEvent): void {
+  private _foldEvent(state: ReplayState, sourceEvent: SessionEvent): void {
+    const input = readSessionInputEvent(sourceEvent)
+    const previousInput = state.latestInput
+    const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
+      && previousInput.messageId === input.data.id
+      ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
+    if (event.type === 'user/message-admit') {
+      state.surface = state.surface.map(node => node.seq === event.data.targetSeq
+        ? { ...analyzeNode(node.seq, event.data.message), images: node.images } : node)
+      return
+    }
+    if (event.type === 'user/message-edit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('token meter: edit target is not the latest user input')
+      state.surface = [...previous.surface, analyzeNode(event.seq, event.data.message)]
+      state.anchorHeader = previous.anchorHeader
+      state.anchorNodes = previous.anchorNodes
+      state.latestInput = { ...previous, seq: event.seq, messageId: event.data.message.id, edited: true }
+      return
+    }
+    if (event.type === 'user/message' && event.data.source.kind === 'user') {
+      state.latestInput = {
+        seq: event.seq, messageId: event.data.id, edited: false, surface: [...state.surface],
+        anchorHeader: state.anchorHeader, anchorNodes: state.anchorNodes,
+      }
+    }
     if (event.type === 'request/header') state.header = { seq: event.seq, value: canonicalHeader(event.data.header) }
     if (event.type === 'image/offload') {
       const offloaded = new Map(event.data.targets.map(target => [target.seq, new Set(target.imageIndexes)]))

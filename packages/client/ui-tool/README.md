@@ -33,6 +33,8 @@ Before dispatch, a named model call appears as one non-expandable row with its t
 
 File and URL toolview Slots obtain `useContextMenu` directly and supply bound `fileContextMenuProps` or `urlContextMenuProps` to `ToolRow`. File registrations inject a gesture-time path resolver for the originating Session’s working directory, falling back to its workspace root. `ToolCallTree` supplies an explicit file adapter to its plain `GenericToolCard` fallback, including nested calls. No Markdown provider is required. Mouse and keyboard gestures retain the captured path, line, URL, and Session without expanding the row or opening the file.
 
+Settled tool rows display call duration when both timestamps are recorded. Generic failures use localized error categories while foreground command exits retain their recorded exit capsule. Recorded filesystem missing-path and permission codes select localized summaries; expanded output preserves the complete error. Expanded input and output sections have separate copy actions; terminal cards can copy the command separately. Search cards highlight the query and open files at matched lines, read cards show the returned window position, and diffs highlight changed words and offer path copying.
+
 ### Registering a business tool view
 
 An owning business package registers its wire Tool name into `tool.call.toolview`:

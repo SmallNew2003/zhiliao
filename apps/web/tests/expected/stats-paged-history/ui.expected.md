@@ -280,6 +280,7 @@
 - button "Branch into a new conversation"
 - text: 7/25 {{clock}} m28 7/25 {{clock}}
 - button "Copy"
+- button "Edit message"
 - status: Completed
 - button "Completed in {{duration}}" [disabled]
 - paragraph: r28
@@ -294,4 +295,4 @@
 - 'button "Access mode, current: Workspace Write"': Workspace Write
 - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
 - button "Send message" [disabled]
-- button "28 turns 28 steps"
+- button "Model time {{duration}}"

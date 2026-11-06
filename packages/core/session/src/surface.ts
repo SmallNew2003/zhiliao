@@ -8,7 +8,8 @@
  * @module @deepseek-ai/dsh-session/surface
  */
 
-import type { Message, ToolSchema } from '@deepseek-ai/dsh-llm'
+import { deepFreeze } from '@deepseek-ai/dsh-util-values'
+import type { Message, ToolSchema, UserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionLogOffset, SessionSeq } from './types.ts'
 import { KNOWN_SESSION_EVENT_TYPES, MESSAGE_PROJECTION_EVENT_TYPES } from './known-event-types.ts'
 import type {
@@ -54,6 +55,37 @@ const SURFACE_EVENT_TYPES = new Set<string>([
   'assistant/message',
   'tool/result',
 ])
+
+/**
+ * Read the latest human-authored input and its durable edit identity.
+ *
+ * Older loops re-emitted an edited message as `user/message` after its
+ * `user/message-edit`; that copy shares the edited message identity and does
+ * not start a newer input generation.
+ * @param events - historical event prefix to scan.
+ * @returns the latest input sequence and message content, or undefined when none exists.
+ */
+export function latestHumanInput(
+  events: readonly SessionEvent[],
+): { readonly seq: SessionSeq; readonly message: UserMessage } | undefined {
+  for (let index = events.length - 1; index >= 0; index--) {
+    const source = events[index]
+    if (source === undefined) continue
+    const event = readSessionInputEvent(source)
+    if (event.type === 'user/message-edit') return { seq: event.seq, message: event.data.message }
+    if (event.type !== 'user/message' || event.data.source.kind !== 'user') continue
+    for (let prior = index - 1; prior >= 0; prior--) {
+      const candidate = events[prior]
+      if (candidate === undefined) continue
+      const edit = readSessionInputEvent(candidate)
+      if (edit.type === 'user/message-edit' && edit.data.message.id === event.data.id) {
+        return { seq: edit.seq, message: edit.data.message }
+      }
+    }
+    return { seq: event.seq, message: event.data }
+  }
+  return undefined
+}
 
 /**
  * Whether an event type can join the model-visible surface.
@@ -113,14 +145,15 @@ export function isReplacementSurfaceEvent(
  * from {@link foldSurface}; without that map this function reads original
  * event content. Session instance methods apply the live projection. Messages
  * are immutable and unchanged content retains its durable identity.
- * @param event - the event to project.
+ * @param source - the raw event to project.
  * @param projectedMessages - message projections from the same log prefix's surface fold.
  * @returns the derived message, or null when the event produces none.
  */
 export function deriveEventMessage(
-  event: SessionEvent,
+  source: SessionEvent,
   projectedMessages?: ReadonlyMap<SessionSeq, Message>,
 ): Message | null {
+  const event = readSessionInputEvent(source)
   const projected = projectedMessages?.get(event.seq)
   if (projected !== undefined) return projected
   // Intentionally non-exhaustive: only message-producing events derive
@@ -131,6 +164,9 @@ export function deriveEventMessage(
     // See Derived history in packages/core/session/README.md.
     case 'user/message': {
       return event.data
+    }
+    case 'user/message-edit': {
+      return event.data.message
     }
     // Empty system and developer nodes retain their surface positions without
     // adding wire messages. An empty assistant event hosts a max-tokens step's
@@ -154,6 +190,40 @@ export function deriveEventMessage(
 /** Whether a payload field is a JSON object rather than an array or scalar. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Validate the human-message fields required to interpret a historical input edit. */
+function isHistoricalUserMessage(value: unknown): value is UserMessage {
+  return isRecord(value) && typeof value['id'] === 'string' && value['id'].length > 0
+    && value['role'] === 'user' && isRecord(value['source']) && value['source']['kind'] === 'user'
+    && Array.isArray(value['content']) && value['content'].every((block: unknown) =>
+    isRecord(block) && typeof block['type'] === 'string' && block['type'].length > 0
+    && (block['type'] !== 'text' || typeof block['text'] === 'string'))
+}
+
+/**
+ * Interpret only the two historical namespaced input-edit records retained by
+ * Session format migration. The returned logical view shares unchanged data;
+ * the raw event, its type, and its durable coordinates remain untouched.
+ * @param source - raw committed event, including ignorable historical records.
+ * @returns a validated native input-edit view, or the original unrelated event.
+ * @throws when a recognized historical record lacks a valid target or human message.
+ */
+export function readSessionInputEvent(source: SessionEvent): SessionEvent {
+  const type: string = source.type
+  if (source.ignorable !== true || (type !== 'plugin:user/message-edit' && type !== 'plugin:user/message-admit')) return source
+  const data: unknown = source.data
+  if (!isRecord(data) || !isEventSeq(data['targetSeq']) || !isHistoricalUserMessage(data['message'])
+    || Object.hasOwn(source, 'surfaceOp') || Object.hasOwn(source, 'sourceEventSeqs')) {
+    throw new Error(`historical input edit at seq ${source.seq} requires a targetSeq and an identified human message`)
+  }
+  return {
+    seq: source.seq,
+    time: source.time,
+    ignorable: true,
+    type: type === 'plugin:user/message-edit' ? 'user/message-edit' : 'user/message-admit',
+    data: { ...data, targetSeq: data['targetSeq'], message: data['message'] },
+  }
 }
 
 /**
@@ -270,8 +340,10 @@ interface SurfaceReplacePlan extends SurfaceFoldReplacement {
 /** One validated surface transition that has not mutated fold state yet. */
 type SurfacePlan =
   | { kind: 'append'; seq: SessionSeq }
+  | { kind: 'admit'; seq: SessionSeq; message: Message }
   | SurfaceReplacePlan
   | { kind: 'project'; projection: SessionMessageProjection; messages: ReadonlyMap<SessionSeq, Message> }
+  | { kind: 'edit'; seq: SessionSeq; target: SessionSeq; nodes: SessionSeq[]; messages: ReadonlyMap<SessionSeq, Message>; shadowedSeqs: SessionSeq[] }
 
 /** Create an empty surface fold state. */
 function createFoldState(): SurfaceFoldState {
@@ -509,17 +581,95 @@ function assertSystemHeadRewrite(
 /** Validate one event at its replay boundary and prepare its atomic fold transition. */
 function planSurfaceEvent(
   state: SurfaceFoldState,
-  event: SessionEvent,
+  source: SessionEvent,
   expectedSeq: SessionSeq,
   events: readonly SessionEvent[],
   baseSeq: SessionLogOffset,
   projections: readonly SessionMessageProjection[],
 ): SurfacePlan | undefined {
+  let event = readSessionInputEvent(source)
   if (event.seq !== expectedSeq) {
     throw new Error(`session event seq ${event.seq} is not contiguous; expected ${expectedSeq}`)
   }
   const surfaceOp = validateSurfaceMetadata(event)
   assertDeveloperHeader(event, events, baseSeq)
+  if (event.type === 'user/message' && event.data.source.kind === 'user' && surfaceOp === 'append') {
+    const latest = latestHumanInput(events.slice(0, event.seq - baseSeq))
+    const latestSource = latest === undefined ? undefined : events[latest.seq - baseSeq]
+    const latestEvent = latestSource === undefined ? undefined : readSessionInputEvent(latestSource)
+    // Historical loops materialized prepared text with the edit's existing message id.
+    if (latestEvent?.type === 'user/message-edit' && latestEvent.data.message.id === event.data.id) {
+      event = {
+        seq: event.seq, time: event.time, type: 'user/message-admit',
+        data: { targetSeq: latestEvent.seq, message: event.data },
+      }
+    }
+  }
+  if (event.type === 'user/message-admit') {
+    const { targetSeq, message } = event.data
+    if (!isEventSeq(targetSeq) || targetSeq >= event.seq || !state.nodes.includes(targetSeq)) {
+      throw new Error('user/message-admit target must be a current earlier input')
+    }
+    const targetSource = events[targetSeq - baseSeq]
+    const target = targetSource === undefined ? undefined : readSessionInputEvent(targetSource)
+    if (target?.type !== 'user/message' && target?.type !== 'user/message-edit') {
+      throw new Error('user/message-admit target must be a user message')
+    }
+    const original = target.type === 'user/message' ? target.data : target.data.message
+    if (original.source.kind !== 'user') throw new Error('user/message-admit target must be a human-authored input')
+    const latest = latestHumanInput(events.slice(0, event.seq - baseSeq))
+    if (latest?.seq !== targetSeq) throw new Error('user/message-admit target must be the latest human input')
+    const mask = (value: Message) => ({ ...value, content: value.content.map(block => block.type === 'text' ? { ...block, text: null } : block) })
+    if (!isDeepEqualJson(mask(original), mask(message))) {
+      throw new Error('user/message-admit may change only text blocks')
+    }
+    const current = state.projectedMessages.get(targetSeq) ?? original
+    return {
+      kind: 'admit', seq: targetSeq,
+      message: deepFreeze({ ...current, content: current.content.map((block, index) => {
+        const admitted = message.content[index]
+        return block.type === 'text' && admitted?.type === 'text' ? admitted : block
+      }) }),
+    }
+  }
+  if (event.type === 'user/message-edit') {
+    if (baseSeq !== 0) throw new Error('user/message-edit requires the complete historical event prefix')
+    const { targetSeq, message } = event.data
+    if (!isEventSeq(targetSeq) || targetSeq >= event.seq) {
+      throw new Error('user/message-edit targetSeq must reference an earlier user message')
+    }
+    const previousEvents = events.slice(0, event.seq)
+    const targetSource = previousEvents[targetSeq]
+    const target = targetSource === undefined ? undefined : readSessionInputEvent(targetSource)
+    const latest = latestHumanInput(previousEvents)
+    if (target?.type !== 'user/message' && target?.type !== 'user/message-edit') {
+      throw new Error('user/message-edit target must be a user message')
+    }
+    if (target.type === 'user/message' && target.data.source.kind !== 'user') {
+      throw new Error('user/message-edit target must be a human-authored user message')
+    }
+    if (latest?.seq !== targetSeq) throw new Error('user/message-edit target must be the latest user message')
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- durable JSON must satisfy the declared user role
+    if (message.role !== 'user' || message.source.kind !== 'user') {
+      throw new Error('user/message-edit replacement must be a human-authored user message')
+    }
+    let prefixEnd = targetSeq
+    const editedSource = previousEvents[prefixEnd]
+    let edited = editedSource === undefined ? undefined : readSessionInputEvent(editedSource)
+    while (edited?.type === 'user/message-edit') {
+      prefixEnd = edited.data.targetSeq
+      const previous = previousEvents[prefixEnd]
+      edited = previous === undefined ? undefined : readSessionInputEvent(previous)
+    }
+    const prefix = foldSurface(previousEvents.slice(0, prefixEnd), projections)
+    const retained = new Set(prefix.nodes)
+    return {
+      kind: 'edit', seq: event.seq, target: targetSeq,
+      nodes: [...prefix.nodes, event.seq],
+      messages: new Map([...prefix.projectedMessages, [event.seq, message] as const]),
+      shadowedSeqs: state.nodes.filter(seq => !retained.has(seq)),
+    }
+  }
   const projection = projections.find(item => item.type === event.type)
   if (projection !== undefined) {
     return { kind: 'project', projection, messages: projection.project(event, {
@@ -570,10 +720,19 @@ function applySurfacePlan(
     state.nodes.splice(plan.startIdx, plan.endIdx - plan.startIdx + 1, plan.seq)
     state.replaceGeneration += 1
     state.contentGeneration += 1
+  } else if (plan?.kind === 'admit') {
+    state.projectedMessages.set(plan.seq, plan.message)
+    state.contentGeneration += 1
   } else if (plan?.kind === 'project') {
     for (const [seq, message] of plan.messages) state.projectedMessages.set(seq, message)
     state.projections.add(plan.projection)
     state.contentGeneration += 1
+  } else if (plan?.kind === 'edit') {
+    state.nodes = plan.nodes
+    state.projectedMessages = new Map(plan.messages)
+    state.replaceGeneration += 1
+    state.contentGeneration += 1
+    return { seq: plan.seq, start: plan.target, end: SessionSeq(plan.seq - 1), shadowedSeqs: plan.shadowedSeqs }
   }
   if (plan?.kind !== 'replace') return
   return {

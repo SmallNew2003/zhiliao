@@ -1,16 +1,17 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ISession, PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { InjectFace, PropsStore, PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UserTextFacts } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { JsonBlock, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
-  ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, UserContentAttachment, UserContentData, UserContentInput,
+  ChatStore, ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, UserContentAttachment, UserContentData, UserContentInput,
 } from '../contract/slots.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { MessageEditControls } from './MessageEditControls.tsx'
 import css from './MessageItem.module.css'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
@@ -178,10 +179,11 @@ const NO_MESSAGE_SOURCE: PropsRenderSlots<'conversation.chat.user.before'>['rend
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
   node, renderSlotChain, content, loadImage, renderFactorySlot, actions,
-  pending = false, echo = false, batchStart = false,
+  hideBubble = false, pending = false, echo = false, batchStart = false,
   referenceLabels, skillNames, previewAttachments, facts: inputFacts = EMPTY_TEXT_FACTS, interactive = false,
 }: {
   content: readonly unknown[]
+  hideBubble?: boolean
   renderFactorySlot: PropsRenderFactories['renderFactorySlot']
   /** Optional IconActions (or similar) below the bubble; receives the joined text. */
   actions?: (text: string) => ReactNode
@@ -224,7 +226,7 @@ function UserStyleBubble({
       data-chat-steering-batch={batchStart ? 'start' : undefined}
     >
       {renderSlotChain('conversation.chat.user.before', { source: node.data.source, kind: node.kind }, { fallback: null })}
-      {renderFactorySlot('conversation.chat.user.content', {
+      {!hideBubble && renderFactorySlot('conversation.chat.user.content', {
         content: prepared,
         loadImage,
         facts,
@@ -322,6 +324,11 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
   )
 }
 
+/** Message edit operation supplied by its owning registration. */
+export interface UserMessageInjected {
+  editMessage: ISession['editMessage']
+}
+
 /**
  * Official user and admitted-steering keyed Chat renderer.
  *
@@ -330,32 +337,38 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
  * bubble without asking for it.
  */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderFactorySlot, loadImage, renderSlotChain, t,
-}: ChatNodeViewProps<'user' | 'steering'> & {
+  node, renderFactorySlot, loadImage, renderSlotChain, useChat, useSession, editMessage, actions, t,
+}: ChatNodeViewProps<'user' | 'steering'> & InjectFace<UserMessageInjected> & PropsStore<ChatStore> & {
   /** Bound by the `user` keyed registration, the only entry that declares the seat. */
   renderSlotChain: PropsRenderSlots<'conversation.chat.user.before'>['renderSlotChain']
 }) {
   const data = node.data
+  const running = useSession(state => state.running)
+  const latest = useChat(snapshot => snapshot.order.findLast((key) => {
+    const candidate = snapshot.nodes.get(key)
+    return candidate?.kind === 'user' || candidate?.kind === 'steering'
+  }) === node.key)
+  const [editing, setEditing] = useState(false)
   return (
     <UserStyleBubble
       node={node}
       renderSlotChain={renderSlotChain}
       content={data.content}
+      hideBubble={editing}
       interactive
       renderFactorySlot={renderFactorySlot}
       loadImage={loadImage}
       batchStart={node.kind === 'steering' && node.data.batchStart === true}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
-      actions={text => (
-        <MessageIconActions
-          text={text}
-          time={data.time}
-          clock="start"
-          className={css.actions}
-          t={t}
-        />
-      )}
+      actions={text => <MessageEditControls text={text} targetSeq={data.seq} latest={latest} running={running}
+        hasAttachments={data.content.some(part => part.type === 'image' || part.type === 'file')}
+        editMessage={editMessage} t={t} onEditingChange={(open) => {
+          setEditing(open)
+          actions.setEditingMessage(open ? node.key : undefined)
+        }}
+        renderActions={trigger => <MessageIconActions text={text} time={data.time} clock="start"
+          className={css.actions} t={t} extraActions={trigger} />} /> }
     />
   )
 })

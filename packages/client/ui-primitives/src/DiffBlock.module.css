@@ -80,3 +80,61 @@
     color: var(--dsw-alias-label-secondary);
   }
 }
+
+.pathText {
+  white-space: pre;
+}
+
+.copyPathButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+  .copyPathButton:hover {
+    color: var(--dsw-alias-label-primary);
+    background-color: color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+  }
+}
+
+.copyPathButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-focus, var(--dsw-alias-label-primary));
+  outline-offset: 1px;
+}
+
+/* A same-file second hunk's separator (a scattered edit), in the dim tone. */
+.gap {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* The diff's own meaning-carrying colors: removed on the error token, added on
+   the success token. A `- `/`+ ` prefix is drawn here so a copied line and the
+   shown line agree, and so the sign reads without relying on color alone. */
+
+.wordHighlight {
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.del .wordHighlight {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 28%, transparent);
+  font-weight: 600;
+}
+
+.add .wordHighlight {
+  background-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 28%, transparent);
+  font-weight: 600;
+}

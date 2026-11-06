@@ -666,6 +666,8 @@ interface GenerateOptions<Purpose extends string = LlmRequestPurpose> {
   /** Registered provider route selecting the adapter instance. */
   provider: string
   model: string
+  /** Positive integer context budget for this call; absent inherits adapter capacity. */
+  contextWindow?: number
   /** Adapter-owned reasoning effort selected for this exact model. */
   reasoningEffort?: ReasoningEffortId
   /**
@@ -813,6 +815,8 @@ FIXME(call-config-shape)：重新审视其余哪些字段出于缓存目的确�
 ```ts type-equiv
 /** Concrete generation settings; omitted controls use the selected route's defaults. */
 interface LlmCallControls {
+  /** Positive integer context budget; absent inherits adapter capacity. */
+  contextWindow?: number
   reasoningEffort?: ReasoningEffortId
   temperature?: number
   maxTokens?: number

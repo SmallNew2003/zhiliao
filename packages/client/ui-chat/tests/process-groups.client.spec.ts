@@ -190,7 +190,7 @@ describe('Definition-owned Chat process groups', () => {
     h.builder.apply({ upserts: [separator(3, true)], timeline })
     h.commit()
     expect(source.getSnapshot()?.data).toEqual({
-      turn: 1, closed: true,
+      turn: 1, closed: true, startTime: 2,
       summary: { counts: [{ kind: 'write', count: 1 }], running: undefined, runningDetail: '' },
     })
   })
@@ -546,4 +546,33 @@ describe('Definition-owned Chat process groups', () => {
     expect(h.commit()?.entries).toBeUndefined()
     expect(source.getSnapshot()?.data.closed).toBe(true)
   })
+})
+
+
+it('retains local group timing and counts failed calls without a loaded call', () => {
+  const node = tool('call', 20)
+  const failure: ChatNode<'tool-call'> = { ...node, data: { root: {
+    kind: 'tool-result', seq: 20, name: 'bash', callId: 'call', call: null, callTime: 10, time: 20,
+    args: PartialArguments.fromText('{}'), subCalls: [],
+    content: [{ type: 'text', text: 'permission denied' }], isError: true,
+  } } }
+  const { store } = harness([failure])
+  const first = store.entries[0]
+  if (first?.kind !== 'group') throw new Error('Expected a process group')
+  const group = store.groupSource(first.key).getSnapshot()
+  expect(group?.data.startTime).toBe(10)
+  expect(group?.data.summary.failedCount).toBe(1)
+})
+
+
+it('groups consecutive session context rows without absorbing the next user input', () => {
+  const context = (key: string, seq: number): ChatConversationViewNode => ({
+    key, id: key, kind: 'context', target: 'chat', anchorSeq: seq,
+    location: { kind: 'session' }, visibility: 'visible', data: { kind: 'context', seq, time: seq, source: null, producer: 'context', form: 'text', content: [{ type: 'tool-addition', tools: [] }] },
+  })
+  const { store } = harness([context('a', 1), context('b', 2), separator(3, false)])
+  expect(store.entries.map(entry => entry.kind)).toEqual(['group', 'node'])
+  const first = store.entries[0]
+  if (first?.kind !== 'group') throw new Error('Expected a context group')
+  expect(store.groupSource(first.key).getSnapshot()?.data.contextCount).toBe(2)
 })

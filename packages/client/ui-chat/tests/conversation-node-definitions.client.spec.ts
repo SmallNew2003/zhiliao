@@ -3118,3 +3118,36 @@ it('keeps user cancellations and forked endings free of a failure row', () => {
     expect(node(snapshot(value), 'turn-error')).toBeUndefined()
   }
 })
+
+
+it.each(['user/message-edit', 'plugin:user/message-edit'])('replaces the edited input for %s and retains discarded nodes', (editType) => {
+  const value = assembler([
+    at(1, 'turn/start', { turn: 1 }),
+    at(2, 'user/message', textMessage('first', 'original'), { surfaceOp: 'append' }),
+    at(3, 'step/start', { turn: 1, step: 1 }),
+    at(4, 'assistant/message', { turn: 1, step: 1, message: assistantMessage('reply', 'obsolete') }, { surfaceOp: 'append' }),
+    at(5, 'step/end', { turn: 1, step: 1 }),
+    at(6, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+  ])
+  value.append(at(7, editType, { targetSeq: 2, message: textMessage('edited', 'replacement') }, { ignorable: true }))
+  value.flush()
+  const current = snapshot(value)
+  const visible = current.order.map(key => current.nodes.get(key))
+  expect(visible.some(node => node?.kind === 'user' && (node as ChatNode<'user'>).data.content.some(part => part.type === 'text' && part.text === 'replacement'))).toBe(true)
+  expect(visible.some(node => node?.anchorSeq === 2 || node?.anchorSeq === 4)).toBe(false)
+  expect(visible.find(node => node?.anchorSeq === 7)?.groupTree).toBe('exchange')
+  expect(current.legacy.nodes.some(node => node.seq === 4)).toBe(false)
+  expect(current.nodes.values().some(node => node.anchorSeq === 2 && node.visibility === 'hidden')).toBe(true)
+  for (const [index, type] of ['user/message', 'user/message-admit', 'plugin:user/message-admit'].entries()) {
+    const message = textMessage('edited', `prepared-${index}`)
+    value.append(at(8 + index, type, type === 'user/message' ? message : { targetSeq: 7, message },
+      type === 'user/message' ? { surfaceOp: 'append' } : { ignorable: true }))
+    value.flush()
+    const next = snapshot(value)
+    const inputs = next.order.map(key => next.nodes.get(key)).filter((node): node is ChatNode<'user'> => node?.kind === 'user')
+    expect(inputs).toHaveLength(1)
+    expect(inputs[0]?.data.seq).toBe(7)
+    expect(inputs[0]?.data.content).toEqual(message.content)
+  }
+
+})

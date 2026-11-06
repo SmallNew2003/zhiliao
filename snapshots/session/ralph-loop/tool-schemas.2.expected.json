@@ -160,6 +160,38 @@
       }
     },
     {
+      "name": "hindsight_remember",
+      "description": "Record a durable finding in this workspace's long-term memory: a decision and its rationale, a convention you confirmed, or a non-obvious fact. Do not use it for anything the repository already records (code, tests, docs, git history) or for the current turn's progress. Ordinary conclusions are captured automatically at the end of every turn.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The finding to keep, stated so it still makes sense out of context."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "hindsight_search",
+      "description": "Search this workspace's long-term memory for earlier decisions, conventions, and context. Use it when a question is about how something was settled previously, or when the injected memory looks too shallow to answer. Prefer this over guessing at a past decision. Results are background knowledge and may be stale; prefer code you can read over memory.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "What to look for. Max 12 memories are returned."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    {
       "name": "interrupt_agent",
       "description": "Ask a subagent to stop its current work. This call returns without waiting for it to stop. You can continue a local direct child's conversation later with send_message. External executions stop permanently and cannot receive follow-ups. Subagents it started will keep running.",
       "parameters": {
@@ -386,7 +418,7 @@
     },
     {
       "name": "subagent",
-      "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes.",
+      "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for a subagent when a search or investigation may span many files and you are not confident a few direct lookups will find the target, when two or more independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. Keep work local when the target is already known, when the task takes only one or two direct steps, or when delegating would only move synthesis of results to the child. Once a search is delegated, do not repeat it yourself, and do not predict a pending subagent's result. Give it a complete, standalone prompt: it does not see this conversation. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -411,7 +443,7 @@
     },
     {
       "name": "subagent_fork",
-      "description": "Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes.",
+      "description": "Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for a fork when a search or investigation may span many files and direct lookups may not find the target, when two or more independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. A fork is especially useful when the child needs context already established in this conversation. Keep work local when the target is already known, when the task takes only one or two direct steps, or when delegating would only move synthesis of results to the child. Once a search is delegated, do not repeat it yourself, and do not predict a pending subagent's result. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes.",
       "parameters": {
         "type": "object",
         "properties": {

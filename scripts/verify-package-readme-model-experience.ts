@@ -49,6 +49,11 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/assistant/task': { kind: 'indirect', reason: 'The sibling create_task consumer supplies the user-authorized prompt; this service owns execution Session creation and durable task records.' },
+  'packages/client/ui-assistant': { kind: 'none', reason: 'The panel, navigation, task cards, and cancellation controls add no model input; Host services own execution.' },
+  'packages/client/ui-memory-browser': { kind: 'none', reason: 'The browser renders read-only memory bank and knowledge-page data without adding it to a Session or model request.' },
+  'packages/client/ui-notification': { kind: 'none', reason: 'The browser and desktop notification transports display localized Session status without contributing model context.' },
+  'packages/host/memory-controller': { kind: 'none', reason: 'The Remote controller serves read-only memory metadata to the browser and registers no model input.' },
   'packages/client/ui-context-menu': { kind: 'none', reason: 'Client menu presentation and contributed callbacks add no model input.' },
   'packages/client/ui-file-actions': { kind: 'none', reason: 'Explicit user file saves and clipboard operations add no model input.' },
   'packages/client/ui-entry-customization': { kind: 'none', reason: 'Controls browser launchers and prepares a reviewable Creator draft without submitting model input.' },

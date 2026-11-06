@@ -34,6 +34,10 @@ export interface TerminalBlockLabels {
   copy: string
   /** Copy-button label during the post-copy confirmation window. */
   copied: string
+  /** Label enabling a separate command copy action. */
+  copyCommand?: string | undefined
+  /** Success label for command copy. */
+  copiedCommand?: string | undefined
   /** Placeholder when a settled command produced no visible output. */
   noOutput: string
   /** Collapse-toggle aria label while expanded. */
@@ -205,6 +209,7 @@ export function TerminalBlock({
   // The raw output (or the caller's override), never the rendered tree: the
   // prompt line and the status pill are chrome the user did not run.
   const { copied, onCopy } = useClipboardCopy(copyText ?? text)
+  const commandCopy = useClipboardCopy(command)
 
   const onToggle = useCallback(() => { setExpanded(value => !value) }, [])
 
@@ -260,6 +265,9 @@ export function TerminalBlock({
           ))}
         </div>
         {status !== undefined && <Pill className={css.status}>{status}</Pill>}
+        {copy.copyCommand !== undefined && <button type="button" className={css.copyButton} onClick={commandCopy.onCopy}>
+          {commandCopy.copied ? copy.copiedCommand ?? copy.copied : copy.copyCommand}
+        </button>}
         {(copyText !== undefined || (!background && !running && !empty)) && (
           <button type="button" className={css.copyButton} onClick={onCopy}>
             {copied ? copy.copied : copy.copy}

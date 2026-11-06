@@ -78,6 +78,17 @@ export const VIEWER_ENDPOINT_CLASSES = {
   // ── always-allowed ───────────────────────────────────────────────────────────
   'remoteAccess/follow': 'always-allowed', // every Peer reads its own access snapshot before any policy
 
+  'assistantTasks/assistants': 'owner-only',
+  'assistantTasks/cancelTask': 'owner-only',
+  'assistantTasks/ensureAssistant': 'owner-only',
+  'assistantTasks/tasks': 'owner-only',
+  'assistantTasks/visibility': 'owner-only',
+  'memoryController/list': 'owner-only',
+  'memoryController/page': 'owner-only',
+  'memoryController/pages': 'owner-only',
+  'memoryController/search': 'owner-only',
+  'memoryController/stats': 'owner-only',
+  'session/editMessage': 'owner-only',
   // ── owner-only ───────────────────────────────────────────────────────────────
   // No reader role names these and no plugin offers them today, so the conservative class is
   // owner-only. A plugin that intends to expose one reclassifies it as 'plugin-offered', which still

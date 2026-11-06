@@ -87,7 +87,8 @@ AgentLoop 初始化 Agent，失败则回滚，并在启动已排队工作前等�
 ```text
 turn/start
   claim next-step input plus one queued message
-  snapshot Session model selection; assemble prompt sections + step-admitted tool schemas
+  snapshot Session model selection; agent/prepare-step
+  resolve step-owned tools; assemble prompt sections + admitted tool schemas
   -> agent/pre-step; project runtime context at fallback
                                      reject | enter(messages, startsRequestSeries?)
      reject, or a first enter rewritten empty -> close the turn with no step
@@ -97,6 +98,7 @@ turn/start
      append entered messages as user/message; reconcile retained runtime context
      log request/header and request/context as needed
      derive and freeze model history from the log
+     agent/request-preflight -> reject or repair/rebuild before dispatch
      stream the bound prepared call -> llm/stream -> agent/assistant-stream start
        agent/assistant-stream chunk*
        assistant/message | assistant/attempt -> agent/assistant-stream end
@@ -107,7 +109,7 @@ turn/start
 turn/end
 ```
 
-`turn/*`、`step/*`、`system/message`、`user/message`、`assistant/message`、`assistant/attempt` 和 `tool/*` 是持久会话事件；其余是分属三个事件域的实时扩展点。`agent/assistant-stream` 发布进程本地 start、瞬态 chunk 与 end frame。loop 会在 committed end frame 前把完整紧凑 stream 提交为一个 message 或仅日志 attempt；Web Session-follow adapter 是该 live event 唯一的远程消费方。`agent/pre-step`、`agent/request`、`llm/stream` 和三个 `tools/*` 事件是 waterfall（瀑布式事件），其监听器必须调用 `next()` 才能委托下去；`agent/turn-stopping` 是 serial 事件，没有 `next()`。
+`turn/*`、`step/*`、`system/message`、`user/message`、`assistant/message`、`assistant/attempt` 和 `tool/*` 是持久会话事件；其余是分属三个事件域的实时扩展点。`agent/assistant-stream` 发布进程本地 start、瞬态 chunk 与 end frame。loop 会在 committed end frame 前把完整紧凑 stream 提交为一个 message 或仅日志 attempt；Web Session-follow adapter 是该 live event 唯一的远程消费方。`agent/prepare-step` 是先于每步工具准入的 serial 事件。`agent/request-preflight` 是 serial 事件，可以拒绝已经冻结并记入日志的请求，或先通过持久化压缩修复请求再发送。`agent/pre-step`、`agent/request`、`llm/stream` 和三个 `tools/*` 事件是 waterfall（瀑布式事件），其监听器必须调用 `next()` 才能委托下去；`agent/turn-stopping` 是 serial 事件，没有 `next()`。
 
 工厂 setup 在 Session 进入 SessionStore 并完成 `session/created` 之后、`agent/created` 之前运行；收尾事件在移除之前提交。
 

@@ -91,6 +91,12 @@
     },
     {
       "path": "../../credentials/deepseek-account"
+    },
+    {
+      "path": "../../host/memory-controller"
+    },
+    {
+      "path": "../../assistant/task"
     }
   ]
 }

@@ -234,3 +234,11 @@ describe('ReadBlock copy', () => {
     expect(view.queryByRole('button', { name: '复制' })).toBeNull()
   })
 })
+
+
+it('shows the returned window position within the file', () => {
+  const view = render(<ReadBlock lines={lines(10, 51)} totalLines={100} />)
+  const thumb = view.container.querySelector<HTMLElement>('[data-read-position]')
+  expect(thumb?.style.left).toBe('50%')
+  expect(thumb?.style.width).toBe('10%')
+})

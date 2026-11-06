@@ -53,6 +53,8 @@ export function GenericToolCard({
   const singleFile = model.filePath !== undefined
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       fileContextMenuProps={model.filePath === undefined ? undefined : getFileTriggerProps(model.filePath)}
       useDisclosure={useDisclosure}
       t={t}
@@ -74,7 +76,7 @@ export function GenericToolCard({
       web={web}
       state={state}
       filePath={model.filePath}
-      onOpenFile={singleFile ? openFile : undefined}
+      onOpenFile={openFile}
       inspect={inspect}
     />
   )

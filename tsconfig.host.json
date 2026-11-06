@@ -172,6 +172,7 @@
     "apps/web/tests/web-search-round.e2e.ts",
     "apps/web/tests/file-upload-round.e2e.ts",
     "apps/web/tests/message-actions.e2e.ts",
+    "apps/web/tests/message-edit-resend.e2e.ts",
     "apps/web/tests/open-in-app-ssh.e2e.ts",
     "apps/web/tests/fork-mid-turn.e2e.ts",
     "apps/web/tests/message-feedback.e2e.ts",
@@ -271,6 +272,14 @@
     "scripts/client-bundle-purity.spec.ts"
   ],
   "references": [
+    { "path": "./packages/mcp/mcp-discovery" },
+    { "path": "./packages/client/ui-notification/tsconfig.host.json" },
+    { "path": "./packages/memory/memory" },
+    { "path": "./packages/memory/hindsight-http" },
+    { "path": "./packages/memory/tool-memory" },
+    { "path": "./packages/host/memory-controller" },
+    { "path": "./packages/assistant/task" },
+    { "path": "./packages/assistant/tool-task" },
     { "path": "./packages/experimental/action-cards" },
     { "path": "./packages/experimental/creation-recommendations" },
     { "path": "./packages/experimental/plugin-recommendations" },

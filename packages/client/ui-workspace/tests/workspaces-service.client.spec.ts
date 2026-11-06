@@ -1568,3 +1568,15 @@ describe('UiWorkspaceService', () => {
     })
   })
 })
+
+
+it('unions hidden session sources and removes disposed sources', () => {
+  const { uiWorkspace } = bench()
+  const source = createSnapshotStore<readonly SessionId[]>([sid('assistant')])
+  const stop = uiWorkspace.registerHiddenSessionSource(source)
+  expect([...uiWorkspace.hiddenSessionIds.getSnapshot()]).toEqual([sid('assistant')])
+  source.set([sid('task')])
+  expect([...uiWorkspace.hiddenSessionIds.getSnapshot()]).toEqual([sid('task')])
+  stop()
+  expect(uiWorkspace.hiddenSessionIds.getSnapshot().size).toBe(0)
+})

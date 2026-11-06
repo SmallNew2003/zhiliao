@@ -1,5 +1,5 @@
 /** React-commit-driven movement and entry/exit fades for keyed rows. */
-import { Component, createRef, type AriaRole, type ReactNode } from 'react'
+import { Component, createRef, type AriaRole, type FocusEventHandler, type KeyboardEventHandler, type ReactNode } from 'react'
 import css from './AnimatedRows.module.css'
 
 const ROW_FADE_MS = 100
@@ -11,6 +11,10 @@ export interface AnimatedRowsProps {
   className: string
   role?: AriaRole
   label?: string
+  /** Keyboard navigation owned by the list consumer. */
+  onKeyDown?: KeyboardEventHandler<HTMLDivElement>
+  /** Roving row focus owned by the list consumer. */
+  onFocus?: FocusEventHandler<HTMLDivElement>
   /** Unique DOM-order keys matching the rendered data-row-key attributes. */
   rowKeys: readonly string[]
   ready: boolean
@@ -172,6 +176,8 @@ export class AnimatedRows extends Component<AnimatedRowsProps> {
         className={this.props.className}
         role={this.props.role}
         aria-label={this.props.label}
+        onKeyDown={this.props.onKeyDown}
+        onFocus={this.props.onFocus}
         onPointerDownCapture={() => { this.armed = true }}
         onKeyDownCapture={() => { this.armed = true }}
       >

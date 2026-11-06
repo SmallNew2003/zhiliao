@@ -25,6 +25,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-api-workspace-controller` | yes | Workspace Remote commands and reconnect-safe state transport |
 | `@deepseek-ai/dsh-api-workspace-files` | yes | Workspace file service and Client resource provider: bounded reads, directory listing, and live metadata over the workspaceFiles Remote namespace |
 
+## assistant
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-assistant-task` | yes | Host-wide assistant records and assistant tasks with scoped execution Sessions |
+| `@deepseek-ai/dsh-tool-assistant-task` | no | Model-facing create_task tool over the Host assistant task service |
+
 ## attachment
 
 | Package | Config | Description |
@@ -69,6 +76,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-shortcuts` | yes | Application keyboard command registry and physical-key routing |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | no | Agent-preset surfaces: the default for later sessions, this session's seat, and the composition editor |
 | `@deepseek-ai/dsh-client-ui-approval` | no | Approval composer takeover over the scoped Remote Event waterfall |
+| `@deepseek-ai/dsh-client-ui-assistant` | no | Assistant surface: global and project assistants with their task lists |
 | `@deepseek-ai/dsh-client-ui-attachment` | no | Dynamic attachment presentation plugin for conversation input, message-image, and trajectory image slots |
 | `@deepseek-ai/dsh-client-ui-brand-official` | no | Official Zhiliao brand occupants for the Web client's sidebar slots |
 | `@deepseek-ai/dsh-client-ui-chat` | no | Chat Conversation target, node definitions, renderers, and details surface |
@@ -85,8 +93,10 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-input-trigger` | no | Input trigger pipeline: '/' and '@' detection, candidate menu, pick routing to registered sources |
 | `@deepseek-ai/dsh-client-ui-jobs` | no | Session-header background-job list with on-demand streaming record panels |
 | `@deepseek-ai/dsh-client-ui-layout` | no | Shell plugin: three-column AppFrame with drag handles, ctx.layout viewing-state service (navigation + panels) |
+| `@deepseek-ai/dsh-client-ui-memory-browser` | no | Long-term memory browser for the dsh web client: the sidebar Memory panel lists the deployment's memory banks, their statistics and fact-type composition, their knowledge pages, and searches the knowledge index |
 | `@deepseek-ai/dsh-client-ui-message-feedback` | no | The Web feedback surface: per-message Like/Dislike in the assistant-message action strip and the feedback dialog behind both ratings and /feedback, backed by the messageFeedback and sessionFeedback Host Remotes |
 | `@deepseek-ai/dsh-client-ui-model-selection` | no | Model selection over the shared model catalog, Session projection, and session.selectModel |
+| `@deepseek-ai/dsh-client-ui-notification` | no | Native OS notifications for session completion, pending approval, and agent-loop failure |
 | `@deepseek-ai/dsh-client-ui-open-in-app` | no | Web "Open In..." controls: the Session-header split button opening the workspace directory in an installed application, and the document preview's default-application controls for one file |
 | `@deepseek-ai/dsh-client-ui-permission-presets` | no | Permission surfaces: a new-session default in General settings and a current-session /permission popup over the permissions projection |
 | `@deepseek-ai/dsh-client-ui-plan` | no | Plan mode controls, persistent transcript plan cards, and sidebar Markdown previews |
@@ -288,6 +298,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-host-directory-picker-browse` | yes | In-app browsing backend of the directory-picker seam (listing/creation primitives over the host filesystem) |
 | `@deepseek-ai/dsh-host-directory-picker-native` | no | Native-OS-chooser backend of the directory-picker seam for the DeepSeek Harness web GUI host |
 | `@deepseek-ai/dsh-host-frontend-static` | yes | SPA dist server for the Web shell: owns the webserver fallback seat, serving explicit index entries and static assets with traversal rejection and 404 misses |
+| `@deepseek-ai/dsh-host-memory-controller` | yes | Read-only Remote projection of the long-term memory a deployment retains: bank listing, per-bank statistics, the knowledge-page tree, knowledge-base search, and page bodies for the browser memory panel |
 | `@deepseek-ai/dsh-host-open-in-app` | yes | Host half of open-in-app: resolved application catalog, icons, and the launch endpoint as three webServer routes |
 | `@deepseek-ai/dsh-host-plugin-inventory` | no | Read-only Remote projection of current Cordis Loader plugin state |
 | `@deepseek-ai/dsh-host-product-telemetry-otel` | yes | Explicit product usage events exported through OpenTelemetry HTTP logs |
@@ -336,7 +347,16 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@deepseek-ai/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
+| `@deepseek-ai/dsh-mcp-discovery` | yes | Scoped progressive MCP discovery and atomic model context loading |
 | `@deepseek-ai/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
+
+## memory
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-memory` | yes | Abstract long-term memory capability seam (ctx.memory) for the DeepSeek Harness — provider registry, bank-resolved recall/search/retention, request/result vocabulary, and the MemoryError taxonomy |
+| `@deepseek-ai/dsh-memory-hindsight-http` | yes | Hindsight HTTP memory provider for the DeepSeek Harness — registers a ctx.memory provider backed by a hindsight daemon, with workspace-resolved banks and timeout-bounded recall, search, and retention |
+| `@deepseek-ai/dsh-tool-memory` | yes | Model-facing memory tools and session lifecycle wiring for the DeepSeek Harness — hindsight_search and hindsight_remember over ctx.memory, plus automatic opening recall, turn retention, and cold-bank seeding |
 
 ## plan
 

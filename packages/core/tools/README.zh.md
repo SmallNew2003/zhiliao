@@ -72,6 +72,8 @@ ctx.tools.register(defineTool({
 
 `get(name, scope, toolSet)`、`definitions(scope, toolSet)` 和 `schemas(scope, toolSet)` 读取已准入集合；省略 `toolSet` 时只查看已注册定义，不计算条件。`executable(name, scope, toolSet)` 是执行时的查找：它应用集合，没有集合时排除条件注册。执行器的描述与分区通过 `AssembleContext.toolSet` 接收同一集合。展示变换不能增删可调用工具。
 
+`preview(definitions, scope)` 使用该作用域选定的执行器渲染候选定义，返回模型声明与已求值的文本段，不修改注册、不求值激活条件，也不授予执行资格。调用方可在提交能力选择前计算完整原生声明和程序接口的成本。
+
 ### 选择执行器
 
 在部署、预设或 Agent 作用域中挂载一个执行器。最近的作用域决定提供者，同一作用域的重复提供者会报错。原生执行器直接公开可见能力；PTC 执行器公开 `run_code` 和生成的 SDK。执行器注册和卸载不触发 `tools/change`；提示词组装和批次执行在运行时解析当前执行器。

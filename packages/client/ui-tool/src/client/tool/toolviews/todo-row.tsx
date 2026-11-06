@@ -58,6 +58,8 @@ export function TodoRow({ toolName, block, inspect, useDisclosure, useTodoHistor
   const summary = summarize(model.bodyRaw, t) ?? { text: model.summary, extra: 0 }
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}

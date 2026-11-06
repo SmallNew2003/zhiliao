@@ -28,16 +28,19 @@ export interface Config {
   model: Volatile<string>
   /** Adapter-owned reasoning effort; omission follows the provider default. */
   reasoningEffort: Volatile<string | undefined>
+  /** Positive integer context budget for newly created Agents. */
+  contextWindow: Volatile<number | undefined>
 }
 
 /** Project stored settings onto the Agent-facing selection type. */
-function selection(settings: { provider: string; model: string; reasoningEffort?: string }): ModelSelection {
+function selection(settings: { provider: string; model: string; reasoningEffort?: string; contextWindow?: number }): ModelSelection {
   return {
     provider: settings.provider,
     model: settings.model,
     ...settings.reasoningEffort === undefined
       ? {}
       : { reasoningEffort: ReasoningEffortId(settings.reasoningEffort) },
+    ...settings.contextWindow === undefined ? {} : { contextWindow: settings.contextWindow },
   }
 }
 
@@ -52,6 +55,7 @@ export class AgentDefaultModelConfig extends Service {
     provider: z.string().required().volatile(),
     model: z.string().required().volatile(),
     reasoningEffort: z.string().volatile(),
+    contextWindow: z.number().step(1).min(1).volatile(),
   })
 
   constructor(private readonly ownerContext: Context, private config: Config) {
@@ -62,13 +66,15 @@ export class AgentDefaultModelConfig extends Service {
 
   /**
    * Read the current default model selection.
-   * @returns a detached provider, model, and optional reasoning selection.
+   * @returns a detached route, optional reasoning effort, and context budget.
    */
   currentSelection(): ModelSelection {
     const reasoningEffort = this.config.reasoningEffort.get()
+    const contextWindow = this.config.contextWindow.get()
     return selection({
       provider: this.config.provider.get(), model: this.config.model.get(),
       ...reasoningEffort === undefined ? {} : { reasoningEffort },
+      ...contextWindow === undefined ? {} : { contextWindow },
     })
   }
 
@@ -87,6 +93,7 @@ export class AgentDefaultModelConfig extends Service {
     const config = {
       provider: next.provider, model: next.model,
       ...next.reasoningEffort === undefined ? {} : { reasoningEffort: String(next.reasoningEffort) },
+      ...next.contextWindow === undefined ? {} : { contextWindow: next.contextWindow },
     }
     const saved = this.saves.then(() => editor.edit(entry, () => config))
     this.saves = saved.catch(() => {})

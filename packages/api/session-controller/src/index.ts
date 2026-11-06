@@ -1,5 +1,6 @@
 /** Session Remote owner: cold reads, explicit Agent commands, and live control state. */
 
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { hostname } from 'node:os'
 import { resolve } from 'node:path'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -42,6 +43,8 @@ import type {
   SessionControlFrame,
   SessionCreateRequest,
   SessionCreateValue,
+  SessionEditMessageRequest,
+  SessionEditMessageValue,
   SessionFollowFrame,
   SessionFollowRequest,
   SessionForkRequest,
@@ -192,6 +195,19 @@ export class SessionController extends TypertRemoteService {
     this.agents = new ApiSessionAgentController(ctx)
     this.agents.initialize()
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
+    ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => {
+      const decision = await next()
+      if (decision.kind !== 'enter' || signal.aborted || messages.length === 0) return decision
+      using observed = await ctx.sessionQuery.observeSession(agent.id, { projectionMode: 'none' })
+      const offered = new Set(messages.map(message => message.id))
+      const committed = new Map(decision.committedMessages?.map(receipt => [receipt.message.id, receipt]))
+      for (const event of observed.events.map(readSessionInputEvent)) {
+        if (event.type === 'user/message-edit' && offered.has(event.data.message.id)) {
+          committed.set(event.data.message.id, { seq: event.seq, message: event.data.message })
+        }
+      }
+      return committed.size === 0 ? decision : { ...decision, committedMessages: [...committed.values()] }
+    })
     ctx.effect(() => ctx.fileUploads.registerAgentResolver(async (sessionId) => {
       const result = await this.agents.resolveAgent(sessionId)
       if ('error' in result) throw result.error
@@ -238,7 +254,9 @@ export class SessionController extends TypertRemoteService {
       ctx.emit('api-session/error', agent.id, errorChain(error))
     })
     ctx.on('session/event', (session, event) => {
-      if (event.type !== 'user/message' || event.data.source.kind !== 'user') return
+      const message = event.type === 'user/message' ? event.data
+        : event.type === 'user/message-edit' ? event.data.message : undefined
+      if (message?.source.kind !== 'user') return
       ctx.emit('api-session/activity', session.id, event.time)
     })
   }
@@ -486,6 +504,16 @@ export class SessionController extends TypertRemoteService {
       ...(principal === undefined ? {} : { principal }),
     }
     return this.commands.prompt(request, source)
+  }
+
+  /**
+   * Edit and resend the latest sent user input while retaining its original attachments.
+   * @param request - target event, replacement text, and stable retry identity.
+   * @returns acceptance after the edit is durable; unchanged text requests another response.
+   */
+  @Remote('editMessage')
+  editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue> {
+    return this.commands.editMessage(request, principalOf(this.ctx.invocation))
   }
 
   /**

@@ -2,6 +2,8 @@
  * Pure folds for durable provider-reported token usage and context occupancy.
  */
 
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import { lastAssistantStreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
@@ -10,6 +12,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
+import { estimateMessage } from './estimate.ts'
 
 const zeroBuckets = (): TokenUsageProjection => ({
   uncachedInputTokens: 0,
@@ -96,6 +99,14 @@ const contextPressureStateSchema = z.object({
     end: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(SessionSeq),
     tokens: z.number().int().nonnegative(),
   }).optional(),
+  latestInput: z.object({
+    messageId: z.string().min(1).transform(MessageId), edited: z.boolean(),
+    inputTokens: z.number().int().nonnegative(),
+    seq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(SessionSeq),
+    surfaceTokens: z.number().int().nonnegative(),
+    pressureTokens: z.number().int().nonnegative().optional(),
+    sampledSurfaceTokens: z.number().int().nonnegative().optional(),
+  }).strict().optional(),
 }).strict()
 
 /** Host fold state for provider pressure and surface adjustments. */
@@ -113,7 +124,8 @@ export const tokenUsageProjectionDefinition = {
   stateVersion: 2,
   stateSchema: tokenUsageStateSchema,
   init: () => ({ totals: zeroBuckets(), last: null }),
-  apply: (state, event) => {
+  apply: (state, sourceEvent) => {
+    const event = readSessionInputEvent(sourceEvent)
     if (event.type === 'llm/retry-started') {
       return state.last?.turn === event.data.turn && state.last.step === event.data.step
         ? { ...state, last: null }
@@ -166,12 +178,51 @@ export const tokenUsageProjectionDefinition = {
  */
 export const contextPressureProjectionDefinition = {
   key: 'contextPressure',
-  stateVersion: 5,
+  stateVersion: 7,
   stateSchema: contextPressureStateSchema,
   init: () => ({ surfaceTokens: 0 }),
-  apply: (state, event) => {
+  apply: (state, sourceEvent) => {
+    const input = readSessionInputEvent(sourceEvent)
+    const previousInput = state.latestInput
+    const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
+      && previousInput.messageId === input.data.id
+      ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
+    if (event.type === 'user/message-admit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('context pressure: admitted input is not the latest input')
+      const inputTokens = estimateMessage(event.data.message)
+      return {
+        ...state, surfaceTokens: state.surfaceTokens + inputTokens - previous.inputTokens,
+        latestInput: { ...previous, inputTokens },
+      }
+    }
+    if (event.type === 'user/message-edit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('context pressure: edit target is not the latest user input')
+      return {
+        ...state.contextWindow === undefined ? {} : { contextWindow: state.contextWindow },
+        surfaceTokens: previous.surfaceTokens + estimateMessage(event.data.message),
+        ...previous.pressureTokens === undefined ? {} : { pressureTokens: previous.pressureTokens },
+        ...previous.sampledSurfaceTokens === undefined ? {} : { sampledSurfaceTokens: previous.sampledSurfaceTokens },
+        latestInput: {
+          ...previous, seq: event.seq, messageId: event.data.message.id, edited: true,
+          inputTokens: estimateMessage(event.data.message),
+        },
+      }
+    }
     const fold = foldSurfaceProjection(state.claim, event)
     let next = state
+    if (event.type === 'user/message' && event.data.source.kind === 'user') {
+      next = {
+        ...next,
+        latestInput: {
+          seq: event.seq, messageId: event.data.id, edited: false,
+          surfaceTokens: state.surfaceTokens, inputTokens: estimateMessage(event.data),
+          ...state.pressureTokens === undefined ? {} : { pressureTokens: state.pressureTokens },
+          ...state.sampledSurfaceTokens === undefined ? {} : { sampledSurfaceTokens: state.sampledSurfaceTokens },
+        },
+      }
+    }
     if (event.type === 'request/context') {
       const contextWindow = event.data.contextWindow
       if (contextWindow !== state.contextWindow) {

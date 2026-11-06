@@ -1,7 +1,7 @@
 /** Select and log permanent image omissions in current model-request order. */
 
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
+import { readSessionInputEvent, type Session, type SessionSeq } from '@deepseek-ai/dsh-session'
 import type { ImageOffloadTarget } from './projection.ts'
 
 /**
@@ -19,8 +19,8 @@ export function offloadOldestImages(session: Session, sourceEventSeqs: readonly 
     if (count === 0) break
     // Existing Session history read; migration deferred. Current surface nodes index the durable log.
     // oxlint-disable-next-line typescript/no-non-null-assertion, typescript/no-deprecated
-    const event = session.eventAt(seq)!
-    if (event.type !== 'user/message' && event.type !== 'tool/result') continue
+    const event = readSessionInputEvent(session.eventAt(seq)!)
+    if (event.type !== 'user/message' && event.type !== 'user/message-edit' && event.type !== 'tool/result') continue
     // oxlint-disable-next-line typescript/no-non-null-assertion -- both input node types produce a message
     const message = session.deriveEventMessage(event)!
     const imageIndexes: number[] = []

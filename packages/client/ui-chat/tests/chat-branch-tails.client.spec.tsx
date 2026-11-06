@@ -1,3 +1,4 @@
+import { userMessageEditingFixture } from './user-message-component-fixture.client.ts'
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -87,9 +88,9 @@ function MessageItem({ node, t: translate, referenceLabels, skillNames }: Messag
   }
   switch (node.kind) {
     case 'user':
-      return <UserMessageNodeView {...props as ChatNodeViewProps<'user'>} {...userSlots} />
+      return <UserMessageNodeView {...userMessageEditingFixture()} {...props as ChatNodeViewProps<'user'>} {...userSlots} />
     case 'steering':
-      return <UserMessageNodeView {...props as ChatNodeViewProps<'steering'>} renderSlotChain={() => null} />
+      return <UserMessageNodeView {...userMessageEditingFixture()} {...props as ChatNodeViewProps<'steering'>} renderSlotChain={() => null} />
     case 'context':
       return <ContextMessageNodeView {...props as ChatNodeViewProps<'context'>} />
     case 'compaction':

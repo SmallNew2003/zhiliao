@@ -953,3 +953,78 @@ select.input {
   line-height: 20px;
   text-align: center;
 }
+
+.contextWindowField {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.contextWindowField legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.contextWindowValue {
+  display: inline-block;
+  max-width: 120px;
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.contextWindowChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.contextWindowChoice {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: 8px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.contextWindowChoice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.contextWindowChoice:has(input:checked) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary);
+}
+
+.contextWindowChoice:has(input:focus-visible) {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.contextWindowChoice:hover:not(:has(input:disabled)) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.contextWindowChoice:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}

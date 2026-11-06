@@ -3,7 +3,7 @@ import type { FileSaveResult } from '@deepseek-ai/dsh-client-ui-file-actions/typ
 
 import type { DesktopShortcutInput, ShortcutConfigSnapshot, ShortcutSaveResult } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import { DESKTOP_IPC, SCHEME, type DshDesktopProductApi, type DesktopUpdatePresentation } from './ipc.ts'
+import { DESKTOP_IPC, SCHEME, type DesktopNotificationRequest, type DesktopNotificationPermission, type DshDesktopProductApi, type DesktopUpdatePresentation } from './ipc.ts'
 import { PLATFORM_IPC } from './platform-ipc.ts'
 import { markDocumentPlatform, syncWindowFullscreen } from './preload-platform.ts'
 import { syncNativeTheme } from './preload-theme.ts'
@@ -63,6 +63,15 @@ function createProductApi(): DshDesktopProductApi {
         ipcRenderer.on(DESKTOP_IPC.shortcutsChanged, handle)
         return () => { ipcRenderer.off(DESKTOP_IPC.shortcutsChanged, handle) }
       },
+    },
+    notifications: {
+      show: (request: DesktopNotificationRequest) => ipcRenderer.invoke(DESKTOP_IPC.notifyShow, request) as Promise<void>,
+      subscribe(listener) {
+        const handle = (_event: Electron.IpcRendererEvent, sessionId: string): void => { listener(sessionId) }
+        ipcRenderer.on(DESKTOP_IPC.notifyClicked, handle)
+        return () => { ipcRenderer.off(DESKTOP_IPC.notifyClicked, handle) }
+      },
+      permission: () => ipcRenderer.invoke(DESKTOP_IPC.notifyPermission) as Promise<DesktopNotificationPermission>,
     },
     updates: {
       status: () => ipcRenderer.invoke(DESKTOP_IPC.updatesStatus) as Promise<DesktopUpdatePresentation>,

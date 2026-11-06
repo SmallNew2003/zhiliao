@@ -383,21 +383,21 @@ describe('dsh-tool-subagent', () => {
 
     const forkProvider = await mock.mountScriptedProvider(ctx, { name: 'fork', inheritsParentContext: true })
     expect(await delegationGuidance(ctx)).toEqual([
-      'Start independent delegations with `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     await mock.mountScriptedProvider(ctx, { name: 'spawn' })
     expect(await delegationGuidance(ctx)).toEqual([
-      'Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
 
     await forkProvider.dispose()
     expect(await delegationGuidance(ctx)).toEqual([
-      'Start independent delegations with `subagent` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     await mock.mountScriptedProvider(ctx, { name: 'fork', inheritsParentContext: true })
     await spawnTool.dispose()
     expect(await delegationGuidance(ctx)).toEqual([
-      'Start independent delegations with `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     await forkTool.dispose()
     expect(await delegationGuidance(ctx)).toEqual([])
@@ -411,19 +411,19 @@ describe('dsh-tool-subagent', () => {
     const peer = (await ctx.agents.create({ sessionId: SessionId('guidance-peer') })).agent
     const showSpawn = parent.ctx.tools.restrict({ deny: ['subagent'] })
     expect(await delegationGuidance(ctx, parent)).toEqual([
-      'Start independent delegations with `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     expect(await delegationGuidance(ctx, peer)).toEqual([
-      'Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     expect(await delegationGuidance(unrelated)).toEqual([
-      'Start independent delegations with `other_delegate` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `other_delegate` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     showSpawn()
 
     const scoped = await parent.ctx.plugin(tool, { provider: 'mock', toolName: 'subagent' })
     expect(await delegationGuidance(ctx, parent)).toEqual([
-      'Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.',
+      'Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.',
     ])
     await scoped.dispose()
     parent.ctx.tools.restrict({ deny: ['subagent', 'subagent_fork'] })
@@ -514,6 +514,14 @@ describe('dsh-tool-subagent', () => {
     expect(schema.description).toContain('inherits this conversation')
     expect(schema.description).not.toContain('does not see this conversation')
     expect(schema.description).not.toContain('Inspect options with `list_subagent_models`')
+    expect(schema.description).toContain('Delegate proactively: ordinary delegation does not require the user to ask')
+    expect(schema.description).toContain('direct lookups may not find the target')
+    expect(schema.description).toContain('two or more independent subtasks can run in parallel')
+    expect(schema.description).toContain('would consume large amounts of context')
+    expect(schema.description).toContain('completed work needs independent verification')
+    expect(schema.description).toContain('Keep work local when the target is already known')
+    expect(schema.description).toContain('Once a search is delegated, do not repeat it yourself')
+    expect(schema.description).toContain('do not predict a pending subagent\'s result')
     const props = (schema.parameters as { properties: Record<string, { description: string }> }).properties
     expect(props['prompt']!.description).toContain('completed turns')
   })
@@ -716,13 +724,22 @@ describe('dsh-tool-subagent local activation', () => {
     expect(schema.description).not.toContain('send_message` starts a later turn')
     expect(schema.description).toContain('immediately returns its id')
     expect(schema.description).not.toContain('never poll or wait on it')
+    // Proactive delegation guidance: triggers and restraint are written together.
+    expect(schema.description).toContain('Delegate proactively: ordinary delegation does not require the user to ask')
+    expect(schema.description).toContain('not confident a few direct lookups will find the target')
+    expect(schema.description).toContain('two or more independent subtasks can run in parallel')
+    expect(schema.description).toContain('would consume large amounts of context')
+    expect(schema.description).toContain('completed work needs independent verification')
+    expect(schema.description).toContain('Keep work local when the target is already known')
+    expect(schema.description).toContain('Once a search is delegated, do not repeat it yourself')
+    expect(schema.description).toContain('do not predict a pending subagent\'s result')
     const properties = (schema.parameters as {
       properties: Record<string, { description?: string }>
     }).properties
     expect(properties.run_in_background).toBeUndefined()
     const assembly = await ctx.systemPrompt.assemble(assembleContextFor(parent))
     const guidance = assembly.sections.find(section => section.name === 'tool:subagent')
-    expect(guidance?.text).toBe('Start independent delegations with `subagent` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.')
+    expect(guidance?.text).toBe('Start independent delegations with `subagent` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.')
 
     const started = await callSubagent(
       ctx,

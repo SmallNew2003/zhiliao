@@ -1,6 +1,7 @@
 /** Immutable system-only interpretation of the loaded Session surface. */
+import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
-import { isSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+import { isAppendSurfaceEvent, isSurfaceEvent, readSessionInputEvent } from '@deepseek-ai/dsh-session/surface'
 import type { SystemPromptNode } from './request-inspection.ts'
 
 interface PositionedSystem {
@@ -22,6 +23,10 @@ export interface SystemPromptState {
   readonly effective: SystemPromptNode | undefined
   /** System event at this position, if any; only this node may own an update card. */
   readonly introduced: SystemPromptNode | undefined
+  /** Prompt state immediately before the latest editable human input. */
+  readonly latestInput?: { readonly seq: number; readonly messageId: MessageId; readonly before: Omit<SystemPromptState, 'latestInput'> }
+  /** Latest system-producing event across human-input checkpoints. */
+  readonly lastSystemEvent?: SessionEvent<'system/message'>
 }
 
 /** Pure interpretation supplied to target-owned Definitions through uiConversation. */
@@ -36,6 +41,24 @@ export type SystemPromptInspector = (previous: SystemPromptState | undefined, ev
  * @returns Immutable surviving system facts and the effective nonempty prompt.
  */
 export function inspectSystemPrompt(previous: SystemPromptState | undefined, event: SessionEvent): SystemPromptState {
+  event = readSessionInputEvent(event)
+  if (event.type === 'user/message-edit') {
+    const input = previous?.latestInput
+    if (input?.seq !== event.data.targetSeq) {
+      return {
+        firstSeq: previous?.firstSeq ?? event.seq, uncertain: true, nodes: [],
+        replacements: new Map(), effective: undefined, introduced: undefined,
+      }
+    }
+    return { ...input.before, introduced: undefined, latestInput: { ...input, seq: event.seq, messageId: event.data.message.id } }
+  }
+  if (event.type === 'user/message' && isAppendSurfaceEvent(event) && event.data.source.kind === 'user') {
+    if (previous?.latestInput?.messageId === event.data.id) return { ...previous, introduced: undefined }
+    const { latestInput: _prior, ...before } = previous ?? {
+      firstSeq: event.seq, uncertain: false, nodes: [], replacements: new Map(), effective: undefined, introduced: undefined,
+    }
+    return { ...before, introduced: undefined, latestInput: { seq: event.seq, messageId: event.data.id, before } }
+  }
   const op = isSurfaceEvent(event) ? event.surfaceOp : undefined
   const firstSeq = previous?.firstSeq ?? event.seq
   let nodes = previous?.nodes ?? []
@@ -81,5 +104,9 @@ export function inspectSystemPrompt(previous: SystemPromptState | undefined, eve
         text: surviving?.text ?? '',
         update: false,
       }
-  return { firstSeq, uncertain, nodes, replacements, effective, introduced }
+  return { firstSeq, uncertain, nodes, replacements, effective, introduced,
+    ...previous?.latestInput === undefined ? {} : { latestInput: previous.latestInput },
+    ...event.type === 'system/message' ? { lastSystemEvent: event }
+      : previous?.lastSystemEvent === undefined ? {} : { lastSystemEvent: previous.lastSystemEvent },
+  }
 }

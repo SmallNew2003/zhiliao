@@ -17,6 +17,9 @@ This table connects model-visible tool names to the plugin package and service s
 | --- | --- | --- | --- | --- | --- |
 | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
 | `@deepseek-ai/dsh-plugin-market` | `plugin_market` | `ctx.tools`, `ctx.pluginMarket` | `tool/call`, `tool/result` | - | - |
+| `@deepseek-ai/dsh-mcp-discovery` | `discover_mcp_tools` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionProjections` | `tool/call`, `tool/result`, `mcp/selection`, `mcp/request-snapshot` | - | - |
+| `@deepseek-ai/dsh-tool-assistant-task` | `create_task` | `ctx.tools`, `ctx.systemPrompt`, `ctx.assistantTasks`, `a registered assistant Session` | `tool/call`, `tool/result`, `assistant storage domain records and independent execution Session` | - | - |
+| `@deepseek-ai/dsh-tool-memory` | `hindsight_remember`, `hindsight_search` | `ctx.tools`, `ctx.memory`, `a primary Session with a resolved workspace bank` | `tool/call`, `tool/result`, `provider-owned memory bank for hindsight_remember` | - | - |
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`, `stagehand_extract`, `stagehand_navigate`, `stagehand_observe`, `stagehand_screenshot`, `stagehand_tabs` | `ctx.browserUse`, `ctx.agents`, `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-action-cards` | `propose_action` | `ctx.tools`, `ctx.agents`, `ctx.sessionProjections`, `ctx.remoteAccess` | `tool/call`, `tool/result`, `plugin:action-cards/decision`, `user/message` | - | Declared only to an Agent that loaded the skill of a registered card kind; the kind packages register their actions, and the Personalized recommendations bundle supplies the shipped kinds. |
@@ -170,6 +173,133 @@ List the plugin market indexes the user configured, the installable bundles one 
 ```
 
 Source: [`packages/boot/plugin-market/src/tools.ts`](../packages/boot/plugin-market/src/tools.ts)
+
+<a id="deepseek-aidsh-mcp-discovery"></a>
+
+## `@deepseek-ai/dsh-mcp-discovery`
+
+### `discover_mcp_tools`
+
+Search and load specific MCP tools, activate resource servers, or release loaded selections. Definitions and instructions enter the next request.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "search",
+        "load",
+        "release"
+      ]
+    },
+    "query": {
+      "type": "string"
+    },
+    "server": {
+      "type": "string"
+    },
+    "names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "offset": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "action"
+  ]
+}
+```
+
+Source: [`packages/mcp/mcp-discovery/src/index.ts`](../packages/mcp/mcp-discovery/src/index.ts)
+
+<a id="deepseek-aidsh-tool-assistant-task"></a>
+
+## `@deepseek-ai/dsh-tool-assistant-task`
+
+### `create_task`
+
+Create one independent task for the user. The task runs in its own Session and can outlive this conversation. This conversation keeps only the task card and its status; do not claim the task finished until its status says so. Use it when the user asks you to do or track work beyond this turn. A project assistant creates the task in its own project; the global assistant may name a registered project by id. If a creation call fails after the task record exists, retry with the same requestId to reuse the task and its Session. Do not use this tool for reminders or recurring schedules.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The complete task instruction delivered as the first message of the task Session."
+    },
+    "title": {
+      "type": "string",
+      "description": "Short task title in the user's language: action plus object. Omit timing, status, and ids."
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Registered project id for a global assistant. A project assistant omits it or names its own project."
+    },
+    "requestId": {
+      "type": "string",
+      "description": "Idempotency key. Reuse the same value when retrying a creation that failed after its task record existed."
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts)
+
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `hindsight_remember`
+
+Record a durable finding in this workspace's long-term memory: a decision and its rationale, a convention you confirmed, or a non-obvious fact. Do not use it for anything the repository already records (code, tests, docs, git history) or for the current turn's progress. Ordinary conclusions are captured automatically at the end of every turn.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "The finding to keep, stated so it still makes sense out of context."
+    }
+  },
+  "required": [
+    "content"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/tools.ts`](../packages/memory/tool-memory/src/tools.ts)
+
+### `hindsight_search`
+
+Search this workspace's long-term memory for earlier decisions, conventions, and context. Use it when a question is about how something was settled previously, or when the injected memory looks too shallow to answer. Prefer this over guessing at a past decision. Results are background knowledge and may be stale; prefer code you can read over memory.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "What to look for. Max 12 memories are returned."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Source: [`packages/memory/tool-memory/src/tools.ts`](../packages/memory/tool-memory/src/tools.ts)
 
 <a id="deepseek-aidsh-mcp-resources"></a>
 
@@ -2061,7 +2191,7 @@ Source: [`packages/subagent/tool-subagent/src/list-models.ts`](../packages/subag
 
 ### `subagent`
 
-Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes.
+Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for a subagent when a search or investigation may span many files and you are not confident a few direct lookups will find the target, when two or more independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. Keep work local when the target is already known, when the task takes only one or two direct steps, or when delegating would only move synthesis of results to the child. Once a search is delegated, do not repeat it yourself, and do not predict a pending subagent's result. Give it a complete, standalone prompt: it does not see this conversation. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes.
 
 ```json
 {

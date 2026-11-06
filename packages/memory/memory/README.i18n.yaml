@@ -1,0 +1,79 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/memory/memory/README.md
+/:
+  en: 8714b1082f3a0982
+  zh: 1b843b8d76723058
+/deepseek-ai-dsh-memory:
+  en: bbf00b4347d57138
+  zh: dc66c1ce3d7fb64d
+/deepseek-ai-dsh-memory/summary:
+  en: a1914bb5c647b80f
+  zh: fe742d8091450ba6
+/deepseek-ai-dsh-memory/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-memory/use-this-package:
+  en: a67bcb2e2c60f837
+  zh: 9cf1057b5c946351
+/deepseek-ai-dsh-memory/use-this-package/when-to-choose-it:
+  en: f180d15e0159a9dd
+  zh: e5e5567c54547d36
+/deepseek-ai-dsh-memory/use-this-package/minimal-configuration:
+  en: 4a72711b02490ddf
+  zh: 1f44f697a8252e80
+/deepseek-ai-dsh-memory/use-this-package/recalling-searching-and-retaining:
+  en: c167ad71d220d1e0
+  zh: f2944fbcb5c0f8dc
+/deepseek-ai-dsh-memory/use-this-package/provider-selection:
+  en: bd23a967e4089989
+  zh: 6d688d18b3376141
+/deepseek-ai-dsh-memory/use-this-package/failures-and-recovery:
+  en: d07e2dae311fa3a9
+  zh: 9e741bc34cdbb77d
+/deepseek-ai-dsh-memory/understand-the-implementation:
+  en: a3364d8193deb7f0
+  zh: d1c4afbf25a7ae4d
+/deepseek-ai-dsh-memory/understand-the-implementation/design-philosophy:
+  en: d695b4f9b21fcd5f
+  zh: 7a9a212e4ca6e068
+/deepseek-ai-dsh-memory/understand-the-implementation/source-map:
+  en: 5a9225a1bdcb3f28
+  zh: d5745436f2c66839
+/deepseek-ai-dsh-memory/understand-the-implementation/data-model:
+  en: f6a54cb94613f544
+  zh: 2a998fb3093f0e7a
+/deepseek-ai-dsh-memory/understand-the-implementation/selection-flow:
+  en: 587d3fbaebc1ce04
+  zh: 72fa61a8bb1eabe8
+/deepseek-ai-dsh-memory/further-exploration:
+  en: 54cc7e506cc2dbc4
+  zh: 4dd23576b2ee80c8
+/deepseek-ai-dsh-memory/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-memory/model-experience/recalled-units-and-memory-results:
+  en: 8b22ad0ab4dfae14
+  zh: ec07b97705d98023
+/deepseek-ai-dsh-memory/model-experience/recalled-units-and-memory-results/what-the-model-sees:
+  en: 24502ffb93f33926
+  zh: 2b3c264d17c93008
+/deepseek-ai-dsh-memory/model-experience/recalled-units-and-memory-results/token-effect:
+  en: 1d624eafab87da35
+  zh: 545452cee3fff370
+/deepseek-ai-dsh-memory/model-experience/recalled-units-and-memory-results/kv-cache-effect:
+  en: e7aeeea66b97c2dc
+  zh: 2ba233ed974588a0
+/deepseek-ai-dsh-memory/known-limitations-and-deferred-work:
+  en: 8d59d6dd3d109e05
+  zh: e04b25890b0ab560
+/deepseek-ai-dsh-memory/known-limitations-and-deferred-work/dev-note:
+  en: 64ee46559b704be8
+  zh: 29e47b77c4e476e1
+/deepseek-ai-dsh-memory/known-limitations-and-deferred-work/dev-note/future-separating-ambiguity-from-absence:
+  en: 5c7703f844ec949a
+  zh: d347d49d644a7312
+/deepseek-ai-dsh-memory/known-limitations-and-deferred-work/dev-note/future-richer-request-vocabulary:
+  en: e365cebd1abcbc5c
+  zh: 27053c2802c61235

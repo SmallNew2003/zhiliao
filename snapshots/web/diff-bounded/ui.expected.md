@@ -1,11 +1,13 @@
-- button "Edit large.txt 4KB +130 -130" [expanded]:
+- button "Edit large.txt 4KB {{duration}} +130 -130" [expanded]:
   - text: Edit
   - button "large.txt"
-  - text: 4KB +130 -130
+  - text: 4KB {{duration}} +130 -130
 - text: Code block
 - button "Wrap lines"
 - button "Copy"
-- text: large.txt - shared heading - old setting 0 - old setting 1 - old setting 2
+- text: large.txt
+- button "Copy path"
+- text: "- shared heading - old setting 0 - old setting 1 - old setting 2"
 - button "Expand 252 more diff lines": … 252 more lines
 - text: + new setting 125 + new setting 126 + new setting 127 + new setting 128
 - button "Inspect"

@@ -31,6 +31,8 @@
 | [system-prompt.md](system-prompt.zh.md) | 逐次组装的上下文、工具提供方结果、提示词段落与协作式组装 |
 | [tools.md](tools.zh.md) | `ToolDefinition` 完整字段、schema DSL、`ToolExecution`/`ToolResult`、工具展示 UI 类型，以及受保护的执行流水线 |
 | [mcp.md](mcp.zh.md) | 外部 MCP 连接、作用域工具与资源、服务器指令、协议结果与配置归属 |
+| [memory.md](memory.zh.md) | 工作区记忆库、提供者操作与只读知识浏览 |
+| [assistant.md](assistant.zh.md) | Host 与项目助理、委派任务记录及分离的 Session 可见性 |
 | [user-questions.md](user-questions.zh.md) | UI 支持的人工问答 seam：`AskUserQuestionRequest`、answer/options 词汇、提供方 API、错误分类体系 |
 | [approval.md](approval.zh.md) | 一次性用户审批 seam：`ApprovalRequest`、`ApprovalOutcome`、逐会话策略、审计事件和 answerer 约定 |
 | [office-to-pdf.md](office-to-pdf.zh.md) | 已授权的 Office 到 PDF 转换、原生/WASM 引擎与有界共享复用 |

@@ -1,0 +1,64 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/host/memory-controller/README.md
+/:
+  en: da08d30bda5e55a6
+  zh: 8bb1b20e9d834a2e
+/deepseek-ai-dsh-host-memory-controller:
+  en: fbed6e42912d97b1
+  zh: 46116ea854c21d00
+/deepseek-ai-dsh-host-memory-controller/summary:
+  en: 41b662215538808a
+  zh: 077269e2e8d88c90
+/deepseek-ai-dsh-host-memory-controller/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-host-memory-controller/use-this-package:
+  en: a179591918f9d87f
+  zh: c7ae3701dddbbcbe
+/deepseek-ai-dsh-host-memory-controller/use-this-package/reading-the-banks:
+  en: 50884ba1c33252c3
+  zh: 63105d728708daa3
+/deepseek-ai-dsh-host-memory-controller/use-this-package/reading-one-bank-s-statistics:
+  en: 15bfcfc06019c7ca
+  zh: 9ead1ddfbbe4bc38
+/deepseek-ai-dsh-host-memory-controller/use-this-package/browsing-and-searching-knowledge-pages:
+  en: c1e4d875960c9ff8
+  zh: 1933a77b4908a9de
+/deepseek-ai-dsh-host-memory-controller/use-this-package/unavailability-is-an-answer-not-an-exception:
+  en: 29c2fbe1ea73a51a
+  zh: 91927d62fa1daa02
+/deepseek-ai-dsh-host-memory-controller/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: c5500056b41ce570
+/deepseek-ai-dsh-host-memory-controller/understand-the-implementation/design-concept:
+  en: 1b2ca5911910c6b7
+  zh: b55679b35aef1b4d
+/deepseek-ai-dsh-host-memory-controller/understand-the-implementation/endpoint-mapping:
+  en: 99f73bdb9db4eedd
+  zh: 336505a9ae0b654b
+/deepseek-ai-dsh-host-memory-controller/understand-the-implementation/transport:
+  en: 656e44ed2fdfeb93
+  zh: 4d2b9b6a73764963
+/deepseek-ai-dsh-host-memory-controller/understand-the-implementation/configuration:
+  en: 49541833c5248a22
+  zh: f243c5f4b43621d8
+/deepseek-ai-dsh-host-memory-controller/understand-the-implementation/source-map:
+  en: cc3fccd59d59c428
+  zh: 0d8c0953219620e9
+/deepseek-ai-dsh-host-memory-controller/further-exploration:
+  en: 33e335cdde414df3
+  zh: 58e5cadbdd100e76
+/deepseek-ai-dsh-host-memory-controller/model-experience:
+  en: 4e476555d4a84601
+  zh: 8513784e1cc03590
+/deepseek-ai-dsh-host-memory-controller/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: f57cc48a1b5cbfa9
+/deepseek-ai-dsh-host-memory-controller/known-limitations-and-deferred-work:
+  en: 4ebc6538a2473932
+  zh: 73bc906be8046737
+/deepseek-ai-dsh-host-memory-controller/known-limitations-and-deferred-work/dev-note:
+  en: 721ce71a8382da9d
+  zh: bdd4d8f7d01d4724

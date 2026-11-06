@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { structuredPatch } from 'diff'
+import { diffWordsWithSpace, structuredPatch } from 'diff'
 import { FoldToggle } from './FoldToggle.tsx'
 import { writeClipboard } from './clipboard.ts'
 import { CodeToolbar, type CodeToolbarLabels } from './CodeToolbar.tsx'
 import { languageForPath } from './code-highlighting.ts'
 import cardCss from './CodeCard.module.css'
+import { useClipboardCopy } from './use-clipboard-copy.ts'
+import { IconCheckOutlineRegular, IconCopyOutlineRegular } from './icons/index.tsx'
 import css from './DiffBlock.module.css'
 
 /** Output lines shown before the height cap collapses the middle. */
@@ -39,6 +41,8 @@ export interface DiffBlockProps {
 export interface DiffBlockLabels extends CodeToolbarLabels {
   copy: string
   copied: string
+  copyPath?: string | undefined
+  pathCopied?: string | undefined
   collapseAria: string
   expandAria: (hidden: number) => string
   collapse: string
@@ -46,9 +50,15 @@ export interface DiffBlockLabels extends CodeToolbarLabels {
 }
 
 /** A single rendered body line and its role, so the height cap slices a flat list. */
+interface DiffSpan {
+  text: string
+  highlight?: boolean | undefined
+}
+
 interface DiffRow {
   kind: 'path' | 'del' | 'add' | 'context' | 'gap'
   text: string
+  spans?: DiffSpan[] | undefined
 }
 
 /** Local exhaustiveness helper — this package does not depend on `dsh-llm`. */
@@ -68,6 +78,123 @@ const ROW_CLASS: Record<DiffRow['kind'], string | undefined> = {
 
 /** Bound synchronous edit-graph search; one replacement consumes two edits. */
 const MAX_DIFF_EDIT_LENGTH = 256
+
+/**
+ * Row discriminant for a single line in a diff hunk.
+ * @param line - line from a unified diff hunk.
+ * @returns the line's diff role.
+ */
+function rowKind(line: string): 'del' | 'add' | 'context' {
+  if (line.startsWith('-')) return 'del'
+  if (line.startsWith('+')) return 'add'
+  return 'context'
+}
+
+/**
+ * Append a text span, coalescing with the prior span when both share the same highlight state.
+ * @param spans - the target span list to append to.
+ * @param text - the slice of text to append.
+ * @param highlight - whether the span is an intra-line difference.
+ */
+function pushSpan(spans: DiffSpan[], text: string, highlight: boolean): void {
+  const prev = spans[spans.length - 1]
+  if (prev && Boolean(prev.highlight) === highlight) {
+    prev.text += text
+  } else {
+    spans.push(highlight ? { text, highlight: true } : { text })
+  }
+}
+
+/**
+ * Compute word-level differences between a deleted line and an added line.
+ * When the search exceeds the edit limit, both sides fall back to a full-line highlight.
+ * @param delText - the removed line's content.
+ * @param addText - the added line's content.
+ * @returns the intra-line spans for the deleted side and the added side.
+ */
+function computeWordDiff(delText: string, addText: string): { delSpans: DiffSpan[]; addSpans: DiffSpan[] } {
+  const changes = diffWordsWithSpace(delText, addText, { maxEditLength: MAX_DIFF_EDIT_LENGTH })
+  if (!changes) {
+    return {
+      delSpans: [{ text: delText, highlight: true }],
+      addSpans: [{ text: addText, highlight: true }],
+    }
+  }
+
+  const delSpans: DiffSpan[] = []
+  const addSpans: DiffSpan[] = []
+
+  for (const change of changes) {
+    if (!change.added) {
+      pushSpan(delSpans, change.value, change.removed)
+    }
+    if (!change.removed) {
+      pushSpan(addSpans, change.value, change.added)
+    }
+  }
+
+  return { delSpans, addSpans }
+}
+
+/**
+ * Parse lines from a unified diff hunk into body rows, pairing adjacent
+ * replacement runs of equal length for intra-line word difference highlighting.
+ * @param lines - hunk lines prefixed with ' ', '-', or '+'.
+ * @returns the parsed diff rows.
+ */
+function parseHunkLines(lines: string[]): DiffRow[] {
+  const rows: DiffRow[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i] as string
+    const kind1 = rowKind(line)
+    if (kind1 === 'context') {
+      rows.push({ kind: 'context', text: line.startsWith(' ') ? line.slice(1) : line })
+      i++
+      continue
+    }
+
+    const run1: string[] = []
+    while (i < lines.length && rowKind(lines[i] as string) === kind1) {
+      run1.push((lines[i] as string).slice(1))
+      i++
+    }
+
+    const kind2 = kind1 === 'del' ? 'add' : 'del'
+    const run2: string[] = []
+    let j = i
+    while (j < lines.length && rowKind(lines[j] as string) === kind2) {
+      run2.push((lines[j] as string).slice(1))
+      j++
+    }
+
+    if (run2.length > 0 && run1.length === run2.length) {
+      i = j
+      const spans1: DiffSpan[][] = []
+      const spans2: DiffSpan[][] = []
+      for (let k = 0; k < run1.length; k++) {
+        const text1 = run1[k] as string
+        const text2 = run2[k] as string
+        const delText = kind1 === 'del' ? text1 : text2
+        const addText = kind1 === 'add' ? text1 : text2
+        const { delSpans, addSpans } = computeWordDiff(delText, addText)
+        spans1.push(kind1 === 'del' ? delSpans : addSpans)
+        spans2.push(kind2 === 'del' ? delSpans : addSpans)
+      }
+      for (let k = 0; k < run1.length; k++) {
+        rows.push({ kind: kind1, text: run1[k] as string, spans: spans1[k] })
+      }
+      for (let k = 0; k < run2.length; k++) {
+        rows.push({ kind: kind2, text: run2[k] as string, spans: spans2[k] })
+      }
+    } else {
+      for (const text of run1) {
+        rows.push({ kind: kind1, text })
+      }
+    }
+  }
+  return rows
+}
 
 /** Derive exact local patches or a whole-fragment replacement when search exceeds the limit. */
 function localHunks(diff: DiffHunk) {
@@ -116,10 +243,7 @@ function buildRows(diffs: DiffHunk[]): DiffRow[] {
     prevPath = diff.path
     for (const [index, hunk] of localHunks(diff).entries()) {
       if (index > 0) rows.push({ kind: 'gap', text: '⋯' })
-      for (const line of hunk.lines) {
-        const kind = line.startsWith('-') ? 'del' : line.startsWith('+') ? 'add' : 'context'
-        rows.push({ kind, text: line.slice(1) })
-      }
+      rows.push(...parseHunkLines(hunk.lines))
     }
   }
   return rows
@@ -200,9 +324,7 @@ export function DiffBlock({ diffs, labels, maxLines = DEFAULT_DIFF_MAX_LINES, cl
       <CodeToolbar lang={language} labels={labels} copyLabel={labels.copy} copiedLabel={labels.copied}
         copied={copied} wrapped={wrapped} onCopy={onCopy} onWrap={() => { setWrapped(value => !value) }} />
       <div className={css.body}>
-        {head.map((row, index) => (
-          <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
-        ))}
+        {head.map((row, index) => <DiffBodyRow key={index} row={row} labels={labels} />) }
         {hidden > 0 && (
           <FoldToggle
             className={css.expand}
@@ -212,10 +334,21 @@ export function DiffBlock({ diffs, labels, maxLines = DEFAULT_DIFF_MAX_LINES, cl
             onToggle={onToggle}
           />
         )}
-        {tail.map((row, index) => (
-          <div key={index} className={clsx(css.line, ROW_CLASS[row.kind])}>{row.text}</div>
-        ))}
+        {tail.map((row, index) => <DiffBodyRow key={headLines + index} row={row} labels={labels} />)}
       </div>
     </div>
   )
+}
+
+function DiffBodyRow({ row, labels }: { row: DiffRow; labels: DiffBlockLabels }) {
+  const { copied, onCopy } = useClipboardCopy(row.text)
+  return <div className={clsx(css.line, ROW_CLASS[row.kind])}>
+    {row.spans === undefined ? row.kind === 'path' ? <span className={css.pathText}>{row.text}</span> : row.text
+      : row.spans.map((span, index) => span.highlight
+        ? <span key={index} className={css.wordHighlight}>{span.text}</span> : span.text)}
+    {row.kind === 'path' && labels.copyPath !== undefined && <button type="button" className={css.copyPathButton} onClick={onCopy}
+      aria-label={copied ? labels.pathCopied ?? labels.copied : labels.copyPath ?? labels.copy}>
+      {copied ? <IconCheckOutlineRegular size={12} /> : <IconCopyOutlineRegular size={12} />}
+    </button>}
+  </div>
 }

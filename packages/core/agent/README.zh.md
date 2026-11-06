@@ -47,7 +47,7 @@ await handle.dispose()   // stops the loop, unregisters, removes the session, un
 
 `agent.model` 实现 `Model` 接口，与 `agent.inbox` 并列。`current()` 返回选择的独立副本：依次读取待生效选择、最近请求的选择和实时 `agent.options`；没有来源同时提供 provider 与 model 时返回 `undefined`。读取不会固定选择，也不会改变已经准备的步骤。
 
-`select({ provider, model, reasoningEffort? })` 完整赋值，从下一个尚未开始准备的步骤生效。省略强度表示使用适配器默认值；选择操作既不继承旧强度，也不查询默认值。与已记录选择相同则不重复记录，但仅与初始 options 相同仍会记录 `model/selection`。调用方负责校验可用性与能力；追加失败沿用 Session 现有的失败保证。
+`select({ provider, model, reasoningEffort?, contextWindow? })` 完整赋值，从下一个尚未开始准备的步骤生效。省略强度和上下文窗口表示使用适配器默认值；选择操作不继承之前的覆盖值，也不查询默认值。与已记录选择相同则不重复记录，但仅与初始 options 相同仍会记录 `model/selection`。调用方负责校验可用性与能力；追加失败沿用 Session 现有的失败保证。
 
 普通恢复保留持久化选择。明确覆盖模型的入口先形成完整选择：仅在配置未指定强度且路由不变时保留旧的显式强度，然后调用 `select()`。Web 与 ACP 用户选择直接调用 `select()`，因此省略强度表示 Auto。选择 Session 模型不会改变部署默认值。
 
@@ -77,7 +77,7 @@ await handle.agent.whenIdle()
 
 `agent/request` 已弃用，仅为现有监听器保留。不要添加新监听器。提供方、模型和可选的显式推理强度在步骤准备时固定；监听器必须保留三者，包括未指定强度的状态。`AgentOptions.maxTokens` 设置输出上限。其他逐请求控制参数覆盖没有替代 API。受影响的调用方参见[迁移指南](../../../docs/upgrade-guide/v0.2.1-alpha.4/session-model-selection/guide.zh.md)。
 
-`agent/*` 事件让插件无需依赖循环包即可作用于实时工作。`agent/pre-step` 可以拒绝拟进入的步骤或替换进入它的消息；`agent/request-error` 让监听器重试失败的模型请求；`agent/turn-stopping` 在本可完成的轮次关闭前运行，并可通过 steer 使其保持打开。`agent/assistant-stream` 携带一个进程本地 Assistant attempt 的有序 start、瞬态分片与 end frame。start 给出该 attempt 的轮次与步骤，分片索引从零开始密集递增，`end.index` 则是下一个分片位置。loop 会在 committed end frame 前把完整紧凑流提交为一个 `assistant/message` 或 `assistant/attempt`，因此实时事件仍是呈现数据而非回放来源。`agent/status`、`agent/created` 与 `agent/disposed` 驱动 UI 与协调状态，逐消息的 `agent/inbox/*` 通知则让收件箱投影保持同步。确切签名、分发 mode 与 payload 约定见 [core 子系统页](../../../docs/subsystems/core.zh.md#cordis-surface) 的生成区块。
+`agent/*` 事件让插件无需依赖循环包即可作用于实时工作。`agent/prepare-step` 在工具准入前运行；`agent/request-preflight` 在分派前检查已冻结并记入日志的请求，持久修复后可请求重建。`agent/pre-step` 可以拒绝拟进入的步骤或替换进入它的消息；`agent/request-error` 让监听器重试失败的模型请求；`agent/turn-stopping` 在本可完成的轮次关闭前运行，并可通过 steer 使其保持打开。`agent/assistant-stream` 携带一个进程本地 Assistant attempt 的有序 start、瞬态分片与 end frame。start 给出该 attempt 的轮次与步骤，分片索引从零开始密集递增，`end.index` 则是下一个分片位置。loop 会在 committed end frame 前把完整紧凑流提交为一个 `assistant/message` 或 `assistant/attempt`，因此实时事件仍是呈现数据而非回放来源。`agent/status`、`agent/created` 与 `agent/disposed` 驱动 UI 与协调状态，逐消息的 `agent/inbox/*` 通知则让收件箱投影保持同步。确切签名、分发 mode 与 payload 约定见 [core 子系统页](../../../docs/subsystems/core.zh.md#cordis-surface) 的生成区块。
 
 -----
 
@@ -95,7 +95,7 @@ await handle.agent.whenIdle()
 
 ### 步骤准入
 
-`PreStepDecision` 要么是 `{ kind: 'reject' }`，要么是 `{ kind: 'enter', messages, startsRequestSeries? }`。enter 分支包含完整、带标识且冻结的消息批次。接纳不等于提交：组装与 `step/start` 之后，已弃用的 `agent/request` hook 在不改变步骤模型选择的前提下调整控制参数，`prepareCall()` 绑定适配器，循环随后才提交系统提示词与用户批次。在任一异步阶段取消都不会提交这两者。`startsRequestSeries: true` 声明一个独立的模型消息序列；包装下游 enter 的监听器会保留该声明与批次，除非有意替换其中一项。领取会从 inbox 移除候选消息，领取后插入的消息则等待后续边界。
+`PreStepDecision` 要么是 `{ kind: 'reject' }`，要么是 `{ kind: 'enter', messages, startsRequestSeries?, committedMessages? }`。已提交消息回执指向已经持久化的编辑；循环校验回执，避免重复输入，并将文本预处理记录为 `user/message-admit`。enter 分支包含完整、带标识且冻结的消息批次。接纳不等于提交：组装与 `step/start` 之后，已弃用的 `agent/request` hook 在不改变步骤模型选择的前提下调整控制参数，`prepareCall()` 绑定适配器，循环随后才提交系统提示词与用户批次。在任一异步阶段取消都不会提交这两者。`startsRequestSeries: true` 声明一个独立的模型消息序列；包装下游 enter 的监听器会保留该声明与批次，除非有意替换其中一项。领取会从 inbox 移除候选消息，领取后插入的消息则等待后续边界。
 
 ### 持久 inbox
 

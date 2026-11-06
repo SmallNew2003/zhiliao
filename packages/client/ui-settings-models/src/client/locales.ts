@@ -139,6 +139,9 @@ export const en = {
   onboardingSave: 'Save and continue',
   onboardingSaving: 'Saving…',
   keyRequired: 'Enter an API key to continue.',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 }
 
 /** The settings.models namespace key union. */
@@ -283,6 +286,9 @@ export const zh: { [Key in keyof typeof en]: string } = {
   onboardingSave: '保存并继续',
   onboardingSaving: '保存中…',
   keyRequired: '请输入 API 密钥后继续。',
+  contextWindowPreset: '上下文窗口预设',
+  contextWindowCustom: '自定义',
+  contextWindowCustomInput: '自定义上下文窗口',
 }
 
 /** Japanese copy, checked against the English keys. */
@@ -424,6 +430,9 @@ export const ja = {
   'onboardingSave': '保存して続ける',
   'onboardingSaving': '保存中…',
   'keyRequired': '続けるにはAPIキーを入力してください。',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -565,6 +574,9 @@ export const es = {
   onboardingSave: 'Guardar y continuar',
   onboardingSaving: 'Guardando…',
   keyRequired: 'Ingrese una clave API para continuar.',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -706,6 +718,9 @@ export const fr = {
   onboardingSave: 'Enregistrer et continuer',
   onboardingSaving: 'Sauvegarde…',
   keyRequired: 'Entrez une clé API pour continuer.',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -847,6 +862,9 @@ export const de = {
   onboardingSave: 'Speichern und fortfahren',
   onboardingSaving: 'Speichern…',
   keyRequired: 'Geben Sie einen API-Schlüssel ein, um fortzufahren.',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -988,6 +1006,9 @@ export const ru = {
   onboardingSave: 'Сохранить и продолжить',
   onboardingSaving: 'Сохранение…',
   keyRequired: 'Введите ключ API, чтобы продолжить.',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -1129,4 +1150,7 @@ export const pt = {
   onboardingSave: 'Salvar e continuar',
   onboardingSaving: 'Salvando…',
   keyRequired: 'Insira uma chave de API para continuar.',
+  contextWindowPreset: 'Context window preset',
+  contextWindowCustom: 'Custom',
+  contextWindowCustomInput: 'Custom context window',
 } satisfies Record<keyof typeof en, string>

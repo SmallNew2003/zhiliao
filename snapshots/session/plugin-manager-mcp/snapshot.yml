@@ -2,10 +2,10 @@ version: 1
 scenario: plugin-manager-mcp
 profile: headless
 composition: plugin-manager-mcp
-recording: live
+recording: authored
 permission: danger-full-access
 header:
   class: plugin-manager-mcp
   pin: true
-  changes: 1
+  changes: 2
   promptChanges: 1

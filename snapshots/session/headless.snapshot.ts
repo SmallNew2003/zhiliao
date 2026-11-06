@@ -758,8 +758,12 @@ function verifyMcpResources(log: string, ptc: boolean): void {
   expect(log).not.toContain('bWNwLXJlc291cmNlLWJpbmFyeQ==')
   expect(normalizedSystemPrompts(log, contextOf([log])).join('\n'))
     .toContain('MCP_RESOURCE_INSTRUCTION: keep {{braces}} literal.')
-  expect(normalizedSystemPrompts(log, contextOf([log])).join('\n'))
-    .toContain('server argument: ["catalog"]')
+  expect(calls).toContain('discover_mcp_tools')
+  const snapshots = events.flatMap(event => event.type === 'mcp/request-snapshot' ? [event.data] : [])
+  expect(snapshots[0]?.servers).toEqual([])
+  expect(snapshots.slice(1).some(snapshot => snapshot.servers.some(server => server.server === 'catalog'))).toBe(true)
+  expect(normalizedSystemPrompts(log, contextOf([log]))[0])
+    .not.toContain('MCP_RESOURCE_INSTRUCTION: keep {{braces}} literal.')
 }
 
 function verifyNoMcpServers(log: string, ptc: boolean): void {

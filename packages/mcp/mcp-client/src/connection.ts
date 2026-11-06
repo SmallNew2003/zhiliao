@@ -362,6 +362,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
 
   return {
     ready,
+    connected: () => client !== undefined && connectedAt !== undefined,
     instructions: () => serverInstructions,
     resources: {
       async request(request, exec): Promise<JsonValue> {

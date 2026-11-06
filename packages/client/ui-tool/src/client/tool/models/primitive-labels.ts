@@ -43,6 +43,8 @@ export function diffBlockLabels(t: T): DiffBlockLabels {
     ...codeToolbarLabels(t),
     copy: t('copy'),
     copied: t('copied'),
+    copyPath: t('diff.copyPath'),
+    pathCopied: t('diff.pathCopied'),
     collapseAria: t('diff.collapseAria'),
     expandAria: count => t('diff.expandAria', { count }),
     collapse: t('collapse'),

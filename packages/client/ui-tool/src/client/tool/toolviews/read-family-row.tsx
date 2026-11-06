@@ -46,6 +46,8 @@ export function readFamilyRow(
   const path = model.filePath
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       fileContextMenuProps={getTriggerProps(path === undefined ? undefined : () => ({
         kind: 'file', value: { sessionId, path: resolveFilePath(path),
           ...(card.filePathLine === undefined ? {} : { line: card.filePathLine }) },

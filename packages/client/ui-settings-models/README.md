@@ -81,6 +81,8 @@ The Models page includes **DeepSeek Account** (`deepseek-account`, **DeepSeek è´
 
 -----
 
+Each model row offers 320K, 640K, and 960K context-window presets while retaining the exact custom capacity and the advanced capacity input.
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 

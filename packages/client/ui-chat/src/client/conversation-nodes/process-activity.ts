@@ -139,9 +139,11 @@ export function processActivity(nodes: readonly ChatNode[]): ProcessActivitySumm
   let runningDetail = ''
   let runningTime = -Infinity
   let preparing: boolean | undefined
+  let failedCount = 0
   const visit = (tool: ToolCallBlock): void => {
     if (seen.has(tool.callId)) return
     seen.add(tool.callId)
+    if (!isRunningTool(tool) && tool.isError && tool.error?.code !== 'interrupted') failedCount++
     const call = isRunningTool(tool) ? tool : tool.call
     if (call !== null) {
       const kind = activity(call.name)
@@ -164,5 +166,6 @@ export function processActivity(nodes: readonly ChatNode[]): ProcessActivitySumm
     running,
     runningDetail,
     ...preparing ? { preparing: true } : {},
+    ...failedCount > 0 ? { failedCount } : {},
   }
 }

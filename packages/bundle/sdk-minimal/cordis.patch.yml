@@ -123,6 +123,9 @@
     - id: tool-executor-native
       name: '@deepseek-ai/dsh-tool-executor-native'
 
+    - id: mcp-discovery
+      name: '@deepseek-ai/dsh-mcp-discovery'
+
     - id: mcp-resources
       name: '@deepseek-ai/dsh-mcp-resources'
 

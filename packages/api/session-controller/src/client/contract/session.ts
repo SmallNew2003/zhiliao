@@ -12,7 +12,7 @@ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { RemoteResult } from '@deepseek-ai/dsh-typert-protocol'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { PromptContentPart, QueueAction, SessionRequestId } from '../../types.ts'
+import type { PromptContentPart, QueueAction, SessionEditMessageRequest, SessionRequestId } from '../../types.ts'
 import type { PendingSubmissionAttachment, SessionSnapshot } from './snapshot.ts'
 
 /**
@@ -101,6 +101,12 @@ export interface ISession {
     signal?: AbortSignal,
     requestId?: SessionRequestId,
   ): Promise<RemoteResult<{ accepted: true }>>
+  /**
+   * Edit and resend the latest sent input while retaining its original attachments.
+   * @param request - target event, replacement text, and stable identity reused for retries.
+   * @returns durable acceptance or the admission error; unchanged text requests another response.
+   */
+  editMessage(request: Omit<SessionEditMessageRequest, 'sessionId'>): Promise<RemoteResult<{ accepted: true }>>
   /**
    * Resolve one stored image using this Session's gateway permission scope.
    * @param attachment - complete image reference from the folded session log.

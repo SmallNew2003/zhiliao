@@ -110,6 +110,8 @@ export function ReadBlock({
   // A read is a window when its returned lines are fewer than the file's total;
   // the note states that so a reader is not misled that the file ends here.
   const windowed = lines.length < totalLines
+  const startPercent = totalLines > 0 ? Math.max(0, Math.min(100, ((lines[0]?.number ?? 1) - 1) / totalLines * 100)) : 0
+  const endPercent = totalLines > 0 ? Math.max(0, Math.min(100, (lines.at(-1)?.number ?? 0) / totalLines * 100)) : 0
 
   const rows = (slice: readonly (readonly [ReadBlockLine, readonly HighlightSpan[] | undefined])[]) =>
     slice.map(([line, spans]) => (
@@ -133,6 +135,9 @@ export function ReadBlock({
         // Empty files must not replace the clipboard with empty text.
         onCopy={lines.length > 0 ? onCopy : undefined} onWrap={() => { setWrapped(value => !value) }}
       />
+      {windowed && <div className={css.positionTrack} aria-hidden>
+        <div className={css.positionThumb} data-read-position style={{ left: `${startPercent}%`, width: `${Math.max(4, endPercent - startPercent)}%` }} />
+      </div>}
       <div className={cardCss.body}>
         {rows(capped ? paired.slice(0, headLines) : paired)}
         {hidden > 0 && (

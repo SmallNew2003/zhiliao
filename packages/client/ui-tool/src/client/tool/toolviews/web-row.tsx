@@ -23,6 +23,8 @@ export function WebRow({ toolName, block, useContextMenu, sessionId, inspect, us
   const icon = toolName === 'web_fetch' ? <IconBrowseOutlineRegular size={14} /> : <IconGlobeOutlineRegular size={14} />
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       urlContextMenuProps={getTriggerProps(href === undefined ? undefined : { kind: 'url', value: { sessionId, url: href } })}
       useDisclosure={useDisclosure}
       t={t}

@@ -8,7 +8,7 @@ import type {
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { LlmAttemptId, MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { LlmModelBadge, TextBlock } from '@deepseek-ai/dsh-llm'
-import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
+import type { SessionId, SessionSeq, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap, SessionProjectionSummaryExcluded, SessionProjectionSummaryValues } from '@deepseek-ai/dsh-session-projection/types'
 import type { Principal } from '@deepseek-ai/dsh-typert-protocol'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -89,6 +89,8 @@ export interface ModelSelection {
   readonly provider: string
   readonly model: string
   readonly reasoningEffort?: string
+  /** Positive integer context budget; absent inherits adapter capacity. */
+  readonly contextWindow?: number
 }
 
 /** One adapter-owned reasoning effort for an exact model route. */
@@ -106,6 +108,8 @@ export interface ModelReasoning {
 
 /** One model displayed inside its provider group. */
 export interface ModelCatalogModel {
+  /** Configured adapter capacity before a Session override. */
+  readonly contextWindow?: number
   readonly id: string
   readonly name: string
   readonly description?: string
@@ -192,6 +196,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/projections-unavailable': Record<string, never>
     'session/writer-held': { readonly sessionId: SessionId }
     'session/agent-busy': { readonly reason: string }
+    'session/edit-stale': { readonly sessionId: SessionId }
     'session/invalid-time-zone': { readonly value: string }
     'session/workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string }
     'agent-preset/conflict': {
@@ -330,6 +335,21 @@ export interface SessionPromptRequest {
 
 /** Receipt after one prompt enters the target Agent inbox. */
 export interface SessionPromptValue {
+  readonly accepted: true
+}
+
+/** Text-only replacement of the latest sent user input, retaining its durable attachments. */
+export interface SessionEditMessageRequest {
+  readonly sessionId: SessionId
+  /** Sequence of the latest user/message or user/message-edit event, including inherited input. */
+  readonly targetSeq: SessionSeq
+  readonly text: string
+  /** Stable identity reused after a lost acceptance response. */
+  readonly requestId: SessionRequestId
+}
+
+/** Durable acceptance of an edit; unchanged text requests another response. */
+export interface SessionEditMessageValue {
   readonly accepted: true
 }
 

@@ -14,6 +14,8 @@ const AGENT_LOOP_REQUESTS = new WeakSet<GenerateOptions>()
 
 /** Concrete generation settings; omitted controls use the selected route's defaults. */
 export interface LlmCallControls {
+  /** Positive integer context budget; absent inherits adapter capacity. */
+  contextWindow?: number
   reasoningEffort?: ReasoningEffortId
   temperature?: number
   maxTokens?: number
@@ -69,6 +71,7 @@ export function callConfigEquals(a: LlmCallConfig, b: LlmCallConfig): boolean {
     a.provider !== b.provider
     || a.model !== b.model
     || a.reasoningEffort !== b.reasoningEffort
+    || a.contextWindow !== b.contextWindow
     || a.temperature !== b.temperature
     || a.maxTokens !== b.maxTokens
   ) return false

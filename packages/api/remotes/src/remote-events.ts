@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-permission-presets/types'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import type {} from '@deepseek-ai/dsh-plugin-market/types'
 import type {} from '@deepseek-ai/dsh-schedule/client'
+import type {} from '@deepseek-ai/dsh-assistant-task/types'
 import type { TypertForwardableEventEntry } from '@deepseek-ai/dsh-typert-protocol'
 
 /**
@@ -24,6 +25,8 @@ import type { TypertForwardableEventEntry } from '@deepseek-ai/dsh-typert-protoc
  * identity or none, and collection changes travel on follow streams instead.
  */
 export const API_REMOTE_FORWARDED_EVENTS = [
+  { event: 'assistant/changed', mode: 'emit' },
+  { event: 'assistant-task/changed', mode: 'emit' },
   { event: 'agent-preset/selected', mode: 'emit' },
   { event: 'approval/request', mode: 'waterfall' },
   { event: 'api-session/activity', mode: 'emit', resources: { session: (sessionId): SessionId => sessionId } },

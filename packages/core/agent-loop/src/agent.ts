@@ -68,6 +68,7 @@ type PreparedStep =
     kind: 'enter'
     messages: UserMessage[]
     startsRequestSeries?: true
+    committedMessages?: Extract<PreStepDecision, { kind: 'enter' }>['committedMessages']
     assembly: PromptAssembly
     selection: Readonly<ModelSelection>
     /** Admission shared by the step's declarations and dispatch; the turn disposes it after the step. */
@@ -289,9 +290,14 @@ export class ReactLoopAgent implements Agent {
     if (selection === undefined) {
       throw new Error(`agent "${this.id}" has no provider/model: set AgentOptions.provider and AgentOptions.model or record a model selection`)
     }
+    await this.dispatch.serial('agent/prepare-step', { messages: claimed, ...position, signal, modelSelection: selection })
+    signal.throwIfAborted()
     const toolSet = await this.loopCtx.tools.resolve({ agent: this, modelSelection: selection, signal })
     try {
-      const assembly = await this.loopCtx.systemPrompt.assemble({ ...assembleContextFor(this, signal), modelSelection: selection, toolSet })
+      const assembly = await this.loopCtx.systemPrompt.assemble({
+        ...assembleContextFor(this, signal), modelSelection: selection, toolSet,
+        stepInput: { ...position, messages: claimed },
+      })
       signal.throwIfAborted()
       const decision = await this.dispatch.waterfall(
         'agent/pre-step', { messages: claimed, ...position, signal, modelSelection: selection },
@@ -462,6 +468,13 @@ export class ReactLoopAgent implements Agent {
       let contextAdmitted = false
       if (firstAttempt) {
         for (const message of decision.messages) {
+          const committed = decision.committedMessages?.find(receipt => receipt.message.id === message.id)
+          if (committed !== undefined) {
+            if (JSON.stringify(message) !== JSON.stringify(committed.message)) {
+              this.session.append('user/message-admit', { targetSeq: committed.seq, message })
+            }
+            continue
+          }
           if (message.source.kind === 'runtime-context') {
             if (context !== undefined && !contextAdmitted) {
               this.session.append('user/message', context, { surfaceOp: 'append' })
@@ -476,7 +489,20 @@ export class ReactLoopAgent implements Agent {
         this.session.append('user/message', context, { surfaceOp: 'append' })
       }
       firstAttempt = false
-      const request = this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, startsRequestSeries, signal)
+      let request = this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, startsRequestSeries, signal)
+      while (true) {
+        const generation = this.session.surface.contentGeneration
+        await this.dispatch.serial('agent/request-preflight', { request, turn, step, signal })
+        signal.throwIfAborted()
+        if (generation === this.session.surface.contentGeneration) break
+        const updates = this.systemPrompt.project(renderedPrompt, {
+          inHistory: preparedCall?.systemPromptUpdate === 'in-history', startsSeries: true,
+        })
+        for (const { message, intent } of updates) {
+          this.session.append('system/message', { turn, step, message }, intent)
+        }
+        request = this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, false, signal)
+      }
       const live = new AssistantStreamAttempt(
         this.session.id,
         ++this.assistantAttemptCounter,
@@ -625,7 +651,7 @@ export class ReactLoopAgent implements Agent {
       // oxlint-disable-next-line typescript/no-non-null-assertion -- the instance logged the header it now folds
       ? requestProposal(session.requestHeader()!)
       : maxTokens === undefined ? {} : { maxTokens }
-    const { provider: _provider, model: _model, reasoningEffort: _effort, ...controls } = persisted
+    const { provider: _provider, model: _model, reasoningEffort: _effort, contextWindow: _contextWindow, ...controls } = persisted
     const seedConfig = deepFreeze(structuredClone({ ...controls, ...selection }))
     const proposedConfig = await this.dispatch.waterfall(
       'agent/request', { turn, step, signal },
@@ -637,6 +663,9 @@ export class ReactLoopAgent implements Agent {
     }
     if (proposedConfig.reasoningEffort !== selection.reasoningEffort) {
       throw new Error(`agent "${this.id}": agent/request proposed reasoning effort "${proposedConfig.reasoningEffort ?? 'adapter default'}" after step preparation fixed "${selection.reasoningEffort ?? 'adapter default'}"; use agent.model.select() before step preparation`)
+    }
+    if (proposedConfig.contextWindow !== selection.contextWindow) {
+      throw new Error(`agent "${this.id}": agent/request changed the captured context window; use agent.model.select() before step preparation`)
     }
     let config: LlmCallConfig
     let preparedCall: PreparedLlmCall | undefined

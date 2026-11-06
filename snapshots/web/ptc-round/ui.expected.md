@@ -9,18 +9,22 @@
   - button "More conversation views"
 - text: "Using ONE run_code program: run bash `echo CODE_ROUND_OK`, then read the file missing.txt catching its error in the program. Return an object with both outcomes. Then reply DONE and stop. {{clock}}"
 - button "Copy"
+- button "Edit message"
 - status: Completed
 - button "Completed in {{duration}}" [expanded]
-- button "Ran code, ran commands, read files" [expanded]
+- button "Ran code, ran commands, read files" [expanded]:
+  - text: Ran code, ran commands, read files
+  - status: 1 operation failed
 - 'button "Think The user wants me to write a single `run_code` program that:"'
-- button "Code Run bash echo and catch missing file read"
+- button "Code Run bash echo and catch missing file read {{duration}}"
 - button "Bash Echo CODE_ROUND_OK" [expanded]
 - text: Done workspace echo CODE_ROUND_OK
+- button "Copy command"
 - button "Copy"
 - text: CODE_ROUND_OK
 - button "Inspect"
 - text: Failed
-- 'button "Read Error: cannot read \"{{cwd}}/workspace/missing.txt\": not found"'
+- button "Read File or directory not found {{duration}}"
 - button "Think The program ran successfully. Let me now reply DONE as instructed."
 - paragraph: DONE
 - button "Copy"
@@ -33,6 +37,6 @@
 - 'button "Access mode, current: Workspace Write"': Workspace Write
 - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
 - button "Send message" [disabled]
-- button "1 turns 2 steps · {{throughput}} tok/s": 1 turns 2 steps{{throughput}} tok/s
+- button "Model time {{duration}}"
 - button "17.5K tok · Cache hit 52%": 17.5K tokCache hit 52%
 - button "7% of context used": 7%

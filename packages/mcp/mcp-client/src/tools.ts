@@ -146,8 +146,11 @@ export async function syncTools(
   for (const dispose of previous.values()) dispose()
   const disposers: ToolDisposers = new Map()
   try {
+    const discovery = ctx.get('mcpDiscovery')
     for (const [publicName, definition] of definitions) {
-      disposers.set(publicName, ctx.tools.register(definition))
+      disposers.set(publicName, discovery === undefined
+        ? ctx.tools.register(definition)
+        : discovery.registerTool(opts.serverName, definition))
     }
   } catch (error) {
     // A conflict on an `mcp__<serverName>__`-qualified name means a foreign

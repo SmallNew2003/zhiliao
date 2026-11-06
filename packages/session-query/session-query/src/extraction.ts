@@ -1,6 +1,6 @@
 /** First-party semantic text extraction for session-query consumers. */
 
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { readSessionInputEvent, type SessionEvent } from '@deepseek-ai/dsh-session'
 // Type-only: includes the first-party todo event consumed below.
 import type {} from '@deepseek-ai/dsh-tool-todo'
 
@@ -9,13 +9,17 @@ import type {} from '@deepseek-ai/dsh-tool-todo'
  *
  * Structural boundaries, embedded raw streams, request envelopes, and unknown
  * declaration-merged events contribute no text.
- * @param event - event to inspect.
+ * @param source - raw event to inspect.
  * @returns newline-joined semantic text, or an empty string when non-searchable.
  */
-export function extractSessionEventText(event: SessionEvent): string {
+export function extractSessionEventText(source: SessionEvent): string {
+  const event = readSessionInputEvent(source)
   switch (event.type) {
     case 'user/message':
       return contentText(event.data.content)
+    case 'user/message-edit':
+    case 'user/message-admit':
+      return contentText(event.data.message.content)
     case 'assistant/message':
       return contentText(event.data.message.content)
     case 'tool/call':

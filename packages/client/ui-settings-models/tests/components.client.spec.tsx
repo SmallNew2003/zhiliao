@@ -43,7 +43,7 @@ function expandRow(position: number): void {
 
 /** The capacity inputs of every open row, in row order. */
 function capacityInputs(label: string): HTMLInputElement[] {
-  return screen.getAllByLabelText<HTMLInputElement>(new RegExp(label))
+  return screen.getAllByLabelText<HTMLInputElement>(new RegExp(label)).filter(element => element instanceof HTMLInputElement)
 }
 
 const PiAiConfig = Schema.object({
@@ -2436,4 +2436,11 @@ it.each([es, fr, de, ru, pt])('keeps capacity examples in translated validation 
       expect(parseCapacity(token!)).toBeGreaterThan(0)
     }
   }
+})
+
+
+it('offers context window presets beside a collapsed model row', async () => {
+  await mountDeepSeekCard()
+  fireEvent.click(screen.getByText(en.customized))
+  expect(screen.getAllByRole('radio', { name: '320K' }).length).toBeGreaterThan(0)
 })

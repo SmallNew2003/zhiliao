@@ -2,7 +2,9 @@ version: 1
 scenario: mcp-resources
 profile: headless
 composition: mcp-resources
-recording: live
+recording: authored
 header:
   class: mcp-resources
   pin: true
+  changes: 1
+  promptChanges: 1

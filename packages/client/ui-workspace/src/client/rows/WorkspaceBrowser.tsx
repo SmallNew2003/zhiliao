@@ -14,7 +14,7 @@
  * are slot entries with their own behavior, so this component threads no
  * action callbacks and hosts no action surface.
  */
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type FocusEvent, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { WorkspaceDialogs } from './WorkspaceDialogs.tsx'
 import {
@@ -34,7 +34,7 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
+  deriveFlat, deriveGroups, deriveSearchResults, omitSessions, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
@@ -138,14 +138,58 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
+/** Keep one visible tree row in the Tab order after focus enters the tree. */
+function onTreeFocus(event: FocusEvent<HTMLElement>): void {
+  const row = event.target
+  if (!(row instanceof HTMLElement) || row.getAttribute('role') !== 'treeitem') return
+  for (const item of event.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]')) {
+    item.tabIndex = item === row ? 0 : -1
+  }
+}
+
+/** Drive visible sidebar rows without taking keys from their action controls. */
+function onTreeKeyDown(event: KeyboardEvent<HTMLElement>): void {
+  if (event.defaultPrevented) return
+  const row = event.target
+  if (!(row instanceof HTMLElement) || row.getAttribute('role') !== 'treeitem') return
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+  const rows = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'))
+  const at = rows.indexOf(row)
+  let target: HTMLElement | undefined
+  switch (event.key) {
+    case 'ArrowUp': target = rows[Math.max(0, at - 1)]; break
+    case 'ArrowDown': target = rows[Math.min(rows.length - 1, at + 1)]; break
+    case 'Home': target = rows[0]; break
+    case 'End': target = rows.at(-1); break
+    case 'ArrowLeft':
+    case 'ArrowRight': {
+      const expanded = row.getAttribute('aria-expanded')
+      if (expanded === null) return
+      if ((event.key === 'ArrowLeft') === (expanded === 'true')) row.click()
+      else if (event.key === 'ArrowRight') target = rows[at + 1]
+      break
+    }
+    case 'Enter':
+    case ' ': row.click(); break
+    default: return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  target?.focus()
+}
+
 /** Grouping, ordering, and archived-filter menu; own open state so it resets with the wide chrome. */
-function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrderPick, onArchivedFilterPick, t }: {
+function ViewOptionsMenu({
+  groupBy, orderBy, archivedFilter, onGroupPick, onOrderPick, onArchivedFilterPick, onExpandAll, onCollapseAll, t,
+}: {
   groupBy: SessionGroupBy
   orderBy: SessionOrderBy
   archivedFilter: ArchivedFilter
   onGroupPick: (mode: SessionGroupBy) => void
   onOrderPick: (mode: SessionOrderBy) => void
   onArchivedFilterPick: (filter: ArchivedFilter) => void
+  onExpandAll: () => void
+  onCollapseAll: () => void
   t: WorkspaceBrowserProps['t']
 }) {
   const [open, setOpen] = useState(false)
@@ -163,6 +207,10 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
         { id: 'updated', label: t('orderBy.updated'), icon: <IconClockOutlineRegular /> },
         { type: 'separator' as const, id: 'archived-filter-separator' },
+        ...(groupBy === 'flat' ? [] : [
+          { id: 'expand-all', label: t('expansion.expandAll') },
+          { id: 'collapse-all', label: t('expansion.collapseAll') },
+        ]),
         { type: 'label' as const, id: 'filter-by', text: t('filterBy.label') },
         { id: 'hide-archived', label: t('viewOptions.hideArchived'), icon: <IconArchiveOffOutlineRegular /> },
         { id: 'show-archived', label: t('viewOptions.showArchived'), icon: <IconQueueOutlineRegular /> },
@@ -176,6 +224,8 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
       onSelect={(id) => {
         if (id === 'workspace' || id === 'workspace-tree' || id === 'flat') onGroupPick(id)
         else if (id === 'manual' || id === 'updated') onOrderPick(id)
+        else if (id === 'expand-all') onExpandAll()
+        else if (id === 'collapse-all') onCollapseAll()
         else if (id === 'hide-archived') onArchivedFilterPick('default')
         else if (id === 'show-archived') onArchivedFilterPick('show')
         else if (id === 'only-archived') onArchivedFilterPick('only')
@@ -662,7 +712,7 @@ function SessionTree({
       {workspaceDropAtListStart && <span className={css.listTopDropIndicator} aria-hidden="true" />}
       <AnimatedRows
         className={clsx(css.list, workspaceDropAtListStart && css.listTopDropActive)}
-        role="tree"
+        role="tree" onKeyDown={onTreeKeyDown} onFocus={onTreeFocus}
         label={t('section.sessions')}
         rowKeys={rowKeys}
         ready={list.phase === 'ready' && workspaceReady && !nativeDragActive}
@@ -729,7 +779,7 @@ function FlatList({
     <HoverCardGroup className={clsx(css.treeBody, css.wide)}>
       <AnimatedRows
         className={clsx(css.list, css.flatList)}
-        role="tree"
+        role="tree" onKeyDown={onTreeKeyDown} onFocus={onTreeFocus}
         label={t('section.sessions')}
         rowKeys={rows.length === 0 ? ['empty'] : rows.map(row => `session:${row.id}`)}
         ready={list.phase === 'ready' && workspaceReady && drag === null}
@@ -799,6 +849,7 @@ interface RemoteSearchState {
 /** Flat search body: local metadata matches plus the current Host result page. */
 function SearchResults({
   useSessions,
+  useHiddenSessionIds,
   useSessionStatus,
   open,
   onUnarchive,
@@ -811,7 +862,7 @@ function SearchResults({
   usePanelInfo,
   useSessionAccess,
   t,
-}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo' | 'useSessionAccess'> & {
+}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useHiddenSessionIds' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo' | 'useSessionAccess'> & {
   workspaces: readonly WorkspaceView[]
   archivedSessionIds: readonly SessionNode['id'][]
   /** Search matches follow the archived filter selected for the list. */
@@ -823,7 +874,7 @@ function SearchResults({
   resultLimit: number
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
-  const list = useSessions(s => s)
+  const list = omitSessions(useSessions(s => s), useHiddenSessionIds(s => s))
   const statuses = useSessionStatus(s => s)
   const currentRemote = remote.query === query
     ? remote
@@ -849,7 +900,7 @@ function SearchResults({
   return (
     <div className={clsx(css.treeBody, css.wide)}>
       <div className={css.list}>
-        <div className={css.searchTree} role="tree" aria-label={t('search.results.aria')}>
+        <div className={css.searchTree} role="tree" onKeyDown={onTreeKeyDown} onFocus={onTreeFocus} aria-label={t('search.results.aria')}>
           {results.items.map(result => (
             <SearchResultItem
               key={result.id}
@@ -901,6 +952,7 @@ export function WorkspaceBrowser({
   usePanelInfo,
   expandSidebar,
   useSessions,
+  useHiddenSessionIds,
   useSessionStatus,
   useRemoteAccess,
   useSessionAccess,
@@ -936,7 +988,9 @@ export function WorkspaceBrowser({
   const addShortcut = shortcuts.find(row => row.id === 'workspace.add')
   const shortcutState = useWorkspaceShortcuts(state => state)
   // Ordering remains live while the rail or search replaces the list body.
-  const list = useSessions(state => state)
+  const rawList = useSessions(state => state)
+  const hiddenSessionIds = useHiddenSessionIds(state => state)
+  const list = useMemo(() => omitSessions(rawList, hiddenSessionIds), [rawList, hiddenSessionIds])
   const storedWorkspaces = useWorkspaces(state => state.items)
   // The resolved name, not `t`, is the memo dependency: the bound seat keeps
   // its identity across a language switch.
@@ -1288,6 +1342,12 @@ export function WorkspaceBrowser({
               archivedFilter={archivedFilter}
               onGroupPick={actions.setGroupBy}
               onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
+              onExpandAll={() => {
+                actions.setGroupExpansion([UNGROUPED_KEY, ...workspaces.map(workspace => workspace.workspaceId)], true)
+              }}
+              onCollapseAll={() => {
+                actions.setGroupExpansion([UNGROUPED_KEY, ...workspaces.map(workspace => workspace.workspaceId)], false)
+              }}
               onArchivedFilterPick={actions.setArchivedFilter}
               t={t}
             />
@@ -1358,6 +1418,7 @@ export function WorkspaceBrowser({
               usePanelInfo={usePanelInfo}
               useSessionAccess={useSessionAccess}
               useSessions={useSessions}
+              useHiddenSessionIds={useHiddenSessionIds}
               useSessionStatus={useSessionStatus}
               open={openSearchResult}
               onUnarchive={onSessionUnarchive}

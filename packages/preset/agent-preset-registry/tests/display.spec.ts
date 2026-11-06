@@ -28,3 +28,10 @@ describe('presetDisplayText', () => {
     expect(presetDisplayText({ id: 'bare' }, t)).toEqual({ name: 'bare' })
   })
 })
+
+
+it('resolves the assistant preset through its localized built-in copy', () => {
+  expect(presetDisplayText({ id: 'assistant' }, t)).toEqual({
+    name: 't:presetAssistantName', description: 't:presetAssistantDescription',
+  })
+})

@@ -35,6 +35,8 @@ kind: "package-library"
 
 只要 Web 客户端需要标准控件或 agent 输出渲染器，就用这些原子组件拼装功能 UI。它们只经 React 渲染，并从主题取得 `--dsw-*` 设计 token，因此无需导入主题或 slot 系统即可适配任意插件。
 
+`DiffBlock` 支持词级差异与可选的路径复制文案；`SearchBlock` 接收查询及文件／行号导航回调。`ReadBlock` 标记返回的文件窗口位置，`TerminalBlock` 通过可选文案提供独立于输出复制的命令复制操作。
+
 <a id="component-catalog"></a>
 ### 组件目录
 
@@ -135,6 +137,8 @@ kind: "package-library"
 `Menu.contextual` 从指针位置定位而不避让顶部栏，并在弹窗内右键时关闭。右键弹窗没有实际渲染的 `role="menuitem"` 行时保持隐藏，包括旧 Slot 返回空内容的情况。结构化 `items` 按分隔线组预留图标栏；`footer` 与各子菜单独立计算分组。右键菜单的 `footer` 以分隔线开头时，直接使用该线，不再叠加边框。不透明的 `children` 保留原有布局；数据行后方的旧 Slot 保留其声明的首条分隔线。`exiting` 在淡出期间保留不可交互的弹窗；`returnFocus` 在异步准备后恢复原控件焦点。`MenuSurface.phase` 分别对材质层、直接内容和 macOS 背景淡入淡出，让材质层继续模糊页面。`MENU_TRANSITION_MS` 同时提供 CSS 动画与弹窗生命周期计时。普通下拉菜单保留原有时序。
 
 -----
+
+`Slider` 展示固定有序的具名档位，支持指针拖动与键盘选择，拥有者完成异步写入期间仍保持拖动可用。
 
 <a id="understand-the-implementation"></a>
 ## 理解实现

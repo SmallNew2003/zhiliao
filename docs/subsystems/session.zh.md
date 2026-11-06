@@ -26,6 +26,19 @@ interface UserMessage extends MessageBase {
  */
 interface SessionEventMap {
   /**
+   * Replace the latest human-authored input and its subsequent model history.
+   * Replay restores the surface immediately before the original input, including
+   * nodes later shadowed by compaction, and adds the identified replacement.
+   * Repeated edits follow the target's earlier edit to the original input.
+   * Raw events and chronological turn/step numbering remain unchanged.
+   */
+  'user/message-edit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
+   * Update only text blocks of the current latest human input after pre-step preparation.
+   * Preserve its identity, metadata, attachments, and surface position.
+   */
+  'user/message-admit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
    * Opens turn `turn` before the loop claims queued input or runs pre-step.
    * Rejection, empty input, cancellation, or failure may close it with no
    * step; otherwise the following identified `user/message` event or batch
@@ -813,6 +826,29 @@ interface PluginRecord {
 
 消费此约定的后端见 [persistence.md](persistence.zh.md)。
 
+## 编辑最新人工输入
+
+`SessionEditMessageRequest` 通过事件序号与稳定的接受标识指定最新人工输入。替换只改变文本，保留输入的持久附件；重复的接受标识复用结果。`SessionEditMessageValue` 确认已提交的编辑；文本未变时仍请求另一条回复。[Session 控制器](../../packages/api/session-controller/README.zh.md)维护准入、取消与回放语义。
+
+```ts type-equiv
+/** Text-only replacement of the latest sent user input, retaining its durable attachments. */
+interface SessionEditMessageRequest {
+  readonly sessionId: SessionId
+  /** Sequence of the latest user/message or user/message-edit event, including inherited input. */
+  readonly targetSeq: SessionSeq
+  readonly text: string
+  /** Stable identity reused after a lost acceptance response. */
+  readonly requestId: SessionRequestId
+}
+```
+
+```ts type-equiv
+/** Durable acceptance of an edit; unchanged text requests another response. */
+interface SessionEditMessageValue {
+  readonly accepted: true
+}
+```
+
 ## Remote 目录与 workspace 打开
 
 `ModelCatalog` 是 `session/modelCatalog` 返回的 Host generation 模型目录：它携带部署默认值、可路由 provider id、成功的 provider 分组与相互隔离的 provider 失败。它不由某个 Session 派生，因此与 Session projection 分开保存。
@@ -963,6 +999,13 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
  * @returns acknowledgement that the Agent accepted the prompt.
  */
 @Remote('prompt') async prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
+
+/**
+ * Edit and resend the latest sent user input while retaining its original attachments.
+ * @param request - target event, replacement text, and stable retry identity.
+ * @returns acceptance after the edit is durable; unchanged text requests another response.
+ */
+@Remote('editMessage') editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue>
 
 /**
  * Read one image from the attachment store after gateway authorization.

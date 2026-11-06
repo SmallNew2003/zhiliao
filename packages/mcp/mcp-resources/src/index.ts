@@ -9,6 +9,7 @@ import { createScope, NamedEntries, ScopedLayers, scopeOf, type ScopeKey, type S
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-mcp-discovery'
 import { registerResourceTools } from './tools.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -62,6 +63,7 @@ export class McpResourceRuntime extends Service {
         order: inner.systemPrompt.getSectionOrder('MCP_SERVERS'),
         interpolate: false,
         text: ({ scope }) => {
+          if (inner.get('mcpDiscovery') !== undefined) return ''
           const names = [...this.layers.merge(scope, layer => layer.servers).keys()].sort()
           return names.length === 0 ? '' : '## MCP resource servers\n\n'
             + 'Use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource with one of these names '
@@ -122,6 +124,7 @@ export class McpResourceRuntime extends Service {
   private request(server: string, request: McpResourceRequest, exec: ToolExecution): Promise<JsonValue> {
     const provider = this.layers.merge(exec.agent, layer => layer.servers).get(server)
     if (!provider) throw new Error(`MCP resource server "${server}" is unavailable in this agent's scope`)
+    this.ctx.get('mcpDiscovery')?.assertServer(server, exec)
     return provider.request(request, exec)
   }
 }

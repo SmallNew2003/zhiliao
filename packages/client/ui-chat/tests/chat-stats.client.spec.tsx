@@ -171,12 +171,12 @@ describe('composer stats pills', () => {
     timing: { stepStartTime: 1_000, firstTokenTime: 1_800, completedTime: 4_800 },
   })
 
-  it('compact keeps only speed and cache hit, with no interactive statistics', () => {
+  it('compact keeps only model duration and cache hit, with no interactive statistics', () => {
     const { source } = makeSource({ nodes: [timedStep()] })
     const view = render(<StatsPills {...props(source)} usePerformanceUsage={selector => selector('compact')} />)
-    expect(view.container.textContent).toBe('20 tok/sCache hit 90%')
+    expect(view.container.textContent).toBe('Model time 3.8sCache hit 90%')
     expect(view.queryByRole('button')).toBeNull()
-    fireEvent.mouseOver(view.getByText('20 tok/s'))
+    fireEvent.mouseOver(view.getByText('Model time 3.8s'))
     expect(view.queryByRole('dialog')).toBeNull()
     view.rerender(<StatsPills {...props(source)} />)
     expect(view.getAllByRole('button')).toHaveLength(2)
@@ -235,12 +235,12 @@ describe('composer stats pills', () => {
     expect(view.getAllByRole('button')[0]!.textContent).toContain(expected)
   })
 
-  it('exposes output speed on the counts pill when decode timing exists', () => {
+  it('shows model duration while retaining output speed in the details', () => {
     const { source } = makeSource({ nodes: [timedStep()] })
     const view = render(<StatsPills {...props(source)} />)
     const timePill = view.getAllByRole('button')[0]!
-    expect(timePill.textContent).toBe('1 turns 1 steps·20 tok/s')
-    expect(timePill.getAttribute('aria-label')).toBe('1 turns 1 steps · 20 tok/s')
+    expect(timePill.textContent).toBe('Model time 3.8s')
+    expect(timePill.getAttribute('aria-label')).toBe('Model time 3.8s')
   })
 
   it('marks each pill with its dock entry id', () => {
@@ -248,7 +248,7 @@ describe('composer stats pills', () => {
     const view = render(<StatsPills {...props(source)} />)
     const pills = [...view.container.querySelectorAll('[data-composer-stat]')]
     expect(pills.map(pill => [pill.getAttribute('data-composer-stat'), pill.textContent])).toEqual([
-      ['activity', '1 turns 1 steps·20 tok/s'],
+      ['activity', 'Model time 3.8s'],
       ['usage', '105 tok·Cache hit 90%'],
     ])
   })
@@ -359,7 +359,7 @@ describe('composer stats pills', () => {
     const { source } = makeSource({ nodes: [timedStep()] })
     const view = render(<StatsPills {...props(source, { tokenUsage: tokenUsage(9_995, 5) })} t={t} />)
     const [timePill, usagePill] = [...view.getAllByRole('button')] as [HTMLElement, HTMLElement]
-    expect(timePill.textContent).toBe('1 轮 1 步·20 tok/s')
+    expect(timePill.textContent).toBe('模型耗时 3.8秒')
     // Whole-log total 9995 + 5 + 1 compacts to 10K.
     expect(usagePill.textContent).toBe('10K tok·缓存命中 99.95%')
     fireEvent.click(timePill)
@@ -500,7 +500,7 @@ describe('composer stats pills', () => {
       }),
     })} />)
     const timePill = view.getAllByRole('button')[0]!
-    expect(timePill.textContent).toBe('200 turns 200 steps·20 tok/s')
+    expect(timePill.textContent).toBe('Model time 1m40s')
     fireEvent.click(timePill)
     const dialog = view.getByRole('dialog')
     expect(dialog.textContent).toContain('LLM time1m40s')

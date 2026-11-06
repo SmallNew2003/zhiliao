@@ -14,4 +14,6 @@ export interface TurnProcessViewEntry {
 /** Per-Session state shared only by the Chat view and details surface. */
 export interface ChatStoreState {
   turnProcesses: TurnProcessViewEntry[]
+  /** Editor retained after a resend hides its original transcript row. */
+  editingMessageKey?: string
 }

@@ -395,7 +395,7 @@ describe('contextBreakdown session projection', () => {
       if (current === undefined) throw new Error('registered context breakdown has no state')
       return current
     }
-    expect(Object.keys(state()).sort()).toEqual(['breakdown', 'surfaceTokens', 'systems'])
+    expect(Object.keys(state()).sort()).toEqual(['breakdown', 'latestInput', 'surfaceTokens', 'systems'])
     expect(state().systems).toHaveLength(1)
     appendSummaryMeter(ctx, session, first, last)
     expect(state().claim).toMatchObject({ start: first, end: last, systemSeqs: [] })
@@ -435,7 +435,7 @@ describe('contextBreakdown session projection', () => {
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
     const row = checkpoint['contextBreakdown']!
-    expect(row.ver).toBe(6)
+    expect(row.ver).toBe(8)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).contextBreakdown).toEqual(projected(ctx, session))
     appendSummaryMeter(ctx, session, first, last)
     const meter = session.snapshotEvents().at(-1)!
@@ -456,7 +456,7 @@ describe('contextBreakdown session projection', () => {
       stale, session.snapshotEvents(), SessionLogOffset(0), session.header, session.inheritedEventCount,
     )
     expect(replayed.snapshot.values.contextBreakdown).toEqual(projected(ctx, session))
-    expect(replayed.checkpoint['contextBreakdown']?.ver).toBe(6)
+    expect(replayed.checkpoint['contextBreakdown']?.ver).toBe(8)
     const invalid = {
       ...checkpoint,
       contextBreakdown: {
@@ -490,7 +490,7 @@ describe('contextBreakdown session projection', () => {
         systemTokens: 8, toolsTokens: staleValue.toolsTokens, messageTokens: 9,
       })
       expect(restored.checkpoint).toEqual(current)
-      expect(restored.checkpoint['contextBreakdown']?.ver).toBe(6)
+      expect(restored.checkpoint['contextBreakdown']?.ver).toBe(8)
     } finally {
       await ctx.fiber.dispose()
     }

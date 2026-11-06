@@ -78,6 +78,10 @@ export interface GroupNode {
   label: string
   /** Total visible sessions in the group. */
   sessionCount: number
+  /** Sessions running directly or through a child, including folded groups. */
+  runningCount: number
+  /** Sessions awaiting approval, plan review, or an answer. */
+  pendingCount: number
   expanded: boolean
   /** The group contains the selected session (active folder tint; supplied here so the renderer never scans). */
   containsCurrent: boolean
@@ -449,6 +453,12 @@ export function deriveGroups(
       createdAt: g.createdAt,
       label: g.label,
       sessionCount: g.sessions.length,
+      runningCount: g.sessions.filter(session =>
+        (statuses.get(session.id)?.running ?? session.running) || runningChildCount(list, session.id, statuses) > 0,
+      ).length,
+      pendingCount: g.sessions.filter(session =>
+        visiblePendingKind(statuses.get(session.id)?.pendingInteraction?.kind) !== undefined,
+      ).length,
       expanded,
       containsCurrent: g.key === currentGroup,
       sessions: expanded
@@ -638,4 +648,19 @@ export function owningParentFolder(path: string, parents: readonly string[]): st
     }
   }
   return owner
+}
+
+/**
+ * Remove Sessions owned by a separated surface from every list view.
+ * @param list - complete Session list snapshot.
+ * @param hidden - Session ids the separated surface owns.
+ * @returns the same snapshot without those ids in `ids` or `byId`.
+ */
+export function omitSessions(list: SessionListState, hidden: ReadonlySet<SessionId>): SessionListState {
+  if (hidden.size === 0) return list
+  const byId: SessionListState['byId'] = {}
+  for (const [id, summary] of Object.entries(list.byId)) {
+    if (!hidden.has(id as SessionId)) byId[id as SessionId] = summary
+  }
+  return { ...list, ids: list.ids.filter(id => !hidden.has(id)), byId }
 }

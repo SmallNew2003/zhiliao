@@ -8,6 +8,7 @@
 import type { ToolArgs, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { LocaleKeysOf } from '@deepseek-ai/dsh-client-ui-slots'
 import { abbreviateHomePath, isAbsoluteWorkspacePath, relativizeToCwd } from '@deepseek-ai/dsh-util-workspace-path'
+import { parseToolError, type ToolErrorModel } from './tool-error-model.ts'
 import { recordedAbsolutePath } from './recorded-path.ts'
 
 export type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -161,6 +162,10 @@ export interface ToolRowModel {
   output: string | null
   /** First line of the result text on an error row; null for every other state. */
   errorSummary: string | null
+  /** Parsed settled failure for localized row copy. */
+  toolError: ToolErrorModel | null
+  /** Elapsed milliseconds between dispatched call and result. */
+  durationMs: number | null
   /** Structured Auto-review denial identity; null for every ordinary result. */
   autoReviewDenial: AutoReviewDenial | null
   state: ToolRowState
@@ -331,6 +336,8 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   // would erase the collapsed error row's summary slot.
   const output = done ? (resultText(block) || null) : null
   const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
+  const toolError = state === 'error' ? parseToolError(output, done ? block.error?.code : undefined) : null
+  const durationMs = done && block.callTime !== null && block.time >= block.callTime ? block.time - block.callTime : null
   const bodyRaw = argsRaw === '' ? null : argsRaw
   return {
     variant,
@@ -340,6 +347,8 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     bodyRaw,
     output,
     errorSummary,
+    toolError,
+    durationMs,
     autoReviewDenial: deriveAutoReviewDenial(block),
     state,
   }

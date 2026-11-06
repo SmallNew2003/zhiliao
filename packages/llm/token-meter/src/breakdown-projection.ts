@@ -6,9 +6,11 @@
  * message count.
  */
 
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import { canonicalHeader, deriveEventMessage, isSurfaceEvent, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { SurfaceEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SurfaceEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 // Type-only: the `compaction/*` SessionEventMap merges (shadow-price events).
 import type {} from '@deepseek-ai/dsh-compaction'
@@ -49,6 +51,11 @@ const contextBreakdownStateSchema = z.object({
   surfaceTokens: tokenCount,
   claim: claimSchema.optional(),
   breakdown: breakdownSchema,
+  latestInput: z.object({
+    seq: sessionSeq, messageId: z.string().min(1).transform(MessageId), edited: z.boolean(),
+    inputTokens: tokenCount, systems: z.array(systemNodeSchema),
+    surfaceTokens: tokenCount, breakdown: breakdownSchema,
+  }).strict().optional(),
 }).strict()
 type ContextBreakdownState = z.infer<typeof contextBreakdownStateSchema>
 type SystemNode = ContextBreakdownState['systems'][number]
@@ -143,14 +150,37 @@ function withoutClaim(state: ContextBreakdownState): ContextBreakdownState {
  */
 export const contextBreakdownProjectionDefinition = {
   key: 'contextBreakdown',
-  stateVersion: 6,
+  stateVersion: 8,
   stateSchema: contextBreakdownStateSchema,
   init: (): ContextBreakdownState => ({
     systems: [],
     surfaceTokens: 0,
     breakdown: { systemTokens: 0, toolsTokens: 0, messageTokens: 0 },
   }),
-  apply: (state, event) => {
+  apply: (state, sourceEvent) => {
+    const input = readSessionInputEvent(sourceEvent)
+    const previousInput = state.latestInput
+    const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
+      && previousInput.messageId === input.data.id
+      ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
+    if (event.type === 'user/message-admit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('context breakdown: admitted input is not the latest input')
+      const inputTokens = estimateMessage(event.data.message)
+      return withTotals({ ...state, latestInput: { ...previous, inputTokens } }, {
+        systems: state.systems, surfaceTokens: state.surfaceTokens + inputTokens - previous.inputTokens,
+      })
+    }
+    if (event.type === 'user/message-edit') {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('context breakdown: edit target is not the latest input')
+      const inputTokens = estimateMessage(event.data.message)
+      return withTotals({
+        systems: previous.systems, surfaceTokens: previous.surfaceTokens,
+        breakdown: { ...previous.breakdown, toolsTokens: state.breakdown.toolsTokens },
+        latestInput: { ...previous, seq: event.seq, messageId: event.data.message.id, edited: true, inputTokens },
+      }, { systems: previous.systems, surfaceTokens: previous.surfaceTokens + inputTokens })
+    }
     if (event.type === 'compaction/summary' || event.type === 'compaction/prune') {
       const shadowed = new Set<number>(event.data.shadowedSeqs)
       return {
@@ -164,7 +194,16 @@ export const contextBreakdownProjectionDefinition = {
       }
     }
     // A claim prices only the event immediately after its metering event.
-    const unclaimed = withoutClaim(state)
+    let unclaimed = withoutClaim(state)
+    if (event.type === 'user/message' && event.data.source.kind === 'user') {
+      unclaimed = {
+        ...unclaimed,
+        latestInput: {
+          seq: event.seq, messageId: event.data.id, edited: false, inputTokens: estimateMessage(event.data),
+          systems: state.systems, surfaceTokens: state.surfaceTokens, breakdown: state.breakdown,
+        },
+      }
+    }
     if (event.type === 'request/header') {
       const toolsTokens = estimateToolsTokens(canonicalHeader(event.data.header))
       return toolsTokens === unclaimed.breakdown.toolsTokens

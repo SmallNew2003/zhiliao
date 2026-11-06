@@ -1,0 +1,79 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/memory/hindsight-http/README.md
+/:
+  en: 7549ebc0697c685b
+  zh: dda25632d7429f0f
+/deepseek-ai-dsh-memory-hindsight-http:
+  en: 99e61fe3128aa7f5
+  zh: 9335c4cbc9bcae3a
+/deepseek-ai-dsh-memory-hindsight-http/summary:
+  en: b147b15432d1b673
+  zh: 889b097ef0eed050
+/deepseek-ai-dsh-memory-hindsight-http/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-memory-hindsight-http/use-this-package:
+  en: 87bc748e2178601e
+  zh: 3fb018380cd6db18
+/deepseek-ai-dsh-memory-hindsight-http/use-this-package/when-to-choose-it:
+  en: 3adcd2e488780a57
+  zh: 8ad979b54d95484d
+/deepseek-ai-dsh-memory-hindsight-http/use-this-package/minimal-configuration:
+  en: bf93e4166f797d88
+  zh: fdcfd79848032c0e
+/deepseek-ai-dsh-memory-hindsight-http/use-this-package/bank-naming:
+  en: 8240e3395f240b93
+  zh: 1192ac218983bbd7
+/deepseek-ai-dsh-memory-hindsight-http/use-this-package/latency-is-the-operational-fact:
+  en: 640bf867f303c5bb
+  zh: 13f467ffe9e39989
+/deepseek-ai-dsh-memory-hindsight-http/use-this-package/failures-and-recovery:
+  en: bf437dda83d28aa6
+  zh: bf8cb0f0f4de7d46
+/deepseek-ai-dsh-memory-hindsight-http/understand-the-implementation:
+  en: 9842c69ad3636bb3
+  zh: 3cdc3f816cbdd0cb
+/deepseek-ai-dsh-memory-hindsight-http/understand-the-implementation/design-philosophy:
+  en: 5bc9524e020d7b7c
+  zh: a78ff4b5b62940b7
+/deepseek-ai-dsh-memory-hindsight-http/understand-the-implementation/source-map:
+  en: 16a58a858600a4b2
+  zh: 684c98d8e8de70a0
+/deepseek-ai-dsh-memory-hindsight-http/understand-the-implementation/data-model:
+  en: 2b52800f6c7cfc0d
+  zh: df80716536c69fc7
+/deepseek-ai-dsh-memory-hindsight-http/understand-the-implementation/request-flow:
+  en: 6b763ce4bc1466a7
+  zh: 503d6ef67cdbbb7b
+/deepseek-ai-dsh-memory-hindsight-http/further-exploration:
+  en: 3b3ac2e368b2a1f3
+  zh: c5c853acd612397d
+/deepseek-ai-dsh-memory-hindsight-http/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-memory-hindsight-http/model-experience/recalled-memory-content:
+  en: 6016f90b3092d54c
+  zh: d982f7791f0cce70
+/deepseek-ai-dsh-memory-hindsight-http/model-experience/recalled-memory-content/what-the-model-sees:
+  en: 143e2d18efae8c75
+  zh: 72254ff0babfd9b2
+/deepseek-ai-dsh-memory-hindsight-http/model-experience/recalled-memory-content/token-effect:
+  en: b054b43140502f81
+  zh: 0662331999200f7d
+/deepseek-ai-dsh-memory-hindsight-http/model-experience/recalled-memory-content/kv-cache-effect:
+  en: 4c0057be9d6f7104
+  zh: 188ce20777aeacbd
+/deepseek-ai-dsh-memory-hindsight-http/known-limitations-and-deferred-work:
+  en: 039c64e6d6d497be
+  zh: 3737977c53825cb4
+/deepseek-ai-dsh-memory-hindsight-http/known-limitations-and-deferred-work/dev-note:
+  en: 64ee46559b704be8
+  zh: 29e47b77c4e476e1
+/deepseek-ai-dsh-memory-hindsight-http/known-limitations-and-deferred-work/dev-note/future-richer-hindsight-endpoints:
+  en: 74f08a5c1427b38c
+  zh: 06a11130d550f72c
+/deepseek-ai-dsh-memory-hindsight-http/known-limitations-and-deferred-work/dev-note/future-a-cheaper-availability-signal:
+  en: a9b7e090ee5dc39c
+  zh: 484cb38afc677b93

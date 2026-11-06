@@ -318,7 +318,12 @@ export function apply(ctx: Context): void {
     requestAddWorkspace: shortcutControls.add,
     closeAddWorkspace: shortcutControls.closeAdd,
     setDirectoryBusy: shortcutControls.directoryBusy,
-    hooks: { workspaceActionRequest, contextMenuTarget: ctx.contextMenus.active, directoryFlow: browserFlowSource, hostInfo,
+    hooks: {
+      hiddenSessionIds: uiWorkspace.hiddenSessionIds,
+      workspaceActionRequest,
+      contextMenuTarget: ctx.contextMenus.active,
+      directoryFlow: browserFlowSource,
+      hostInfo,
       workspaceShortcuts: shortcutControls.state, shortcuts: ctx.shortcuts.catalog },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({

@@ -179,7 +179,6 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // loop, and the live tool registrations; disposal stops reconnection,
   // quiesces in-flight work, and unregisters the current generation.
   const connection = startConnection(ctx, config, reconnect)
-  registerServerContext(ctx, config.serverName, connection)
   let stopping: Promise<void> | undefined
   const dispose = (): Promise<void> => stopping ??= connection.dispose()
   // Cordis announces unload before awaiting an unfinished apply(). Closing
@@ -190,6 +189,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     return dispose()
   }, { global: true })
   ctx.effect(() => dispose, 'mcp-client.connection')
+  registerServerContext(ctx, config.serverName, connection)
 
   // Block plugin activation on the initial connection + tool discovery so
   // Cordis consumers observe the tools immediately after the fiber activates.

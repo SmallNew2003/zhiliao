@@ -65,6 +65,8 @@ export interface Config {
   model: Volatile<string>
   /** Adapter-owned reasoning effort; omission follows the provider default. */
   reasoningEffort: Volatile<string | undefined>
+  /** Positive integer context budget for newly created Agents. */
+  contextWindow: Volatile<number | undefined>
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-agent-default-model -->
@@ -243,7 +245,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-session-controller`
 
 - `inject`: `agentDefaultModel` · `agents` · `attachments` · `fileUploads` · `fs` · `llm` · `remoteAccess` · `sessions` · `sessionProjections` · `sessionQuery` · `typert` · `typertGateway` · `workspaceRegistry`
-- `source`: [`packages/api/session-controller/src/index.ts:110`](../packages/api/session-controller/src/index.ts)
+- `source`: [`packages/api/session-controller/src/index.ts:113`](../packages/api/session-controller/src/index.ts)
 
 ```ts config-catalog
 /** Session Controller deployment policy. */
@@ -365,6 +367,35 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-api-workspace-files -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-assistant-task -->
+<a id="deepseek-aidsh-assistant-task"></a>
+
+## `@deepseek-ai/dsh-assistant-task`
+
+- `inject`: `storageDomain` · `sessions` · `agents` · `remoteAccess`
+- `source`: [`packages/assistant/task/src/index.ts:54`](../packages/assistant/task/src/index.ts)
+
+```ts config-catalog
+/** Configuration for the Host assistant domain. */
+export interface Config {
+  /** Agent preset used for assistant conversation Sessions; omission defaults to `assistant`. */
+  assistantPreset?: string
+  /** Agent preset used for task execution Sessions; omission defaults to `standard`. */
+  workerPreset?: string
+  /** Maximum tasks one assistant turn may create; omission defaults to 3. */
+  maxTasksPerTurn?: number
+  /** Maximum non-terminal tasks one assistant may own; omission defaults to 5. */
+  maxActiveTasks?: number
+  /** Maximum UTF-8 bytes of one task prompt; omission defaults to 65,536. */
+  maxPromptBytes?: number
+  /** Maximum characters of one task title; omission defaults to 120. */
+  maxTitleChars?: number
+  /** Default task-list page size; omission defaults to 50. */
+  listPageSize?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-assistant-task -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-attachment-local -->
 <a id="deepseek-aidsh-attachment-local"></a>
@@ -736,7 +767,7 @@ export interface Config {
 export interface BasicCompactionConfig extends CompactionPolicyConfig {
   /** Exact provider/model overrides; duplicate targets fail plugin load. */
   modelPolicies?: ModelCompactPolicyConfig[]
-  /** Enable automatic step-boundary pressure and overflow-recovery listeners. Defaults to `true`. */
+  /** Enable automatic pressure and overflow recovery. False still blocks oversized explicit budgets. Defaults to `true`. */
   auto?: boolean
 }
 
@@ -1766,6 +1797,31 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-frontend-static -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-host-memory-controller -->
+<a id="deepseek-aidsh-host-memory-controller"></a>
+
+## `@deepseek-ai/dsh-host-memory-controller`
+
+- `inject`: `memory`
+- `source`: [`packages/host/memory-controller/src/index.ts:61`](../packages/host/memory-controller/src/index.ts)
+
+```ts config-catalog
+/**
+ * The read-only browse surface's transport settings. Every field is
+ * deployment-varying and therefore configurable rather than a constant.
+ */
+export interface Config {
+  /** Base URL of the memory daemon, without a trailing slash. */
+  readonly baseUrl?: string
+  /**
+   * Timeout for one browse request. These are metadata reads, so the budget is
+   * the provider's cheap-metadata budget rather than its inference budget.
+   */
+  readonly timeoutMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-host-memory-controller -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-host-open-in-app -->
 <a id="deepseek-aidsh-host-open-in-app"></a>
 
@@ -2445,6 +2501,103 @@ export interface ReconnectConfig {
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-mcp-client -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-mcp-discovery -->
+<a id="deepseek-aidsh-mcp-discovery"></a>
+
+## `@deepseek-ai/dsh-mcp-discovery`
+
+- `inject`: `tools` · `systemPrompt` · `sessionProjections`
+- `source`: [`packages/mcp/mcp-discovery/src/index.ts:36`](../packages/mcp/mcp-discovery/src/index.ts)
+
+```ts config-catalog
+/** UTF-8 limits cover complete emitted MCP representations. */
+export interface Config {
+  /** Maximum UTF-8 bytes of complete directory text, including wrappers and continuation guidance. */
+  catalogBytes: number
+  /** Maximum UTF-8 bytes of serialized complete MCP schemas, including discovery. */
+  nativeBytes: number
+  /** Maximum UTF-8 bytes of the complete generated MCP SDK, including discovery. */
+  sdkBytes: number
+  /** Maximum UTF-8 bytes of activated literal server instructions, including attribution. */
+  instructionBytes: number
+  /** Maximum UTF-8 bytes of complete serialized discovery results. */
+  resultBytes: number
+  /** Maximum descriptors per search page; byte admission may return fewer. */
+  resultLimit: number
+  /** Independent auxiliary configuration; omission disables auxiliary requests. */
+  selector?: SelectorConfig | undefined
+}
+
+/** Independent auxiliary route; omission disables all selector calls. */
+export interface SelectorConfig {
+  /** Explicit registered auxiliary provider route; never inherited from the conversation. */
+  provider: string
+  /** Auxiliary model id resolved by that provider. */
+  model: string
+  /** Maximum UTF-8 bytes of exact auxiliary system and message text. */
+  inputBytes: number
+  /** Maximum UTF-8 bytes accepted from the auxiliary reply. */
+  outputBytes: number
+  /** Explicit auxiliary generation token limit, independent of reply byte admission. */
+  maxTokens: number
+  /** Cooperative auxiliary deadline in milliseconds; cancellation awaits owned work. */
+  timeoutMs: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-mcp-discovery -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory -->
+<a id="deepseek-aidsh-memory"></a>
+
+## `@deepseek-ai/dsh-memory`
+
+- `source`: [`packages/memory/memory/src/index.ts:56`](../packages/memory/memory/src/index.ts)
+
+```ts config-catalog
+/**
+ * Config for the memory seam. `provider` pins which registered provider wins; it is
+ * optional because a single registered usable provider auto-selects. Deployment-varying
+ * choices live here (or in cordis.yml against these fields) rather than in constants.
+ */
+export interface MemoryRuntimeConfig {
+  /** Explicit provider id. Omitted = auto-select when exactly one usable provider exists. */
+  readonly provider?: string
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory -->
+
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-memory-hindsight-http -->
+<a id="deepseek-aidsh-memory-hindsight-http"></a>
+
+## `@deepseek-ai/dsh-memory-hindsight-http`
+
+- `inject`: `memory`
+- `source`: [`packages/memory/hindsight-http/src/index.ts:40`](../packages/memory/hindsight-http/src/index.ts)
+
+```ts config-catalog
+/**
+ * Plugin config. Every field is deployment-varying and therefore configurable rather than
+ * a constant: which daemon to talk to, and how long each class of request may take.
+ */
+export interface Config {
+  /** Base URL of the hindsight daemon, without a trailing slash. */
+  baseUrl?: string
+  /** Bank id suffix used when a workspace has no resolvable project name. */
+  defaultBankSuffix?: string
+  /** Timeout for cheap metadata endpoints such as health and bank listing. */
+  metadataTimeoutMs?: number
+  /** How long a health-probe answer is reused before memory re-checks the daemon. */
+  probeTtlMs?: number
+  /** Timeout for recall and search, which run inference server-side. */
+  recallTimeoutMs?: number
+  /** Timeout for retaining a transcript. */
+  retainTimeoutMs?: number
+  /** Maximum transcript characters sent in one retention request. */
+  maxRetainChars?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-memory-hindsight-http -->
 
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-message-feedback -->
 <a id="deepseek-aidsh-message-feedback"></a>
@@ -4152,6 +4305,33 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-lsp -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-memory -->
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+- `inject`: `memory`
+- `source`: [`packages/memory/tool-memory/src/index.ts:49`](../packages/memory/tool-memory/src/index.ts)
+
+```ts config-catalog
+/** Plugin config: recall budget, injection shape, retention, and cold-bank seeding. */
+export interface Config {
+  /** Inject recalled memories ahead of the first request of a session. */
+  injectRecall?: boolean
+  /** Retain each finished turn's transcript into the session's bank. */
+  retainTranscripts?: boolean
+  /** Maximum memories injected in one session opening. */
+  recallLimit?: number
+  /** Seed a cold bank with recent commits and a read-only survey. */
+  seedColdBanks?: boolean
+  /** How many recent commits seed a cold bank from. */
+  seedCommitCount?: number
+  /** Wall-clock budget for seeding one workspace; exceeded work is abandoned. */
+  seedBudgetMs?: number
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-memory -->
+
 <!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-tool-present -->
 <a id="deepseek-aidsh-tool-present"></a>
 
@@ -4835,6 +5015,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-action-cards` | — | [`packages/experimental/client-ui-action-cards/src/index.ts`](../packages/experimental/client-ui-action-cards/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-agent-preset` | — | [`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-approval` | — | [`packages/client/ui-approval/src/index.ts`](../packages/client/ui-approval/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-assistant` | — | [`packages/client/ui-assistant/src/index.ts`](../packages/client/ui-assistant/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-attachment` | — | [`packages/client/ui-attachment/src/index.ts`](../packages/client/ui-attachment/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-brand-official` | — | [`packages/client/ui-brand-official/src/index.ts`](../packages/client/ui-brand-official/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-chat` | — | [`packages/client/ui-chat/src/index.ts`](../packages/client/ui-chat/src/index.ts) |
@@ -4853,8 +5034,10 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-input-trigger` | — | [`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-jobs` | — | [`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-layout` | — | [`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-memory-browser` | — | [`packages/client/ui-memory-browser/src/index.ts`](../packages/client/ui-memory-browser/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-message-feedback` | — | [`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-model-selection` | — | [`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-notification` | — | [`packages/client/ui-notification/src/index.ts`](../packages/client/ui-notification/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-open-in-app` | — | [`packages/client/ui-open-in-app/src/index.ts`](../packages/client/ui-open-in-app/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-permission-presets` | — | [`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-plan` | — | [`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts) |
@@ -4931,6 +5114,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-subprocess-local` | — | [`packages/subprocess/subprocess-local/src/index.ts`](../packages/subprocess/subprocess-local/src/index.ts) |
 | `@deepseek-ai/dsh-subprocess-ssh` | `ssh` | [`packages/ssh/subprocess-ssh/src/index.ts`](../packages/ssh/subprocess-ssh/src/index.ts) |
 | `@deepseek-ai/dsh-terminal` | — | [`packages/terminal/terminal/src/index.ts`](../packages/terminal/terminal/src/index.ts) |
+| `@deepseek-ai/dsh-tool-assistant-task` | `tools` · `systemPrompt` | [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts) |
 | `@deepseek-ai/dsh-tool-call-timeout-policy` | `tools` | [`packages/guard/timeout-policy/src/index.ts`](../packages/guard/timeout-policy/src/index.ts) |
 | `@deepseek-ai/dsh-tool-cordis` | `tools` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
 | `@deepseek-ai/dsh-tool-executor-native` | `tools` | [`packages/core/tool-executor-native/src/index.ts`](../packages/core/tool-executor-native/src/index.ts) |

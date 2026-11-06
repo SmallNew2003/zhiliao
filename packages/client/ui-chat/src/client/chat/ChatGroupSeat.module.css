@@ -105,6 +105,7 @@
   overflow-y: auto;
   overscroll-behavior-y: auto;
   scrollbar-gutter: stable;
+  padding: 4px 14px 6px 15px;
 }
 
 .label {
@@ -164,3 +165,16 @@
     transition: none;
   }
 }
+
+.failedBadge {
+  flex: none;
+  color: var(--dsw-alias-state-error-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
+  border-radius: 8px;
+  padding: 1px 6px;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.body[hidden] { padding: 0; border: 0; }
+.body::-webkit-scrollbar { width: 6px; }
+.body::-webkit-scrollbar-thumb { background: var(--dsw-alias-border-l2); border-radius: 3px; }

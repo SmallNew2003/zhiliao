@@ -53,6 +53,8 @@ export function DetailsRow({ toolName, block, cwd, home, openFile, inspect, useD
     : model.titleKey
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}

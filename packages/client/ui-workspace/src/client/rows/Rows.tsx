@@ -162,6 +162,16 @@ function hoverTimeLabel(updatedAt: number, now: number, t: RowTranslate): string
 }
 
 /**
+ * Pluralized group size from the dictionary's count templates.
+ * @param sessionCount - visible sessions in the group.
+ * @param t - the browser root's locale seat.
+ * @returns the localized count label.
+ */
+function sessionCountLabel(sessionCount: number, t: RowTranslate): string {
+  return t(sessionCount === 1 ? 'sessions.count.one' : 'sessions.count.other', { n: sessionCount })
+}
+
+/**
  * Absolute creation time through the dictionary's date template (the message
  * clock pattern): `toLocaleString` would follow the browser language, not the
  * app locale, and produce mixed-language text after a switch.
@@ -173,9 +183,11 @@ function createdLabel(createdAt: number, t: RowTranslate): string {
   return t('hover.created', { time: `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}` })
 }
 
-/** Hover-card body: workspace title, display directory path, absolute creation time. */
-function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
+/** Hover-card body: workspace title, group size, display directory path, absolute creation time. */
+function WorkspaceHoverContent({ label, sessionCount, runningCount, cwd, createdAt, t }: {
   label: string
+  sessionCount: number
+  runningCount: number
   cwd: string | undefined
   createdAt: number
   t: RowTranslate
@@ -183,6 +195,8 @@ function WorkspaceHoverContent({ label, cwd, createdAt, t }: {
   return (
     <div className={css.hoverContent}>
       <div className={css.hoverTitle}>{label}</div>
+      <div className={css.hoverTime}>{sessionCountLabel(sessionCount, t)}</div>
+      {runningCount > 0 && <div className={css.hoverStatus}><StateDot state="ongoing" /><span>{t(runningCount === 1 ? 'group.running.one' : 'group.running.other', { n: runningCount })}</span></div>}
       <div className={css.hoverPath}>{cwd}</div>
       <div className={css.hoverTime}>{createdLabel(createdAt, t)}</div>
     </div>
@@ -297,6 +311,7 @@ function ProjectRow({
       data-row-key={`workspace:${group.key}`}
       role="treeitem"
       aria-expanded={row.expanded}
+      tabIndex={0}
       onClick={onToggle}
       {...getTriggerProps(workspaceMenuTarget === undefined ? undefined : { kind: 'workspace', value: { ...workspaceMenuTarget, displayTitle: label } })}
       draggable={drag !== undefined}
@@ -319,6 +334,8 @@ function ProjectRow({
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
+      {row.runningCount > 0 && <span className={css.slot} aria-label={t(row.runningCount === 1 ? 'group.running.one' : 'group.running.other', { n: row.runningCount })}><StateDot state="ongoing" /></span>}
+      {row.pendingCount > 0 && <span className={css.slot} aria-label={t(row.pendingCount === 1 ? 'group.awaiting.one' : 'group.awaiting.other', { n: row.pendingCount })}><StateDot state="warning" /></span>}
       <span className={css.rowActions}>
         {workspaceMenuTarget !== undefined && (
           <button type="button" className={css.iconButton} data-context-menu-trigger
@@ -352,6 +369,8 @@ function ProjectRow({
       anchor={ownRow}
       content={<WorkspaceHoverContent
         label={row.label}
+        sessionCount={row.sessionCount}
+        runningCount={row.runningCount}
         cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
         createdAt={row.createdAt}
         t={t}
@@ -528,6 +547,7 @@ export function SearchResultItem({
     <div
       className={clsx(css.searchResultRow, selected && css.selected, result.archived && css.archived)}
       role="treeitem"
+      tabIndex={0}
       aria-selected={selected}
       aria-description={result.archived ? t('toast.archivedNotOpenable') : undefined}
       onClick={() => { onOpen(result.id) }}

@@ -9,12 +9,18 @@ export interface ProcessActivitySummary {
   readonly runningDetail: string
   /** Present only while the selected live activity has not reached tool/call. */
   readonly preparing?: true
+  /** Distinct settled calls that failed within this group. */
+  readonly failedCount?: number
 }
 
 /** Presentation facts for one group between independent replies or input. */
 export interface ProcessGroupData {
-  readonly turn: number
+  readonly turn: number | undefined
+  /** Consecutive session-scoped context rows; absent for execution groups. */
+  readonly contextCount?: number
   readonly closed: boolean
+  /** Earliest known member start, retained while the group identity survives. */
+  readonly startTime?: number
   readonly summary: ProcessActivitySummary
 }
 

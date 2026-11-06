@@ -8,6 +8,9 @@ import type { DesktopFileDrag } from '@deepseek-ai/dsh-util-file-drag'
 
 /** IPC channel names kept private to the desktop application bundle. */
 export const DESKTOP_IPC = {
+  notifyShow: 'dsh-desktop:notify-show',
+  notifyClicked: 'dsh-desktop:notify-clicked',
+  notifyPermission: 'dsh-desktop:notify-permission',
   fileSave: 'dsh-desktop:file-save',
   clipboardImageRead: 'dsh-desktop:clipboard-image-read',
   shortcutsInput: 'dsh-desktop:shortcuts-input',
@@ -79,6 +82,14 @@ export interface DesktopUpdatePresentation {
 
 /** Product documents cannot supply update versions, package URLs, or installation authorization. */
 export interface DshDesktopProductApi {
+  readonly notifications: {
+    /** Present one native notification. */
+    show(request: DesktopNotificationRequest): Promise<void>
+    /** Subscribe to notification clicks; the listener receives the session id when one was carried. */
+    subscribe(listener: (sessionId: string) => void): () => void
+    /** The current OS authorization state. */
+    permission(): Promise<DesktopNotificationPermission>
+  }
   readonly fileActions: DesktopFileActions
   readonly protocolVersion: 1
   readonly browser: DesktopBrowserBridge
@@ -112,4 +123,17 @@ export function assertDesktopSender(event: IpcMainInvokeEvent, hostnames: readon
   if (url.protocol !== `${SCHEME}:` || !hostnames.includes(url.hostname)) {
     throw new Error('dsh desktop: rejected IPC from an unowned renderer')
   }
+}
+
+/** OS notification authorization state as the shell reports it. */
+export type DesktopNotificationPermission = 'granted' | 'denied' | 'default' | 'unsupported'
+
+/** One native notification the shell is asked to present. */
+export interface DesktopNotificationRequest {
+  /** Short headline the OS shows in the notification centre. */
+  readonly title: string
+  /** Detail line the OS shows under the headline. */
+  readonly body: string
+  /** Session the notification opens when clicked; absent opens no conversation. */
+  readonly sessionId?: string
 }

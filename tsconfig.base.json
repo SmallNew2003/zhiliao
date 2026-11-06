@@ -28,6 +28,23 @@
     // not declaration path aliases, keep each package/vendor source compiled
     // under its own tsconfig boundary.
     "paths": {
+      "@deepseek-ai/dsh-mcp-discovery": ["./packages/mcp/mcp-discovery/src/index.ts"],
+      "@deepseek-ai/dsh-mcp-discovery/types": ["./packages/mcp/mcp-discovery/src/types.ts"],
+      "@deepseek-ai/dsh-memory": ["./packages/memory/memory/src/index.ts"],
+      "@deepseek-ai/dsh-memory/types": ["./packages/memory/memory/src/types.ts"],
+      "@deepseek-ai/dsh-memory-hindsight-http": ["./packages/memory/hindsight-http/src/index.ts"],
+      "@deepseek-ai/dsh-tool-memory": ["./packages/memory/tool-memory/src/index.ts"],
+      "@deepseek-ai/dsh-host-memory-controller": ["./packages/host/memory-controller/src/index.ts"],
+      "@deepseek-ai/dsh-host-memory-controller/types": ["./packages/host/memory-controller/src/types.ts"],
+      "@deepseek-ai/dsh-assistant-task": ["./packages/assistant/task/src/index.ts"],
+      "@deepseek-ai/dsh-assistant-task/types": ["./packages/assistant/task/src/types.ts"],
+      "@deepseek-ai/dsh-tool-assistant-task": ["./packages/assistant/tool-task/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-memory-browser": ["./packages/client/ui-memory-browser/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-memory-browser/client": ["./packages/client/ui-memory-browser/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-assistant": ["./packages/client/ui-assistant/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-assistant/client": ["./packages/client/ui-assistant/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-notification": ["./packages/client/ui-notification/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-notification/client": ["./packages/client/ui-notification/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-file-actions": ["./packages/client/ui-file-actions/src/index.ts"],
       "@deepseek-ai/dsh-client-ui-file-actions/client": ["./packages/client/ui-file-actions/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-file-actions/types": ["./packages/client/ui-file-actions/src/types.ts"],

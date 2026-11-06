@@ -1,6 +1,6 @@
 // Composer statistics pills, each its own 'conversation.composer.dock' list
 // entry (activity, usage) so a plugin can replace or add one pill by id.
-// Compact keeps speed and cache hit as plain readings; Detailed adds counts,
+// Compact keeps model duration and cache hit as plain readings; Detailed adds counts,
 // token totals, and click-open dialogs. Settled-node identity prevents
 // stream-delta updates from rerendering the pills.
 
@@ -245,18 +245,18 @@ function DialogPill({ stat, icon, label, text, title, titleValue, children }: Pi
 }
 
 /**
- * Turn and step counts with whole-session speed, opening the time and speed
- * dialog; Compact keeps only the speed reading.
+ * Model duration opens the whole-session timing and speed dialog in Detailed mode.
  */
 export const ActivityPill = memo(function ActivityPill({ useChat, useProjection, usePerformanceUsage, t }: StatPillProps) {
   const mode = usePerformanceUsage(value => value)
   const stats = useSessionStats(useChat, useProjection)
   const speed = stats.decodeMs > 0 ? decodeSpeed(stats, t) : null
   const icon = <IconGaugeOutlineRegular />
-  if (mode === 'compact') return speed === null ? null : <PlainPill stat="activity" icon={icon} {...reading(speed, null)} />
+  const duration = stats.llmMs > 0 ? t('stats.modelTime', { duration: formatDuration(stats.llmMs, t) }) : null
+  if (mode === 'compact') return duration === null ? null : <PlainPill stat="activity" icon={icon} {...reading(duration, null)} />
   if (stats.steps === 0) return null
   const counts = t('stats.counts', { turns: stats.turns, steps: stats.steps })
-  const content: PillContent = { stat: 'activity', icon, ...reading(counts, speed) }
+  const content: PillContent = { stat: 'activity', icon, ...reading(duration ?? counts, null) }
   // A window without one timed figure has no dialog rows to show, so the pill
   // stays a plain reading instead of a button opening an empty dialog.
   if (stats.llmMs <= 0 && stats.toolMs <= 0 && stats.ttftSteps <= 0 && speed === null) return <PlainPill {...content} />

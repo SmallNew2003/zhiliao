@@ -202,6 +202,14 @@ flowchart LR
   cfg --> plugin_dsh_base_llm_deepseek
   plugin_dsh_base_llm_deepseek_account["llm-deepseek-account<br/>@deepseek-ai/dsh-llm-deepseek-account"]
   cfg --> plugin_dsh_base_llm_deepseek_account
+  plugin_dsh_base_memory["memory<br/>@deepseek-ai/dsh-memory"]
+  cfg --> plugin_dsh_base_memory
+  plugin_dsh_base_memory_hindsight_http["memory-hindsight-http<br/>@deepseek-ai/dsh-memory-hindsight-http"]
+  cfg --> plugin_dsh_base_memory_hindsight_http
+  plugin_dsh_base_tool_memory["tool-memory<br/>@deepseek-ai/dsh-tool-memory"]
+  cfg --> plugin_dsh_base_tool_memory
+  plugin_dsh_base_mcp_discovery["mcp-discovery<br/>@deepseek-ai/dsh-mcp-discovery"]
+  cfg --> plugin_dsh_base_mcp_discovery
 ```
 
 | Plugin id | Package / module |
@@ -303,6 +311,10 @@ flowchart LR
 | `fs-sandbox` | `@deepseek-ai/dsh-fs-sandbox` |
 | `llm-deepseek` | `@deepseek-ai/dsh-llm-deepseek-api-key` |
 | `llm-deepseek-account` | `@deepseek-ai/dsh-llm-deepseek-account` |
+| `memory` | `@deepseek-ai/dsh-memory` |
+| `memory-hindsight-http` | `@deepseek-ai/dsh-memory-hindsight-http` |
+| `tool-memory` | `@deepseek-ai/dsh-tool-memory` |
+| `mcp-discovery` | `@deepseek-ai/dsh-mcp-discovery` |
 
 Source config: [`packages/bundle/base/cordis.patch.yml`](../../packages/bundle/base/cordis.patch.yml).
 

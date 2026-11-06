@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/mcp/mcp-discovery/README.md
+/:
+  en: d3e01d15e1e341a8
+  zh: a9277490c812a377
+/deepseek-ai-dsh-mcp-discovery:
+  en: d3a472d4852c7961
+  zh: fd5a868c0926ae8c
+/deepseek-ai-dsh-mcp-discovery/summary:
+  en: a6b49ec92abb99d3
+  zh: a95bdd36dffa85fb
+/deepseek-ai-dsh-mcp-discovery/table-of-contents:
+  en: 23386452a66b2fbd
+  zh: dc8dd4f5941b9f74
+/deepseek-ai-dsh-mcp-discovery/use-this-package:
+  en: 41405456f44044f9
+  zh: 0a57d92b95ce5279
+/deepseek-ai-dsh-mcp-discovery/understand-the-implementation:
+  en: 25bd3e189796b4b9
+  zh: 2d6bdfff0d55c6a5
+/deepseek-ai-dsh-mcp-discovery/further-exploration:
+  en: 29363ba165892264
+  zh: 616ecfeea83d7246
+/deepseek-ai-dsh-mcp-discovery/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-mcp-discovery/model-experience/discovery-and-selected-definitions:
+  en: 3a5c29a4e20c1ccb
+  zh: 59600e8531872cdb
+/deepseek-ai-dsh-mcp-discovery/model-experience/discovery-and-selected-definitions/what-the-model-sees:
+  en: cca76dceb24c10ad
+  zh: 77979728437f636c
+/deepseek-ai-dsh-mcp-discovery/model-experience/discovery-and-selected-definitions/token-effect:
+  en: 7d586fd955a66a1e
+  zh: b0522c122bffd8fe
+/deepseek-ai-dsh-mcp-discovery/model-experience/discovery-and-selected-definitions/kv-cache-effect:
+  en: f17533b13ea3a8c3
+  zh: 7efb657fa551eb56
+/deepseek-ai-dsh-mcp-discovery/known-limitations-and-deferred-work:
+  en: be30384b4fddc90e
+  zh: e897edede431da1c
+/deepseek-ai-dsh-mcp-discovery/known-limitations-and-deferred-work/dev-note:
+  en: 940c183309f24cc9
+  zh: 84822e0c8d84574c

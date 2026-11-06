@@ -10,7 +10,7 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import { MutableSessionEventSource } from '@deepseek-ai/dsh-api-session-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { StaticRemoteAccess } from '@deepseek-ai/dsh-client-test-runtime'
+import { StaticRemoteAccess, TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import type { HostObservable, RootStandardSourceContribution } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -32,6 +32,7 @@ interface SessionsBench {
   setMainView(id: SessionId, count: number): void
   setRetainInfo(id: SessionId, count: number): void
   emitStatus(id: SessionId, running: boolean): void
+  emitError(id: SessionId, message: string): void
   release(id: SessionId): Promise<void>
 }
 
@@ -41,15 +42,7 @@ const roots: Context[] = []
 
 function createSessionsBench(ctx: Context): SessionsBench {
   roots.push(ctx)
-  let statusListener: ((id: SessionId, running: boolean) => void) | undefined
-  ctx.provide('remote', {
-    $on: (_event: string, listener: (id: SessionId, running: boolean) => void) => {
-      statusListener = listener
-      return () => {
-        if (statusListener === listener) statusListener = undefined
-      }
-    },
-  } as never)
+  const remote = new TestRemote(ctx)
   const list = createSnapshotStore<SessionListState>({
     ids: [],
     byId: {},
@@ -171,10 +164,8 @@ function createSessionsBench(ctx: Context): SessionsBench {
         retainedBy: count === 0 ? {} : { mainView: count },
       })
     },
-    emitStatus(id, running) {
-      if (statusListener === undefined) throw new Error('api-session/status is not subscribed')
-      statusListener(id, running)
-    },
+    emitStatus(id, running) { remote.emit('api-session/status', [id, running]) },
+    emitError(id, message) { remote.emit('api-session/error', [id, message]) },
     async release(id) {
       bindings.delete(id)
       const scopeCtx = scopes.get(id)
@@ -556,6 +547,7 @@ describe('UiSession status', () => {
       running: false,
       pendingInteraction: undefined,
       completionUnread: false,
+      lastAgentError: null,
     })
     bench.list.update((draft) => { draft.byId[id]!.running = true })
     expect(service.sessionStatus.getSnapshot().get(id)?.running).toBe(true)
@@ -599,6 +591,7 @@ describe('UiSession status', () => {
       running: false,
       pendingInteraction: undefined,
       completionUnread: true,
+      lastAgentError: null,
     })
     bench.list.update((draft) => { draft.phase = 'ready' })
     expect(service.sessionStatus.getSnapshot().has(id)).toBe(false)
@@ -791,4 +784,18 @@ describe('ui-session apply', () => {
   it('keeps the Host loader half inert', () => {
     expect(() => { nodeApply() }).not.toThrow()
   })
+})
+
+
+it('publishes a session failure and clears it when the session runs again', () => {
+  const ctx = new Context()
+  const bench = createSessionsBench(ctx)
+  const id = sessionId('failed')
+  bench.binding(id)
+  const service = createUiSession(ctx, bench)
+  expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBeNull()
+  bench.emitError(id, 'provider unavailable')
+  expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBe('provider unavailable')
+  bench.emitStatus(id, true)
+  expect(service.sessionStatus.getSnapshot().get(id)?.lastAgentError).toBeNull()
 })

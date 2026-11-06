@@ -1216,3 +1216,26 @@ describe('Trajectory conversation Definitions', () => {
     ])
   })
 })
+
+it.each(['user/message-edit', 'plugin:user/message-edit'])('restores the pre-input prompt for %s', (editType) => {
+  const message = (id: string, text: string) => ({ id, role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
+  const value = assembler([
+    at(1, 'turn/start', { turn: 1 }),
+    at(2, 'step/start', { turn: 1, step: 1 }),
+    at(3, 'system/message', { turn: 1, step: 1, message: systemMessage('before') }, { surfaceOp: 'append' }),
+    at(4, 'user/message', message('original', 'original'), { surfaceOp: 'append' }),
+    at(5, 'request/header', { reason: 'initial', header: { config: { provider: 'test', model: 'test' }, tools: [] } }),
+    at(6, 'system/message', { turn: 1, step: 1, message: systemMessage('after') }, { surfaceOp: 'append' }),
+    at(7, 'assistant/message', { turn: 1, step: 1, message: assistantMessage('first', 'first') }),
+    at(8, 'step/end', { turn: 1, step: 1 }),
+    at(9, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    at(10, editType, { targetSeq: 4, message: message('edit', 'edited') }, { ignorable: true }),
+    at(11, 'turn/start', { turn: 2 }),
+    at(12, 'step/start', { turn: 2, step: 1 }),
+    at(13, 'request/header', { reason: 'series', header: { config: { provider: 'test', model: 'test' }, tools: [] } }),
+    at(14, 'assistant/message', { turn: 2, step: 1, message: assistantMessage('second', 'second') }),
+  ])
+  const requests = snapshot(value).requests
+  const last = requests.at(-1)
+  expect(last?.purpose === 'assistant' ? last.prompt?.system : undefined).toBe('before')
+})

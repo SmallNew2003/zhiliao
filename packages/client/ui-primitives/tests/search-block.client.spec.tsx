@@ -225,3 +225,16 @@ describe('SearchBlock copy', () => {
     expect(view.container.firstElementChild?.getAttribute('data-search')).toBe('paths')
   })
 })
+
+
+describe('SearchBlock navigation and highlights', () => {
+  it('highlights the query and opens a matched file at its recorded line', () => {
+    const open = vi.fn()
+    const view = render(<SearchMatchesBlock kind="matches" truncated={false} total={1}
+      files={[{ path: 'src/a.ts', matches: [{ lineNumber: 7, line: 'return Hello' }] }]}
+      query="hello" onOpenPath={open} />)
+    expect(view.container.querySelector('mark')?.textContent).toBe('Hello')
+    fireEvent.keyDown(view.getByRole('button', { name: /7:.*return.*Hello/ }), { key: 'Enter' })
+    expect(open).toHaveBeenCalledWith('src/a.ts', 7)
+  })
+})

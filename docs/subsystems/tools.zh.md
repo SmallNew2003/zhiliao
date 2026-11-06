@@ -221,6 +221,18 @@ interface ResolvedToolSet {
 }
 ```
 
+## 执行器预览
+
+`ctx.tools.preview()` 通过所选执行器渲染拟议定义集合，不注册该集合，也不改变步骤准入。`ToolPreview` 包含生成的模型声明、SDK 文本与已求值的执行器分区，让 [MCP 发现](mcp.zh.md#progressive-discovery)等消费方在提交选择前测量完整贡献。
+
+```ts type-equiv
+/** Model declarations and literal prompt sections produced by one selected executor. */
+interface ToolPreview extends ToolModelInput {
+  /** Executor sections with their text already evaluated against the proposed definitions. */
+  readonly sections: readonly (Omit<PromptSection, 'text'> & { readonly text: string })[]
+}
+```
+
 ## 执行器与原始调用批次
 
 `ctx.tools.execute()` 把完整的原始模型调用批次委托给最近作用域的执行器。服务在每个批次开始时选择当前提供者；提示词组装仅返回模型输入。`agent` 在独立服务调用中不存在；`log` 在模型步骤之外的程序调用（例如初始化钩子）中不存在。有 Agent 而没有 `log` 时，调用仍受该 Agent 的工具作用域约束，但不记录根调用／结果事件。工具自身的事件仍可使用 Agent 的 Session。
@@ -706,6 +718,16 @@ definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinitio
  * @returns one deep-cloned schema per visible tool.
  */
 schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[]
+
+/**
+ * Render proposed definitions through the scope's selected executor without
+ * registering tools or evaluating step activation conditions.
+ * @param definitions - definitions whose complete model representation is being priced.
+ * @param scope - viewing Agent or preset; omission uses the deployment executor.
+ * @returns executor-owned declarations and rendered sections.
+ * @throws ToolExecutorUnavailableError when the selected executor is unavailable.
+ */
+preview(definitions: readonly ToolDefinition[], scope?: ScopeKey): ToolPreview
 
 /**
  * Provide the executor for the calling scope; an unscoped contribution is the deployment default.

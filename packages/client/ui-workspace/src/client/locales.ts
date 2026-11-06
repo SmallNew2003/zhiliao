@@ -125,6 +125,13 @@ export const zh = {
   'time.months': '{n}个月',
   'time.years': '{n}年',
   'time.ago': '{t}前',
+  'expansion.label': '展开',
+  'expansion.expandAll': '全部展开',
+  'expansion.collapseAll': '全部折叠',
+  'group.running.one': '{n} 个会话进行中',
+  'group.running.other': '{n} 个会话进行中',
+  'group.awaiting.one': '{n} 个会话等待中',
+  'group.awaiting.other': '{n} 个会话等待中',
 } satisfies Record<string, string>
 
 /** The workspace namespace key union. */
@@ -251,6 +258,13 @@ export const en = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': '{t} ago',
+  'expansion.label': 'Expansion',
+  'expansion.expandAll': 'Expand all',
+  'expansion.collapseAll': 'Collapse all',
+  'group.running.one': '{n} session running',
+  'group.running.other': '{n} sessions running',
+  'group.awaiting.one': '{n} session waiting',
+  'group.awaiting.other': '{n} sessions waiting',
 } satisfies Record<WorkspaceKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -374,6 +388,13 @@ export const ja = {
   'time.months': '{n}か月',
   'time.years': '{n}年',
   'time.ago': '{t}前',
+  'expansion.label': '展開',
+  'expansion.expandAll': 'すべて展開',
+  'expansion.collapseAll': 'すべて折りたたむ',
+  'group.running.one': '{n} 件のセッションが実行中',
+  'group.running.other': '{n} 件のセッションが実行中',
+  'group.awaiting.one': '{n} 件のセッションが待機中',
+  'group.awaiting.other': '{n} 件のセッションが待機中',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -497,6 +518,13 @@ export const es = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': 'Hace {t}',
+  'expansion.label': 'Expansión',
+  'expansion.expandAll': 'Expandir todo',
+  'expansion.collapseAll': 'Contraer todo',
+  'group.running.one': '{n} sesión en ejecución',
+  'group.running.other': '{n} sesiones en ejecución',
+  'group.awaiting.one': '{n} sesión en espera',
+  'group.awaiting.other': '{n} sesiones en espera',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -620,6 +648,13 @@ export const fr = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': 'Il y a {t}',
+  'expansion.label': 'Déploiement',
+  'expansion.expandAll': 'Tout déployer',
+  'expansion.collapseAll': 'Tout replier',
+  'group.running.one': '{n} séance en cours',
+  'group.running.other': '{n} séances en cours',
+  'group.awaiting.one': '{n} séance en attente',
+  'group.awaiting.other': '{n} séances en attente',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -743,6 +778,13 @@ export const de = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': 'Vor {t}',
+  'expansion.label': 'Erweitern',
+  'expansion.expandAll': 'Alle erweitern',
+  'expansion.collapseAll': 'Alle reduzieren',
+  'group.running.one': '{n} laufende Sitzung',
+  'group.running.other': '{n} laufende Sitzungen',
+  'group.awaiting.one': '{n} wartende Sitzung',
+  'group.awaiting.other': '{n} wartende Sitzungen',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -866,6 +908,13 @@ export const ru = {
   'time.months': '{n}mo',
   'time.years': '{n}y',
   'time.ago': '{t} назад',
+  'expansion.label': 'Развёртывание',
+  'expansion.expandAll': 'Развернуть всё',
+  'expansion.collapseAll': 'Свернуть всё',
+  'group.running.one': '{n} сеанс выполняется',
+  'group.running.other': '{n} сеансов выполняется',
+  'group.awaiting.one': '{n} сеанс ожидает',
+  'group.awaiting.other': '{n} сеансов ожидают',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -989,4 +1038,11 @@ export const pt = {
   'time.months': '{n} mês',
   'time.years': '{n}s',
   'time.ago': '{t} atrás',
+  'expansion.label': 'Expansão',
+  'expansion.expandAll': 'Expandir tudo',
+  'expansion.collapseAll': 'Recolher tudo',
+  'group.running.one': '{n} sessão em execução',
+  'group.running.other': '{n} sessões em execução',
+  'group.awaiting.one': '{n} sessão aguardando',
+  'group.awaiting.other': '{n} sessões aguardando',
 } satisfies Record<keyof typeof en, string>

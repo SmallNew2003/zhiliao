@@ -221,6 +221,18 @@ interface ResolvedToolSet {
 }
 ```
 
+## Executor preview
+
+`ctx.tools.preview()` renders a proposed definition set through the selected executor without registering it or changing step admission. `ToolPreview` contains the resulting model declarations, SDK text, and evaluated executor sections, so consumers such as [MCP discovery](mcp.md#progressive-discovery) can measure complete contributions before committing a selection.
+
+```ts type-equiv
+/** Model declarations and literal prompt sections produced by one selected executor. */
+interface ToolPreview extends ToolModelInput {
+  /** Executor sections with their text already evaluated against the proposed definitions. */
+  readonly sections: readonly (Omit<PromptSection, 'text'> & { readonly text: string })[]
+}
+```
+
 ## Executors and raw call batches
 
 `ctx.tools.execute()` delegates a complete raw model-call batch to the nearest scoped executor. The service selects the current provider when each batch starts; prompt assembly returns only model input. `agent` is absent for standalone service calls; `log` is absent for programmatic calls outside a model step, such as initialization hooks. An Agent without `log` still scopes tool access but produces no root call/result events. Tool-owned events may still use its Session.
@@ -706,6 +718,16 @@ definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinitio
  * @returns one deep-cloned schema per visible tool.
  */
 schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[]
+
+/**
+ * Render proposed definitions through the scope's selected executor without
+ * registering tools or evaluating step activation conditions.
+ * @param definitions - definitions whose complete model representation is being priced.
+ * @param scope - viewing Agent or preset; omission uses the deployment executor.
+ * @returns executor-owned declarations and rendered sections.
+ * @throws ToolExecutorUnavailableError when the selected executor is unavailable.
+ */
+preview(definitions: readonly ToolDefinition[], scope?: ScopeKey): ToolPreview
 
 /**
  * Provide the executor for the calling scope; an unscoped contribution is the deployment default.

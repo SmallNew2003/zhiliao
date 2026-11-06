@@ -81,6 +81,8 @@ Models 页面包含 **DeepSeek 账号**（`deepseek-account`，英文为 **DeepS
 
 -----
 
+每个模型行提供 320K、640K、960K 上下文窗口预设，并保留精确的自定义容量及高级容量输入。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 

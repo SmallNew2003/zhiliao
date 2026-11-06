@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The `mcp/` group lets the model call external Model Context Protocol (MCP) tools and read server resources. Configure only `mcp-client` entries; shipped profiles already mount `mcp-resources` once. MCP tools and prompt text appear only for callers with a configured server in scope. Connections also supply server instructions. Package READMEs own configuration and limitations.
+The `mcp/` group lets the model discover external Model Context Protocol (MCP) capabilities, load selected tools, and read server resources. Configure `mcp-client` entries; shipped profiles provide progressive discovery and shared resource tools. MCP tools and prompt text appear only for callers with a configured server in scope. Connections supply server instructions, and discovery controls their request admission. Package READMEs own configuration and limitations.
 
 ## Table of Contents
 
@@ -22,11 +22,12 @@ The `mcp/` group lets the model call external Model Context Protocol (MCP) tools
 <a id="packages"></a>
 ## Packages
 
-The client owns each configured connection; the shared resource package supplies resource tools across those connections.
+The client owns each configured connection; discovery selects definitions and instructions, while the resource package supplies shared resource tools.
 
 | Package | What it provides |
 |---|---|
 | [`mcp-client/`](mcp-client/README.md) | Connect one MCP server, expose its tools and instructions, and provide its resource operations |
+| [`mcp-discovery/`](mcp-discovery/README.md) | Scoped capability discovery, bounded loading, and request-bound execution identities |
 | [`mcp-resources/`](mcp-resources/README.md) | Discover and read resources through shared tools with explicit server selection |
 
 -----

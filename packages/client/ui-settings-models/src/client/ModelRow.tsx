@@ -1,6 +1,6 @@
 /** Shared model fields and actions for both adapter catalog editors. */
 
-import type { DragEvent, ReactNode } from 'react'
+import { useId, type DragEvent, type ReactNode } from 'react'
 import {
   IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconDragHandleOutlineRegular,
   IconTrashOutlineRegular, Tooltip, useRowDragPreview,
@@ -18,6 +18,46 @@ interface CapacityInput {
   placeholder: string
   onChange: (value: string) => void
   onBlur?: () => void
+}
+
+const CONTEXT_WINDOW_PRESETS = ['320K', '640K', '960K']
+
+/** Common presets stay visible; other capacities keep their exact value in the summary. */
+function ContextWindowPresets({ input, position, disabled, t }: {
+  input: CapacityInput
+  position: number
+  disabled: boolean
+  t: (key: ModelsKey) => string
+}): ReactNode {
+  const groupName = useId()
+  const isPreset = CONTEXT_WINDOW_PRESETS.includes(input.value)
+  return (
+    <fieldset className={styles['contextWindowField']} role="radiogroup" aria-label={`${t('contextWindowPreset')} ${String(position)}`}>
+      <legend className={styles['modelFieldLabel']}>
+        {t('contextWindow')}
+        {!isPreset && input.value !== ''
+          ? <span className={styles['contextWindowValue']} title={input.value}>{t('contextWindowCustom')} {input.value}</span>
+          : null}
+      </legend>
+      <div className={styles['contextWindowChoices']}>
+        {CONTEXT_WINDOW_PRESETS.map(value => (
+          <label key={value} className={styles['contextWindowChoice']}>
+            <input
+              type="radio"
+              name={groupName}
+              value={value}
+              checked={input.value === value}
+              disabled={disabled}
+              onChange={() => {
+                input.onChange(value)
+              }}
+            />
+            <span>{value}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
 }
 
 /** Adapter-owned data and actions for one model row. */
@@ -182,6 +222,7 @@ export function ModelRow(props: ModelRowProps): ReactNode {
           )
           : null}
       </div>
+      <ContextWindowPresets input={props.contextWindow} position={position} disabled={disabled} t={t} />
     </div>
   )
 }

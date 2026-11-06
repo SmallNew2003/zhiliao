@@ -87,7 +87,9 @@ export function searchCardModel(block: ToolCallBlock): SearchCardModel | null {
   const meta = block.meta as Record<string, unknown>
   if (typeof meta.truncated !== 'boolean') return null
   if (typeof meta.total !== 'number' || !Number.isInteger(meta.total) || meta.total < 0) return null
-  const common = { truncated: meta.truncated, total: meta.total }
+  const call = parsedToolCall(block)
+  const query = typeof call?.args.pattern === 'string' ? call.args.pattern : undefined
+  const common = { truncated: meta.truncated, total: meta.total, query }
   const recovery = meta.truncated ? flattenContent(block.content) : undefined
   if (tool === 'grep') {
     if (meta.shape !== 'matches') return null

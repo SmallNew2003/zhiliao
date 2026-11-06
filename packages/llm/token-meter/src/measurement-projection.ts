@@ -1,4 +1,6 @@
 /** Fixed-size recovery facts; positional attachment prices remain a rebuildable cache. */
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import { assembleAssistantStream } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
@@ -20,15 +22,21 @@ const usageFields = z.looseObject({
 // Keep provider fields and optional-property presence exactly as recorded.
 const usageSchema = z.custom<TokenUsage>(value => usageFields.safeParse(value).success)
 
+const anchorSchema = z.object({
+  headerSeq: seqSchema.nullable(),
+  assistantTokens: countSchema,
+  usage: usageSchema.nullable(),
+}).strict().nullable()
+
 const measurementStateSchema = z.object({
   headerSeq: seqSchema.nullable(),
   stepStart: z.object({ turn: z.number(), step: z.number() }).strict().nullable(),
-  anchor: z.object({
-    headerSeq: seqSchema.nullable(),
-    assistantTokens: countSchema,
-    usage: usageSchema.nullable(),
-  }).strict().nullable(),
+  anchor: anchorSchema,
   invalidSeq: seqSchema.nullable(),
+  latestInput: z.object({
+    seq: seqSchema, messageId: z.string().min(1).transform(MessageId), edited: z.boolean(),
+    anchor: anchorSchema, invalidSeq: seqSchema.nullable(),
+  }).strict().optional(),
 }).strict()
 
 /** One header reference, one open step, and the latest successful call's usage facts. */
@@ -37,12 +45,31 @@ export type MeasurementState = z.infer<typeof measurementStateSchema>
 /**
  * Advance one measurement prefix without mutating its previous state.
  * @param state - measurement facts before the candidate event.
- * @param event - next committed journal event.
+ * @param sourceEvent - next committed journal event.
  * @returns updated measurement facts.
  * @throws the original measurement error for invalid boundaries or payloads.
  */
-export function advanceMeasurement(state: MeasurementState, event: SessionEvent): MeasurementState {
+export function advanceMeasurement(state: MeasurementState, sourceEvent: SessionEvent): MeasurementState {
+  const input = readSessionInputEvent(sourceEvent)
+  const previousInput = state.latestInput
+  const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
+    && previousInput.messageId === input.data.id
+    ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
   switch (event.type) {
+    case 'user/message':
+      return event.data.source.kind === 'user'
+        ? {
+          ...state,
+          latestInput: { seq: event.seq, messageId: event.data.id, edited: false, anchor: state.anchor, invalidSeq: state.invalidSeq },
+        } : state
+    case 'user/message-edit': {
+      const previous = state.latestInput
+      if (previous?.seq !== event.data.targetSeq) throw new Error('token measurement: edit target is not the latest input')
+      return {
+        ...state, anchor: previous.anchor, invalidSeq: previous.invalidSeq,
+        latestInput: { ...previous, seq: event.seq, messageId: event.data.message.id, edited: true },
+      }
+    }
     case 'request/header':
       canonicalHeader(event.data.header)
       return { ...state, headerSeq: event.seq }
@@ -84,10 +111,11 @@ export function advanceMeasurement(state: MeasurementState, event: SessionEvent)
 /** Host-only measurement facts, independent of session and surface length. */
 export const measurementProjectionDefinition = {
   key: 'tokenMeasurement',
-  stateVersion: 2,
+  stateVersion: 4,
   stateSchema: measurementStateSchema,
   init: (): MeasurementState => ({ headerSeq: null, stepStart: null, anchor: null, invalidSeq: null }),
-  apply: (state, event) => {
+  apply: (state, sourceEvent) => {
+    const event = readSessionInputEvent(sourceEvent)
     if (state.invalidSeq !== null) return state
     try {
       return advanceMeasurement(state, event)

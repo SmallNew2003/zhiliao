@@ -122,7 +122,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'currentSelection(): ModelSelection',
         description: 'Read the current default model selection.',
         parameters: [],
-        returns: 'a detached provider, model, and optional reasoning selection.',
+        returns: 'a detached route, optional reasoning effort, and context budget.',
       },
       {
         signature: 'async saveSelection(next: ModelSelection): Promise<void>',
@@ -460,6 +460,61 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'assistantTasks',
+    summary: 'Host-wide assistant records and assistant tasks.',
+    description: 'Host-wide assistant records and assistant tasks.\n\nAssistant conversations are ordinary Sessions; task execution Sessions are ordinary root Sessions created through the same Session controller the Web client uses. This service owns only the durable mapping, status derivation, and separation identity; it never writes task markers into Session headers.',
+    methods: [
+      {
+        signature: '@Remote(\'ensureAssistant\') async ensureAssistant(request: AssistantsEnsureRequest): Promise<AssistantView>',
+        description: 'Create or reuse one assistant in the requested scope.',
+        parameters: [{ name: 'request', description: 'Global or project scope; a project must name a registered Workspace.' }],
+        returns: 'The current assistant record.',
+      },
+      {
+        signature: '@Remote(\'assistants\') listAssistants(request?: AssistantsListRequest): AssistantView[]',
+        description: 'List assistant records.',
+        parameters: [{ name: 'request', description: 'Optional scope filter.' }],
+        returns: 'Matching assistants, global first.',
+      },
+      {
+        signature: '@Remote(\'tasks\') listTasks(request?: AssistantTasksListRequest): AssistantTaskView[]',
+        description: 'List assistant tasks newest first.',
+        parameters: [{ name: 'request', description: 'Optional assistant, project, and page bounds.' }],
+        returns: 'One bounded page of task views.',
+      },
+      {
+        signature: '@Remote(\'cancelTask\') async cancelTask(request: AssistantTasksCancelRequest): Promise<AssistantTaskView>',
+        description: 'Cancel one assistant task.',
+        parameters: [{ name: 'request', description: 'Task identity.' }],
+        returns: 'The updated task view, or the unchanged terminal task.',
+      },
+      {
+        signature: '@Remote(\'visibility\') visibility(): AssistantVisibilityValue',
+        description: 'Read the Session ids the assistant surface must separate from user tasks.',
+        parameters: [],
+        returns: 'Current and retired assistant Sessions, every task execution Session, and each one\'s owning assistant or task.',
+      },
+      {
+        signature: 'async createTask(request: AssistantTaskCreateRequest): Promise<AssistantTaskCreateValue>',
+        description: 'Create one assistant task and deliver its first prompt through the Session controller.',
+        parameters: [{ name: 'request', description: 'Caller assistant Session, prompt, optional title and target project.' }],
+        returns: 'The task and its reserved execution Session.',
+      },
+      {
+        signature: 'isAssistant(sessionId: SessionId): boolean',
+        description: 'Check whether the Session is a registered assistant conversation.',
+        parameters: [{ name: 'sessionId', description: 'candidate conversation Session.' }],
+        returns: 'whether the assistant domain owns this conversation.',
+      },
+      {
+        signature: 'getTask(id: AssistantTaskId): AssistantTaskView | undefined',
+        description: 'Read one task view by id, if present.',
+        parameters: [{ name: 'id', description: 'task identity.' }],
+        returns: 'current task view, or undefined when absent.',
+      },
+    ],
+  },
+  {
     key: 'attachments',
     summary: 'Immutable binary attachment service.',
     description: 'Immutable binary attachment service. Implementations validate bytes before publishing a reference.',
@@ -724,8 +779,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'abstract compactIfNeeded( agent: CompactionAgentContext, trigger: CompactionTrigger, signal: AbortSignal, ): Promise<CompactionResult | null>',
-        description: 'Consider automatic compaction for one explicit trigger. Pressure policy uses the latest durable routed request, while context-overflow policy may force a useful balanced reduction even below the normal threshold. Return `null` when no safe range can be compacted. A single oversized retained unit or request envelope cannot be repaired through surface compaction.',
-        parameters: [{ name: 'agent', description: 'agent context owning the session surface and routing options.' }, { name: 'trigger', description: 'normal pressure or provider-confirmed context overflow.' }, { name: 'signal', description: 'cancellation signal; model-backed implementations must forward it.' }],
+        description: 'Consider automatic compaction for one explicit trigger. Pressure policy uses the latest durable routed request, while context-overflow policy may force a useful balanced reduction even below the normal threshold. Return `null` when no safe range can be compacted for a best-effort trigger. Explicit context-budget admission rejects when the estimated request cannot fit after reserving resolved output tokens, including when automatic summarization is disabled. A single oversized retained unit or request envelope cannot be repaired through surface compaction.',
+        parameters: [{ name: 'agent', description: 'agent context owning the session surface and routing options.' }, { name: 'trigger', description: 'normal pressure, provider-confirmed overflow, or strict explicit-budget admission.' }, { name: 'signal', description: 'cancellation signal; model-backed implementations must forward it.' }],
         returns: 'the compaction result, or `null` if no compaction was needed.',
       },
       {
@@ -2072,6 +2127,48 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'mcpDiscovery',
+    summary: 'Deferred MCP definitions share permission filtering and execution with ordinary tools.',
+    description: 'Deferred MCP definitions share permission filtering and execution with ordinary tools.',
+    methods: [
+      {
+        signature: 'registerServer(server: string, source: ServerSource): () => void',
+        description: 'Register a configured server in the caller\'s scope.',
+        parameters: [{ name: 'server', description: 'namespace.' }, { name: 'source', description: 'connection facts.' }],
+        returns: 'effect disposer.',
+      },
+      {
+        signature: 'registerTool(server: string, definition: ToolDefinition): () => void',
+        description: 'Register one deferred MCP definition without changing authorization.',
+        parameters: [{ name: 'server', description: 'owning namespace.' }, { name: 'definition', description: 'original tool.' }],
+        returns: 'effect disposer.',
+      },
+      {
+        signature: 'search(scope?: ScopeKey, request: SearchRequest = {}): DiscoveryPage',
+        description: 'Search the permission-filtered catalog without loading schemas.',
+        parameters: [{ name: 'scope', description: 'caller identity.' }, { name: 'request', description: 'bounded filters and pagination.' }],
+        returns: 'complete byte-limited page.',
+      },
+      {
+        signature: 'load(agent: Agent, names: readonly string[], servers: readonly string[] = [], signal?: AbortSignal): LoadResult',
+        description: 'Atomically add tool definitions and complete server instructions.',
+        parameters: [{ name: 'agent', description: 'durable owner.' }, { name: 'names', description: 'exact public tool names.' }, { name: 'servers', description: 'resource-only activation targets.' }, { name: 'signal', description: 'cancellation before commit.' }],
+        returns: 'admission or refusal.',
+      },
+      {
+        signature: 'release(agent: Agent, names?: readonly string[], servers: readonly string[] = []): LoadResult',
+        description: 'Release selections for future requests; started snapshots stay fixed.',
+        parameters: [{ name: 'agent', description: 'owner.' }, { name: 'names', description: 'names, or omission to release all.' }, { name: 'servers', description: 'activated server names to release.' }],
+        returns: 'remaining selection.',
+      },
+      {
+        signature: 'assertServer(server: string, exec: ToolExecution): void',
+        description: 'Guard model resource calls before network access. Programmatic calls without an Agent bypass activation only.',
+        parameters: [{ name: 'server', description: 'resource namespace.' }, { name: 'exec', description: 'execution owner.' }],
+      },
+    ],
+  },
+  {
     key: 'mcpResources',
     summary: 'Scoped resource access plus three tools shared by configured MCP servers.',
     description: 'Scoped resource access plus three tools shared by configured MCP servers.',
@@ -2081,6 +2178,86 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Register one server and expose resource tools while that scope has providers.',
         parameters: [{ name: 'server', description: 'configured server name, unique in this scope.' }, { name: 'provider', description: 'connection-owned resource operations.' }],
         returns: 'the effect disposer for this exact registration.',
+      },
+    ],
+  },
+  {
+    key: 'memory',
+    summary: 'The long-term memory service.',
+    description: 'The long-term memory service. Registered as `ctx.memory` (one instance per context).\n\nSelection semantics (resolved at call time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `MEMORY_PROVIDER_CONFIGURED_MISSING`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `MEMORY_PROVIDER_UNAVAILABLE`.\n- No id configured, no usable provider → `MEMORY_PROVIDER_UNAVAILABLE`.\n\nEvery method degrades loudly rather than silently: a missing or unhealthy backend raises MemoryError so callers can decide to warn and continue. Callers on the agent hot path are expected to catch, because memory must never block a turn.',
+    methods: [
+      {
+        signature: 'registerProvider(provider: MemoryProvider): () => void',
+        description: 'Register a memory provider. Throws MemoryError `MEMORY_DUPLICATE_PROVIDER` when its id is taken. Returns a disposer; disposed with the calling fiber.',
+        parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'isAvailable(): boolean',
+        description: 'Whether a usable provider is currently registered. Callers on the agent hot path check this first so a disabled or unreachable backend costs nothing.\n\nThis never throws: "is memory usable" must be answerable as `false`, otherwise every caller needs its own try/catch around the question. A misconfigured provider id is still reported through MemoryError on the calls that need a provider.',
+        parameters: [],
+        returns: 'true when at least one registered provider reports itself available.',
+      },
+      {
+        signature: 'async resolveBank(workspaceRoot: string, signal?: AbortSignal): Promise<MemoryBankId>',
+        description: 'Resolve the bank that owns `workspaceRoot`, creating it when absent. Selection errors surface here unchanged.',
+        parameters: [{ name: 'workspaceRoot', description: 'absolute directory whose bank should be resolved.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the bank id for that workspace.',
+      },
+      {
+        signature: 'async search(request: MemorySearchRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemorySearchResult>',
+        description: 'Search a bank\'s memories through the selected provider. The seam enforces `request.limit`: an over-returning provider\'s `units` are truncated and `truncated` set.',
+        parameters: [{ name: 'request', description: 'the query and optional limit.' }, { name: 'bankId', description: 'the bank to search.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the search outcome, capped to `request.limit`.',
+      },
+      {
+        signature: 'async recall(request: MemoryRecallRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRecallResult>',
+        description: 'Recall memories relevant to a session opening. The seam enforces `request.limit`.',
+        parameters: [{ name: 'request', description: 'the opening prompt and optional limit.' }, { name: 'bankId', description: 'the bank to recall from.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the recall outcome, capped to `request.limit`.',
+      },
+      {
+        signature: 'async retain(request: MemoryRetainRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRetainResult>',
+        description: 'Retain a finished session\'s transcript into a bank.',
+        parameters: [{ name: 'request', description: 'the transcript to retain.' }, { name: 'bankId', description: 'the bank to retain into.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the retention outcome reported by the backend.',
+      },
+    ],
+  },
+  {
+    key: 'memoryController',
+    summary: 'Remote-only service exposing the memory daemon\'s read-only browse surface: bank listing, per-bank statistics, the knowledge-page tree, knowledge-base search, and one page\'s body.',
+    description: 'Remote-only service exposing the memory daemon\'s read-only browse surface: bank listing, per-bank statistics, the knowledge-page tree, knowledge-base search, and one page\'s body.\n\nRegistered as `ctx.memoryController` under the `memoryController` namespace, which is distinct from the `memory` seam\'s own key so the two never collide.',
+    methods: [
+      {
+        signature: '@Remote(\'list\') async list(): Promise<MemoryListResult>',
+        description: 'List the memory banks the daemon holds, so a browser can pick one to read.',
+        parameters: [],
+        returns: 'the banks with their fact counts and last-write instants, or why the listing is unavailable.',
+      },
+      {
+        signature: '@Remote(\'stats\') async stats(bankId: string): Promise<MemoryStatsResult>',
+        description: 'Read one bank\'s statistics: node, link, and document totals plus the fact type and link type distributions.',
+        parameters: [{ name: 'bankId', description: 'provider-owned bank id; contains `::`, so it is encoded.' }],
+        returns: 'the statistics, or why they are unavailable.',
+      },
+      {
+        signature: '@Remote(\'pages\') async pages(bankId: string): Promise<MemoryPagesResult>',
+        description: 'List one bank\'s knowledge pages as a flat, depth-first list.',
+        parameters: [{ name: 'bankId', description: 'provider-owned bank id.' }],
+        returns: 'the pages, or why the tree is unavailable.',
+      },
+      {
+        signature: '@Remote(\'search\') async search(bankId: string, query: string, limit: number | undefined): Promise<MemorySearchResult>',
+        description: 'Search one bank\'s knowledge base.\n\nThis is the knowledge-base index, not the seam\'s `search`, which answers by running inference on the daemon and takes a minute or more. A browser panel cannot wait for that, so the panel searches the curated pages instead.',
+        parameters: [{ name: 'bankId', description: 'provider-owned bank id.' }, { name: 'query', description: 'free text to match against page bodies.' }, { name: 'limit', description: 'maximum hits; clamped into `[1, 100]`, defaulting to 20.' }],
+        returns: 'the hits and the backend\'s total match count, or why the search is unavailable.',
+      },
+      {
+        signature: '@Remote(\'page\') async page(bankId: string, pageId: string): Promise<MemoryPageResult>',
+        description: 'Read one knowledge page\'s body.',
+        parameters: [{ name: 'bankId', description: 'provider-owned bank id.' }, { name: 'pageId', description: 'provider-owned page id.' }],
+        returns: 'the page body, a result without a page when the daemon holds none under that id, or why the read is unavailable.',
       },
     ],
   },
@@ -2753,6 +2930,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Admit one prompt after explicitly resuming its Session.',
         parameters: [{ name: 'request', description: 'Session identity, prompt content, source metadata, and delivery mode.' }, { name: 'signal', description: 'caller cancellation before prompt admission begins.' }],
         returns: 'acknowledgement that the Agent accepted the prompt.',
+      },
+      {
+        signature: '@Remote(\'editMessage\') editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue>',
+        description: 'Edit and resend the latest sent user input while retaining its original attachments.',
+        parameters: [{ name: 'request', description: 'target event, replacement text, and stable retry identity.' }],
+        returns: 'acceptance after the edit is durable; unchanged text requests another response.',
       },
       {
         signature: '@Remote(\'attachment\') attachment(request: SessionAttachmentRequest): Promise<SessionAttachmentValue>',
@@ -4105,6 +4288,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one deep-cloned schema per visible tool.',
       },
       {
+        signature: 'preview(definitions: readonly ToolDefinition[], scope?: ScopeKey): ToolPreview',
+        description: 'Render proposed definitions through the scope\'s selected executor without registering tools or evaluating step activation conditions.',
+        parameters: [{ name: 'definitions', description: 'definitions whose complete model representation is being priced.' }, { name: 'scope', description: 'viewing Agent or preset; omission uses the deployment executor.' }],
+        returns: 'executor-owned declarations and rendered sections.',
+        throws: ['ToolExecutorUnavailableError when the selected executor is unavailable.'],
+      },
+      {
         signature: 'setExecutor(executor: ToolExecutor): () => void',
         description: 'Provide the executor for the calling scope; an unscoped contribution is the deployment default. Rendering any executor-owned section requires the viewing scope\'s selection to remain available.',
         parameters: [{ name: 'executor', description: 'initialized provider owned by the contributing plugin.' }],
@@ -4772,12 +4962,28 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.modelSelection - captured step selection, retained across retries; omitted effort uses adapter defaults. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
+    name: 'agent/prepare-step',
+    mode: 'serial',
+    signature: '\'agent/prepare-step\'(this: Scoped<Agent>, payload: { agent: Agent; messages: readonly UserMessage[]; turn: number; step: number; signal: AbortSignal; modelSelection: Readonly<ModelSelection> }): void | Promise<void>',
+    summary: 'Prepare capabilities before step-time tool activation and prompt assembly.',
+    description: 'Prepare capabilities before step-time tool activation and prompt assembly. Rejection fails preparation without committing the claimed input.',
+    parameters: [{ name: 'payload', description: '.modelSelection - complete selection captured for this step.' }],
+  },
+  {
     name: 'agent/request-error',
     mode: 'waterfall',
     signature: '\'agent/request-error\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; provider: string; failure: LlmFailure; retryPolicy: ResolvedRetryPolicy | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>',
     summary: 'Handle one failed model-request attempt before the loop retries or closes its step.',
     description: 'Handle one failed model-request attempt before the loop retries or closes its step. A listener returns `{ kind: \'retry\' }` without calling `next()` when it owns recovery, or calls `next()` to delegate. The default `undefined` leaves the failure terminal.',
     parameters: [{ name: 'payload', description: '.signal - the turn abort signal. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
+  },
+  {
+    name: 'agent/request-preflight',
+    mode: 'serial',
+    signature: '\'agent/request-preflight\'(this: Scoped<Agent>, payload: { agent: Agent; request: GenerateOptions; turn: number; step: number; signal: AbortSignal }): Promise<void>',
+    summary: 'Admit the frozen, durably logged request before an assistant attempt starts.',
+    description: 'Admit the frozen, durably logged request before an assistant attempt starts. Throw to reject dispatch or append durable surface changes to repair it. The loop reconciles the prompt, rebuilds, and repeats preflight after a surface change, preserving the assembled route and current input batch. Listeners must not mutate the request; cancellation prevents dispatch.',
+    parameters: [{ name: 'payload', description: '.signal - live turn cancellation signal. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
     name: 'agent/status',
@@ -4850,6 +5056,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Ask composed answerers for one decision.',
     description: 'Ask composed answerers for one decision. Return an outcome to claim the request or call `next()` to delegate. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.',
     parameters: [{ name: 'req', description: 'pending approval request.' }],
+  },
+  {
+    name: 'assistant-task/changed',
+    mode: 'emit',
+    signature: '\'assistant-task/changed\'(taskId: AssistantTaskId): void',
+    summary: 'One assistant task changed; clients refresh the named task or catalog.',
+    description: 'One assistant task changed; clients refresh the named task or catalog.',
+    parameters: [{ name: 'taskId', description: 'task whose persisted view changed.' }],
+  },
+  {
+    name: 'assistant/changed',
+    mode: 'emit',
+    signature: '\'assistant/changed\'(): void',
+    summary: 'One assistant record was created, replaced, or retired.',
+    description: 'One assistant record was created, replaced, or retired.',
+    parameters: [],
   },
   {
     name: 'authorization/settled',
@@ -5636,6 +5858,22 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AssembledSection {\n    name: string;\n    text: string;\n    interpolate?: boolean;\n}',
   },
   {
+    name: 'AssistantConversationEntry',
+    declaration: 'export interface AssistantConversationEntry {\n    readonly sessionId: SessionId;\n    readonly assistantId: AssistantId;\n    readonly workspaceId?: WorkspaceId;\n    readonly retired: boolean;\n}',
+  },
+  {
+    name: 'AssistantExecutionEntry',
+    declaration: 'export interface AssistantExecutionEntry {\n    readonly sessionId: SessionId;\n    readonly taskId: AssistantTaskId;\n    readonly assistantId: AssistantId;\n    readonly workspaceId?: WorkspaceId;\n}',
+  },
+  {
+    name: 'AssistantId',
+    declaration: 'export type AssistantId = Branded<\'assistant-id\'>;',
+  },
+  {
+    name: 'AssistantKind',
+    declaration: 'export type AssistantKind = \'global\' | \'project\';',
+  },
+  {
     name: 'AssistantMessage',
     declaration: 'export interface AssistantMessage extends MessageBase {\n    readonly role: \'assistant\';\n    readonly source: ModelMessageSource;\n}',
   },
@@ -5644,12 +5882,60 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface AssistantProviderMetadata {\n    provider: string;\n    model: string;\n    replayState?: unknown;\n}',
   },
   {
+    name: 'AssistantsEnsureRequest',
+    declaration: 'export interface AssistantsEnsureRequest {\n    readonly kind: AssistantKind;\n    readonly workspaceId?: WorkspaceId;\n}',
+  },
+  {
+    name: 'AssistantsListRequest',
+    declaration: 'export interface AssistantsListRequest {\n    readonly kind?: AssistantKind;\n    readonly workspaceId?: WorkspaceId;\n}',
+  },
+  {
     name: 'AssistantStreamFrame',
     declaration: 'export type AssistantStreamFrame = {\n    readonly type: \'start\';\n    readonly attemptId: LlmAttemptId;\n    readonly revision: number;\n    readonly turn: number;\n    readonly step: number;\n} | {\n    readonly type: \'chunk\';\n    readonly attemptId: LlmAttemptId;\n    readonly revision: number;\n    readonly index: number;\n    readonly time: number;\n    readonly chunk: StreamChunk;\n} | {\n    readonly type: \'end\';\n    readonly attemptId: LlmAttemptId;\n    readonly revision: number;\n    readonly index: number;\n    readonly outcome: {\n        readonly kind: \'committed\';\n        readonly eventType: \'assistant/message\' | \'assistant/attempt\';\n        readonly seq: SessionSeq;\n    } | {\n        readonly kind: \'abandoned\';\n    };\n};',
   },
   {
     name: 'AssistantStreamRecord',
     declaration: 'export type AssistantStreamRecord = {\n    readonly type: \'text-chunks\';\n    readonly time0: number;\n    readonly index: number;\n    readonly dt: readonly number[];\n    readonly texts: readonly string[];\n} | {\n    readonly type: \'reasoning-chunks\';\n    readonly time0: number;\n    readonly index: number;\n    readonly dt: readonly number[];\n    readonly texts: readonly string[];\n} | {\n    readonly type: \'tool-call-chunks\';\n    readonly time0: number;\n    readonly index: number;\n    readonly dt: readonly number[];\n    readonly id: ToolCallId;\n    readonly name?: string;\n    readonly args: readonly string[];\n} | {\n    readonly type: \'chunk\';\n    readonly time: number;\n    readonly chunk: StreamChunk;\n};',
+  },
+  {
+    name: 'AssistantTaskCreateRequest',
+    declaration: 'export interface AssistantTaskCreateRequest {\n    readonly callerSessionId: SessionId;\n    readonly prompt: string;\n    readonly title?: string;\n    readonly workspaceId?: WorkspaceId;\n    readonly requestId?: string;\n    readonly signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'AssistantTaskCreateValue',
+    declaration: 'export interface AssistantTaskCreateValue {\n    readonly taskId: AssistantTaskId;\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'AssistantTaskFailure',
+    declaration: 'export interface AssistantTaskFailure {\n    readonly code: string;\n    readonly message: string;\n}',
+  },
+  {
+    name: 'AssistantTaskId',
+    declaration: 'export type AssistantTaskId = Branded<\'assistant-task-id\'>;',
+  },
+  {
+    name: 'AssistantTasksCancelRequest',
+    declaration: 'export interface AssistantTasksCancelRequest {\n    readonly id: AssistantTaskId;\n}',
+  },
+  {
+    name: 'AssistantTasksListRequest',
+    declaration: 'export interface AssistantTasksListRequest {\n    readonly assistantId?: AssistantId;\n    readonly workspaceId?: WorkspaceId;\n    readonly limit?: number;\n    readonly offset?: number;\n}',
+  },
+  {
+    name: 'AssistantTaskStatus',
+    declaration: 'export type AssistantTaskStatus = \'created\' | \'running\' | \'waiting-approval\' | \'waiting-answer\' | \'done\' | \'failed\' | \'cancelled\';',
+  },
+  {
+    name: 'AssistantTaskView',
+    declaration: 'export interface AssistantTaskView {\n    readonly id: AssistantTaskId;\n    readonly assistantId: AssistantId;\n    readonly workspaceId?: WorkspaceId;\n    readonly title: string;\n    readonly status: AssistantTaskStatus;\n    readonly sessionId: SessionId;\n    readonly sessionAvailable: boolean;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly failure?: AssistantTaskFailure;\n}',
+  },
+  {
+    name: 'AssistantView',
+    declaration: 'export interface AssistantView {\n    readonly id: AssistantId;\n    readonly kind: AssistantKind;\n    readonly workspaceId?: WorkspaceId;\n    readonly sessionId: SessionId;\n    readonly retiredSessionIds: readonly SessionId[];\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+  },
+  {
+    name: 'AssistantVisibilityValue',
+    declaration: 'export interface AssistantVisibilityValue {\n    readonly sessionIds: readonly SessionId[];\n    readonly conversations: readonly AssistantConversationEntry[];\n    readonly executions: readonly AssistantExecutionEntry[];\n}',
   },
   {
     name: 'AtInput',
@@ -5897,7 +6183,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CompactionTrigger',
-    declaration: 'export type CompactionTrigger = \'pressure\' | \'context-overflow\';',
+    declaration: 'export type CompactionTrigger = \'pressure\' | \'context-overflow\' | \'context-budget\';',
   },
   {
     name: 'CompositionRowEnablement',
@@ -6240,6 +6526,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface DirectoryRegistrationHandle {\n    (): void;\n    replace(entries: readonly LlmConfigurableProvider[]): void;\n}',
   },
   {
+    name: 'DiscoveryItem',
+    declaration: 'export interface DiscoveryItem {\n    server: string;\n    name?: string;\n    description: string;\n    connected: boolean;\n}',
+  },
+  {
+    name: 'DiscoveryPage',
+    declaration: 'export interface DiscoveryPage {\n    items: DiscoveryItem[];\n    nextOffset: number | null;\n    hint: string;\n}',
+  },
+  {
     name: 'Domain',
     declaration: 'export interface Domain<S extends DomainSpec> {\n    readonly name: string;\n    readonly global: DomainGlobalHandleOf<S>;\n    table<N extends keyof S[\'tables\'] & string>(name: N): KvTable<TableKeyOf<S, N>, TableValueOf<S, N>>;\n    close(): Promise<void>;\n}',
   },
@@ -6573,7 +6867,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions<Purpose extends string = LlmRequestPurpose> {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: RequestMessage[];\n    system?: string;\n    tools?: ToolSchema[];\n    toolHistory?: ToolHistory;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: Purpose;\n}',
+    declaration: 'export interface GenerateOptions<Purpose extends string = LlmRequestPurpose> {\n    provider: string;\n    model: string;\n    contextWindow?: number;\n    reasoningEffort?: ReasoningEffortId;\n    messages: RequestMessage[];\n    system?: string;\n    tools?: ToolSchema[];\n    toolHistory?: ToolHistory;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: Purpose;\n}',
   },
   {
     name: 'GenericCallView',
@@ -6909,7 +7203,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmCallControls',
-    declaration: 'export interface LlmCallControls {\n    reasoningEffort?: ReasoningEffortId;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n}',
+    declaration: 'export interface LlmCallControls {\n    contextWindow?: number;\n    reasoningEffort?: ReasoningEffortId;\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n}',
   },
   {
     name: 'LlmConfigurableProvider',
@@ -6982,6 +7276,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LlmRuntime',
     declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined;\n    imageRequestTarget(provider: string, model: string, image: ImageAttachmentRef): ImageRequestTarget;\n    fileRequestText(ref: FileAttachmentRef): string;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(conf /* …truncated — full shape in source */',
+  },
+  {
+    name: 'LoadResult',
+    declaration: 'export type LoadResult = {\n    ok: true;\n    names: string[];\n    servers: string[];\n} | {\n    ok: false;\n    reason: string;\n};',
   },
   {
     name: 'LocalAtInput',
@@ -7132,6 +7430,102 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
   },
   {
+    name: 'MemoryAnswer',
+    declaration: 'export type MemoryAnswer<T> = ({\n    readonly available: true;\n} & T) | {\n    readonly available: false;\n    readonly reason: MemoryUnavailableReason;\n    readonly detail: string;\n};',
+  },
+  {
+    name: 'MemoryBankId',
+    declaration: 'export type MemoryBankId = Branded<\'MemoryBankId\'>;',
+  },
+  {
+    name: 'MemoryBanksPayload',
+    declaration: 'export interface MemoryBanksPayload {\n    readonly banks: readonly MemoryBankSummary[];\n}',
+  },
+  {
+    name: 'MemoryBankStats',
+    declaration: 'export interface MemoryBankStats {\n    readonly bankId: string;\n    readonly totalNodes: number;\n    readonly totalLinks: number;\n    readonly totalDocuments: number;\n    readonly nodesByFactType: readonly MemoryCount[];\n    readonly linksByLinkType: readonly MemoryCount[];\n    readonly pendingOperations: number;\n    readonly failedOperations: number;\n}',
+  },
+  {
+    name: 'MemoryBankSummary',
+    declaration: 'export interface MemoryBankSummary {\n    readonly bankId: string;\n    readonly name: string;\n    readonly factCount: number;\n    readonly lastWriteAt?: string;\n}',
+  },
+  {
+    name: 'MemoryCount',
+    declaration: 'export interface MemoryCount {\n    readonly label: string;\n    readonly count: number;\n}',
+  },
+  {
+    name: 'MemoryId',
+    declaration: 'export type MemoryId = Branded<\'MemoryId\'>;',
+  },
+  {
+    name: 'MemoryKnowledgePage',
+    declaration: 'export interface MemoryKnowledgePage {\n    readonly pageId: string;\n    readonly name: string;\n    readonly description?: string;\n    readonly updatedAt?: string;\n    readonly stale: boolean;\n}',
+  },
+  {
+    name: 'MemoryKnowledgePageBody',
+    declaration: 'export interface MemoryKnowledgePageBody {\n    readonly pageId: string;\n    readonly name: string;\n    readonly body: string;\n}',
+  },
+  {
+    name: 'MemoryListResult',
+    declaration: 'export type MemoryListResult = MemoryAnswer<MemoryBanksPayload>;',
+  },
+  {
+    name: 'MemoryPagePayload',
+    declaration: 'export interface MemoryPagePayload {\n    readonly page?: MemoryKnowledgePageBody;\n}',
+  },
+  {
+    name: 'MemoryPageResult',
+    declaration: 'export type MemoryPageResult = MemoryAnswer<MemoryPagePayload>;',
+  },
+  {
+    name: 'MemoryPagesPayload',
+    declaration: 'export interface MemoryPagesPayload {\n    readonly pages: readonly MemoryKnowledgePage[];\n}',
+  },
+  {
+    name: 'MemoryPagesResult',
+    declaration: 'export type MemoryPagesResult = MemoryAnswer<MemoryPagesPayload>;',
+  },
+  {
+    name: 'MemoryProvider',
+    declaration: 'export interface MemoryProvider {\n    readonly id: string;\n    available(): boolean;\n    resolveBank(workspaceRoot: string, signal?: AbortSignal): Promise<MemoryBankId>;\n    search(request: MemorySearchRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemorySearchResult>;\n    recall(request: MemoryRecallRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRecallResult>;\n    retain(request: MemoryRetainRequest, bankId: MemoryBankId, signal?: AbortSignal): Promise<MemoryRetainResult>;\n}',
+  },
+  {
+    name: 'MemoryRecallRequest',
+    declaration: 'export interface MemoryRecallRequest {\n    readonly prompt: string;\n    readonly limit?: number;\n}',
+  },
+  {
+    name: 'MemoryRecallResult',
+    declaration: 'export interface MemoryRecallResult {\n    readonly units: readonly MemoryUnit[];\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'MemoryRetainRequest',
+    declaration: 'export interface MemoryRetainRequest {\n    readonly turns: readonly TranscriptTurn[];\n    readonly bankId?: MemoryBankId;\n}',
+  },
+  {
+    name: 'MemoryRetainResult',
+    declaration: 'export interface MemoryRetainResult {\n    readonly retained: boolean;\n    readonly detail?: string;\n}',
+  },
+  {
+    name: 'MemorySearchRequest',
+    declaration: 'export interface MemorySearchRequest {\n    readonly query: string;\n    readonly limit?: number;\n}',
+  },
+  {
+    name: 'MemoryStatsPayload',
+    declaration: 'export interface MemoryStatsPayload {\n    readonly stats?: MemoryBankStats;\n}',
+  },
+  {
+    name: 'MemoryStatsResult',
+    declaration: 'export type MemoryStatsResult = MemoryAnswer<MemoryStatsPayload>;',
+  },
+  {
+    name: 'MemoryUnavailableReason',
+    declaration: 'export type MemoryUnavailableReason = \'unavailable\' | \'misconfigured\' | \'unreachable\' | \'failed\';',
+  },
+  {
+    name: 'MemoryUnit',
+    declaration: 'export interface MemoryUnit {\n    readonly id: MemoryId;\n    readonly text: string;\n    readonly bankId?: MemoryBankId;\n}',
+  },
+  {
     name: 'Mergeability',
     declaration: 'export type Mergeability = \'mergeable\' | \'conflicting\' | \'unknown\';',
   },
@@ -7249,7 +7643,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ModelCatalogModel',
-    declaration: 'export interface ModelCatalogModel {\n    readonly id: string;\n    readonly name: string;\n    readonly description?: string;\n    readonly reasoning?: ModelReasoning;\n    readonly badge?: LlmModelBadge;\n}',
+    declaration: 'export interface ModelCatalogModel {\n    readonly contextWindow?: number;\n    readonly id: string;\n    readonly name: string;\n    readonly description?: string;\n    readonly reasoning?: ModelReasoning;\n    readonly badge?: LlmModelBadge;\n}',
   },
   {
     name: 'ModelMessageSource',
@@ -7585,7 +7979,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PreStepDecision',
-    declaration: 'export type PreStepDecision = {\n    kind: \'reject\';\n} | {\n    kind: \'enter\';\n    messages: UserMessage[];\n    startsRequestSeries?: true;\n};',
+    declaration: 'export type PreStepDecision = {\n    kind: \'reject\';\n} | {\n    kind: \'enter\';\n    messages: UserMessage[];\n    startsRequestSeries?: true;\n    committedMessages?: readonly {\n        seq: SessionSeq;\n        message: UserMessage;\n    }[];\n};',
   },
   {
     name: 'PreToolDecision',
@@ -7900,10 +8294,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type RequestErrorAction = {\n    kind: \'retry\';\n} | undefined;',
   },
   {
-    name: 'RequestHeaderReason',
-    declaration: 'export type RequestHeaderReason = \'initial\' | \'resume\' | \'change\' | \'series\';',
-  },
-  {
     name: 'RequestImageAttachment',
     declaration: 'export interface RequestImageAttachment {\n    variantId: ImageVariantId;\n    attachment: ImageAttachmentRef;\n    data: Uint8Array;\n    mediaType: ImageMediaType;\n    bytes: number;\n    width: number;\n    height: number;\n    depth: \'uchar\';\n    space: \'srgb\';\n    hasAlpha: boolean;\n}',
   },
@@ -8156,6 +8546,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SearchPathsResultView {\n    card: \'search\';\n    shape: \'paths\';\n    title?: string;\n    paths: string[];\n    truncated: boolean;\n    total: number;\n}',
   },
   {
+    name: 'SearchRequest',
+    declaration: 'export interface SearchRequest {\n    query?: string;\n    server?: string;\n    names?: readonly string[];\n    offset?: number;\n}',
+  },
+  {
     name: 'SearchResultView',
     declaration: 'export type SearchResultView = SearchMatchesResultView | SearchPathsResultView;',
   },
@@ -8178,6 +8572,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ServerResponse',
     declaration: 'export interface ServerResponse {\n    readonly type: \'server-response\';\n    readonly rpcId: RpcId;\n    readonly result: ConnectionRpcResult<unknown>;\n}',
+  },
+  {
+    name: 'ServerSource',
+    declaration: 'export interface ServerSource {\n    instructions(): string;\n    connected(): boolean;\n}',
   },
   {
     name: 'Session',
@@ -8268,6 +8666,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionCreateValue {\n    readonly sessionId: SessionId;\n    readonly agentPreset?: string;\n}',
   },
   {
+    name: 'SessionEditMessageRequest',
+    declaration: 'export interface SessionEditMessageRequest {\n    readonly sessionId: SessionId;\n    readonly targetSeq: SessionSeq;\n    readonly text: string;\n    readonly requestId: SessionRequestId;\n}',
+  },
+  {
+    name: 'SessionEditMessageValue',
+    declaration: 'export interface SessionEditMessageValue {\n    readonly accepted: true;\n}',
+  },
+  {
     name: 'SessionEndInput',
     declaration: 'export interface SessionEndInput {\n    reason: \'clear\' | \'logout\' | \'prompt_input_exit\' | \'resume\' | \'other\';\n    sessionId: string;\n}',
   },
@@ -8289,7 +8695,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionEventMap',
-    declaration: 'export interface SessionEventMap {\n    \'turn/start\': {\n        turn: number;\n    };\n    \'turn/end\': {\n        turn: number;\n        reason: TurnEndReason;\n    };\n    \'step/start\': {\n        turn: number;\n        step: number;\n    };\n    \'step/end\': {\n        turn: number;\n        step: number;\n    };\n    \'user/message\': UserMessage;\n    \'developer/message\': {\n        turn: number;\n        step: number;\n        message: DeveloperMessage;\n        headerSeq?: SessionSeq;\n    };\n    \'system/message\': {\n        turn: number;\n        step: number;\n        message: SystemMessage;\n    };\n    \'assistant/message\': {\n        turn: number;\n        step: number;\n        message: AssistantMessage;\n        stream: AssistantStreamRecord[];\n        usage?: TokenUsage;\n        interrupted?: true;\n    };\n    \'assistant/attempt\': {\n        turn: number;\n        step: number;\n        stream: AssistantStreamRecord[];\n    };\n    \'tool/call\': {\n        turn: number;\n        step: number;\n        callId: ToolCallId;\n        name: string;\n        arguments: string;\n    };\n    \'tool/result\': {\n        turn: number;\n        step: number;\n        message: ToolResultMessage;\n        error?: {\n            name: string;\n            code: string;\n            reason?: string;\n        };\n        meta?: JsonValue;\n    };\n    \'request/header\': {\n        header: EpochHeader;\n        reason: RequestHeaderReason;\n        startsSeries?: true;\n    };\n    \'request/context\': RequestContext;\n    \'session/end-seed\': {\n   /* …truncated — full shape in source */',
+    declaration: 'export interface SessionEventMap {\n    \'user/message-edit\': {\n        targetSeq: SessionSeq;\n        message: UserMessage;\n    };\n    \'user/message-admit\': {\n        targetSeq: SessionSeq;\n        message: UserMessage;\n    };\n    \'turn/start\': {\n        turn: number;\n    };\n    \'turn/end\': {\n        turn: number;\n        reason: TurnEndReason;\n    };\n    \'step/start\': {\n        turn: number;\n        step: number;\n    };\n    \'step/end\': {\n        turn: number;\n        step: number;\n    };\n    \'user/message\': UserMessage;\n    \'developer/message\': {\n        turn: number;\n        step: number;\n        message: DeveloperMessage;\n        headerSeq?: SessionSeq;\n    };\n    \'system/message\': {\n        turn: number;\n        step: number;\n        message: SystemMessage;\n    };\n    \'assistant/message\': {\n        turn: number;\n        step: number;\n        message: AssistantMessage;\n        stream: AssistantStreamRecord[];\n        usage?: TokenUsage;\n        interrupted?: true;\n    };\n    \'assistant/attempt\': {\n        turn: number;\n        step: number;\n        stream: AssistantStreamRecord[];\n    };\n    \'tool/call\': {\n        turn: number;\n        step: number;\n        callId: ToolCallId;\n        name: string;\n        arguments: string;\n    };\n    \'tool/result\': {\n        turn: number;\n        step: number;\n        message: ToolResultMessage;\n        error?: {\n            name: string;\n            code: string;\n            reason?: string;\n        };\n        meta?: JsonValue;\n    };\n   /* …truncated — full shape in source */',
   },
   {
     name: 'SessionEventMetadataFilter',
@@ -8729,7 +9135,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionSurfaceSnapshot',
-    declaration: 'export interface SessionSurfaceSnapshot {\n    session: SessionHeader;\n    inheritedEventCount: SessionLogOffset;\n    capturedThroughSeq: OptionalSessionSeq;\n    events: SurfaceEvent[];\n}',
+    declaration: 'export interface SessionSurfaceSnapshot {\n    session: SessionHeader;\n    inheritedEventCount: SessionLogOffset;\n    capturedThroughSeq: OptionalSessionSeq;\n    events: (SurfaceEvent | SessionEvent<\'user/message-edit\'>)[];\n}',
   },
   {
     name: 'SessionTelemetryRecord',
@@ -9612,6 +10018,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ToolOutputDefinition {\n    readonly schema: JsonSchemaNode;\n    render(args: unknown, value: JsonValue): ContentBlock[];\n    presentationMeta?(args: unknown, value: JsonValue): JsonValue;\n}',
   },
   {
+    name: 'ToolPreview',
+    declaration: 'export interface ToolPreview extends ToolModelInput {\n    readonly sections: readonly (Omit<PromptSection, \'text\'> & {\n        readonly text: string;\n    })[];\n}',
+  },
+  {
     name: 'ToolPromptSection',
     declaration: 'export interface ToolPromptSection extends Pick<PromptSection, \'name\' | \'order\' | \'interpolate\'> {\n    readonly text: string | ((tools: readonly ToolDefinition[]) => string);\n}',
   },
@@ -9657,7 +10067,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolsService',
-    declaration: 'export class ToolsService extends Service {\n    static inject;\n    static Config;\n    constructor(ctx: Context);\n    register(definition: ToolDefinition, options: ToolRegistrationOptions = {}): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    get(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    executable(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    async resolve(context: ToolActivationContext): Promise<ResolvedToolSet>;\n    definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinition[];\n    schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[];\n    setExecutor(executor: ToolExecutor): () => void;\n    async execute(input: ToolBatchInput): Promise<ToolBatchResult>;\n    guard(guard: ToolGuard): () => void;\n    checkGuards(exec: ToolExecution): string | undefined;\n}',
+    declaration: 'export class ToolsService extends Service {\n    static inject;\n    static Config;\n    constructor(ctx: Context);\n    register(definition: ToolDefinition, options: ToolRegistrationOptions = {}): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    get(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    executable(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    async resolve(context: ToolActivationContext): Promise<ResolvedToolSet>;\n    definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinition[];\n    schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[];\n    preview(definitions: readonly ToolDefinition[], scope?: ScopeKey): ToolPreview;\n    setExecutor(executor: ToolExecutor): () => void;\n    async execute(input: ToolBatchInput): Promise<ToolBatchResult>;\n    guard(guard: ToolGuard): () => void;\n    checkGuards(exec: ToolExecution): string | undefined;\n}',
   },
   {
     name: 'ToolUpdate',
@@ -9674,6 +10084,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TranscriptionRequest',
     declaration: 'export interface TranscriptionRequest {\n    readonly audioBase64: string;\n    readonly providerId?: SpeechProviderId;\n    readonly language?: string;\n}',
+  },
+  {
+    name: 'TranscriptTurn',
+    declaration: 'export interface TranscriptTurn {\n    readonly turn: number;\n    readonly prompt: string;\n    readonly response?: string;\n}',
   },
   {
     name: 'TranslationProvider',

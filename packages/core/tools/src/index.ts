@@ -4,7 +4,8 @@ import z from '@deepseek-ai/schemastery'
 import { AnonymousEntries, NamedEntries, ScopedLayers, scopeOf, scopeChainOf } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey, ScopeLayer } from '@deepseek-ai/dsh-scope'
 import { ToolExecutorUnavailableError } from './executor.ts'
-import type { ToolExecutor, ToolBatchInput, ToolBatchResult } from './executor.ts'
+import type { ToolExecutor, ToolBatchInput, ToolBatchResult, ToolModelInput } from './executor.ts'
+import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
 import './events.ts'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import { projectToolSchema } from './schema.ts'
@@ -33,6 +34,12 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     tools: ToolsService
   }
+}
+
+/** Model declarations and literal prompt sections produced by one selected executor. */
+export interface ToolPreview extends ToolModelInput {
+  /** Executor sections with their text already evaluated against the proposed definitions. */
+  readonly sections: readonly (Omit<PromptSection, 'text'> & { readonly text: string })[]
 }
 
 /** One restriction compiled at registration for repeated live-global lookup. */
@@ -315,6 +322,25 @@ export class ToolsService extends Service {
    */
   schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[] {
     return this.definitions(scope, toolSet).map(definition => projectToolSchema(definition, true))
+  }
+
+  /**
+   * Render proposed definitions through the scope's selected executor without
+   * registering tools or evaluating step activation conditions.
+   * @param definitions - definitions whose complete model representation is being priced.
+   * @param scope - viewing Agent or preset; omission uses the deployment executor.
+   * @returns executor-owned declarations and rendered sections.
+   * @throws ToolExecutorUnavailableError when the selected executor is unavailable.
+   */
+  preview(definitions: readonly ToolDefinition[], scope?: ScopeKey): ToolPreview {
+    const executor = this.selectExecutor(scope)
+    return {
+      ...executor.describe(definitions),
+      sections: (executor.sections ?? []).map(section => ({
+        ...section,
+        text: typeof section.text === 'function' ? section.text(definitions) : section.text,
+      })),
+    }
   }
   /**
    * Provide the executor for the calling scope; an unscoped contribution is the deployment default.

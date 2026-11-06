@@ -3,6 +3,7 @@ import { createAssistantMessage, createToolResultMessage, createUserMessage, Too
 import type { ContentBlock, ImageBlock } from '@deepseek-ai/dsh-llm'
 import { deriveEventMessage, foldSurface, Session, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionEventMap } from '@deepseek-ai/dsh-session'
+import { offloadOldestImages } from '../src/image-offload.ts'
 import { imageOffloadProjection } from '../src/projection.ts'
 
 function createSession(...args: Parameters<typeof Session.create>): Session {
@@ -30,6 +31,21 @@ function marked(session: Session): boolean[] {
 }
 
 describe('durable image selections', () => {
+  it('offloads images from a historical namespaced edited input', () => {
+    const seed = createSession(SessionId('legacy-image-seed'))
+    const original = input(seed, [image])
+    const edited = seed.append('user/message-edit', {
+      targetSeq: original.seq,
+      message: createUserMessage({ content: [image], source: { kind: 'user' } }),
+    })
+    const raw = seed.snapshotEvents().map(event => event.type === 'user/message-edit'
+      ? { ...event, type: 'plugin:user/message-edit', ignorable: true } as never : event)
+    const restored = createSession(SessionId('legacy-image-restored'), raw)
+    expect(offloadOldestImages(restored, [edited.seq], 1)).toBe(true)
+    expect(marked(restored)).toEqual([true])
+    expect(restored.snapshotEvents()[edited.seq]?.type).toBe('plugin:user/message-edit')
+  })
+
   it('preserves message identity, original data, and previously derived snapshots', () => {
     const session = createSession(SessionId('images'))
     const source = input(session, [

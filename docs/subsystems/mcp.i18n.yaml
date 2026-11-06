@@ -6,23 +6,29 @@
   en: 8e65e07d162dcc41
   zh: 5f4ae607cd468767
 /mcp/summary:
-  en: 7855928245a9ae43
-  zh: 41a2e31cfe7c68c3
+  en: bd9bc3053ada440b
+  zh: 1f74ef944f5ef309
 /mcp/table-of-contents:
-  en: 5c0aa5a2e528af97
-  zh: ae2ba2297294e3de
+  en: 4f8a067f11797ad6
+  zh: 58b220e547d7b768
 /mcp/configuration:
-  en: 2f81683ec4a5d00a
-  zh: 24d09bf8c02029da
+  en: 1d26fcd76e46d303
+  zh: b148af40e36b90ab
 /mcp/responsibilities-and-scope:
-  en: dd1323247f70625e
-  zh: 10a7eb288d7bd223
+  en: a7232697beab6614
+  zh: 37d5390637649933
+/mcp/progressive-discovery:
+  en: b3f4ee4ca1fdf695
+  zh: 9e0b366f04e42ed0
+/mcp/discovery-types:
+  en: 81cc82e3ff7f2913
+  zh: a8f633e53888f5fc
 /mcp/protocol-and-results:
   en: 46e9b914f016b636
   zh: e1e9ee92a22f2562
 /mcp/resources-and-instructions:
-  en: df9cc13a5d6eb923
-  zh: 3276d65c19d4c446
+  en: 84836caa1269e6cb
+  zh: 0afcb1ef58ba7a40
 /mcp/resource-provider-types:
   en: 16ae356364b54262
   zh: 28fa0c87dbbd5e88
@@ -30,5 +36,5 @@
   en: 27a59706525c88ed
   zh: 1fb1684bc03bb6ae
 /mcp/further-reading:
-  en: d9bb664b4fd11b99
-  zh: f1a1d6badffdfb74
+  en: b19da7c140a49a4f
+  zh: 0dd3b765c16dea32

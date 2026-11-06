@@ -351,6 +351,8 @@ export function AskQuestionRow({
   )
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       useDisclosure={useDisclosure}
       t={t}
       variant={model.variant}

@@ -173,7 +173,7 @@ export function apply(ctx: Context): void {
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose() })
   const performanceUsage = performancePolicy.mode
-  registerChatNodeRenderers(ctx, performanceUsage, presentation)
+  registerChatNodeRenderers(ctx, performanceUsage, presentation, chatStore)
   ctx.slots.registerFactory({
     name: 'conversation.chat.user.content', scope: 'session', locale: NS,
     children: { 'conversation.chat.user.images': { kind: 'single', scope: 'session' } },

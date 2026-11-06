@@ -27,6 +27,21 @@ export function localPathMediaUrl(base: string, value: string): string | undefin
   return fileMediaUrl(base, path)
 }
 
+/**
+ * Strip unescaped pseudo-XML tool calls accidentally emitted in text streams by models.
+ * @param text - markdown text from model chunk.
+ * @returns sanitized text without pseudo tool-call XML blocks.
+ */
+export function cleanModelPseudoToolCalls(text: string): string {
+  if (!text.includes('<tool_call>') && !text.includes('</tool_call>')) return text
+  return text
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>(?:\n|$)/gi, '')
+    .replace(/<tool_call>[\s\S]*?(?:<\/parameter>\s*)+(?:\n|$)/gi, '')
+    .replace(/<\/?tool_call>\s*/gi, '')
+    .trim()
+}
+
+
 export interface AssistantMarkdownProps extends
   Pick<PropsRenderSlots<'conversation.chat.reasoning.body' | 'conversation.chat.message.images'>, 'renderSlot'>,
   Pick<ChatNodeOwnerProps, 'loadImage'> {
@@ -81,11 +96,13 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
     if (groupPart === 'reasoning' && block.kind !== 'reasoning') continue
     if (groupPart === 'response' && block.kind === 'reasoning') continue
     switch (block.kind) {
-      case 'text':
+      case 'text': {
+        const text = cleanModelPseudoToolCalls(block.text)
+        if (text === '') break
         rendered.push(
           <MarkdownText
             key={i}
-            text={block.text}
+            text={text}
             streaming={streaming}
             labels={labels}
             fileMentions={mentions}
@@ -94,6 +111,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
           />,
         )
         break
+      }
       case 'reasoning':
         if (block.text.trim() === '') break
         rendered.push(

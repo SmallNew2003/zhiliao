@@ -1,0 +1,28 @@
+- banner:
+  - navigation "Session hierarchy": Use the bash tool to
+  - text: Standard mode
+  - button "More actions"
+  - button "Open right sidebar"
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "More conversation views"
+- text: "Use the bash tool to run exactly: echo WEB_E2E_OK. Then reply with the single word DONE and stop. {{clock}}"
+- button "Copy"
+- button "Edit message"
+- status: Completed
+- button "Completed in {{duration}}"
+- paragraph: DONE
+- button "Copy"
+- button "Good response"
+- button "Bad response"
+- button "Branch into a new conversation"
+- text: {{clock}}
+- textbox "Message or run a task, / commands, @ files or sessions"
+- button "Add files or run commands"
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
+- button "Send message" [disabled]
+- button "Model time {{duration}}"
+- button "31.6K tok · Cache hit 99%": 31.6K tokCache hit 99%
+- button "6% of context used": 6%

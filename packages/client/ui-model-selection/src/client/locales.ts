@@ -33,6 +33,13 @@ export const zh = {
   'search.empty': '没有匹配的模型。',
   'empty.models': '暂无可用模型',
   'empty.efforts': '当前模型未提供推理等级。',
+  'menu.contextWindow': '上下文窗口',
+  'context.current': '当前：{value}',
+  'context.unknown': '未知',
+  'context.preset': '{value}K',
+  'context.smaller': '已调小窗口，继续对话前将按需压缩上下文。',
+  'action.configure': '配置',
+  'group.recent': '最近使用',
 } satisfies Record<string, string>
 
 /** The model namespace key union. */
@@ -63,6 +70,13 @@ export const en = {
   'search.empty': 'No matching models.',
   'empty.models': 'No models available.',
   'empty.efforts': 'This model provides no reasoning effort levels.',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<ModelKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -90,6 +104,13 @@ export const ja = {
   'search.empty': '一致するモデルがありません。',
   'empty.models': '利用可能なモデルがありません。',
   'empty.efforts': 'このモデルには推論強度の設定がありません。',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -117,6 +138,13 @@ export const es = {
   'search.empty': 'No hay modelos coincidentes.',
   'empty.models': 'No hay modelos disponibles.',
   'empty.efforts': 'Este modelo no proporciona niveles de esfuerzo de razonamiento.',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -144,6 +172,13 @@ export const fr = {
   'search.empty': 'Aucun modèle correspondant.',
   'empty.models': 'Aucun modèle disponible.',
   'empty.efforts': 'Ce modèle ne fournit aucun niveau d’effort de raisonnement.',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -171,6 +206,13 @@ export const de = {
   'search.empty': 'Keine passenden Modelle.',
   'empty.models': 'Keine Modelle verfügbar.',
   'empty.efforts': 'Dieses Modell liefert keine Argumentationsaufwandsstufen.',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -198,6 +240,13 @@ export const ru = {
   'search.empty': 'Нет подходящих моделей.',
   'empty.models': 'Нет доступных моделей.',
   'empty.efforts': 'Эта модель не обеспечивает обоснования уровней усилий.',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -225,4 +274,11 @@ export const pt = {
   'search.empty': 'Não há modelos correspondentes.',
   'empty.models': 'Nenhum modelo disponível.',
   'empty.efforts': 'Este modelo não fornece níveis de esforço de raciocínio.',
+  'menu.contextWindow': 'Context window',
+  'context.current': 'Current: {value}',
+  'context.unknown': 'Unknown',
+  'context.preset': '{value}K',
+  'context.smaller': 'Window reduced. Context will be compacted if needed before continuing.',
+  'action.configure': 'Configure',
+  'group.recent': 'Recent',
 } satisfies Record<keyof typeof en, string>

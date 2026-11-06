@@ -42,6 +42,8 @@ export function FileMutationRow({
   const size = kilobytes === null ? null : t('tool.preparing.content', { kilobytes })
   return (
     <ToolRow
+      durationMs={model.durationMs}
+      toolError={model.autoReviewDenial === null ? model.toolError : null}
       fileContextMenuProps={getTriggerProps(path === undefined ? undefined : () => ({
         kind: 'file', value: { sessionId, path: resolveFilePath(path) },
       }))}

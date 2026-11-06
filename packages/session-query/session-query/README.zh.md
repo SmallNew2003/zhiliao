@@ -44,6 +44,8 @@ kind: "package-reference"
 
 不带正文的记录只公开 `SessionHeader.isSeeded`。返回事件正文的读取（`readSession`、`readSurface`、`readEvent`）与保留的 `SessionObservation` 值还携带精确 `inheritedEventCount`，因此调用方无需从日志推断切点即可区分继承事件与自有事件。
 
+历史命名空间输入编辑通过 `readSessionInputEvent` 参与表层读取、文本提取与关系追踪。原始日志读取与事件文档的类型标签保留记录时的标识，当前表层事件则公开经过验证的逻辑编辑视图。
+
 ### 过滤器
 
 `SessionResultFilter` 按 id、可空 cwd、创建时间范围、可空父级或来源可用性缩小会话范围；`SessionEventResultFilter` 按 seq/时间范围、事件类型、表层或字面文本缩小事件范围。过滤器数组使用 AND 连接，同一子句内的列表值使用 OR；空列表值不匹配任何内容，范围包含端点，格式错误的范围或未知的封闭联合值以 `SESSION_QUERY_INVALID_FILTER` 失败。

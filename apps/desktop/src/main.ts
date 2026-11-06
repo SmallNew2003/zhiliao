@@ -29,6 +29,7 @@ import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError 
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
 import { installDesktopFileDrag } from './file-drag.ts'
 import { installDesktopDirectoryPicker } from './directory-picker.ts'
+import { installDesktopNotifications } from './notifications.ts'
 import { installMicrophonePermissions } from './microphone-permissions.ts'
 import { DesktopBackendController } from './backend-controller.ts'
 import { DESKTOP_IPC, SCHEME, assertDesktopSender, type DesktopUpdateState } from './ipc.ts'
@@ -285,6 +286,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
+      backgroundThrottling: false,
       webviewTag: primary,
       devTools: true,
     },
@@ -778,6 +780,7 @@ async function main(): Promise<void> {
   })
 
   installDesktopDirectoryPicker(() => mainWindow)
+  installDesktopNotifications(() => mainWindow)
   installMicrophonePermissions(session.defaultSession, () => mainWindow?.webContents)
   const shortcuts = installDesktopShortcuts(() => mainWindow, app.getPath('userData'),
     process.platform === 'darwin' ? 'macos' : process.platform === 'win32' ? 'windows' : 'linux', () => { refreshApplicationMenu() }, window => updateOverlays.input(window))

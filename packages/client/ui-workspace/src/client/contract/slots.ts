@@ -248,6 +248,8 @@ export type WorkspaceBrowserInjected = {
   /** Open actions for the clicked Session without selecting it. */
   openSessionMenu: (sessionId: SessionId, displayTitle: string, point: { x: number; y: number }, mode?: 'toggle') => void
   hooks: DirectoryPickingInjected['hooks'] & {
+    /** Session ids separated from ordinary browsing by registered feature sources. */
+    hiddenSessionIds: HostObservable<ReadonlySet<SessionId>>
     workspaceActionRequest: HostObservable<WorkspaceActionRequest | null>
     contextMenuTarget: HostObservable<ContextMenuTarget | null>
     /**

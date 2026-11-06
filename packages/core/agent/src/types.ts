@@ -83,6 +83,8 @@ export interface ModelSelection {
   model: string
   /** Adapter-owned reasoning effort, or provider/default behavior when absent. */
   reasoningEffort?: ReasoningEffortId
+  /** Positive integer context budget; absent inherits the adapter capacity. */
+  contextWindow?: number
 }
 
 /** Client view of the durable model-selection fold. */

@@ -1,5 +1,6 @@
 /** Session commands whose activation policy is explicit at each Remote method. */
 
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { modelAvailable } from './catalog.ts'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,10 +19,11 @@ import type { MessageSource } from '@deepseek-ai/dsh-llm'
 import { buildForkSeed } from '@deepseek-ai/dsh-session/fork'
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import { latestHumanInput } from '@deepseek-ai/dsh-session/surface'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
-import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError, remoteErrorOf, type Principal } from '@deepseek-ai/dsh-typert-protocol'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import {
   ApiSessionAgentController,
@@ -39,6 +41,8 @@ import type {
   SessionCancelValue,
   SessionCreateRequest,
   SessionCreateValue,
+  SessionEditMessageRequest,
+  SessionEditMessageValue,
   SessionForkRequest,
   SessionForkValue,
   SessionPromptRequest,
@@ -154,6 +158,7 @@ export class SessionCommandController {
         const selected: AgentModelSelection = {
           provider: request.provider,
           model: request.model,
+          ...(request.contextWindow === undefined ? {} : { contextWindow: request.contextWindow }),
           ...(request.reasoningEffort === undefined
             ? {}
             : { reasoningEffort: ReasoningEffortId(request.reasoningEffort) }),
@@ -358,6 +363,117 @@ export class SessionCommandController {
   }
 
   /**
+   * Commit a text replacement of the latest sent input, then request a response from its restored history.
+   * @param request - latest input sequence, replacement text, and stable retry identity.
+   * @param principal - current non-owner editor, or absence for the owner.
+   * @returns durable acceptance; unchanged text resends the original input with another response.
+   * @throws RemoteError when the Agent is active, the target is stale, or an original attachment is unreadable.
+   */
+  async editMessage(request: SessionEditMessageRequest, principal?: Principal): Promise<SessionEditMessageValue> {
+    using initial = await this.observeEditSession(request.sessionId)
+    if (hasEditRequest(initial.events, request.requestId)) return { accepted: true }
+    const agent = await this.resolveAgent(request.sessionId)
+    const validate = (events: readonly SessionEvent[]): UserMessage => {
+      if (this.ctx.agents.get(agent.id) !== agent) {
+        throw new RemoteError('session/not-found', 'session was disposed during edit admission', { sessionId: agent.id })
+      }
+      if (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0) {
+        throw new RemoteError('session/agent-busy', 'message editing requires an idle agent with no pending input', {
+          reason: 'active-or-pending-input',
+        })
+      }
+      const latest = latestHumanInput(events)
+      if (latest === undefined || latest.seq !== request.targetSeq) {
+        throw new RemoteError('session/edit-stale', 'message is no longer the latest sent user input', { sessionId: agent.id })
+      }
+      return latest.message
+    }
+    using current = await this.observeEditSession(agent.id)
+    if (hasEditRequest(current.events, request.requestId)) return { accepted: true }
+    validate(current.events)
+    let admission: Promise<SessionEditMessageValue>
+    try {
+      admission = agent.runMaintenance(async (signal) => {
+        try {
+          using reserved = await this.observeEditSession(agent.id)
+          signal.throwIfAborted()
+          const original = validate(reserved.events)
+          const originalText = original.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('')
+          // Unchanged text resends the original blocks verbatim, so text
+          // interleaved with attachments keeps its original block order.
+          const content = request.text === originalText
+            ? original.content
+            : replaceInputText(original.content, request.text)
+          if (!content.some(part => part.type !== 'text' || part.text.trim().length > 0)) {
+            throw new RemoteError('gateway/bad-request', 'edited input must include non-whitespace text or an attachment', {})
+          }
+          const validateModel = async (): Promise<AgentModelSelection> => {
+            const selection = agent.model.current()
+            if (selection === undefined) throw new RemoteError('gateway/bad-request', 'No model selected.', {})
+            if (content.some(part => part.type === 'image')) {
+              const model = await this.ctx.llm.resolveModelInfo(selection.provider, selection.model)
+              if (model.inputModalities !== undefined && !model.inputModalities.includes('image')) {
+                throw new RemoteError('session/attachment-invalid', 'the selected model does not support image input', {
+                  reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES',
+                })
+              }
+            }
+            const currentSelection = agent.model.current()
+            if (currentSelection?.provider !== selection.provider || currentSelection.model !== selection.model) {
+              throw new RemoteError('session/agent-busy', 'model selection changed during message edit admission', {
+                reason: 'model-selection-changed',
+              })
+            }
+            if (!this.ctx.llm.listProviders().some(provider => provider.id === selection.provider)) {
+              throw new RemoteError('session/model-unavailable', 'the selected model provider is unavailable', {
+                provider: selection.provider, model: selection.model,
+              })
+            }
+            return selection
+          }
+          await validateModel()
+          for (const part of content) {
+            if (part.type === 'image') await this.ctx.attachments.readImage(part.attachment, signal)
+            if (part.type === 'file') {
+              for await (const _chunk of this.ctx.attachments.readFileStream(part.attachment, signal)) {
+                signal.throwIfAborted()
+              }
+            }
+          }
+          signal.throwIfAborted()
+          using final = await this.observeEditSession(agent.id)
+          const validatedSelection = await validateModel()
+          signal.throwIfAborted()
+          const committingSelection = agent.model.current()
+          if (committingSelection?.provider !== validatedSelection.provider || committingSelection.model !== validatedSelection.model) {
+            throw new RemoteError('session/agent-busy', 'model selection changed during message edit admission', {
+              reason: 'model-selection-changed',
+            })
+          }
+          validate(final.events)
+          const { principal: _originalPrincipal, ...retainedSource } = { principal: undefined, ...original.source }
+          const message = createUserMessage({
+            content,
+            source: { ...retainedSource, kind: 'user', rpcId: request.requestId, ...principal === undefined ? {} : { principal } },
+          })
+          agent.session.append('user/message-edit', { targetSeq: request.targetSeq, message })
+          agent.followup(message)
+          return { accepted: true }
+        } catch (error) {
+          if (remoteErrorOf(error) !== undefined) throw error
+          if (error instanceof AttachmentError) {
+            throw new RemoteError('session/attachment-invalid', error.message, { reason: error.code })
+          }
+          throw new RemoteError('session/agent-busy', 'message edit was not accepted', { reason: String(error) })
+        }
+      })
+    } catch (error) {
+      throw new RemoteError('session/agent-busy', 'message editing requires an idle agent', { reason: String(error) })
+    }
+    return await admission
+  }
+
+  /**
    * Read one durable image using the supplied reference without consulting Session history.
    * @param request - image reference and gateway permission scope; Session existence is not checked.
    * @returns the durable attachment reference and base64-encoded bytes.
@@ -483,6 +599,17 @@ export class SessionCommandController {
     return found.agent
   }
 
+  private async observeEditSession(sessionId: SessionId): Promise<SessionObservation> {
+    try {
+      return await this.ctx.sessionQuery.observeSession(sessionId, { projectionMode: 'none' })
+    } catch (error) {
+      if (error instanceof SessionQueryError && error.code === 'SESSION_QUERY_SESSION_NOT_FOUND') {
+        throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId })
+      }
+      throw new RemoteError('gateway/internal', 'message edit history is unavailable', { reason: String(error) })
+    }
+  }
+
   private rejectCreation(error: unknown): never {
     if (remoteErrorOf(error) !== undefined) throw error
     if (error instanceof ApiSessionPresetConflict) {
@@ -515,6 +642,28 @@ export class SessionCommandController {
     }
     return undefined
   }
+}
+
+function hasEditRequest(events: readonly SessionEvent[], requestId: SessionRequestId): boolean {
+  return events.map(readSessionInputEvent).some(event => event.type === 'user/message-edit'
+    && event.data.message.source.kind === 'user'
+    && 'rpcId' in event.data.message.source
+    && event.data.message.source.rpcId === requestId)
+}
+
+function replaceInputText(content: UserMessage['content'], text: string): UserMessage['content'] {
+  const replaced: Array<UserMessage['content'][number]> = []
+  let placed = false
+  for (const part of content) {
+    if (part.type !== 'text') {
+      replaced.push(part)
+    } else if (!placed) {
+      if (text.length > 0) replaced.push({ type: 'text', text })
+      placed = true
+    }
+  }
+  if (!placed && text.length > 0) replaced.unshift({ type: 'text', text })
+  return replaced
 }
 
 /** Replace each file part with the file or image its staged receipt names. */

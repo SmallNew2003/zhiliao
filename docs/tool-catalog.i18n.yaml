@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: fd4d90071c13dcbd
-  zh: 87867027203f0354
+  en: 64075a365642d248
+  zh: 83e08def591de321
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -21,8 +21,29 @@
   en: 1ec7b4cbc3d98e28
   zh: 1ec7b4cbc3d98e28
 /tool-schema-catalog/deepseek-ai-dsh-plugin-market/plugin-market:
-  en: ecb8ee73c7bc68b8
-  zh: 59af75c81d7d529d
+  en: aee65ebcb286d7bb
+  zh: 72316b03b44388a6
+/tool-schema-catalog/deepseek-ai-dsh-mcp-discovery:
+  en: b6d17267aad436a3
+  zh: b6d17267aad436a3
+/tool-schema-catalog/deepseek-ai-dsh-mcp-discovery/discover-mcp-tools:
+  en: b435f991824593fd
+  zh: 24baac12d2b48af3
+/tool-schema-catalog/deepseek-ai-dsh-tool-assistant-task:
+  en: cad7829a649ee204
+  zh: cad7829a649ee204
+/tool-schema-catalog/deepseek-ai-dsh-tool-assistant-task/create-task:
+  en: 878ce08d6a6051a4
+  zh: 64595e8eb88fffee
+/tool-schema-catalog/deepseek-ai-dsh-tool-memory:
+  en: b94bf14065439df0
+  zh: b94bf14065439df0
+/tool-schema-catalog/deepseek-ai-dsh-tool-memory/hindsight-remember:
+  en: 222c32e926470301
+  zh: d493279c9584b76f
+/tool-schema-catalog/deepseek-ai-dsh-tool-memory/hindsight-search:
+  en: 73e13ff1262a3d1e
+  zh: 66f0dd8dfeedfc75
 /tool-schema-catalog/deepseek-ai-dsh-mcp-resources:
   en: dd78bd55ec83a539
   zh: dd78bd55ec83a539
@@ -249,8 +270,8 @@
   en: 207228068bc61885
   zh: 36e9344ee1af8869
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent/subagent:
-  en: 140c965c2b04d02f
-  zh: 95495dad5c77046d
+  en: e9333844b6abfe85
+  zh: 47b9934ef907bbb9
 /tool-schema-catalog/deepseek-ai-dsh-tool-subagent-control:
   en: ab82e130c3413f04
   zh: ab82e130c3413f04

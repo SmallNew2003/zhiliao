@@ -21,6 +21,9 @@
 | --- | --- | --- | --- | --- | --- |
 | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
 | `@deepseek-ai/dsh-plugin-market` | `plugin_market` | `ctx.tools`, `ctx.pluginMarket` | `tool/call`, `tool/result` | - | - |
+| `@deepseek-ai/dsh-mcp-discovery` | `discover_mcp_tools` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionProjections` | `tool/call`, `tool/result`, `mcp/selection`, `mcp/request-snapshot` | - | - |
+| `@deepseek-ai/dsh-tool-assistant-task` | `create_task` | `ctx.tools`, `ctx.systemPrompt`, `ctx.assistantTasks`, `a registered assistant Session` | `tool/call`, `tool/result`, `assistant storage domain records and independent execution Session` | - | - |
+| `@deepseek-ai/dsh-tool-memory` | `hindsight_remember`, `hindsight_search` | `ctx.tools`, `ctx.memory`, `a primary Session with a resolved workspace bank` | `tool/call`, `tool/result`, `provider-owned memory bank for hindsight_remember` | - | - |
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`、`stagehand_extract`、`stagehand_navigate`、`stagehand_observe`、`stagehand_screenshot`、`stagehand_tabs` | `ctx.browserUse`、`ctx.agents`、`ctx.tools`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-action-cards` | `propose_action` | `ctx.tools`、`ctx.agents`、`ctx.sessionProjections`、`ctx.remoteAccess` | `tool/call`、`tool/result`、`plugin:action-cards/decision`、`user/message` | - | 只向加载过已注册卡片种类 Skill 的 Agent 声明；各种类的包注册自己的动作，个性化推荐 Bundle 提供随产品发布的种类。 |
@@ -174,6 +177,133 @@
 ```
 
 来源： [`packages/boot/plugin-market/src/tools.ts`](../packages/boot/plugin-market/src/tools.ts)
+
+<a id="deepseek-aidsh-mcp-discovery"></a>
+
+## `@deepseek-ai/dsh-mcp-discovery`
+
+### `discover_mcp_tools`
+
+搜索并加载特定 MCP 工具、激活资源服务器，或释放已加载的选择。定义与指令进入下一个请求。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "search",
+        "load",
+        "release"
+      ]
+    },
+    "query": {
+      "type": "string"
+    },
+    "server": {
+      "type": "string"
+    },
+    "names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "offset": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "action"
+  ]
+}
+```
+
+来源： [`packages/mcp/mcp-discovery/src/index.ts`](../packages/mcp/mcp-discovery/src/index.ts)
+
+<a id="deepseek-aidsh-tool-assistant-task"></a>
+
+## `@deepseek-ai/dsh-tool-assistant-task`
+
+### `create_task`
+
+为用户创建一个独立任务。任务在独立 Session 中运行，可以持续到本次对话结束之后。本对话只保留任务卡片及其状态；在状态显示完成前，不得声称任务已完成。用户要求执行或跟踪超出当前轮次的工作时使用本工具。项目助理在自己的项目中创建任务；全局助理可以通过标识指定已注册项目。创建调用在任务记录已存在后失败时，使用相同 requestId 重试以复用任务与 Session。不要用本工具设置提醒或周期计划。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The complete task instruction delivered as the first message of the task Session."
+    },
+    "title": {
+      "type": "string",
+      "description": "Short task title in the user's language: action plus object. Omit timing, status, and ids."
+    },
+    "workspaceId": {
+      "type": "string",
+      "description": "Registered project id for a global assistant. A project assistant omits it or names its own project."
+    },
+    "requestId": {
+      "type": "string",
+      "description": "Idempotency key. Reuse the same value when retrying a creation that failed after its task record existed."
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+来源： [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts)
+
+<a id="deepseek-aidsh-tool-memory"></a>
+
+## `@deepseek-ai/dsh-tool-memory`
+
+### `hindsight_remember`
+
+在本工作区的长期记忆中记录持久发现：决策及其理由、已确认的约定，或非显然的事实。不要记录仓库已有的内容（代码、测试、文档、Git 历史），也不要记录当前轮次的进展。普通结论会在每轮结束时自动保留。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "content": {
+      "type": "string",
+      "description": "The finding to keep, stated so it still makes sense out of context."
+    }
+  },
+  "required": [
+    "content"
+  ]
+}
+```
+
+来源： [`packages/memory/tool-memory/src/tools.ts`](../packages/memory/tool-memory/src/tools.ts)
+
+### `hindsight_search`
+
+搜索本工作区长期记忆中的早期决策、约定与上下文。问题涉及先前如何作出决定，或注入的记忆不足以回答时使用本工具。优先查询，不要猜测过去的决策。结果是可能已过时的背景知识；可读取的代码优先于记忆。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "What to look for. Max 12 memories are returned."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+来源： [`packages/memory/tool-memory/src/tools.ts`](../packages/memory/tool-memory/src/tools.ts)
 
 <a id="deepseek-aidsh-mcp-resources"></a>
 
@@ -2067,7 +2197,7 @@ subagent_oar 工具在为外部提供方配置的别名之间选择。本目录�
 
 ### `subagent`
 
-将一项自包含任务委派给 subagent（在自身上下文中工作的独立 agent），用它卸载聚焦且独立的工作，例如研究、限定范围的实现或分析，以免消耗当前对话的上下文。subagent 会返回结果，但不会返回中间步骤。此工具启动独立管理的 subagent 并立即返回其 id。运行时会在任务结束时通知你。子代理通过 `send_message` 汇报结果；你可以使用 `send_message` 在运行时引导它，或在结束后继续对话。
+将一项自包含任务委派给 subagent（在自身上下文中工作的独立 agent），由它承担聚焦且独立的工作，例如研究、限定范围的实现或分析，以免消耗当前对话的上下文。subagent 返回结果，不返回中间步骤。应主动委派：普通委派不需要用户提出；只有 Agent Teams 与 workflow 需要明确请求。搜索或调查可能涉及很多文件、且无法确信几次直接查找就能定位目标时，两项以上独立子任务可并行时，子任务会占用大量上下文时，或已完成工作需要独立验证时，可使用 subagent。目标已知、任务只有一两个直接步骤，或委派只会把结果综合转交给子级时，应自行处理。委派搜索后不要重复搜索，也不要预测尚未完成的 subagent 结果。给它完整且自包含的提示词：它看不到当前对话。此工具启动独立管理的 subagent 并立即返回其 id。运行时在它结束时通知你。子级通过 `send_message` 汇报结果；使用 `send_message` 在运行时引导它，或在结束后继续对话。
 
 ```json
 {

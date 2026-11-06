@@ -249,6 +249,8 @@ interface ModelSelection {
   model: string
   /** Adapter-owned reasoning effort, or provider/default behavior when absent. */
   reasoningEffort?: ReasoningEffortId
+  /** Positive integer context budget; absent inherits the adapter capacity. */
+  contextWindow?: number
 }
 ```
 
@@ -392,6 +394,8 @@ type PreStepDecision =
     messages: UserMessage[]
     /** Start a distinct model-message series before this step's admitted messages. */
     startsRequestSeries?: true
+    /** Receipts for the latest human input; preparation preserves its identity and changes only text blocks. */
+    committedMessages?: readonly { seq: SessionSeq; message: UserMessage }[]
   }
 ```
 
@@ -515,7 +519,7 @@ Owns the default model selection independently of any Host or transport. Each op
 ```ts cordis-catalog
 /**
  * Read the current default model selection.
- * @returns a detached provider, model, and optional reasoning selection.
+ * @returns a detached route, optional reasoning effort, and context budget.
  */
 currentSelection(): ModelSelection
 
@@ -1056,6 +1060,31 @@ Types: [Scoped](scope.md) · [UserMessage](session.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
+<a id="agentprepare-step--serial"></a>
+
+#### `agent/prepare-step` — serial
+
+Prepare capabilities before step-time tool activation and prompt assembly. Rejection fails preparation without committing the claimed input.
+
+```ts cordis-catalog
+/**
+ * Prepare capabilities before step-time tool activation and prompt assembly.
+ * Rejection fails preparation without committing the claimed input.
+ * @param payload.agent - agent preparing the step.
+ * @param payload.messages - claimed input before runtime context projection.
+ * @param payload.turn - owning turn.
+ * @param payload.step - proposed step.
+ * @param payload.signal - live turn cancellation signal.
+ * @param payload.modelSelection - complete selection captured for this step.
+ * @mode serial
+ */
+'agent/prepare-step'(this: Scoped<Agent>, payload: { agent: Agent; messages: readonly UserMessage[]; turn: number; step: number; signal: AbortSignal; modelSelection: Readonly<ModelSelection> }): void | Promise<void>
+```
+
+Types: [Scoped](scope.md) · [UserMessage](session.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
 <a id="agentrequest-error--waterfall"></a>
 
 #### `agent/request-error` — waterfall
@@ -1082,6 +1111,34 @@ Handle one failed model-request attempt before the loop retries or closes its st
 ```
 
 Types: [LlmFailure](llm-streaming.md) · [ResolvedRetryPolicy](llm-streaming.md) · [Scoped](scope.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentrequest-preflight--serial"></a>
+
+#### `agent/request-preflight` — serial
+
+Admit the frozen, durably logged request before an assistant attempt starts. Throw to reject dispatch or append durable surface changes to repair it. The loop reconciles the prompt, rebuilds, and repeats preflight after a surface change, preserving the assembled route and current input batch. Listeners must not mutate the request; cancellation prevents dispatch.
+
+```ts cordis-catalog
+/**
+ * Admit the frozen, durably logged request before an assistant attempt starts.
+ * Throw to reject dispatch or append durable surface changes to repair it.
+ * The loop reconciles the prompt, rebuilds, and repeats preflight after a
+ * surface change, preserving the assembled route and current input batch.
+ * Listeners must not mutate the request; cancellation prevents dispatch.
+ * @param payload.agent - agent owning the admitted session surface.
+ * @param payload.request - frozen request derived from the current logged envelope and messages.
+ * @param payload.turn - turn containing the request.
+ * @param payload.step - step containing the request.
+ * @param payload.signal - live turn cancellation signal.
+ * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+ * @mode serial
+ */
+'agent/request-preflight'(this: Scoped<Agent>, payload: { agent: Agent; request: GenerateOptions; turn: number; step: number; signal: AbortSignal }): Promise<void>
+```
+
+Types: [GenerateOptions](llm-streaming.md) · [Scoped](scope.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 

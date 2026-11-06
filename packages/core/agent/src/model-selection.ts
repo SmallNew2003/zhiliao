@@ -29,8 +29,14 @@ export interface ModelSelectionProjectionState {
  * @param reasoningEffort - explicit effort; omission follows adapter defaults.
  * @returns a detached selection.
  */
-function toSelection(provider: string, model: string, reasoningEffort: ReasoningEffortId | undefined): ModelSelection {
-  return { provider, model, ...reasoningEffort === undefined ? {} : { reasoningEffort } }
+function toSelection(
+  provider: string, model: string, reasoningEffort: ReasoningEffortId | undefined, contextWindow?: number,
+): ModelSelection {
+  return {
+    provider, model,
+    ...reasoningEffort === undefined ? {} : { reasoningEffort },
+    ...contextWindow === undefined ? {} : { contextWindow },
+  }
 }
 
 /**
@@ -51,18 +57,22 @@ function sameRoute(left: ModelSelection, right: ModelSelection): boolean {
  */
 function sameModelSelection(left: ModelSelection | null, right: ModelSelection | null): boolean {
   return left === right || (left !== null && right !== null
-    && sameRoute(left, right) && left.reasoningEffort === right.reasoningEffort)
+    && sameRoute(left, right) && left.reasoningEffort === right.reasoningEffort && left.contextWindow === right.contextWindow)
 }
 
 /** Selection a recorded request used, omitting an effort the adapter defaulted. */
 function selectionOfHeader({ config, adapterDefaults }: EpochHeader): ModelSelection {
-  return toSelection(config.provider, config.model, adapterDefaults?.reasoningEffort === true ? undefined : config.reasoningEffort)
+  return toSelection(
+    config.provider, config.model,
+    adapterDefaults?.reasoningEffort === true ? undefined : config.reasoningEffort, config.contextWindow,
+  )
 }
 
 const selectionSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
   reasoningEffort: z.string().min(1).transform(ReasoningEffortId).exactOptional(),
+  contextWindow: z.number().int().positive().exactOptional(),
 }).nullable()
 
 /**
@@ -71,7 +81,7 @@ const selectionSchema = z.object({
  */
 export const modelSelectionProjectionDefinition: Required<ProjectionDefinition<'modelSelection', ModelSelectionProjectionState>> = {
   key: 'modelSelection',
-  stateVersion: 3,
+  stateVersion: 4,
   stateSchema: z.object({ lastUsed: selectionSchema, pending: selectionSchema }),
   init: () => ({ lastUsed: null, pending: null }),
   apply: (state, event) => {
@@ -111,7 +121,7 @@ export class AgentModel implements Model {
 
   select(selection: Readonly<ModelSelection>): void {
     if (sameModelSelection(this.recordedSelection(), selection)) return
-    this.session.append('model/selection', toSelection(selection.provider, selection.model, selection.reasoningEffort))
+    this.session.append('model/selection', toSelection(selection.provider, selection.model, selection.reasoningEffort, selection.contextWindow))
   }
 
   private recordedSelection(): ModelSelection | null {

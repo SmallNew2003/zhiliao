@@ -1,7 +1,7 @@
 /** Recovery facts survive JSON checkpoints while positional prices are rebuilt independently. */
 import { Context } from '@deepseek-ai/cordis'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { Session, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionCheckpoint } from '@deepseek-ai/dsh-session-projection'
@@ -158,10 +158,14 @@ describe('measurement recovery facts', () => {
       session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'message'.repeat(n + 1) }], source: { kind: 'user' } }), { surfaceOp: 'append' })
     }
     const state = ctx.sessionProjections.checkpoint(session).tokenMeasurement!.val
-    expect(state).toEqual(initial)
+    const { latestInput: _initialInput, ...initialFacts } = measurementProjectionDefinition.stateSchema.parse(initial)
+    const { latestInput, ...facts } = measurementProjectionDefinition.stateSchema.parse(state)
+    expect(facts).toEqual(initialFacts)
+    expect(latestInput).toEqual({ seq: SessionSeq(session.seq - 1), messageId: session.snapshotEvents().findLast((event): event is SessionEvent<'user/message'> => event.type === 'user/message')?.data.id, edited: false, anchor: facts.anchor, invalidSeq: null })
     expect(measurementProjectionDefinition.stateSchema.parse(JSON.parse(JSON.stringify(state)))).toEqual(state)
-    expect(JSON.stringify(state).length).toBeLessThan(200)
-    expect(state).toEqual({
+    expect(JSON.stringify(facts).length).toBeLessThan(200)
+    expect(JSON.stringify(latestInput).length).toBeLessThan(200)
+    expect(facts).toEqual({
       headerSeq: 2, stepStart: null, invalidSeq: null,
       anchor: { headerSeq: 2, assistantTokens: 0, usage: { inputTokens: 1000, outputTokens: 10 } },
     })

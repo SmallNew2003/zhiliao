@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-memory-browser/README.md
+/:
+  en: 8cbb371d43751aaf
+  zh: 0459d802d543ccde
+/deepseek-ai-dsh-client-ui-memory-browser:
+  en: 0fac2776937ca80e
+  zh: 644297af8857e4d8
+/deepseek-ai-dsh-client-ui-memory-browser/summary:
+  en: 56af3af3b55a6edd
+  zh: b3126e4d5b86b789
+/deepseek-ai-dsh-client-ui-memory-browser/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-client-ui-memory-browser/use-this-package:
+  en: 8781cff9f1f24eaa
+  zh: be60680612af904a
+/deepseek-ai-dsh-client-ui-memory-browser/use-this-package/reading-the-banks:
+  en: ca360ec5034930cb
+  zh: e43103423d00a283
+/deepseek-ai-dsh-client-ui-memory-browser/use-this-package/reading-one-bank-s-composition:
+  en: 4df71754372149a1
+  zh: ab68b9215f6808d0
+/deepseek-ai-dsh-client-ui-memory-browser/use-this-package/browsing-and-searching-knowledge-pages:
+  en: 38458cfa4e2d63f6
+  zh: c8b746e6f4f56517
+/deepseek-ai-dsh-client-ui-memory-browser/use-this-package/when-memory-is-not-available:
+  en: 83726e5052348097
+  zh: a4372048fcd43cc1
+/deepseek-ai-dsh-client-ui-memory-browser/understand-the-implementation:
+  en: 42b15ac6321706aa
+  zh: c5500056b41ce570
+/deepseek-ai-dsh-client-ui-memory-browser/understand-the-implementation/registration:
+  en: dae0fa7336746047
+  zh: 1fc1b7606cb2ec13
+/deepseek-ai-dsh-client-ui-memory-browser/understand-the-implementation/the-store:
+  en: 18c39c3b7c2a3ce1
+  zh: 1ea1e7f7993da0f0
+/deepseek-ai-dsh-client-ui-memory-browser/understand-the-implementation/presentation:
+  en: d7884ff181375a87
+  zh: dd0a9ecea086ba08
+/deepseek-ai-dsh-client-ui-memory-browser/understand-the-implementation/styling:
+  en: f3fed0380eaae689
+  zh: 1692f0e9b4402b2d
+/deepseek-ai-dsh-client-ui-memory-browser/further-exploration:
+  en: c9a7f7cf54f0e9ed
+  zh: 3ba4c0ab0d0d9e36
+/deepseek-ai-dsh-client-ui-memory-browser/model-experience:
+  en: e83e713ea2806a65
+  zh: 4b47b67b030ab248
+/deepseek-ai-dsh-client-ui-memory-browser/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: f57cc48a1b5cbfa9
+/deepseek-ai-dsh-client-ui-memory-browser/known-limitations-and-deferred-work:
+  en: f7847855c649e412
+  zh: 1a6abf91104f0c62
+/deepseek-ai-dsh-client-ui-memory-browser/known-limitations-and-deferred-work/dev-note:
+  en: 091bf83f58523de0
+  zh: 7f4666e430821b6d

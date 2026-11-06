@@ -1,1 +1,1 @@
-- text: {{throughput}} tok/s Cache hit 98%
+- text: Model time {{duration}} Cache hit 98%

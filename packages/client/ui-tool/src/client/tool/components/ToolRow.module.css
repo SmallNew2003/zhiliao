@@ -343,3 +343,13 @@
 @media (hover: none) {
   .inspectButton { opacity: 1; }
 }
+
+.duration { flex: none; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.ioHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ioCopyButton { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; cursor: pointer; }
+
+.root:not([data-state='preparing']) .row:not([aria-expanded='true']) {
+  border-radius: 10px;
+  padding-inline: 6px;
+  background: var(--dsw-alias-interactive-bg-hover);
+}

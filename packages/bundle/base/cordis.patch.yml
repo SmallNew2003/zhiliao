@@ -532,3 +532,17 @@
 
     - id: llm-deepseek-account
       name: '@deepseek-ai/dsh-llm-deepseek-account'
+
+- insert:
+    - id: memory
+      name: '@deepseek-ai/dsh-memory'
+    - id: memory-hindsight-http
+      name: '@deepseek-ai/dsh-memory-hindsight-http'
+      config:
+        baseUrl: !!js process.env.HINDSIGHT_API_URL ?? 'http://127.0.0.1:9077'
+    - id: tool-memory
+      name: '@deepseek-ai/dsh-tool-memory'
+
+- insert:
+    - id: mcp-discovery
+      name: '@deepseek-ai/dsh-mcp-discovery'

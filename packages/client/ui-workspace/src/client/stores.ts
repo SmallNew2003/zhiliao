@@ -47,6 +47,7 @@ type WorkspaceViewActions = {
     mode: SessionOrderBy,
     initialOrders: Readonly<Record<string, readonly string[]>>,
   ) => void
+  setGroupExpansion: (draft: WorkspaceViewState, keys: readonly string[], expanded: boolean) => void
   setGroupExpanded: (draft: WorkspaceViewState, key: string, expanded: boolean) => void
   retainAccountKeys: (draft: WorkspaceViewState, workspaceKeys: readonly string[]) => void
   syncSessionOrders: (
@@ -96,6 +97,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
         d.sessionOrderByAccount = mode === 'manual' ? copySessionOrders(initialOrders) : {}
         d.orderBy = mode
       },
+      setGroupExpansion: (d, keys, expanded) => { for (const key of keys) d.groupExpansion[key] = expanded },
       setGroupExpanded: (d, key: string, expanded: boolean) => { d.groupExpansion[key] = expanded },
       retainAccountKeys: (d, workspaceKeys: readonly string[]) => {
         const retained = new Set(workspaceKeys)

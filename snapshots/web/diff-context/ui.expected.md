@@ -1,9 +1,11 @@
-- button "Edit config.txt 1KB +1 -1" [expanded]:
+- button "Edit config.txt 1KB {{duration}} +1 -1" [expanded]:
   - text: Edit
   - button "config.txt"
-  - text: 1KB +1 -1
+  - text: 1KB {{duration}} +1 -1
 - text: Code block
 - button "Wrap lines"
 - button "Copy"
-- text: config.txt - mode=DEBUG + mode=RELEASE level=info
+- text: config.txt
+- button "Copy path"
+- text: "- mode=DEBUG + mode=RELEASE level=info"
 - button "Inspect"

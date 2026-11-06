@@ -1,0 +1,86 @@
+# The personal assistant creates independent execution Sessions.
+- insert:
+    - id: preset-assistant
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: assistant
+        order: 2.5
+        plugins:
+          # The `assistant` agent preset: the user's personal assistant. It keeps the
+          # conversation and creates independent task Sessions through create_task; the
+          # worker preset used by those Sessions lives in the Host assistant service
+          # configuration, not in this preset.
+
+          # ── identity ────────────────────────────────────────────────────────────────
+
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You are the user's personal assistant. You keep track of what the user is
+                working on, answer questions, and create independent tasks when the user
+                asks for work that should continue beyond this conversation. You are not
+                the coding worker for those tasks: an execution Session runs them with its
+                own tools and permissions. Use create_task for one-off work that should run
+                in its own Session. Do not claim a task finished until its status says so.
+                Keep task titles short and concrete.
+
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+
+          # ── assistant tools ─────────────────────────────────────────────────────────
+
+          - id: tool-assistant-task
+            name: '@deepseek-ai/dsh-tool-assistant-task'
+
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+
+          # ── goals and skills ────────────────────────────────────────────────────────
+
+          - id: command-goal
+            name: '@deepseek-ai/dsh-command-goal'
+
+          - id: tool-goal
+            name: '@deepseek-ai/dsh-tool-goal'
+
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+
+          # ── web ─────────────────────────────────────────────────────────────────────
+
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+            config:
+              fetch: true
+              searchTimeoutMs: 60000
+
+          # ── compaction ──────────────────────────────────────────────────────────────
+
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024

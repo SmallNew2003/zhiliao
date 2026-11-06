@@ -1,6 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { headTailCap } from './head-tail-cap.ts'
+import { IconInspectOutlineRegular } from './icons/index.tsx'
 import { useClipboardCopy } from './use-clipboard-copy.ts'
 import css from './SearchBlock.module.css'
 
@@ -42,6 +43,10 @@ interface SearchBlockCommon {
   total: number
   /** Height cap in rows before the middle collapses (default {@link DEFAULT_SEARCH_MAX_LINES}). */
   maxLines?: number | undefined
+  /** Search query to highlight within matched lines (case-insensitive substring match). */
+  query?: string | undefined
+  /** Callback to open a file path, optionally jumping to a 1-based line number. */
+  onOpenPath?: ((path: string, line?: number) => void) | undefined
   /** Extra class merged onto the wrapper. */
   className?: string | undefined
 }
@@ -85,7 +90,7 @@ export type SearchBlockProps = SearchMatchesBlockProps | SearchPathsBlockProps
  */
 type SearchRow =
   | { type: 'file'; path: string; count: number; index: number; collapsed: boolean }
-  | { type: 'match'; lineNumber: number; line: string; key: string; fileIndex: number }
+  | { type: 'match'; lineNumber: number; line: string; key: string; fileIndex: number; filePath: string }
   | { type: 'path'; path: string }
 
 /**
@@ -148,7 +153,14 @@ function toRows(props: SearchBlockProps, collapsed: ReadonlySet<number>): Search
     rows.push({ type: 'file', path: file.path, count: file.matches.length, index, collapsed: isCollapsed })
     if (isCollapsed) return
     for (const match of file.matches) {
-      rows.push({ type: 'match', lineNumber: match.lineNumber, line: match.line, key: `${index}:${match.lineNumber}`, fileIndex: index })
+      rows.push({
+        type: 'match',
+        lineNumber: match.lineNumber,
+        line: match.line,
+        key: `${index}:${match.lineNumber}`,
+        fileIndex: index,
+        filePath: file.path,
+      })
     }
   })
   return rows
@@ -170,12 +182,114 @@ function rowKey(row: SearchRow): string {
 }
 
 /**
+ * Highlight occurrences of `query` within `text` (case-insensitive substring match).
+ * Preserves the original casing of the matched substrings.
+ * @param text - the line text to render.
+ * @param query - the search query, if provided.
+ * @returns React node with `<mark className={css.matchHighlight}>` for matches, or raw text.
+ */
+function highlightQuery(text: string, query?: string): ReactNode {
+  if (!query) return text
+  const lowerQuery = query.toLowerCase()
+  const lowerText = text.toLowerCase()
+  let startIndex = 0
+  let matchIndex = lowerText.indexOf(lowerQuery, startIndex)
+  if (matchIndex === -1) return text
+
+  const nodes: ReactNode[] = []
+  let key = 0
+  while (matchIndex !== -1) {
+    if (matchIndex > startIndex) {
+      nodes.push(text.slice(startIndex, matchIndex))
+    }
+    nodes.push(
+      <mark key={key++} className={css.matchHighlight}>
+        {text.slice(matchIndex, matchIndex + query.length)}
+      </mark>,
+    )
+    startIndex = matchIndex + query.length
+    matchIndex = lowerText.indexOf(lowerQuery, startIndex)
+  }
+  if (startIndex < text.length) {
+    nodes.push(text.slice(startIndex))
+  }
+  return nodes
+}
+
+/**
+ * A result line. Without `open` the row is plain text; with `open` it is a
+ * button-like row that activates on click, Enter, or Space.
+ * @param open - the activation callback, or undefined when the card cannot open paths.
+ * @param children - the row content.
+ * @returns the line element.
+ */
+function renderLine(open: (() => void) | undefined, children: ReactNode): ReactNode {
+  return (
+    <div
+      className={clsx(css.line, open && css.clickableLine)}
+      role={open ? 'button' : undefined}
+      tabIndex={open ? 0 : undefined}
+      onClick={open ? () => { open() } : undefined}
+      onKeyDown={open ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          open()
+        }
+      } : undefined}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * An open-path trigger inside a file header: a button-like span that opens
+ * `path` on click, Enter, or Space and stops propagation, so the header's
+ * expand/collapse toggle does not also fire.
+ * @param path - the file path the trigger opens.
+ * @param onOpenPath - the card's open-path callback.
+ * @param className - the trigger's class.
+ * @param ariaLabel - the accessible name; undefined for a text-labelled trigger.
+ * @param children - the trigger content.
+ * @returns the trigger element.
+ */
+function openPathTrigger(
+  path: string,
+  onOpenPath: (path: string, line?: number) => void,
+  className: string | undefined,
+  ariaLabel: string | undefined,
+  children: ReactNode,
+): ReactNode {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      className={className}
+      onClick={(event) => {
+        event.stopPropagation()
+        onOpenPath(path)
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          event.stopPropagation()
+          onOpenPath(path)
+        }
+      }}
+    >
+      {children}
+    </span>
+  )
+}
+
+/**
  * Render a completed search as a grouped-matches or flat-path card.
  * @param props - see {@link SearchBlockProps}.
  * @returns the search block element.
  */
 export function SearchBlock(props: SearchBlockProps) {
-  const { truncated, total, maxLines = DEFAULT_SEARCH_MAX_LINES, className } = props
+  const { truncated, total, maxLines = DEFAULT_SEARCH_MAX_LINES, className, onOpenPath } = props
   const [expanded, setExpanded] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set())
 
@@ -218,12 +332,39 @@ export function SearchBlock(props: SearchBlockProps) {
   const tail = tailHeader === undefined ? naturalTail : naturalTail.slice(1)
 
   const renderRow = (row: SearchRow): ReactNode => {
-    if (row.type === 'path') return <div className={css.line}>{row.path}</div>
+    if (row.type === 'path') {
+      return renderLine(
+        onOpenPath ? () => { onOpenPath(row.path) } : undefined,
+        highlightQuery(row.path, props.query),
+      )
+    }
     if (row.type === 'match') {
-      return (
-        <div className={css.line}>
+      return renderLine(
+        onOpenPath ? () => { onOpenPath(row.filePath, row.lineNumber) } : undefined,
+        <>
           <span className={css.lineNumber}>{row.lineNumber}: </span>
-          {row.line}
+          {highlightQuery(row.line, props.query)}
+        </>,
+      )
+    }
+    if (onOpenPath) {
+      return (
+        <div
+          className={css.fileHeader}
+          role="button"
+          tabIndex={0}
+          aria-expanded={!row.collapsed}
+          onClick={() => { toggleFile(row.index) }}
+          onKeyDown={(event) => {
+            if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault()
+              toggleFile(row.index)
+            }
+          }}
+        >
+          {openPathTrigger(row.path, onOpenPath, clsx(css.filePath, css.clickablePath), undefined, row.path)}
+          {openPathTrigger(row.path, onOpenPath, css.openIcon, row.path, <IconInspectOutlineRegular />)}
+          <span className={css.fileCount}>{row.count}</span>
         </div>
       )
     }

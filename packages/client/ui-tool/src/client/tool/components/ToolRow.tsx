@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import {
   CodeBlock, DiffBlock, DisclosureRow, IconInspectOutlineRegular, ReadBlock, SearchBlock,
   TerminalBlock, TextShimmer, WebBlock,
-  diffTotals,
+  diffTotals, useClipboardCopy,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ContextMenuTriggerProps } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -27,6 +27,7 @@ import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { AskQuestionCard } from './AskQuestionCard.tsx'
 import { ToolDetails, type ToolDetailsModel } from './ToolDetails.tsx'
 import { ExitCodeBadge } from './ExitCodeBadge.tsx'
+import { localizeToolError, type ToolErrorModel } from '../models/tool-error-model.ts'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -81,6 +82,8 @@ export interface ToolRowProps {
   web?: WebCardModelProps | null | undefined
   /** Read-only fields/list card derived from a successful recorded result. */
   details?: ToolDetailsModel | null | undefined
+  durationMs?: number | null | undefined
+  toolError?: ToolErrorModel | null | undefined
   state: ToolRowState
   /**
    * Recorded file target or a supported argument fallback. With onOpenFile,
@@ -148,6 +151,7 @@ export const ToolRow = memo(function ToolRow({
   web,
   details,
   state,
+  durationMs, toolError,
   filePath,
   filePathLine,
   onOpenFile,
@@ -156,6 +160,9 @@ export const ToolRow = memo(function ToolRow({
   inspect,
   useDisclosure,
 }: ToolRowProps) {
+  const duration = durationMs == null ? null : durationMs < 1000
+    ? t('row.durationMs', { ms: Math.round(durationMs) })
+    : t('row.durationSec', { sec: (durationMs / 1000).toFixed(durationMs < 10000 ? 1 : 0) })
   const { expanded, toggle: toggleExpand } = useDisclosure()
   const terminalLabels = useMemo(() => terminalBlockLabels(t), [t])
   const diffLabels = useMemo(() => diffBlockLabels(t), [t])
@@ -188,7 +195,7 @@ export const ToolRow = memo(function ToolRow({
   const normalSummary = terminalBody?.description ?? (open ? detailsBody?.expandedSummary ?? summary : summary)
   const exitLabel = terminalExitLabel(terminal, t)
   // Generic failures retain their first result line; command exits keep their description.
-  const failureLine = state === 'error' && exitLabel === null ? errorSummary ?? normalSummary : null
+  const failureLine = state === 'error' && exitLabel === null ? toolError == null ? errorSummary ?? normalSummary : localizeToolError(toolError, t) : null
   const summaryText = failureLine ?? normalSummary
   // Diff totals remain visible after the optional summary suffix.
   const diffStat = useMemo(() => diffBody === null ? null : diffTotals(diffBody.card.diffs), [diffBody])
@@ -262,13 +269,15 @@ export const ToolRow = memo(function ToolRow({
       {suffix !== null && (
         <TextShimmer className={css.summarySuffix}>{suffix}</TextShimmer>
       )}
+      {duration !== null && <span className={css.duration}>{duration}</span>}
       {totals !== null && (
         <TextShimmer className={clsx(css.summarySuffix, css.diffStat)}>
           <span className={css.diffAdded}>{`+${totals.added}`}</span>{' '}<span className={css.diffRemoved}>{`-${totals.removed}`}</span>
         </TextShimmer>
       )}
     </>
-  ), [summaryLinkKeyDown, fileContextMenuProps, urlContextMenuProps, linkHref, openFile, state, suffix, totals, summaryText, exitLabel])
+  ), [duration, summaryLinkKeyDown, fileContextMenuProps, urlContextMenuProps, linkHref,
+    openFile, state, suffix, totals, summaryText, exitLabel])
   const expandedContent = useMemo(() => open ? (
     <div className={clsx(css.bodyWrap, detailsBody !== null && css.detailsBodyWrap)}>
       {askQuestionBody !== null
@@ -289,7 +298,7 @@ export const ToolRow = memo(function ToolRow({
                 {state === 'error' && outputText !== null && (
                   <div className={css.ioCard}>
                     <div className={css.ioSection}>
-                      <span className={css.ioLabel}>{t('row.output')}</span>
+                      <CopySectionHeader label={t('row.output')} text={outputText} t={t} />
                       <span className={css.ioText} data-error>{outputText}</span>
                     </div>
                   </div>
@@ -337,6 +346,9 @@ export const ToolRow = memo(function ToolRow({
                         labels={searchLabels}
                         maxLines={CHAT_SEARCH_MAX_LINES}
                         className={css.searchBody}
+                        onOpenPath={onOpenFile === undefined ? undefined : (path, line) => {
+                          onOpenFile(path, line === undefined ? undefined : { line })
+                        }}
                       />
                       {/* A capped search's recovery locator lives only in the result
                       text; show it below the card so the dropped rows survive. */}
@@ -361,7 +373,7 @@ export const ToolRow = memo(function ToolRow({
                             <div className={css.ioCard}>
                               {cardBody !== null && (
                                 <div className={css.ioSection}>
-                                  <span className={css.ioLabel}>{t('row.input')}</span>
+                                  <CopySectionHeader label={t('row.input')} text={cardBody} t={t} />
                                   <span className={css.ioText}>{cardBody}</span>
                                 </div>
                               )}
@@ -370,7 +382,7 @@ export const ToolRow = memo(function ToolRow({
                               )}
                               {outputText !== null && (
                                 <div className={css.ioSection}>
-                                  <span className={css.ioLabel}>{t('row.output')}</span>
+                                  <CopySectionHeader label={t('row.output')} text={outputText} t={t} />
                                   <span className={css.ioText} data-error={state === 'error' || undefined}>
                                     {outputText}
                                   </span>
@@ -418,3 +430,10 @@ export const ToolRow = memo(function ToolRow({
     </div>
   )
 })
+
+function CopySectionHeader({ label, text, t }: { label: string; text: string; t: TranslateNS<'conversation'> }) {
+  const { copied, onCopy } = useClipboardCopy(text)
+  return <div className={css.ioHeader}><span className={css.ioLabel}>{label}</span>
+    <button type="button" className={css.ioCopyButton} onClick={onCopy}>{copied ? t('copied') : t('copy')}</button>
+  </div>
+}

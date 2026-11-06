@@ -365,13 +365,13 @@ describe('ToolRow', () => {
 
   it('row click expands: chevron leading, summary kept inline, body in the scrolling card', () => {
     const view = render(<ToolRow {...rowProps} />)
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.queryByTestId('tool-icon')).toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
     expect(view.getByText(/"a": 1/)).toBeTruthy()
     expect(view.container.querySelector('[class*="ioCard"]')).not.toBeNull()
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.queryByTestId('tool-icon')).not.toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
   })
@@ -386,7 +386,7 @@ describe('ToolRow', () => {
     }} />)
     expect(view.container.querySelector('[data-disclosure-row]')?.textContent).toContain('+1 -1')
     expect(view.container.querySelector('[data-diff]')).toBeNull()
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.getAllByText('+1')).toHaveLength(1)
     expect(view.getAllByText('-1')).toHaveLength(1)
     expect(view.getAllByText('start')).toHaveLength(1)
@@ -409,11 +409,11 @@ describe('ToolRow', () => {
     const view = render(<ToolRow {...rowProps} />)
     expect(bodyFormatCalls()).toBe(0)
 
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(bodyFormatCalls()).toBe(1)
     expect(view.getByText(/"a": 1/)).toBeTruthy()
 
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(bodyFormatCalls()).toBe(1)
     expect(view.queryByText(/"a": 1/)).toBeNull()
   })
@@ -490,7 +490,7 @@ describe('ToolRow', () => {
     )
     expect(view.getByText('boom')).toBeTruthy()
     expect(view.queryByText('List files')).toBeNull()
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.getByText(/detail/)).toBeTruthy()
     expect(view.container.querySelector('[data-error]')).not.toBeNull()
   })
@@ -557,7 +557,7 @@ describe('ToolRow', () => {
 
   it('no inspect callback, no pill', () => {
     const view = render(<ToolRow {...rowProps} />)
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.queryByText('查看')).toBeNull()
   })
 
@@ -684,7 +684,7 @@ describe('GenericToolCard', () => {
     const view = render(<GenericToolCard {...props('mystery', denied)}
       getFileTriggerProps={() => ({})} />)
     expect(view.getByText('Auto review 已拒绝')).toBeTruthy()
-    fireEvent.click(view.getByRole('button'))
+    fireEvent.click(view.container.querySelector('[aria-expanded]')!)
     expect(view.getByText('工具未执行。原因：scope was not authorized')).toBeTruthy()
     expect(view.queryByText('输入')).toBeNull()
     expect(view.getAllByText('输出')).toHaveLength(1)
@@ -694,4 +694,26 @@ describe('GenericToolCard', () => {
     expect(view.queryByText('Tool execution rejected by user')).toBeNull()
     expect(view.queryByText(/"path"/)).toBeNull()
   })
+})
+
+
+it('derives call duration and classifies a failed command message', () => {
+  const model = toolRowModel('bash', result({ callTime: 100, time: 150, isError: true,
+    content: [{ type: 'text', text: 'command failed with exit code 127' }] }))
+  expect(model.durationMs).toBe(50)
+  expect(model.toolError?.kind).toBe('command_not_found')
+})
+
+it.each([
+  ['FS_NOT_FOUND', 'file_not_found', '文件或目录不存在'],
+  ['FS_PERMISSION_DENIED', 'permission_denied', '访问权限受限'],
+])('localizes %s failures and preserves their complete output', (code, kind, label) => {
+  const output = `Error: cannot read "${'/temporary-workspace'.repeat(8)}/missing.txt": not found`
+  const model = toolRowModel('read', result({ isError: true,
+    error: { name: 'FsError', code }, content: [{ type: 'text', text: output }] }))
+  expect(model.toolError?.kind).toBe(kind)
+  expect(model.output).toBe(output)
+  const view = render(<ToolRow {...model} title="Read" icon={<i />} useDisclosure={useDisclosure} t={t} />)
+  expect(view.getByRole('button', { name: new RegExp(label) })).not.toBeNull()
+  expect(view.container.textContent).not.toContain('/temporary-workspace')
 })

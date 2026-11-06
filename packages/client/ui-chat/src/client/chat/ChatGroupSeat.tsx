@@ -15,6 +15,7 @@ import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { hiddenOrCollapsing } from './flow-motion.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { processTitle } from './step-process.ts'
+import { formatRunDuration } from './message-chrome.ts'
 import { useDisclosure } from './use-disclosure.ts'
 import { useProcessScroll } from './use-process-scroll.ts'
 import css from './ChatGroupSeat.module.css'
@@ -82,6 +83,17 @@ function useStableLiveProcessTitle(desired: LiveProcessTitle, active: boolean): 
 }
 
 
+function useElapsed(start: number | undefined, running: boolean, t: ChatFlowSlotProps['t']): string {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    if (!running || start === undefined) return
+    const timer = setInterval(() => { setNow(Date.now()) }, 1000)
+    return () => { clearInterval(timer) }
+  }, [running, start])
+  return running && start !== undefined ? formatRunDuration(now - start, t).map(part => part.text).join('') : ''
+}
+
+
 const GroupMembers = memo(function GroupMembers({ members, ...props }: SeatProps & {
   readonly members: readonly NodeReference[]
 }) {
@@ -105,12 +117,13 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
     detail: data?.summary.runningDetail ?? '',
     preparing: data?.summary.preparing === true,
   }, data !== undefined && !data.closed)
+  const elapsed = useElapsed(data?.startTime, data?.closed === false, t)
   if (data === undefined) return null
-  const label = data.closed ? processTitle(data.summary, t)
+  const label = data.contextCount !== undefined ? t('message.contextGroup', { count: data.contextCount }) : data.closed ? processTitle(data.summary, t)
     : live.preparing ? t(`message.stepProcess.prepare.${live.activity === 'thinking' ? 'tools' : live.activity}`)
       : t(`message.stepProcess.${live.activity}`)
   const detail = detailed && !data.closed ? live.detail : ''
-  const title = detail === '' ? label : `${label}${t('message.turnProcess.separator')}${detail}`
+  const title = [label, detail, elapsed].filter(Boolean).join(t('message.turnProcess.separator'))
   const activity = data.closed ? data.summary.counts[0]?.kind ?? 'thinking' : live.activity
   return (
     <button type="button" className={css.title} aria-expanded={open} aria-controls={bodyId}
@@ -124,6 +137,9 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
       <TextShimmer active={!data.closed}>
         <TextShimmer className={css.label}>{title}</TextShimmer>
       </TextShimmer>
+      {(data.summary.failedCount ?? 0) > 0 && <span className={css.failedBadge} role="status">
+        {data.summary.failedCount === 1 ? t('message.processGroup.failedSingle') : t('message.processGroup.failedCount', { count: data.summary.failedCount ?? 0 })}
+      </span>}
     </button>
   )
 })
@@ -133,6 +149,7 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   const members = useChatGroup(groupKey, group => group?.members)
   const turn = useChatGroup(groupKey, group => group?.data.turn)
   const closed = useChatGroup(groupKey, group => group?.data.closed)
+  const contextGroup = useChatGroup(groupKey, group => group?.data.contextCount !== undefined)
   const foldCompleted = props.usePresentation(policy => policy.foldCompletedTurns)
   const { expanded: open, setExpanded: setOpen } = useDisclosure()
   const firstKey = members?.[0]?.key ?? ''
@@ -144,7 +161,7 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
     return location?.kind === 'turn' || location?.kind === 'step' ? location.turn : undefined
   })
   // Detailed keeps the latest completed Turn flat, like a running one, until the next input.
-  const grouped = props.usePresentation(policy => policy.stepGrouping === 'collapsed'
+  const grouped = props.usePresentation(policy => contextGroup || policy.stepGrouping === 'collapsed'
     || (policy.stepGrouping === 'history' && turnLocation?.status !== 'open' && !deferCollapse))
   const reason = turnLocation?.end?.data.reason.kind
   const alwaysOpen = presentation?.turnClosed === false || presentation?.hasInterleavedInput === true

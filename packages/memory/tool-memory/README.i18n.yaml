@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/memory/tool-memory/README.md
+/:
+  en: a1fd1e219d8770a4
+  zh: ebedb7cfbaa25088
+/deepseek-ai-dsh-tool-memory:
+  en: fd232e28c2effa41
+  zh: 01ae094a31d03f79
+/deepseek-ai-dsh-tool-memory/summary:
+  en: 03a521020030d570
+  zh: 864729eb136138a3
+/deepseek-ai-dsh-tool-memory/table-of-contents:
+  en: 257701b6850ffbfd
+  zh: bed3f71b4c390185
+/deepseek-ai-dsh-tool-memory/use-this-package:
+  en: 25f765151876bb36
+  zh: 0fc9bb4e3cba372e
+/deepseek-ai-dsh-tool-memory/use-this-package/minimal-configuration:
+  en: fd38384d292c74ec
+  zh: 1c789873e9012fd8
+/deepseek-ai-dsh-tool-memory/understand-the-implementation:
+  en: c7933d81e466c5cf
+  zh: a36752b2bf4ef7d9
+/deepseek-ai-dsh-tool-memory/dev-note:
+  en: 7fd14b62ebe5478c
+  zh: 129801b363bea47a
+/deepseek-ai-dsh-tool-memory/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-memory/model-experience/request-context-and-condition:
+  en: cd8530c72534ee6b
+  zh: 16dbf6046e7e51fd
+/deepseek-ai-dsh-tool-memory/model-experience/request-context-and-condition/what-the-model-sees:
+  en: d97bf0354c01ce17
+  zh: a696fe9de79f3e28
+/deepseek-ai-dsh-tool-memory/model-experience/request-context-and-condition/what-the-model-sees/recalled-memory-preamble:
+  en: 99a595acc57eca8b
+  zh: 41a725c4fb2723d1
+/deepseek-ai-dsh-tool-memory/model-experience/request-context-and-condition/token-effect:
+  en: b0813ba4c058f015
+  zh: af0bd6ea83455d41
+/deepseek-ai-dsh-tool-memory/model-experience/request-context-and-condition/kv-cache-effect:
+  en: c7aed3a533227e05
+  zh: e8316788fc32a8b7
+/deepseek-ai-dsh-tool-memory/model-experience/tools:
+  en: 72ee1234c12b966a
+  zh: e5bbfa1985c64fca
+/deepseek-ai-dsh-tool-memory/model-experience/tools/what-the-model-sees:
+  en: e0e60d5c80b62ef0
+  zh: 2b5748cd1191e623
+/deepseek-ai-dsh-tool-memory/model-experience/tools/token-effect:
+  en: a263b9b00105f1da
+  zh: fc3a64ed191be818
+/deepseek-ai-dsh-tool-memory/model-experience/tools/kv-cache-effect:
+  en: b742cca6185ba387
+  zh: 10cbd7eddd382290
+/deepseek-ai-dsh-tool-memory/known-limitations-and-deferred-work:
+  en: 2e7c9ee1e9382edf
+  zh: e8c95911a1dbb76f

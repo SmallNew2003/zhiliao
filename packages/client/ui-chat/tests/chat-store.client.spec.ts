@@ -45,3 +45,13 @@ describe('createChatStore', () => {
     expect(turnProcessOpen(store.store.getSnapshot(), { turn: 3, answerStep: 3 }, defaultOpen)).toBe(defaultOpen)
   })
 })
+
+
+it('retains the active message editor independently of transcript membership', () => {
+  const view = createChatStore().create()
+  view.actions.setEditingMessage('message:4')
+  view.actions.setTurnProcessOpen(1, 1, true)
+  expect(view.store.getSnapshot().editingMessageKey).toBe('message:4')
+  view.actions.setEditingMessage(undefined)
+  expect(view.store.getSnapshot().editingMessageKey).toBeUndefined()
+})

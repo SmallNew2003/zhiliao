@@ -122,7 +122,15 @@ function providerWording(inheritsConversation: boolean): { description: string; 
         + 'completed turns so far (it does not see the current in-flight turn). Use this when the subtask '
         + 'builds on this conversation\'s context — a follow-up analysis, '
         + 'a review, a continuation — without consuming this conversation\'s context for the work itself. '
-        + 'You receive its result, not its intermediate steps.',
+        + 'You receive its result, not its intermediate steps. Delegate proactively: ordinary delegation '
+        + 'does not require the user to ask; only Agent Teams and workflow require an explicit request. '
+        + 'Reach for a fork when a search or investigation may span many files and direct lookups may not '
+        + 'find the target, when two or more independent subtasks can run in parallel, when a subtask would '
+        + 'consume large amounts of context, or when completed work needs independent verification. A fork '
+        + 'is especially useful when the child needs context already established in this conversation. Keep '
+        + 'work local when the target is already known, when the task takes only one or two direct steps, or '
+        + 'when delegating would only move synthesis of results to the child. Once a search is delegated, do '
+        + 'not repeat it yourself, and do not predict a pending subagent\'s result.',
       promptDescription:
         'The task for the subagent. It already sees this conversation\'s completed turns, so build on them '
         + 'freely and state only what is new.',
@@ -133,7 +141,15 @@ function providerWording(inheritsConversation: boolean): { description: string; 
       'Delegate a self-contained task to a subagent (a separate agent that works in its own context) '
       + 'to offload focused, independent work — research, a scoped '
       + 'implementation, an analysis — so it does not consume this conversation\'s context. The subagent '
-      + 'returns its result, not its intermediate steps.',
+      + 'returns its result, not its intermediate steps. Delegate proactively: ordinary delegation does '
+      + 'not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for '
+      + 'a subagent when a search or investigation may span many files and you are not confident a few '
+      + 'direct lookups will find the target, when two or more independent subtasks can run in parallel, '
+      + 'when a subtask would consume large amounts of context, or when completed work needs independent '
+      + 'verification. Keep work local when the target is already known, when the task takes only one or '
+      + 'two direct steps, or when delegating would only move synthesis of results to the child. Once a '
+      + 'search is delegated, do not repeat it yourself, and do not predict a pending subagent\'s result. '
+      + 'Give it a complete, standalone prompt: it does not see this conversation.',
     promptDescription:
       'The complete, self-contained task for the subagent. It does not share this '
       + 'conversation\'s context, so include everything it needs.',
@@ -370,7 +386,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         .sort()
       if (visible[0] !== toolName) return ''
       const names = visible.map(name => `\`${name}\``).join(' or ')
-      return `Start independent delegations with ${names} together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.`
+      return `Start independent delegations with ${names} together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.`
     },
   })
   ctx.systemPrompt.context({

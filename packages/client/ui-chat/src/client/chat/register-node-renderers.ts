@@ -1,6 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { PerformanceUsageMode } from '../../chat-settings.ts'
+import type { ChatStore } from '../contract/slots.ts'
 import type { ChatPresentationPolicy } from '../presentation-policy.ts'
 import { NS } from '../locale.ts'
 import { AssistantNodeView, type AssistantNodeInjected } from './AssistantNodeView.tsx'
@@ -8,7 +10,7 @@ import { sessionFilePath } from '../file-path.ts'
 import { CommandNodeView, ManualCompactionNodeView } from './CommandNodeView.tsx'
 import {
   CompactionNodeView, ContextMessageNodeView, RetryNodeView, TurnErrorNodeView,
-  TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView,
+  TurnMaxTokensNodeView, UnknownNodeView, UserMessageNodeView, type UserMessageInjected,
 } from './MessageItem.tsx'
 import { DefaultReasoningBody, ReasoningContent } from './ReasoningContent.tsx'
 import { SystemPromptNodeView } from './SystemPromptRow.tsx'
@@ -23,11 +25,13 @@ import { TurnTriggerNodeView } from './TurnTriggerNodeView.tsx'
  * @param ctx - owning UI Conversation context.
  * @param performanceUsage - live statistics detail preference.
  * @param presentation - live presentation policy.
+ * @param chatStore - per-Session viewing state shared by the flow and message editors.
  */
 export function registerChatNodeRenderers(
   ctx: Context,
   performanceUsage: ObservableSnapshot<PerformanceUsageMode>,
   presentation: ObservableSnapshot<ChatPresentationPolicy>,
+  chatStore: ChatStore,
 ): void {
   ctx.effect(() => ctx.slots.registerFactory({
     name: 'conversation.chat.reasoning.content',
@@ -38,14 +42,22 @@ export function registerChatNodeRenderers(
     name: 'conversation.chat.reasoning.body',
     priority: 100,
   }, DefaultReasoningBody))
+  const messageEditing = (sessionId: SessionId): UserMessageInjected => {
+    const binding = ctx.sessions.binding(sessionId)
+    if (binding === undefined) throw new Error(`ui-chat: unknown session "${sessionId}"`)
+    return { editMessage: request => binding.session.editMessage(request) }
+  }
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
-    name: 'conversation.chat.node', key: 'user', locale: NS,
+    name: 'conversation.chat.node', key: 'user', locale: NS, store: chatStore,
+    inject: messageEditing,
     children: { 'conversation.chat.user.before': { kind: 'chain', scope: 'session' } },
   }, UserMessageNodeView))
   // Steering rows share the renderer without owning the message-source seat.
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
-    name: 'conversation.chat.node', key: 'steering', locale: NS,
-    inject: () => ({ renderSlotChain: () => null }),
+    name: 'conversation.chat.node', key: 'steering', locale: NS, store: chatStore,
+    inject: (sessionId): UserMessageInjected & { renderSlotChain: () => null } => ({
+      ...messageEditing(sessionId), renderSlotChain: () => null,
+    }),
   }, UserMessageNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'context', locale: NS }, ContextMessageNodeView))

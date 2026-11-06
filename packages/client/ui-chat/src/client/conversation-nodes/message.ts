@@ -3,13 +3,15 @@ import type {
   ContextMessageNode, ConversationContextReader, ConversationLocation, ConversationNodeDefinition,
   SteeringMessageNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { isAppendSurfaceEvent, isReplacementSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+import { isAppendSurfaceEvent, isReplacementSurfaceEvent, readSessionInputEvent } from '@deepseek-ai/dsh-session/surface'
 import type { InboxState } from './inbox.ts'
 import type { ProcessEvidenceState } from './turn-process.ts'
 import { chatNode, contextLocation } from './common.ts'
 import { contextForm, contextProducer } from './event-projection.ts'
 
 interface ReferencedUserMessageNode extends UserMessageNode {
+  /** Original sequence whose response was discarded by this edit. */
+  readonly editTargetSeq?: number
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
   /** Skill names the same step's `skill-invocation` injections loaded. */
@@ -17,6 +19,8 @@ interface ReferencedUserMessageNode extends UserMessageNode {
 }
 
 interface ReferencedSteeringMessageNode extends SteeringMessageNode {
+  /** Original sequence whose response was discarded by this edit. */
+  readonly editTargetSeq?: number
   /** Labels cited by the immediately following session-reference context. */
   readonly referenceLabels?: readonly string[]
   /** Skill names the same step's `skill-invocation` injections loaded. */
@@ -82,7 +86,11 @@ function followsProcessEvidence(location: ConversationLocation, reader: Conversa
 export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
   kind: 'input-message',
   target: 'chat',
-  match: (event) => {
+  match: (source) => {
+    const event = source.type === 'assistant/live-chunk' ? source : readSessionInputEvent(source)
+    if (event.type === 'user/message-edit' || event.type === 'user/message-admit') {
+      return { id: String(event.data.message.id), role: 'start' }
+    }
     if (event.type === 'user/message') {
       return isAppendSurfaceEvent(event) && !isCompactionCheckpoint(event)
         ? { id: String(event.data.id), role: 'start' }
@@ -91,7 +99,11 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
     return null
   },
   start: (_context, match, reader) => {
-    const event = match.event
+    const event = match.event.type === 'assistant/live-chunk' ? match.event : readSessionInputEvent(match.event)
+    if (event.type === 'user/message-admit') return { kind: 'user', messageId: event.data.message.id,
+      seq: event.data.targetSeq, time: event.time, content: event.data.message.content, source: event.data.message.source }
+    if (event.type === 'user/message-edit') return { kind: 'user', messageId: event.data.message.id, seq: event.seq,
+      time: event.time, content: event.data.message.content, source: event.data.message.source, editTargetSeq: event.data.targetSeq }
     if (event.type !== 'user/message') throw new Error('input-message start requires user/message')
     if (event.data.source.kind !== 'user') {
       const nextTurn = reader.previous<InboxState>('inbox-next-turn')?.state
@@ -133,7 +145,14 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
         source: event.data.source,
       }
   },
-  update: context => context.state,
+  update: (context, match) => {
+    const state = context.state
+    if (state.kind === 'context') return state
+    const event = match.event.type === 'assistant/live-chunk' ? match.event : readSessionInputEvent(match.event)
+    const message = event.type === 'user/message' ? event.data
+      : event.type === 'user/message-admit' ? event.data.message : undefined
+    return message === undefined ? state : { ...state, content: message.content, source: message.source }
+  },
   buildViewNode: (context) => {
     if (context.state === undefined) return null
     const waking = context.state.kind === 'context'
@@ -143,7 +162,8 @@ export const messageDefinition: ConversationNodeDefinition<MessageNode> = {
     // later steering stay in the current exchange, so they never fold earlier Turns.
     const location = contextLocation(context)
     const human = context.state.kind === 'user' || context.state.kind === 'steering'
-    const opensExchange = human && location.kind === 'step' && location.step.step === 1
+    const edited = context.state.kind === 'user' && context.state.editTargetSeq !== undefined
+    const opensExchange = human && (edited || location.kind === 'step' && location.step.step === 1)
     return chatNode(
       context,
       waking ? 'turn-trigger' : context.state.kind,

@@ -3,6 +3,21 @@
   "entries": [
     {
       "doc": "docs/subsystems/session.md",
+      "symbol": "SessionEditMessageRequest",
+      "source": "packages/api/session-controller/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
+      "symbol": "SessionEditMessageValue",
+      "source": "packages/api/session-controller/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/tools.md",
+      "symbol": "ToolPreview",
+      "source": "packages/core/tools/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/session.md",
       "symbol": "SessionLogUploadRequest",
       "source": "packages/session/session-log-deepseek/src/types.ts"
     },

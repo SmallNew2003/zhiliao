@@ -1,3 +1,4 @@
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session/surface'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationMatch, ConversationNodeContext, ConversationNodeDefinition, RequestPromptInspector,
@@ -65,10 +66,15 @@ export function systemMessageDefinition(inspect: SystemPromptInspector): Convers
   return {
     kind: 'system-message',
     target: 'chat',
-    match: event => event.type === 'system/message'
+    match: (source) => {
+      const event = source.type === 'assistant/live-chunk' ? source : readSessionInputEvent(source)
+      return event.type === 'system/message'
+      || event.type === 'user/message-edit'
+      || (event.type === 'user/message' && event.surfaceOp === 'append' && event.data.source.kind === 'user')
       || ('surfaceOp' in event && event.surfaceOp !== 'append')
-      ? { id: String(event.seq), role: 'start' }
-      : null,
+        ? { id: String(event.seq), role: 'start' }
+        : null
+    },
     start: (_context, match, reader) => {
       if (match.event.type === 'assistant/live-chunk') throw new Error('system-message requires a durable event')
       return inspect(reader.previous<SystemPromptState>('system-message')?.state, match.event)
@@ -115,7 +121,7 @@ export function requestPromptDefinition(inspect: RequestPromptInspector): Conver
       const inspection = inspect(previous?.prompt, match.event, system)
       const change = inspection.change?.kind
       // Appended prompts own their cards; a same-step header must not repeat them.
-      const systemEvent = systemContext?.matches[0]?.event
+      const systemEvent = systemContext?.state.lastSystemEvent ?? systemContext?.matches[0]?.event
       const shownByUpdate = system !== undefined
         && systemEvent?.type === 'system/message' && systemEvent.surfaceOp === 'append'
         && (system.update || previous === undefined)

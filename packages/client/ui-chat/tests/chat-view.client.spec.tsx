@@ -332,9 +332,13 @@ function HarnessChatNode({
   const nodeProps = { ...shared, ...owner, ...hooks }
   switch (owner.node.kind) {
     case 'user':
-      return <UserMessageNodeView {...nodeProps} node={owner.node} renderSlotChain={renderUserChain} />
+      return <UserMessageNodeView
+        editMessage={async () => ({ ok: true, value: { accepted: true } })}
+        {...nodeProps} node={owner.node} renderSlotChain={renderUserChain} />
     case 'steering':
-      return <UserMessageNodeView {...nodeProps} node={owner.node} renderSlotChain={() => null} />
+      return <UserMessageNodeView
+        editMessage={async () => ({ ok: true, value: { accepted: true } })}
+        {...nodeProps} node={owner.node} renderSlotChain={() => null} />
     case 'context':
       return <ContextMessageNodeView {...nodeProps} node={owner.node} />
     case 'assistant-step':

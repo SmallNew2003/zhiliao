@@ -29,7 +29,7 @@ create_goal may infer goal intent from a direct human request in any language. A
 
 Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.
 
-Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn.
+Start independent delegations with `subagent` or `subagent_fork` together in one assistant message and continue useful work while they run. When only waiting for their results remains, end your turn instead of sleeping or polling; the next result starts a new turn. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Delegate searches that may span many files, independent parallel work, context-heavy tasks, and independent verification. Keep known targets and one- or two-step work local, and do not repeat a search already delegated.
 
 ## Writing code for run_code
 
@@ -107,6 +107,16 @@ interface ToolArgsMap {
     /** One glob filter for which files to search (e.g. "*.ts", "*.{js,jsx}"). Not a list; negation is not supported. */
     include?: string;
   } & Record<string, JsonValue>;
+  /** Record a durable finding in this workspace's long-term memory: a decision and its rationale, a convention you confirmed, or a non-obvious fact. Do not use it for anything the repository already records (code, tests, docs, git history) or for the current turn's progress. Ordinary conclusions are captured automatically at the end of every turn. */
+  hindsight_remember: {
+    /** The finding to keep, stated so it still makes sense out of context. */
+    content: string;
+  } & Record<string, JsonValue>;
+  /** Search this workspace's long-term memory for earlier decisions, conventions, and context. Use it when a question is about how something was settled previously, or when the injected memory looks too shallow to answer. Prefer this over guessing at a past decision. Results are background knowledge and may be stale; prefer code you can read over memory. */
+  hindsight_search: {
+    /** What to look for. Max 12 memories are returned. */
+    query: string;
+  } & Record<string, JsonValue>;
   /** Ask a subagent to stop its current work. This call returns without waiting for it to stop. You can continue a local direct child's conversation later with send_message. External executions stop permanently and cannot receive follow-ups. Subagents it started will keep running. */
   interrupt_agent: {
     /** The id of an agent created under you: your direct child or a deeper descendant. */
@@ -161,7 +171,7 @@ interface ToolArgsMap {
     /** The exact skill name from the available skills list. */
     name: string;
   } & Record<string, JsonValue>;
-  /** Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes. */
+  /** Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for a subagent when a search or investigation may span many files and you are not confident a few direct lookups will find the target, when two or more independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. Keep work local when the target is already known, when the task takes only one or two direct steps, or when delegating would only move synthesis of results to the child. Once a search is delegated, do not repeat it yourself, and do not predict a pending subagent's result. Give it a complete, standalone prompt: it does not see this conversation. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes. */
   subagent: {
     /** Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent. */
     cwd?: string;
@@ -170,7 +180,7 @@ interface ToolArgsMap {
     /** The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs. */
     prompt: string;
   } & Record<string, JsonValue>;
-  /** Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes. */
+  /** Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. Delegate proactively: ordinary delegation does not require the user to ask; only Agent Teams and workflow require an explicit request. Reach for a fork when a search or investigation may span many files and direct lookups may not find the target, when two or more independent subtasks can run in parallel, when a subtask would consume large amounts of context, or when completed work needs independent verification. A fork is especially useful when the child needs context already established in this conversation. Keep work local when the target is already known, when the task takes only one or two direct steps, or when delegating would only move synthesis of results to the child. Once a search is delegated, do not repeat it yourself, and do not predict a pending subagent's result. This tool starts an independently managed subagent and immediately returns its id. The runtime notifies you when it finishes. The child reports results with `send_message`; use `send_message` to steer it while running or continue its conversation after it finishes. */
   subagent_fork: {
     /** Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent. */
     cwd?: string;
@@ -350,6 +360,17 @@ interface ToolOutputMap {
       lineNumber: number;
       line: string;
     }[];
+  };
+  hindsight_remember: {
+    remembered: boolean;
+    detail: string;
+  };
+  hindsight_search: {
+    memories: {
+      id: string;
+      text: string;
+    }[];
+    truncated: boolean;
   };
   interrupt_agent: {
     accepted: boolean;

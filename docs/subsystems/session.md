@@ -26,6 +26,19 @@ interface UserMessage extends MessageBase {
  */
 interface SessionEventMap {
   /**
+   * Replace the latest human-authored input and its subsequent model history.
+   * Replay restores the surface immediately before the original input, including
+   * nodes later shadowed by compaction, and adds the identified replacement.
+   * Repeated edits follow the target's earlier edit to the original input.
+   * Raw events and chronological turn/step numbering remain unchanged.
+   */
+  'user/message-edit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
+   * Update only text blocks of the current latest human input after pre-step preparation.
+   * Preserve its identity, metadata, attachments, and surface position.
+   */
+  'user/message-admit': { targetSeq: SessionSeq; message: UserMessage }
+  /**
    * Opens turn `turn` before the loop claims queued input or runs pre-step.
    * Rejection, empty input, cancellation, or failure may close it with no
    * step; otherwise the following identified `user/message` event or batch
@@ -809,6 +822,29 @@ What a persistence backend relies on: the durable log persists every event lossl
 
 The backends that consume this contract are on [persistence.md](persistence.md).
 
+## Editing the latest human input
+
+`SessionEditMessageRequest` identifies the latest human input by event sequence and a stable acceptance id. The replacement changes text while retaining the input's durable attachments; a repeated acceptance id reuses the result. `SessionEditMessageValue` acknowledges a committed edit; unchanged text requests another response. The [Session controller](../../packages/api/session-controller/README.md) owns admission, cancellation, and replay semantics.
+
+```ts type-equiv
+/** Text-only replacement of the latest sent user input, retaining its durable attachments. */
+interface SessionEditMessageRequest {
+  readonly sessionId: SessionId
+  /** Sequence of the latest user/message or user/message-edit event, including inherited input. */
+  readonly targetSeq: SessionSeq
+  readonly text: string
+  /** Stable identity reused after a lost acceptance response. */
+  readonly requestId: SessionRequestId
+}
+```
+
+```ts type-equiv
+/** Durable acceptance of an edit; unchanged text requests another response. */
+interface SessionEditMessageValue {
+  readonly accepted: true
+}
+```
+
 ## Remote catalog and workspace opening
 
 `ModelCatalog` is the Host-generation model directory returned by `session/modelCatalog`: it carries the deployment default, routable provider ids, successful provider groups, and isolated provider failures. It is not derived from one Session and remains separate from Session projections.
@@ -959,6 +995,13 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
  * @returns acknowledgement that the Agent accepted the prompt.
  */
 @Remote('prompt') async prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>
+
+/**
+ * Edit and resend the latest sent user input while retaining its original attachments.
+ * @param request - target event, replacement text, and stable retry identity.
+ * @returns acceptance after the edit is durable; unchanged text requests another response.
+ */
+@Remote('editMessage') editMessage(request: SessionEditMessageRequest): Promise<SessionEditMessageValue>
 
 /**
  * Read one image from the attachment store after gateway authorization.

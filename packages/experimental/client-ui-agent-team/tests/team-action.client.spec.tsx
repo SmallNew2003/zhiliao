@@ -142,7 +142,9 @@ describe('TeamAction', () => {
   })
 
   it('overlays live Session status and the durable model selection on roster rows', () => {
-    const statuses: SessionStatusSnapshot = new Map([[WORKER, { running: true, pendingInteraction: undefined, completionUnread: false }]])
+    const statuses: SessionStatusSnapshot = new Map([[WORKER, {
+      running: true, pendingInteraction: undefined, completionUnread: false, lastAgentError: null,
+    }]])
     const b = bench({
       statuses,
       running: { [SESSION]: true },
@@ -163,7 +165,11 @@ describe('TeamAction', () => {
     const row = screen.getByRole('button', { name: new RegExp(`worker.*${zh['memberStatus.running']}.*worker-model`, 'u') })
     expect(row.querySelector('[data-state="ongoing"]')).not.toBeNull()
 
-    act(() => { b.statuses.set(new Map([[WORKER, { running: false, pendingInteraction: undefined, completionUnread: false }]])) })
+    act(() => {
+      b.statuses.set(new Map([[WORKER, {
+        running: false, pendingInteraction: undefined, completionUnread: false, lastAgentError: null,
+      }]]))
+    })
     expect(screen.getByRole('button', { name: /^worker.*未运行/u })).toBeTruthy()
 
     act(() => {
@@ -235,7 +241,7 @@ describe('TeamAction', () => {
           ['unrelated' as SessionId]: { state: 'ready', error: null, values: { agentTeam: { members: [], tasks: [] } } },
         },
       })
-      b.statuses.set(new Map([['unrelated' as SessionId, { running: true, pendingInteraction: undefined, completionUnread: false }]]))
+      b.statuses.set(new Map([['unrelated' as SessionId, { running: true, pendingInteraction: undefined, completionUnread: false, lastAgentError: null }]]))
     })
     expect(onRender).not.toHaveBeenCalled()
 

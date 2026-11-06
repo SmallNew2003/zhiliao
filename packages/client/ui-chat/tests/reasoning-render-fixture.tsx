@@ -12,6 +12,7 @@ import type { PropsRenderFactories, PropsRenderSlots } from '@deepseek-ai/dsh-cl
 import { en, NS, zh } from '../src/client/locale.ts'
 import { derivePresentationPolicy, type CollapseTiming, type FoldedReplies } from '../src/client/presentation-policy.ts'
 import { registerChatNodeRenderers } from '../src/client/chat/register-node-renderers.ts'
+import { createChatStore } from '../src/client/stores.ts'
 import type { PerformanceUsageMode, TranscriptViewMode } from '../src/chat-settings.ts'
 
 type RenderSeats = PropsRenderSlots<'conversation.chat.reasoning.body'> & PropsRenderFactories
@@ -48,7 +49,7 @@ export async function createReasoningRenderFixture(language = 'zh') {
           createSnapshotStore<TranscriptViewMode>('detailed'),
           createSnapshotStore<CollapseTiming>('completion'),
           createSnapshotStore<FoldedReplies>('all'),
-        ))
+        ), createChatStore())
     },
   })
   await runtime.sessions.add({ id: 'reasoning-fixture' })

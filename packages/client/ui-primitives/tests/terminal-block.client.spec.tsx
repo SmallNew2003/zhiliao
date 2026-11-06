@@ -500,3 +500,13 @@ describe('writeClipboard', () => {
     await expect(writeClipboard('payload')).resolves.toBe(false)
   })
 })
+
+
+it('copies the command separately from output', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  const view = render(<LocalizedTerminalBlock command="pwd" output="/workspace" labels={{ ...terminalBlockLabels, copyCommand: 'Copy command', copiedCommand: 'Command copied' }} />)
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: 'Copy command' })) })
+  expect(writeText).toHaveBeenCalledWith('pwd')
+  expect(view.getByRole('button', { name: 'Command copied' })).toBeTruthy()
+})

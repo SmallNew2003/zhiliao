@@ -1,4 +1,4 @@
-- button "Create goal Ship compact tool cards" [expanded]
+- button "Create goal Ship compact tool cards {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Ship compact tool cards
@@ -7,7 +7,7 @@
     - term: Rounds
     - definition: 0 / 8
 - button "Inspect"
-- button "Update to-do list 1/3 completed · Render compact fields and lists 3 added" [expanded]
+- button "Update to-do list 1/3 completed · Render compact fields and lists 3 added {{duration}}" [expanded]
 - text: Initial list
 - list:
   - listitem:
@@ -20,7 +20,7 @@
     - img "Added": +
     - text: Review the narrow layout Pending
 - button "Inspect"
-- button "Create automation task Review the build and open the demo" [expanded]
+- button "Create automation task Review the build and open the demo {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Review the build and open the demo
@@ -31,7 +31,7 @@
     - term: Status
     - definition: Scheduled
 - button "Inspect"
-- button "Update automation task Review the build and open the demo" [expanded]
+- button "Update automation task Review the build and open the demo {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Review the build and open the demo
@@ -42,7 +42,7 @@
     - term: Status
     - definition: Scheduled
 - button "Inspect"
-- button "Create automation task Weekly release review" [expanded]
+- button "Create automation task Weekly release review {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Weekly release review
@@ -53,7 +53,7 @@
     - term: Status
     - definition: Enabled
 - button "Inspect"
-- button "View automation task Weekly release review" [expanded]
+- button "View automation task Weekly release review {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Weekly release review
@@ -64,7 +64,7 @@
     - term: Status
     - definition: Enabled
 - button "Inspect"
-- button "Edit automation task Weekly release review" [expanded]
+- button "Edit automation task Weekly release review {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Weekly release review
@@ -75,7 +75,7 @@
     - term: Status
     - definition: Paused
 - button "Inspect"
-- button "List automation tasks 3 automation tasks" [expanded]
+- button "List automation tasks 3 automation tasks {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Review the build and open the demo
@@ -102,14 +102,14 @@
     - term: Status
     - definition: Ended
 - button "Inspect"
-- button "Edit automation task details-task" [expanded]
+- button "Edit automation task details-task {{duration}}" [expanded]
 - list:
   - listitem:
     - text: details-task
     - term: Status
     - definition: Deleted
 - button "Inspect"
-- button "View goal Ship compact tool cards" [expanded]
+- button "View goal Ship compact tool cards {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Ship compact tool cards
@@ -118,7 +118,7 @@
     - term: Rounds
     - definition: 0 / 8
 - button "Inspect"
-- button "Update goal Ship compact tool cards" [expanded]
+- button "Update goal Ship compact tool cards {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Ship compact tool cards
@@ -127,7 +127,7 @@
     - term: Rounds
     - definition: 0 / 8
 - button "Inspect"
-- button "List automation tasks 4 automation tasks" [expanded]
+- button "List automation tasks 4 automation tasks {{duration}}" [expanded]
 - list:
   - listitem:
     - text: Review the build and open the demo
@@ -162,14 +162,14 @@
     - term: Status
     - definition: Scheduled
 - button "Inspect"
-- button "Delete automation task details-reminder" [expanded]
+- button "Delete automation task details-reminder {{duration}}" [expanded]
 - list:
   - listitem:
     - text: details-reminder
     - term: Status
     - definition: Deleted
 - button "Inspect"
-- button "Update to-do list 2/3 completed 1 added · 1 updated · 1 removed" [expanded]
+- button "Update to-do list 2/3 completed 1 added · 1 updated · 1 removed {{duration}}" [expanded]
 - text: Changes since the previous list
 - list:
   - listitem:
@@ -188,7 +188,7 @@
       - img "Completed"
       - text: Keep the existing row and expansion controls Completed
 - button "Inspect"
-- button "Inspect providers 2 inspect providers" [expanded]
+- button "Inspect providers 2 inspect providers {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -246,7 +246,7 @@
                 - button "Copy"
                 - code: "{ \"type\": \"object\" }"
 - button "Inspect"
-- button "Query runtime Slots.listSubTree" [expanded]
+- button "Query runtime Slots.listSubTree {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -278,7 +278,7 @@
           - term: block
           - definition: ToolCallBlock
 - button "Inspect"
-- button "Inspect plugins 1 dynamic plugins" [expanded]
+- button "Inspect plugins 1 dynamic plugins {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -294,7 +294,7 @@
       - list:
         - listitem: run-demo-1 Completed
 - button "Inspect"
-- button "Run workflow tool-card-audit" [expanded]
+- button "Run workflow tool-card-audit {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -322,7 +322,7 @@
         - listitem:
           - paragraph: terminal_list
 - button "Inspect"
-- button "Run ralph loop 已检查详情区域的换行和工具名称显示。" [expanded]
+- button "Run ralph loop 已检查详情区域的换行和工具名称显示。 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -338,7 +338,7 @@
         - listitem:
           - paragraph: 检查并整理工具卡片的布局问题
 - button "Inspect"
-- 'button "Read event tool/call · #5" [expanded]'
+- 'button "Read event tool/call · #5 {{duration}}" [expanded]'
 - text: Recorded result
 - list:
   - listitem:
@@ -373,7 +373,7 @@
         - listitem:
           - paragraph: "Before: - seq 4 | assistant/message | {{timestamp}} 更新任务清单。 After: - seq 6 | tool/result | {{timestamp}} Updated todo list: 0 completed, 1 in progress, 0 pending."
 - button "Inspect"
-- button "Search events 2 matches" [expanded]
+- button "Search events 2 matches {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -389,7 +389,7 @@
     - term: Record status
     - definition: current
 - button "Inspect"
-- button "Trace event 任务清单变化示例" [expanded]
+- button "Trace event 任务清单变化示例 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -407,7 +407,7 @@
     - term: Derived events
     - definition: None
 - button "Inspect"
-- button "Search sessions 2 matches" [expanded]
+- button "Search sessions 2 matches {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -433,7 +433,7 @@
     - term: Best match
     - definition: seq 1 | user/message | current | {{timestamp}}
 - button "Inspect"
-- button "Trace session 任务清单变化示例" [expanded]
+- button "Trace session 任务清单变化示例 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -451,7 +451,7 @@
       - listitem: review-child — Layout review | {{timestamp}} | persisted
       - listitem: review-grandchild — Narrow layout | {{timestamp}} | persisted
 - button "Inspect"
-- button "List models deepseek" [expanded]
+- button "List models deepseek {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -461,7 +461,7 @@
     - text: deepseek/deepseek-reasoner
     - paragraph: DeepSeek Reasoner
 - button "Inspect"
-- button "Create subagent 检查工具卡片布局，并列出三个最值得改进的地方。" [expanded]
+- button "Create subagent 检查工具卡片布局，并列出三个最值得改进的地方。 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -469,7 +469,7 @@
     - term: Agent ID
     - definition: agent-demo-review
 - button "Inspect"
-- button "List subagents 3 agents" [expanded]
+- button "List subagents 3 agents {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -491,19 +491,19 @@
     - term: Depth
     - definition: "2"
 - button "Inspect"
-- button "Send message agent-demo-review" [expanded]
+- button "Send message agent-demo-review {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
     - text: agent-demo-review Message delivered
     - paragraph: 请优先检查窄屏下的任务差异列表。
 - button "Inspect"
-- button "Interrupt agent agent-demo-review" [expanded]
+- button "Interrupt agent agent-demo-review {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem: agent-demo-review Interrupt requested
 - button "Inspect"
-- button "List background jobs 3 background jobs" [expanded]
+- button "List background jobs 3 background jobs {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -519,7 +519,7 @@
     - term: Type
     - definition: terminal
 - button "Inspect"
-- button "Read job output job-demo-build" [expanded]
+- button "Read job output job-demo-build {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -528,14 +528,14 @@
     - button "Copy"
     - code: Building client assets… ✓ 184 modules transformed. dist/index.js 92.4 kB
 - button "Inspect"
-- button "Cancel background job job-demo-preview" [expanded]
+- button "Cancel background job job-demo-preview {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
     - text: job-demo-preview Cancellation requested
     - paragraph: 演示检查已经结束
 - button "Inspect"
-- button "Open terminal preview" [expanded]
+- button "Open terminal preview {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -547,7 +547,7 @@
     - button "Copy"
     - code: /workspace/demo %
 - button "Inspect"
-- button "Read terminal terminal-demo-1" [expanded]
+- button "Read terminal terminal-demo-1 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -556,7 +556,7 @@
     - button "Copy"
     - code: "VITE v7.0.0 ready in {{duration}} Local: http://localhost:5173/ Watching for file changes…"
 - button "Inspect"
-- button "List terminals 3 terminals" [expanded]
+- button "List terminals 3 terminals {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -580,7 +580,7 @@
     - term: Exit code
     - definition: "0"
 - button "Inspect"
-- button "Signal terminal terminal-demo-1" [expanded]
+- button "Signal terminal terminal-demo-1 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -590,19 +590,19 @@
     - term: Process group
     - definition: "43120"
 - button "Inspect"
-- button "Close terminal terminal-demo-1" [expanded]
+- button "Close terminal terminal-demo-1 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem: terminal-demo-1 Closed
 - button "Inspect"
-- button "Find definition src/app.ts · 1 locations" [expanded]
+- button "Find definition src/app.ts · 1 locations {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
     - button "src/tool-details.ts"
     - text: Line 24, column 1
 - button "Inspect"
-- button "Find references src/tool-details.ts · 4 locations" [expanded]
+- button "Find references src/tool-details.ts · 4 locations {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -616,7 +616,7 @@
     - text: Line 67, column 12
   - listitem: untitled:Untitled-1 Line 6, column 7
 - button "Inspect"
-- button "Find implementation src/types.ts · 2 locations" [expanded]
+- button "Find implementation src/types.ts · 2 locations {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -626,7 +626,7 @@
     - button "src/fallback-details.ts"
     - text: Line 8, column 1
 - button "Inspect"
-- button "Inspect symbol src/tool-details.ts:24:1" [expanded]
+- button "Inspect symbol src/tool-details.ts:24:1 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -637,7 +637,7 @@
     - code: "function renderToolDetails(model: ToolDetailsModel): ReactNode"
     - paragraph: Render compact fields and list rows from a recorded tool result.
 - button "Inspect"
-- button "Create teammate ui-review" [expanded]
+- button "Create teammate ui-review {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -652,7 +652,7 @@
     - term: Context
     - definition: fresh
 - button "Inspect"
-- button "List subagents 3 agents" [expanded]
+- button "List subagents 3 agents {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -684,14 +684,14 @@
     - term: Context
     - definition: fresh
 - button "Inspect"
-- button "Send message ui-review" [expanded]
+- button "Send message ui-review {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
     - text: ui-review Message delivered
     - paragraph: 请先检查新增、删除和状态变化的区分是否清楚。
 - button "Inspect"
-- button "Create team task 检查工具卡片的窄屏布局" [expanded]
+- button "Create team task 检查工具卡片的窄屏布局 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -709,7 +709,7 @@
         - listitem:
           - paragraph: packages/client/ui-tool/src/client/tool/
 - button "Inspect"
-- button "Read team task 检查工具卡片的窄屏布局" [expanded]
+- button "Read team task 检查工具卡片的窄屏布局 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -727,7 +727,7 @@
         - listitem:
           - paragraph: packages/client/ui-tool/src/client/tool/
 - button "Inspect"
-- button "Update team task 检查工具卡片的窄屏布局" [expanded]
+- button "Update team task 检查工具卡片的窄屏布局 {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -747,7 +747,7 @@
         - listitem:
           - paragraph: packages/client/ui-tool/src/client/tool/
 - button "Inspect"
-- button "List team tasks 2 team tasks" [expanded]
+- button "List team tasks 2 team tasks {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:
@@ -781,12 +781,12 @@
         - listitem:
           - paragraph: task-demo-1
 - button "Inspect"
-- button "Wait for subagent Subagent activity" [expanded]
+- button "Wait for subagent Subagent activity {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem: Subagent activity Change detected
 - button "Inspect"
-- button "Interrupt agent ui-review" [expanded]
+- button "Interrupt agent ui-review {{duration}}" [expanded]
 - text: Recorded result
 - list:
   - listitem:

@@ -28,6 +28,7 @@ describe('MCP server context', () => {
     let instructions = 'MCP server: docs\nKeep {{server.template}} literal.'
     const fiber = await ctx.plugin({ apply(inner: Context) {
       registerServerContext(inner, 'docs', {
+        connected: () => true,
         resources: { request: async () => ({ resources: [] }) },
         instructions: () => instructions,
       })
@@ -50,6 +51,7 @@ describe('MCP server context', () => {
     await ctx.plugin({ apply(inner: Context) {
       const scoped = createScope(inner, scopeKey)
       registerServerContext(scoped.ctx, 'private', {
+        connected: () => true,
         resources: { request: async () => ({ resources: [] }) },
         instructions: () => 'Private server instructions.',
       })

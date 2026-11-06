@@ -87,7 +87,7 @@ const noAttention: SessionStatusSnapshot = new Map()
 const status = (
   pendingInteraction: SessionPendingInteraction | undefined,
   overrides: Partial<SessionStatus> = {},
-): SessionStatus => ({ running: undefined, pendingInteraction, completionUnread: false, ...overrides })
+): SessionStatus => ({ running: undefined, pendingInteraction, completionUnread: false, lastAgentError: null, ...overrides })
 const archived = (...ids: string[]): readonly SessionId[] => ids.map(sid)
 const rowState = (options: {
   pinned?: readonly string[]
@@ -340,7 +340,7 @@ describe('deriveGroups', () => {
     const done = summary('done', 3)
     const plain = summary('plain', 2)
     const sessions = list(done, plain)
-    const statuses: SessionStatusSnapshot = new Map([[done.id, status(undefined, { completionUnread: true })]])
+    const statuses: SessionStatusSnapshot = new Map([[done.id, status(undefined, { completionUnread: true, lastAgentError: null })]])
     const groups = deriveGroups(
       sessions, [workspace('first', ['done', 'plain'])], noRows, statuses, view(['first']),
     )
@@ -961,4 +961,12 @@ it('leaves unnamed history titles empty for locale-owned row labels', () => {
   item.displayTitle = 'Default workspace'
   const sessions = list(item)
   expect(deriveFlat(sessions, [item.id], noRows, noAttention)[0]?.title).toBe('')
+})
+
+
+it('reports running and awaiting sessions even while their workspace is folded', () => {
+  const sessions = list({ ...summary('running', 2), running: true }, summary('waiting', 1))
+  const statuses = new Map([[sid('waiting'), status({ kind: 'approval' } as SessionPendingInteraction)]])
+  const groups = deriveGroups(sessions, [workspace('project', ['running', 'waiting'])], rowState(), statuses, view())
+  expect(groups[0]).toMatchObject({ runningCount: 1, pendingCount: 1, sessions: [] })
 })

@@ -8,7 +8,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type {
-  LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
+  GenerateOptions, LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
@@ -21,6 +21,8 @@ declare module '@deepseek-ai/dsh-system-prompt' {
     agent?: Agent
     /** Captured step selection, retained across retries; omitted effort uses adapter defaults. Absent outside agent steps. */
     modelSelection?: Readonly<ModelSelection>
+    /** Claimed inbox input and coordinates for the step being assembled; absent on diagnostics. */
+    stepInput?: { readonly turn: number; readonly step: number; readonly messages: readonly UserMessage[] }
   }
 }
 
@@ -143,6 +145,8 @@ export type PreStepDecision =
     messages: UserMessage[]
     /** Start a distinct model-message series before this step's admitted messages. */
     startsRequestSeries?: true
+    /** Receipts for the latest human input; preparation preserves its identity and changes only text blocks. */
+    committedMessages?: readonly { seq: SessionSeq; message: UserMessage }[]
   }
 
 /** Action returned by a listener that owns model-request recovery. */
@@ -336,6 +340,18 @@ declare module '@deepseek-ai/cordis' {
     'agent/inbox/discarded'(this: Scoped<Agent>, payload: { agent: Agent; message: UserMessage }): void
     // ---- the machine's extension points ----
     /**
+     * Prepare capabilities before step-time tool activation and prompt assembly.
+     * Rejection fails preparation without committing the claimed input.
+     * @param payload.agent - agent preparing the step.
+     * @param payload.messages - claimed input before runtime context projection.
+     * @param payload.turn - owning turn.
+     * @param payload.step - proposed step.
+     * @param payload.signal - live turn cancellation signal.
+     * @param payload.modelSelection - complete selection captured for this step.
+     * @mode serial
+     */
+    'agent/prepare-step'(this: Scoped<Agent>, payload: { agent: Agent; messages: readonly UserMessage[]; turn: number; step: number; signal: AbortSignal; modelSelection: Readonly<ModelSelection> }): void | Promise<void>
+    /**
      * Reject a proposed step or replace the messages that enter it. Calling
      * `next()` preserves the current messages.
      * @param payload.agent - the agent proposing the step.
@@ -371,6 +387,21 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
     */
     'agent/request'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; signal: AbortSignal }, next: () => Promise<LlmCallConfig>): Promise<LlmCallConfig>
+    /**
+     * Admit the frozen, durably logged request before an assistant attempt starts.
+     * Throw to reject dispatch or append durable surface changes to repair it.
+     * The loop reconciles the prompt, rebuilds, and repeats preflight after a
+     * surface change, preserving the assembled route and current input batch.
+     * Listeners must not mutate the request; cancellation prevents dispatch.
+     * @param payload.agent - agent owning the admitted session surface.
+     * @param payload.request - frozen request derived from the current logged envelope and messages.
+     * @param payload.turn - turn containing the request.
+     * @param payload.step - step containing the request.
+     * @param payload.signal - live turn cancellation signal.
+     * Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.
+     * @mode serial
+     */
+    'agent/request-preflight'(this: Scoped<Agent>, payload: { agent: Agent; request: GenerateOptions; turn: number; step: number; signal: AbortSignal }): Promise<void>
     /**
      * Handle one failed model-request attempt before the loop retries or closes
      * its step. A listener returns `{ kind: 'retry' }` without calling `next()`

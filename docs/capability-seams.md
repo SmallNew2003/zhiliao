@@ -54,9 +54,22 @@ flowchart LR
   pkg_tool_pwsh["tool-pwsh"]
   pkg_subagent["subagent"]
   pkg_sdk_jsonrpc_server["sdk-jsonrpc-server"]
+  pkg_memory["memory"]
+  svc_memory["ctx.memory<br/>Workspace long-term memory"]
+  pkg_memory_hindsight_http["memory-hindsight-http"]
+  pkg_tool_memory["tool-memory"]
+  pkg_host_memory_controller["host-memory-controller"]
+  svc_memoryController["ctx.memoryController<br/>Memory browser Remote"]
+  pkg_client_ui_memory_browser["client-ui-memory-browser"]
+  pkg_assistant_task["assistant-task"]
+  svc_assistantTasks["ctx.assistantTasks<br/>Assistants and delegated tasks"]
+  pkg_tool_assistant_task["tool-assistant-task"]
+  pkg_client_ui_assistant["client-ui-assistant"]
+  pkg_mcp_discovery["mcp-discovery"]
+  svc_mcpDiscovery["ctx.mcpDiscovery<br/>Progressive MCP loading"]
+  pkg_mcp_client["mcp-client"]
   pkg_mcp_resources["mcp-resources"]
   svc_mcpResources["ctx.mcpResources<br/>Scoped MCP resource access"]
-  pkg_mcp_client["mcp-client"]
   pkg_browser_use["browser-use"]
   svc_browserUse["ctx.browserUse<br/>Browser-use provider registration"]
   pkg_experimental_browser_use_playwright_mcp["experimental-browser-use-playwright-mcp"]
@@ -333,6 +346,7 @@ flowchart LR
   pkg_api_workspace_controller --> svc_workspaceController
   pkg_api_workspace_files --> svc_workspaceFiles
   pkg_app_boot --> svc_profileContext
+  pkg_assistant_task --> svc_assistantTasks
   pkg_attachment --> svc_attachments
   pkg_attachment_local --> svc_attachments
   pkg_authorization --> svc_authorization
@@ -390,6 +404,7 @@ flowchart LR
   pkg_host_directory_picker --> svc_directoryPicker
   pkg_host_directory_picker_browse --> svc_directoryPicker
   pkg_host_directory_picker_native --> svc_directoryPicker
+  pkg_host_memory_controller --> svc_memoryController
   pkg_host_product_telemetry_otel --> svc_productTelemetry
   pkg_host_webserver --> svc_webServer
   pkg_inspector --> svc_inspector
@@ -402,7 +417,10 @@ flowchart LR
   pkg_lsp --> svc_lsp
   pkg_lsp_stdio --> svc_lsp
   pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_discovery --> svc_mcpDiscovery
   pkg_mcp_resources --> svc_mcpResources
+  pkg_memory --> svc_memory
+  pkg_memory_hindsight_http --> svc_memory
   pkg_message_feedback --> svc_messageFeedback
   pkg_office_to_pdf --> svc_officeToPdf
   pkg_otel --> svc_otel
@@ -495,6 +513,8 @@ flowchart LR
   svc_approval --> pkg_acp
   svc_approval --> pkg_tool_bash
   svc_approval --> pkg_tools
+  svc_assistantTasks --> pkg_client_ui_assistant
+  svc_assistantTasks --> pkg_tool_assistant_task
   svc_attachments --> pkg_api_session_controller
   svc_attachments --> pkg_llm_deepseek
   svc_attachments --> pkg_llm_pi_ai
@@ -537,7 +557,11 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_mcpDiscovery --> pkg_mcp_client
+  svc_mcpDiscovery --> pkg_mcp_resources
   svc_mcpResources --> pkg_mcp_resources
+  svc_memory --> pkg_tool_memory
+  svc_memoryController --> pkg_client_ui_memory_browser
   svc_officeToPdf --> pkg_client_ui_sidebar_documentpreview
   svc_otel --> pkg_host_product_telemetry_otel
   svc_otel --> pkg_session_telemetry_otel
@@ -666,6 +690,10 @@ flowchart LR
 | `ctx.forgePanel` | `service` | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | - | - | Streams one panel state per followed Session: Git inspection using Session permissions, the recognized code host and its sign-in, and the bound change requests with polled status. |
 | `ctx.worktrees` | `seam` | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-tool-worktree`](../packages/experimental/tool-worktree) | - | Explicit experimental creation from a pinned local commit. Existing write permissions govern checkout and shared Git metadata; the working-directory service owns the resulting Session directory. |
 | `ctx.workingDirectory` | `seam` | [`working-directory`](../packages/session/working-directory) | [`working-directory`](../packages/session/working-directory) | [`tool-working-directory`](../packages/session/tool-working-directory), [`tool-fs`](../packages/fs/tool-fs), [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`subagent`](../packages/subagent/subagent), [`sdk-jsonrpc-server`](../packages/sdk/server) | - | One Session projection owns the effective execution directory. The filesystem validates changes; user context reports them while original metadata and write grants stay fixed. |
+| `ctx.memory` | `seam` | [`memory`](../packages/memory/memory) | [`memory-hindsight-http`](../packages/memory/hindsight-http) | [`tool-memory`](../packages/memory/tool-memory) | - | Providers resolve workspace banks and serve bounded recall, search, and retention; lifecycle consumers record recalled context before model use. |
+| `ctx.memoryController` | `service` | [`host-memory-controller`](../packages/host/memory-controller) | - | [`client-ui-memory-browser`](../packages/client/ui-memory-browser) | - | Read-only bank, statistics, knowledge-page, and search operations expose explicit unavailable states through resource-authorized Remote methods. |
+| `ctx.assistantTasks` | `service` | [`assistant-task`](../packages/assistant/task) | - | [`tool-assistant-task`](../packages/assistant/tool-task), [`client-ui-assistant`](../packages/client/ui-assistant) | - | Host storage owns assistant and task identities; execution uses ordinary Sessions while the visibility feed separates assistant-owned Sessions from Workspace navigation. |
+| `ctx.mcpDiscovery` | `service` | [`mcp-discovery`](../packages/mcp/mcp-discovery) | - | [`mcp-client`](../packages/mcp/mcp-client), [`mcp-resources`](../packages/mcp/mcp-resources) | - | Scoped catalog and durable selections load exact tool definitions and server instructions before step admission; executor-owned previews enforce representation budgets. |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | Connection-owned providers serve shared resource tools in the calling agent scope. |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | One provider-owned name per service instance. Providers own their tools and browser resources per live Session; the shared service has no browser operation API. |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | One provider-owned name per service instance. Each provider also owns its model tools; the service has no common action API, runtime selection, or Session workflow lock. |

@@ -33,6 +33,8 @@ Automatic modal entry and modal/menu return focus, including after Escape and ap
 
 This package is a Web-shell build input. Its static ESM retains third-party imports and styles for Vite; independent consumers supply its development dependencies ([dependency rules](../AGENTS.md#dependency-declaration)).
 
+`DiffBlock` supports word-level changes and optional path-copy labels; `SearchBlock` accepts a query and file/line navigation callback. `ReadBlock` marks the returned file window, and `TerminalBlock` accepts optional command-copy labels independently of output copying.
+
 Compose feature UI from these atoms whenever the web client needs a standard control or an agent-output renderer. They render through React only and take `--dsw-*` design tokens from the theme, so they fit any plugin without importing the theme or the slot system.
 
 <a id="component-catalog"></a>
@@ -135,6 +137,8 @@ The atoms cannot read the application locale, so every piece of user-facing copy
 `Menu.contextual` positions from the pointer without the frame inset and closes on a right-click inside the popup. Contextual popups with no rendered `role="menuitem"` rows stay hidden, including when legacy Slots return no content. Structured `items` reserve an icon column per divider group; `footer` and each submenu calculate their own groups. A contextual `footer` with a leading separator uses that line instead of adding a second border. Opaque `children` retain their own layout; a legacy Slot after data rows keeps its declared leading separator. `exiting` retains an inert popup for its fade; `returnFocus` restores the original control after asynchronous preparation. `MenuSurface.phase` fades the material, direct content, and macOS backing separately so the material keeps blurring the page. `MENU_TRANSITION_MS` supplies both CSS timing and the popup lifecycle timers. Ordinary dropdowns retain their existing timing.
 
 -----
+
+`Slider` renders a fixed ordered set of labeled steps, supports pointer dragging and keyboard selection, and keeps the current drag live while its owner completes an asynchronous write.
 
 <a id="understand-the-implementation"></a>
 ## Understand the implementation

@@ -29,7 +29,7 @@ function reply(node: ChatNode): boolean {
 
 function sameSummary(left: ProcessActivitySummary, right: ProcessActivitySummary): boolean {
   return left.running === right.running && left.runningDetail === right.runningDetail
-    && left.preparing === right.preparing
+    && left.preparing === right.preparing && left.failedCount === right.failedCount
     && left.counts.length === right.counts.length && left.counts.every((value, index) =>
     value.kind === right.counts[index]?.kind && value.count === right.counts[index].count)
 }
@@ -54,6 +54,16 @@ function readNode(input: ProcessInput, key: NodeKey): ChatNode {
   return node
 }
 
+function memberStart(node: ChatNode): number | undefined {
+  if (node.kind === 'tool-call') {
+    const root = node.data.root
+    return 'kind' in root ? root.callTime ?? root.time : root.time
+  }
+  if (node.kind === 'assistant-step') return node.data.time
+  if (node.kind === 'model-retry') return node.data.current.time
+  return node.location.kind === 'step' ? node.location.step.start?.time : undefined
+}
+
 /** One group's members and cached summary, refreshed together when its content changes. */
 class ProcessGroup {
   private nodes: readonly ChatNode[] = []
@@ -68,12 +78,16 @@ class ProcessGroup {
     const unchanged = nodes.length === this.nodes.length && nodes.every((node, index) => node === this.nodes[index])
     const previous = this.snapshot.data
     const activity = unchanged && previous.closed === closed ? previous.summary : processActivity(nodes)
-    const summary = closed ? { counts: activity.counts, running: undefined, runningDetail: '' } : activity
+    const summary = closed ? { counts: activity.counts, running: undefined, runningDetail: '',
+      ...activity.failedCount === undefined ? {} : { failedCount: activity.failedCount } } : activity
+    const times = nodes.map(memberStart).filter((time): time is number => time !== undefined)
+    if (previous.startTime !== undefined) times.push(previous.startTime)
+    const startTime = times.length === 0 ? undefined : Math.min(...times)
     this.nodes = nodes
-    if (previous.closed !== closed || !sameSummary(previous.summary, summary)) {
+    if (previous.closed !== closed || previous.startTime !== startTime || !sameSummary(previous.summary, summary)) {
       this.snapshot = {
         key: this.key, members: this.members,
-        data: { turn: this.turn, closed, summary },
+        data: { turn: this.turn, closed, summary, ...startTime === undefined ? {} : { startTime } },
       }
     }
   }
@@ -201,6 +215,9 @@ export class ProcessState {
   private turns = new Map<number, TurnGroups>()
   private order: readonly NodeKey[] = []
   private pending: GroupUpdate<ProcessGroupData> | null = null
+  private contextGroups = new Map<GroupKey, GroupSnapshot<ProcessGroupData>>()
+  private contextUpserts: GroupSnapshot<ProcessGroupData>[] = []
+  private contextRemoves: GroupKey[] = []
 
   /**
    * Consume one synchronous Builder input without retaining its readers.
@@ -222,7 +239,7 @@ export class ProcessState {
       this.order = input.order
       this.pending = {
         entries: this.rootEntries(input),
-        groups: { kind: 'replace', snapshots: [...turns.values()].flatMap(turn => turn.snapshots()) },
+        groups: { kind: 'replace', snapshots: [...turns.values()].flatMap(turn => turn.snapshots()).concat([...this.contextGroups.values()]) },
       }
       return
     }
@@ -268,22 +285,59 @@ export class ProcessState {
     const reordered = input.order !== this.order || regroup.size > 0
     this.order = input.order
     const installed = new Set(upserts.map(group => group.key))
+    const entries = reordered ? this.rootEntries(input) : undefined
     this.pending = reordered || upserts.length > 0 || removes.length > 0
       ? {
-        ...reordered ? { entries: this.rootEntries(input) } : {},
-        groups: { kind: 'apply', upserts, removes: removes.filter(key => !installed.has(key)) },
+        ...entries === undefined ? {} : { entries },
+        groups: { kind: 'apply', upserts: [...upserts, ...reordered ? this.contextUpserts : []], removes: [...removes.filter(key => !installed.has(key)), ...reordered ? this.contextRemoves : []] },
       }
       : null
   }
 
   private rootEntries(input: ProcessInput): RenderEntry[] {
-    return input.order.flatMap<RenderEntry>((key) => {
+    const output: RenderEntry[] = []
+    const groups = new Map<GroupKey, GroupSnapshot<ProcessGroupData>>()
+    const upserts: GroupSnapshot<ProcessGroupData>[] = []
+    let pending: NodeReference[] = []
+    const flush = (): void => {
+      const first = pending[0]
+      if (first === undefined) return
+      if (pending.length === 1) output.push(first)
+      else {
+        const retained = [...this.contextGroups.values()].find(group =>
+          group.members.every(member => pending.some(next => next.key === member.key)))
+        const key = retained?.key ?? brandString<GroupKey>(JSON.stringify(['context', first.key]))
+        const group: GroupSnapshot<ProcessGroupData> = retained !== undefined && sameMembers(retained.members, pending)
+          ? retained : { key, members: pending, data: { turn: undefined, closed: true, contextCount: pending.length,
+            summary: { counts: [], running: undefined, runningDetail: '' } } }
+        groups.set(key, group)
+        if (group !== retained) upserts.push(group)
+        output.push({ kind: 'group', key })
+      }
+      pending = []
+    }
+    for (const key of input.order) {
       const turn = readPosition(input, key).turn
-      if (turn === undefined) return [{ kind: 'node', key }]
-      const groups = this.turns.get(turn)
-      if (groups === undefined) throw new Error(`Chat grouping order is missing Turn ${turn}`)
-      return groups.references(key)
-    })
+      if (turn === undefined) {
+        const node = readNode(input, key)
+        if (node.kind === 'context' || node.kind === 'system-prompt') {
+          pending.push({ kind: 'node', key })
+          continue
+        }
+      }
+      flush()
+      if (turn === undefined) output.push({ kind: 'node', key })
+      else {
+        const turnGroups = this.turns.get(turn)
+        if (turnGroups === undefined) throw new Error(`Chat grouping order is missing Turn ${turn}`)
+        output.push(...turnGroups.references(key))
+      }
+    }
+    flush()
+    this.contextRemoves = [...this.contextGroups.keys()].filter(key => !groups.has(key))
+    this.contextGroups = groups
+    this.contextUpserts = upserts
+    return output
   }
 
   /**

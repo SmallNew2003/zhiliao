@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AssistantMarkdown, localPathMediaUrl } from '../src/client/chat/AssistantMarkdown.tsx'
+import { AssistantMarkdown, localPathMediaUrl, cleanModelPseudoToolCalls } from '../src/client/chat/AssistantMarkdown.tsx'
 import { useDetailedPresentation } from './presentation-fixture.client.ts'
 import { unusedImageLoader } from './reasoning-component-fixture.tsx'
 import { useDisclosure } from '../src/client/chat/use-disclosure.ts'
@@ -97,4 +97,9 @@ it('decodes Markdown URL escapes once before encoding the file query', () => {
     ['/work/literal%2520.png', '/work/literal%20.png'],
   ]) expect(new URL(localPathMediaUrl(BASE, authored!)!).searchParams.get('path')).toBe(path)
   expect(localPathMediaUrl(BASE, '/work/bad%escape.png')).toBeUndefined()
+})
+
+
+it('hides leaked pseudo tool calls without changing the authored media syntax', () => {
+  expect(cleanModelPseudoToolCalls('Answer\n<tool_call><parameter>x</parameter></tool_call>\n![图](./a.png)')).toBe('Answer\n![图](./a.png)')
 })

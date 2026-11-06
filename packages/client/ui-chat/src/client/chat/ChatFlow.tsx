@@ -1,5 +1,6 @@
 /** Ordered Chat rows, local echoes, and running status share the flow slot's parent. */
 import { memo, type ReactElement } from 'react'
+import type { NodeKey } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { ChatFlowSlotProps } from '../contract/slots.ts'
@@ -30,6 +31,7 @@ export const ChatFlow = memo(function ChatFlow({
   cwd, openFile, inspectCall, forkAt, loadImage,
 }: ChatFlowSlotProps) {
   const nodeStore = useChat(snapshot => snapshot.nodes)
+  const editingKey = useStore(state => state.editingMessageKey)
   const running = useSession(snapshot => snapshot.running)
   const disconnected = useConnectionState(state => state === 'disconnected' || state === 'connecting')
   const latestTurnAnchor = useChat(snapshot => snapshot.navigation.items().at(-1)?.anchorKey)
@@ -61,6 +63,10 @@ export const ChatFlow = memo(function ChatFlow({
         return assertNever(entry)
     }
   })
+  // Keep the same keyed editor mounted while its accepted resend replaces the original input.
+  if (editingKey !== undefined && !entries.some(entry => entry.kind === 'node' && entry.key === editingKey)) {
+    rows.push(<ChatNodeSeat {...seatProps} key={chatRenderKey({ kind: 'node', key: editingKey as NodeKey })} nodeKey={editingKey} />)
+  }
   // Transcript echoes open the running Turn and precede the status; steering
   // and Inbox echoes follow it, so the status stays on the running Turn's tail.
   // The first transcript echo opens the next Turn, whose first claim takes the

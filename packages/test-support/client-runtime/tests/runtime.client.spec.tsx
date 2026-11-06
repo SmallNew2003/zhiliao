@@ -744,6 +744,11 @@ describe('fixture session face', () => {
     expect(() => bare.readAttachment({
       attachmentId: AttachmentId('att-1'), mediaType: 'image/png', bytes: 1, width: 1, height: 1,
     })).toThrow(/readAttachment is not stubbed/)
+    expect(() => bare.editMessage()).toThrow(/editMessage is not stubbed/)
+    const editing = vi.fn().mockResolvedValue({ ok: true, value: { accepted: true } })
+    await runtime.sessions.add({ id: 'edit-fixture', session: { editMessage: editing } })
+    await expect(runtime.sessions.behavior('edit-fixture').editMessage()).resolves.toEqual({ ok: true, value: { accepted: true } })
+    expect(editing).toHaveBeenCalledOnce()
     expect(() => bare.updateQueue()).toThrow(/updateQueue is not stubbed/)
     expect(() => bare.cancel()).toThrow(/cancel is not stubbed/)
     expect(() => bare.command()).toThrow(/command is not stubbed/)

@@ -5,6 +5,7 @@
  * @module @deepseek-ai/dsh-agent-loop/runtime-context
  */
 
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed, ContextSnapshotSection, Message } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionSeq, SurfaceIntent, SystemMessage, UserMessage } from '@deepseek-ai/dsh-session'
@@ -126,6 +127,25 @@ export class RuntimeContextProjection {
    * @param session - session receiving projected messages.
    */
   constructor(ctx: Context, session: Session) {
+    this.restore(session)
+
+    ctx.on('session/event', (subject, sourceEvent) => {
+      const event = readSessionInputEvent(sourceEvent)
+      if (subject !== session) return
+      if (event.type === 'user/message-edit') {
+        this.restore(session)
+      } else if (event.type === 'user/message' && isOwned(event.data)) {
+        this.retained = { seq: event.seq, text: textOf(event.data) }
+      } else if (this.retained
+        && isReplacementSurfaceEvent(event)
+        && event.sourceEventSeqs?.includes(this.retained.seq) === true) {
+        this.retained = null
+      }
+    })
+  }
+
+  private restore(session: Session): void {
+    this.retained = undefined
     const surface = new Set(session.surface.nodes)
     for (const event of eventsNewestFirst(session)) {
       if (event.type !== 'user/message' || !isOwned(event.data)) continue
@@ -136,16 +156,6 @@ export class RuntimeContextProjection {
       }
     }
 
-    ctx.on('session/event', (subject, event) => {
-      if (subject !== session) return
-      if (event.type === 'user/message' && isOwned(event.data)) {
-        this.retained = { seq: event.seq, text: textOf(event.data) }
-      } else if (this.retained
-        && isReplacementSurfaceEvent(event)
-        && event.sourceEventSeqs?.includes(this.retained.seq) === true) {
-        this.retained = null
-      }
-    })
   }
 
   /**

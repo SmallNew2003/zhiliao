@@ -1,4 +1,4 @@
-/** Web-localized copy for the four shipped presets and declared copy for every other row. */
+/** Web-localized copy for shipped presets and declared copy for every other row. */
 
 import { describe, expect, it } from 'vitest'
 import { en, ja, presetDisplayText, zh } from '../src/client/locales.ts'
@@ -11,6 +11,7 @@ describe('preset display copy', () => {
     ['ptc', 'presetPtcName', 'presetPtcDescription'],
     ['minimal', 'presetMinimalName', 'presetMinimalDescription'],
     ['cordis', 'presetCordisName', 'presetCordisDescription'],
+    ['assistant', 'presetAssistantName', 'presetAssistantDescription'],
   ] as const)('localizes the shipped %s preset in English, Chinese, and Japanese', (id, nameKey, descriptionKey) => {
     const preset = { id }
 
@@ -32,4 +33,9 @@ describe('preset display copy', () => {
     expect(presetDisplayText({ id: 'bare' }, translate(en)))
       .toEqual({ name: 'bare' })
   })
+})
+
+
+it('names the personal assistant in the active locale', () => {
+  expect(presetDisplayText({ id: 'assistant' }, translate(zh)).name).toBe('助理模式')
 })

@@ -127,6 +127,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     wide: true,
     expandSidebar: vi.fn(),
     useSessions: hook(sessionState([])),
+    useHiddenSessionIds: hook<ReadonlySet<SessionId>>(new Set()),
     useSessionStatus: hook(noPendingInteraction),
     useSessionRetainInfo: () => undefined,
     usePanelInfo,
@@ -484,7 +485,7 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByText('分组方式')).toBeTruthy() // the menu heading label
     expect(screen.getAllByRole('separator')).toHaveLength(2)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
+      '按工作区', '按工作区树', '单列表', '手动排序', '最近更新', '全部展开', '全部折叠', '隐藏已归档', '全部对话（显示已归档）', '仅显示已归档',
     ])
     expect(screen.getByRole('menuitem', { name: '按工作区' }).querySelector('svg')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '手动排序' }).querySelector('svg')).toBeTruthy()
@@ -820,7 +821,7 @@ describe('WorkspaceBrowser', () => {
     })
     const status = (id: string, value: Partial<SessionStatus>) =>
       hook<SessionStatusSnapshot>(new Map([[sid(id), {
-        running: false, pendingInteraction: undefined, completionUnread: false, ...value,
+        running: false, pendingInteraction: undefined, completionUnread: false, lastAgentError: null, ...value,
       }]]))
     const expectVisible = (count: number) => {
       expect(screen.getAllByRole('treeitem').map(row => within(row).getByText(/^(alpha|session-\d+)$/u).textContent))
@@ -841,7 +842,7 @@ describe('WorkspaceBrowser', () => {
       pendingInteraction: { key: 'question:1', kind: 'plan-review', sessionId: sid('session-7') } as SessionPendingInteraction,
     }) })
     expectVisible(7)
-    rerender(b, { useSessionStatus: status('session-8', { completionUnread: true }) })
+    rerender(b, { useSessionStatus: status('session-8', { completionUnread: true, lastAgentError: null }) })
     expectVisible(8)
     fireEvent.click(screen.getByRole('button', { name: '展开其余 4 个会话' }))
     expectVisible(12)
@@ -857,7 +858,7 @@ describe('WorkspaceBrowser', () => {
     })
     fireEvent.click(screen.getByText('alpha'))
     const running = (value: boolean) => hook<SessionStatusSnapshot>(new Map([[sid('session-9'), {
-      running: value, pendingInteraction: undefined, completionUnread: false,
+      running: value, pendingInteraction: undefined, completionUnread: false, lastAgentError: null,
     }]]))
     rerender(b, { useSessionStatus: running(true) })
     rerender(b, { useSessionStatus: running(false) })
@@ -880,15 +881,15 @@ describe('WorkspaceBrowser', () => {
     })
     fireEvent.click(screen.getByText('alpha'))
     const running = (...ids: string[]) => hook<SessionStatusSnapshot>(new Map(ids.map(id => [sid(id), {
-      running: true, pendingInteraction: undefined, completionUnread: false,
+      running: true, pendingInteraction: undefined, completionUnread: false, lastAgentError: null,
     }])))
     rerender(b, {
       useSessions: hook(sessionState(items, { main: sid('session-53') })),
       useSessionStatus: hook<SessionStatusSnapshot>(new Map([
-        [sid('session-55'), { running: true, pendingInteraction: undefined, completionUnread: false }],
-        [sid('session-56'), { running: false, pendingInteraction: undefined, completionUnread: true }],
+        [sid('session-55'), { running: true, pendingInteraction: undefined, completionUnread: false, lastAgentError: null }],
+        [sid('session-56'), { running: false, pendingInteraction: undefined, completionUnread: true, lastAgentError: null }],
         [sid('session-57'), {
-          running: false, completionUnread: false,
+          running: false, completionUnread: false, lastAgentError: null,
           pendingInteraction: { key: 'question:1', kind: 'question', sessionId: sid('session-57') } as SessionPendingInteraction,
         }],
       ])),
@@ -2658,7 +2659,7 @@ describe('Workspace tree grouping', () => {
     fireEvent.click(screen.getByText('Child'))
     fireEvent.click(screen.getByText('Projects'))
     const status = (running: boolean) => hook<SessionStatusSnapshot>(new Map([[sid('child-8'), {
-      running, pendingInteraction: undefined, completionUnread: false,
+      running, pendingInteraction: undefined, completionUnread: false, lastAgentError: null,
     }]]))
     rerender(b, { useSessionStatus: status(true) })
     rerender(b, { useSessionStatus: status(false) })
@@ -2797,4 +2798,35 @@ describe('Workspace tree grouping', () => {
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledOnce()
     expect(b.props.insertWorkspaceBefore).toHaveBeenCalledWith(wid('alpha'), wid('gamma'))
   })
+})
+
+
+it('moves keyboard focus between visible sidebar rows without activating them', () => {
+  const open = vi.fn()
+  mount({
+    open,
+    useSessions: hook(sessionState([summary('alpha-s', 2), summary('beta-s', 1)])),
+    useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-s']), workspace('beta', ['beta-s'])])),
+  })
+  const rows = screen.getAllByRole('treeitem')
+  rows[0]!.focus()
+  fireEvent.keyDown(rows[0]!, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(rows[1])
+  expect(rows[0]!.tabIndex).toBe(-1)
+  expect(open).not.toHaveBeenCalled()
+})
+
+
+it('lets keyboard navigation focus matching search rows', async () => {
+  mount({
+    useSessions: hook(sessionState([summary('alpha-session', 2), summary('beta-session', 1)])),
+    useWorkspaces: hook(workspaceState([workspace('alpha', ['alpha-session', 'beta-session'])])),
+  })
+  fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
+  fireEvent.change(screen.getByPlaceholderText('搜索会话名称'), { target: { value: 'session' } })
+  const tree = await screen.findByRole('tree', { name: '搜索结果' })
+  const rows = within(tree).getAllByRole('treeitem')
+  rows[0]!.focus()
+  fireEvent.keyDown(rows[0]!, { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(rows[1])
 })

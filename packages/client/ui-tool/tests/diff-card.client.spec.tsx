@@ -196,7 +196,7 @@ describe('chat row diff body', () => {
     // The path link is not the expand control; the leading toggle is.
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
-    expect(view.getByText('hello fixture')).toBeTruthy()
+    expect([...view.container.querySelectorAll('[data-diff] [class*="_line_"]')].some(row => row.textContent === 'hello fixture')).toBe(true)
   })
 
   it('a running diff call expands to its intended change', () => {
@@ -272,7 +272,7 @@ describe('FileMutationRow diff card', () => {
     expect(view.queryByText('hello fixture')).toBeNull()
     toggleRow(view)
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
-    expect(view.getByText('hello fixture')).toBeTruthy()
+    expect([...view.container.querySelectorAll('[data-diff] [class*="_line_"]')].some(row => row.textContent === 'hello fixture')).toBe(true)
     expect(view.getByRole('button', { name: '复制' })).toBeTruthy()
   })
 
@@ -297,7 +297,7 @@ describe('FileMutationRow diff card', () => {
     toggleRow(view)
     expect(view.getAllByText('+1')).toHaveLength(1)
     expect(view.getAllByText('-0')).toHaveLength(1)
-    expect(view.getByText('hello fixture')).toBeTruthy()
+    expect([...view.container.querySelectorAll('[data-diff] [class*="_line_"]')].some(row => row.textContent === 'hello fixture')).toBe(true)
   })
 
   it('reflects the run state on its leading slot', () => {

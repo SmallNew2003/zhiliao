@@ -21,6 +21,8 @@ export type AgentPresetSettingsKey =
   | 'presetMinimalDescription'
   | 'presetCordisName'
   | 'presetCordisDescription'
+  | 'presetAssistantName'
+  | 'presetAssistantDescription'
   | 'inUse'
   | 'noDescription'
   | 'brokenBadge'
@@ -77,6 +79,8 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   createPluginUnavailable: 'Temporarily unavailable. Reopen this menu to retry',
   createPluginMissing: 'Creator mode is not included in this configuration',
 
+  presetAssistantName: 'Assistant mode',
+  presetAssistantDescription: 'Personal assistant that tracks work and creates independent task sessions.',
 }
 
 /** Simplified Chinese copy. */
@@ -118,6 +122,8 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   createPluginUnavailable: '暂时不可用，请重新打开菜单重试',
   createPluginMissing: '当前配置未提供创造模式',
 
+  presetAssistantName: '助理模式',
+  presetAssistantDescription: '个人助理：跟踪工作并创建独立任务会话。',
 }
 
 // The resolution itself is the shared fold in `dsh-agent-preset-registry/display`,
@@ -157,6 +163,8 @@ export const ja = {
   'createPluginChecking': 'クリエイターモードが利用可能か確認中',
   'createPluginUnavailable': '一時的に利用できません。このメニューを開き直して再試行してください',
   'createPluginMissing': 'この構成にはクリエイターモードが含まれていません',
+  presetAssistantName: 'アシスタントモード',
+  presetAssistantDescription: '作業を把握し、独立したタスクセッションを作成する個人アシスタント。',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -202,6 +210,8 @@ export const es = {
   createPluginUnavailable: 'Temporalmente no disponible. Vuelve a abrir este menú para volver a intentarlo.',
   createPluginMissing: 'El modo creador no está incluido en esta configuración.',
 
+  presetAssistantName: 'Modo asistente',
+  presetAssistantDescription: 'Asistente personal que organiza el trabajo y crea sesiones de tareas independientes.',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -247,6 +257,8 @@ export const fr = {
   createPluginUnavailable: 'Temporairement indisponible. Rouvrez ce menu pour réessayer',
   createPluginMissing: "Le mode Créateur n'est pas inclus dans cette configuration",
 
+  presetAssistantName: 'Mode assistant',
+  presetAssistantDescription: 'Assistant personnel qui suit le travail et crée des sessions de tâches indépendantes.',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -292,6 +304,8 @@ export const de = {
   createPluginUnavailable: 'Vorübergehend nicht verfügbar. Öffnen Sie dieses Menü erneut, um es erneut zu versuchen',
   createPluginMissing: 'Der Creator-Modus ist in dieser Konfiguration nicht enthalten',
 
+  presetAssistantName: 'Assistentenmodus',
+  presetAssistantDescription: 'Persönlicher Assistent, der die Arbeit verfolgt und eigenständige Aufgabensitzungen erstellt.',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -337,6 +351,8 @@ export const ru = {
   createPluginUnavailable: 'Временно недоступен. Откройте это меню еще раз, чтобы повторить попытку.',
   createPluginMissing: 'Режим Creator не включен в эту конфигурацию.',
 
+  presetAssistantName: 'Режим ассистента',
+  presetAssistantDescription: 'Личный ассистент, который отслеживает работу и создаёт независимые сеансы задач.',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -382,4 +398,6 @@ export const pt = {
   createPluginUnavailable: 'Temporariamente indisponível. Reabra este menu para tentar novamente',
   createPluginMissing: 'O modo criador não está incluído nesta configuração',
 
+  presetAssistantName: 'Modo assistente',
+  presetAssistantDescription: 'Assistente pessoal que acompanha o trabalho e cria sessões de tarefas independentes.',
 } satisfies Record<keyof typeof en, string>

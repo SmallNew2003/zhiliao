@@ -9,6 +9,18 @@ const PLAN_NEXT_ACTION_EN = 'describe your task to generate plan'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': '未识别工具 "{name}"',
+  'tool.error.commandFailed': '命令执行失败 (退出码 {code})',
+  'tool.error.commandNotFound': '命令不存在或未找到',
+  'tool.error.timeout': '执行超时',
+  'tool.error.fileNotFound': '文件或目录不存在',
+  'tool.error.permissionDenied': '访问权限受限',
+  'diff.copyPath': '复制路径',
+  'diff.pathCopied': '已复制路径',
+  'terminal.copyCommand': '复制命令',
+  'terminal.copiedCommand': '已复制命令',
   'quote.remove': '移除引用',
   'shortcut.newline': '换行',
   'shortcut.complementary': '使用互补的 Queue／Steer 方式',
@@ -399,6 +411,18 @@ export type ConversationKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': 'Unknown tool "{name}"',
+  'tool.error.commandFailed': 'Command failed (exit code {code})',
+  'tool.error.commandNotFound': 'Command not found',
+  'tool.error.timeout': 'Execution timed out',
+  'tool.error.fileNotFound': 'File or directory not found',
+  'tool.error.permissionDenied': 'Permission denied',
+  'diff.copyPath': 'Copy path',
+  'diff.pathCopied': 'Path copied',
+  'terminal.copyCommand': 'Copy command',
+  'terminal.copiedCommand': 'Copied command',
   'quote.remove': 'Remove quote',
   'shortcut.newline': 'New line',
   'shortcut.complementary': 'Use the complementary Queue / Steer action',
@@ -788,6 +812,18 @@ export const en = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': '不明なツール「{name}」',
+  'tool.error.commandFailed': 'コマンドが失敗しました（終了コード {code}）',
+  'tool.error.commandNotFound': 'コマンドが見つかりません',
+  'tool.error.timeout': '実行がタイムアウトしました',
+  'tool.error.fileNotFound': 'ファイルまたはディレクトリが見つかりません',
+  'tool.error.permissionDenied': 'アクセスが拒否されました',
+  'diff.copyPath': 'パスをコピー',
+  'diff.pathCopied': 'パスをコピーしました',
+  'terminal.copyCommand': 'コマンドをコピー',
+  'terminal.copiedCommand': 'コマンドをコピーしました',
   'quote.remove': '引用を削除',
   'shortcut.newline': '改行',
   'shortcut.complementary': '補助のキュー / 実行中の指示変更を使用',
@@ -1175,6 +1211,18 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': 'Herramienta desconocida «{name}»',
+  'tool.error.commandFailed': 'El comando falló (código {code})',
+  'tool.error.commandNotFound': 'Comando no encontrado',
+  'tool.error.timeout': 'La ejecución agotó el tiempo',
+  'tool.error.fileNotFound': 'Archivo o directorio no encontrado',
+  'tool.error.permissionDenied': 'Permiso denegado',
+  'diff.copyPath': 'Copiar ruta',
+  'diff.pathCopied': 'Ruta copiada',
+  'terminal.copyCommand': 'Copiar comando',
+  'terminal.copiedCommand': 'Comando copiado',
   'quote.remove': 'Eliminar cotización',
   'shortcut.newline': 'Nueva linea',
   'shortcut.complementary': 'Usar la acción alternativa de poner en cola o redirigir',
@@ -1564,6 +1612,18 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': 'Outil inconnu « {name} »',
+  'tool.error.commandFailed': 'Échec de la commande (code {code})',
+  'tool.error.commandNotFound': 'Commande introuvable',
+  'tool.error.timeout': 'Délai d’exécution dépassé',
+  'tool.error.fileNotFound': 'Fichier ou dossier introuvable',
+  'tool.error.permissionDenied': 'Accès refusé',
+  'diff.copyPath': 'Copier le chemin',
+  'diff.pathCopied': 'Chemin copié',
+  'terminal.copyCommand': 'Copier la commande',
+  'terminal.copiedCommand': 'Commande copiée',
   'quote.remove': 'Supprimer le devis',
   'shortcut.newline': 'Nouvelle ligne',
   'shortcut.complementary': 'Utiliser l’action alternative de mise en attente ou de guidage',
@@ -1953,6 +2013,18 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': 'Unbekanntes Werkzeug „{name}“',
+  'tool.error.commandFailed': 'Befehl fehlgeschlagen (Code {code})',
+  'tool.error.commandNotFound': 'Befehl nicht gefunden',
+  'tool.error.timeout': 'Zeitüberschreitung bei der Ausführung',
+  'tool.error.fileNotFound': 'Datei oder Verzeichnis nicht gefunden',
+  'tool.error.permissionDenied': 'Zugriff verweigert',
+  'diff.copyPath': 'Pfad kopieren',
+  'diff.pathCopied': 'Pfad kopiert',
+  'terminal.copyCommand': 'Befehl kopieren',
+  'terminal.copiedCommand': 'Befehl kopiert',
   'quote.remove': 'Zitat entfernen',
   'shortcut.newline': 'Neue Zeile',
   'shortcut.complementary': 'Die alternative Aktion zum Vormerken oder Lenken verwenden',
@@ -2342,6 +2414,18 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': 'Неизвестный инструмент «{name}»',
+  'tool.error.commandFailed': 'Ошибка команды (код {code})',
+  'tool.error.commandNotFound': 'Команда не найдена',
+  'tool.error.timeout': 'Время выполнения истекло',
+  'tool.error.fileNotFound': 'Файл или каталог не найден',
+  'tool.error.permissionDenied': 'Доступ запрещён',
+  'diff.copyPath': 'Копировать путь',
+  'diff.pathCopied': 'Путь скопирован',
+  'terminal.copyCommand': 'Копировать команду',
+  'terminal.copiedCommand': 'Команда скопирована',
   'quote.remove': 'Удалить цитату',
   'shortcut.newline': 'Новая линия',
   'shortcut.complementary': 'Использовать альтернативное действие: поставить в очередь или направить',
@@ -2731,6 +2815,18 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
+  'row.durationMs': '{ms}ms',
+  'row.durationSec': '{sec}s',
+  'tool.error.unknownTool': 'Ferramenta desconhecida «{name}»',
+  'tool.error.commandFailed': 'Falha no comando (código {code})',
+  'tool.error.commandNotFound': 'Comando não encontrado',
+  'tool.error.timeout': 'Tempo de execução esgotado',
+  'tool.error.fileNotFound': 'Arquivo ou diretório não encontrado',
+  'tool.error.permissionDenied': 'Permissão negada',
+  'diff.copyPath': 'Copiar caminho',
+  'diff.pathCopied': 'Caminho copiado',
+  'terminal.copyCommand': 'Copiar comando',
+  'terminal.copiedCommand': 'Comando copiado',
   'quote.remove': 'Remover cotação',
   'shortcut.newline': 'Nova linha',
   'shortcut.complementary': 'Usar a ação alternativa de enfileirar ou orientar',

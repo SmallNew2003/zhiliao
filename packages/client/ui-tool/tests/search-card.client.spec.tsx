@@ -100,7 +100,7 @@ describe('searchCardModel', () => {
     expect(searchCardModel(settledGrep())).toEqual({
       recovery: undefined,
       card: {
-        kind: 'matches',
+        kind: 'matches', query: 'foo',
         files: [
           { path: 'a.ts', matches: [{ lineNumber: 12, line: 'const foo = 1' }, { lineNumber: 40, line: 'return foo' }] },
           { path: 'b.ts', matches: [{ lineNumber: 7, line: 'foo()' }] },
@@ -129,7 +129,7 @@ describe('searchCardModel', () => {
     // Empty block content isolates the truncation signal from the recovery arm.
     expect(searchCardModel(settledGlob({ content: [], meta: pathsMeta({ truncated: true, total: 20 }) }))).toEqual({
       recovery: undefined,
-      card: { kind: 'paths', paths: ['src/a.ts', 'src/b.ts'], truncated: true, total: 20 },
+      card: { kind: 'paths', paths: ['src/a.ts', 'src/b.ts'], query: '**/*.ts', truncated: true, total: 20 },
     })
   })
 

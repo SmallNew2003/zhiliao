@@ -56,9 +56,22 @@ flowchart LR
   pkg_tool_pwsh["tool-pwsh"]
   pkg_subagent["subagent"]
   pkg_sdk_jsonrpc_server["sdk-jsonrpc-server"]
+  pkg_memory["memory"]
+  svc_memory["ctx.memory<br/>Workspace long-term memory"]
+  pkg_memory_hindsight_http["memory-hindsight-http"]
+  pkg_tool_memory["tool-memory"]
+  pkg_host_memory_controller["host-memory-controller"]
+  svc_memoryController["ctx.memoryController<br/>Memory browser Remote"]
+  pkg_client_ui_memory_browser["client-ui-memory-browser"]
+  pkg_assistant_task["assistant-task"]
+  svc_assistantTasks["ctx.assistantTasks<br/>Assistants and delegated tasks"]
+  pkg_tool_assistant_task["tool-assistant-task"]
+  pkg_client_ui_assistant["client-ui-assistant"]
+  pkg_mcp_discovery["mcp-discovery"]
+  svc_mcpDiscovery["ctx.mcpDiscovery<br/>Progressive MCP loading"]
+  pkg_mcp_client["mcp-client"]
   pkg_mcp_resources["mcp-resources"]
   svc_mcpResources["ctx.mcpResources<br/>Scoped MCP resource access"]
-  pkg_mcp_client["mcp-client"]
   pkg_browser_use["browser-use"]
   svc_browserUse["ctx.browserUse<br/>Browser-use provider registration"]
   pkg_experimental_browser_use_playwright_mcp["experimental-browser-use-playwright-mcp"]
@@ -335,6 +348,7 @@ flowchart LR
   pkg_api_workspace_controller --> svc_workspaceController
   pkg_api_workspace_files --> svc_workspaceFiles
   pkg_app_boot --> svc_profileContext
+  pkg_assistant_task --> svc_assistantTasks
   pkg_attachment --> svc_attachments
   pkg_attachment_local --> svc_attachments
   pkg_authorization --> svc_authorization
@@ -392,6 +406,7 @@ flowchart LR
   pkg_host_directory_picker --> svc_directoryPicker
   pkg_host_directory_picker_browse --> svc_directoryPicker
   pkg_host_directory_picker_native --> svc_directoryPicker
+  pkg_host_memory_controller --> svc_memoryController
   pkg_host_product_telemetry_otel --> svc_productTelemetry
   pkg_host_webserver --> svc_webServer
   pkg_inspector --> svc_inspector
@@ -404,7 +419,10 @@ flowchart LR
   pkg_lsp --> svc_lsp
   pkg_lsp_stdio --> svc_lsp
   pkg_mcp_client --> svc_mcpResources
+  pkg_mcp_discovery --> svc_mcpDiscovery
   pkg_mcp_resources --> svc_mcpResources
+  pkg_memory --> svc_memory
+  pkg_memory_hindsight_http --> svc_memory
   pkg_message_feedback --> svc_messageFeedback
   pkg_office_to_pdf --> svc_officeToPdf
   pkg_otel --> svc_otel
@@ -497,6 +515,8 @@ flowchart LR
   svc_approval --> pkg_acp
   svc_approval --> pkg_tool_bash
   svc_approval --> pkg_tools
+  svc_assistantTasks --> pkg_client_ui_assistant
+  svc_assistantTasks --> pkg_tool_assistant_task
   svc_attachments --> pkg_api_session_controller
   svc_attachments --> pkg_llm_deepseek
   svc_attachments --> pkg_llm_pi_ai
@@ -539,7 +559,11 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_mcpDiscovery --> pkg_mcp_client
+  svc_mcpDiscovery --> pkg_mcp_resources
   svc_mcpResources --> pkg_mcp_resources
+  svc_memory --> pkg_tool_memory
+  svc_memoryController --> pkg_client_ui_memory_browser
   svc_officeToPdf --> pkg_client_ui_sidebar_documentpreview
   svc_otel --> pkg_host_product_telemetry_otel
   svc_otel --> pkg_session_telemetry_otel
@@ -668,6 +692,10 @@ flowchart LR
 | `ctx.forgePanel` | `service` | [`experimental-client-ui-forge`](../packages/experimental/client-ui-forge) | - | - | - | 为每个被跟随的 Session 推送一份面板状态：使用 Session 权限进行的 Git 检查、识别出的代码托管平台及其登录状态，以及带轮询状态的已绑定变更请求。 |
 | `ctx.worktrees` | `seam` | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-worktree`](../packages/experimental/worktree) | [`experimental-tool-worktree`](../packages/experimental/tool-worktree) | - | 显式实验组合从固定的本地提交创建工作树。检出目录与共享 Git 元数据受现有写权限约束；工作目录服务拥有创建后的 Session 目录。 |
 | `ctx.workingDirectory` | `seam` | [`working-directory`](../packages/session/working-directory) | [`working-directory`](../packages/session/working-directory) | [`tool-working-directory`](../packages/session/tool-working-directory), [`tool-fs`](../packages/fs/tool-fs), [`tool-bash`](../packages/shell/tool-bash), [`tool-pwsh`](../packages/shell/tool-pwsh), [`subagent`](../packages/subagent/subagent), [`sdk-jsonrpc-server`](../packages/sdk/server) | - | 一个 Session 投影拥有有效执行目录。文件系统验证变更，用户上下文报告目录信息，原始元数据与写入授权保持不变。 |
+| `ctx.memory` | `seam` | [`memory`](../packages/memory/memory) | [`memory-hindsight-http`](../packages/memory/hindsight-http) | [`tool-memory`](../packages/memory/tool-memory) | - | 提供方解析工作区记忆库，提供有界召回、搜索与保留；生命周期消费方在模型使用前记录召回上下文。 |
+| `ctx.memoryController` | `service` | [`host-memory-controller`](../packages/host/memory-controller) | - | [`client-ui-memory-browser`](../packages/client/ui-memory-browser) | - | 只读记忆库、统计、知识页与搜索操作通过资源授权的 Remote 方法返回显式不可用状态。 |
+| `ctx.assistantTasks` | `service` | [`assistant-task`](../packages/assistant/task) | - | [`tool-assistant-task`](../packages/assistant/tool-task), [`client-ui-assistant`](../packages/client/ui-assistant) | - | Host 存储拥有助理与任务标识；执行使用普通 Session，可见性数据流则将助理拥有的 Session 与 Workspace 导航分离。 |
+| `ctx.mcpDiscovery` | `service` | [`mcp-discovery`](../packages/mcp/mcp-discovery) | - | [`mcp-client`](../packages/mcp/mcp-client), [`mcp-resources`](../packages/mcp/mcp-resources) | - | 作用域目录与持久选择在步骤准入前加载确切工具定义和服务器指令；执行器拥有的预览检查表示预算。 |
 | `ctx.mcpResources` | `seam` | [`mcp-resources`](../packages/mcp/mcp-resources) | [`mcp-client`](../packages/mcp/mcp-client) | [`mcp-resources`](../packages/mcp/mcp-resources) | - | 连接所有者提供的操作在调用 agent 的作用域内服务于共享资源工具。 |
 | `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | [`experimental-browser-use-playwright-mcp`](../packages/experimental/browser-use-playwright-mcp), [`experimental-browser-use-chrome-devtools-mcp`](../packages/experimental/browser-use-chrome-devtools-mcp), [`experimental-browser-use-stagehand-native`](../packages/experimental/browser-use-stagehand-native) | - | 每个服务实例注册一个提供方拥有的名称。提供方按实时 Session 拥有自己的工具与浏览器资源；共享服务不提供浏览器操作 API。 |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | [`experimental-computer-use-cua-driver-mcp`](../packages/experimental/computer-use-cua-driver-mcp), [`experimental-computer-use-cua-driver-native`](../packages/experimental/computer-use-cua-driver-native) | - | 每个服务实例只注册一个提供方自定的名称。各提供方也拥有自己的模型工具；服务不提供通用操作 API、运行时选择或 Session 流程锁。 |

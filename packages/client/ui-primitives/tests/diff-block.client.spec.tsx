@@ -229,3 +229,9 @@ describe('DiffBlock copy', () => {
     expect(writeText).toHaveBeenCalledTimes(1)
   })
 })
+
+
+it('highlights changed words while preserving unchanged text', () => {
+  const view = render(<DiffBlock diffs={[{ path: 'a.ts', oldText: 'const old = 1', newText: 'const next = 1' }]} />)
+  expect([...view.container.querySelectorAll('[class*="wordHighlight"]')].map(node => node.textContent)).toEqual(['old', 'next'])
+})

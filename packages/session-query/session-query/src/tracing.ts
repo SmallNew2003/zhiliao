@@ -1,7 +1,7 @@
 /** One-shot session-lineage and event-relationship tracing helpers. */
 
 import { currentSessionMessageProjections } from '@deepseek-ai/dsh-session-format-catalog/message-projections'
-import { foldSurface, isSurfaceEvent, snapshotSessionEvent } from '@deepseek-ai/dsh-session'
+import { foldSurface, isSurfaceEvent, readSessionInputEvent, snapshotSessionEvent } from '@deepseek-ai/dsh-session'
 import type {
   SessionEvent,
   SessionId,
@@ -22,6 +22,7 @@ interface EventLogAnalysis {
   replacedBy: Map<SessionSeq, SessionSeq>
   replacedEventSeqs: Map<SessionSeq, SessionSeq[]>
   currentSeqs: SessionSeq[]
+  projectedMessages: ReturnType<typeof foldSurface>['projectedMessages']
 }
 
 /**
@@ -46,18 +47,22 @@ export function eventRecords(
 export function currentSurfaceEvents(
   sessionId: SessionId,
   events: readonly SessionEvent[],
-): SurfaceEvent[] {
+): (SurfaceEvent | SessionEvent<'user/message-edit'>)[] {
   const analysis = analyzeEventLog(sessionId, events)
   return analysis.currentSeqs.map((seq) => {
-    const event = events[seq]
+    const source = events[seq]
+    const event = source === undefined ? undefined : readSessionInputEvent(source)
     /* v8 ignore next 6 -- analyzeEventLog validated contiguous seqs and foldSurface returned only surface-event seqs. */
-    if (event === undefined || event.seq !== seq || !isSurfaceEvent(event)) {
+    if (event === undefined || event.seq !== seq || (!isSurfaceEvent(event) && event.type !== 'user/message-edit')) {
       throw new SessionQueryError(
         `invalid session surface: current node ${seq} is not a surface event`,
         'SESSION_QUERY_INVALID_SURFACE',
       )
     }
-    return snapshotSessionEvent(event)
+    const message = analysis.projectedMessages.get(seq)
+    return snapshotSessionEvent(message === undefined ? event : event.type === 'user/message'
+      ? { ...event, data: message as typeof event.data }
+      : { ...event, data: { ...event.data, message } } as typeof event)
   })
 }
 
@@ -216,10 +221,13 @@ function analyzeEventLog(
     replacedBy,
     replacedEventSeqs,
     currentSeqs: [...folded.nodes],
+    projectedMessages: folded.projectedMessages,
   }
 }
 
-function eventSources(event: SessionEvent): readonly SessionSeq[] {
+function eventSources(source: SessionEvent): readonly SessionSeq[] {
+  const event = readSessionInputEvent(source)
+  if (event.type === 'user/message-edit') return [event.data.targetSeq]
   return event.sourceEventSeqs ?? []
 }
 

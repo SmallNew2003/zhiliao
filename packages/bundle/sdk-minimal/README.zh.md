@@ -80,11 +80,11 @@ dsh --profile sdk-minimal
 
 #### 模型看到的内容
 
-系统提示词取 `DSH_SYSTEM_PROMPT`，未设置时使用 `You are a helpful software engineer assistant.`。未配置 MCP 服务器时，对外公布的工具为 `read_image`、`working_directory`，以及 Linux/macOS 上 agent 所有的持久 `bash` 或 Windows 上的 `pwsh`。必需的用户上下文提供当前目录。可选运行时上下文、文本文件工具、workspace 指令、skill、jobs 控制与 Harness 身份均不存在。
+系统提示词取 `DSH_SYSTEM_PROMPT`，未设置时使用 `You are a helpful software engineer assistant.`。未配置 MCP 服务器时，对外公布的工具为 `read_image`、`working_directory`，以及 Linux/macOS 上 agent 所有的持久 `bash` 或 Windows 上的 `pwsh`。必需的用户上下文提供当前目录。可选运行时上下文、文本文件工具、workspace 指令、skill、jobs 控制与 Harness 身份均不存在。已配置的 MCP 服务器使用[渐进发现](../../mcp/mcp-discovery/README.zh.md)：模型搜索作用域目录，并在请求准入前加载所选工具与完整服务器指令。辅助选择器仅在显式配置后启用。
 
 #### Token 影响
 
-默认是一个稳定 persona、三个工具 schema，以及初始目录与后续变更的用户上下文。已配置 MCP 服务器会添加自己的工具、共享资源工具及可用的服务器指令。图片消耗模型输入 token。图片超过路由预算时，[图片省略](../../compaction/compaction-image-offload/README.zh.md)会永久将较早的图片位置替换为包含附件与路径的占位文本，并重试请求或压缩摘要。上下文压力达到配置阈值时，自动压缩会额外发起摘要请求，并用摘要替换较早的模型可见历史；持久 JSONL 日志保留这些事件。
+默认是一个稳定 persona、三个工具 schema，以及初始目录与后续变更的用户上下文。已配置 MCP 服务器会添加发现工具；准入后的选择添加工具 schema、共享资源工具与完整服务器指令。图片消耗模型输入 token。图片超过路由预算时，[图片省略](../../compaction/compaction-image-offload/README.zh.md)会永久将较早的图片位置替换为包含附件与路径的占位文本，并重试请求或压缩摘要。上下文压力达到配置阈值时，自动压缩会额外发起摘要请求，并用摘要替换较早的模型可见历史；持久 JSONL 日志保留这些事件。
 
 #### KV Cache 影响
 

@@ -33,6 +33,8 @@ kind: "package-reference"
 
 文件和 URL 工具视图 Slot 直接获取 `useContextMenu`，向 `ToolRow` 提供已绑定的 `fileContextMenuProps` 或 `urlContextMenuProps`。文件注册注入在触发时读取原始 Session 工作目录的路径解析器，工作目录缺失时使用工作区根目录。`ToolCallTree` 向普通 `GenericToolCard` fallback 显式提供文件适配函数，包含嵌套调用。无需 Markdown Provider。鼠标和键盘手势保留捕获的路径、行号、URL 与 Session，不会展开工具行或打开文件。
 
+工具行在起止时间均有记录时显示调用耗时。通用失败使用本地化错误类别，前台命令退出仍保留记录的退出状态胶囊。记录中的文件路径缺失和权限错误码选择本地化摘要，展开的输出保留完整错误。展开的输入与输出区域各有复制操作，终端卡片可单独复制命令。搜索卡片高亮查询并按匹配行打开文件，读取卡片标明返回窗口的位置，差异卡片高亮变化词并提供路径复制。
+
 ### 注册业务工具视图
 
 拥有该视图的业务包将其 wire 工具名称注册进 `tool.call.toolview`：

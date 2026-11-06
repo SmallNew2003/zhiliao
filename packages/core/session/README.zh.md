@@ -59,6 +59,10 @@ session.deriveMessages()         // the derived model history
 
 `system/message` 承载渲染后的系统提示词：第一条是 surface 第 0 号节点，准入依据已准备调用的能力，不具备能力的路由将非空渲染文本归并到首个系统节点，延续中的 `in-history` 序列则在缓存历史之后追加；空系统节点不投影为消息，因此清除提示词必须为所有生效的系统节点记录空内容替换，而非仅替换最新节点；当第 0 号节点是 `system/message` 时，surface 折叠拒绝覆盖它的替换，除非替换事件本身是恰好覆盖该节点的 `system/message`，而后续系统节点不受保护，压缩范围可以遮蔽它们（[决策](../../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.zh.md)）。
 
+`readSessionInputEvent(event)` 仅验证并解释带 `ignorable: true` 的历史 `plugin:user/message-edit` 与 `plugin:user/message-admit` 记录。表层折叠、最新输入标识与消息派生沿用原生编辑语义，原始记录保持不变。其他插件记录保持不透明；历史载荷或编辑目标无效时拒绝重建。
+
+历史循环可能追加与最新编辑消息 ID 相同的预处理 `user/message`。表层将该精确标识解释为编辑节点的文本准入，后续编辑仍以编辑序号为目标，并保留两条原始记录。非文本变化仍会被拒绝准入。
+
 ### 读取日志
 
 `session.seq` 无需物化数组即可读取当前日志长度，`session.eventAt(seq)` 按序列号读取单个已接受且深度冻结的事件。`session.snapshotEvents(fromSeq?, toSeqExclusive?)` 会物化半开区间的冻结稳定快照；当前完整快照会缓存到下一次追加。`eventAt()`、`snapshotEvents()` 和 `ownEvents()` 已弃用：现有逻辑可以暂不迁移，但禁止新增生产调用。仓库测试文件可以在限定范围的 lint 豁免下使用这三个读取方法（[策略](../../../.agents/notes/implemented/architecture/2026-09-09-deprecate-synchronous-session-event-reads.zh.md)）。只需要长度的调用方使用 `seq`。

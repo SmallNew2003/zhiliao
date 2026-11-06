@@ -1,3 +1,4 @@
+import { readSessionInputEvent } from '@deepseek-ai/dsh-session/surface'
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationNodeDefinition, RequestPromptInspector, SystemPromptState, SystemPromptInspector,
@@ -33,10 +34,15 @@ function trajectorySystemMessageDefinition(inspect: SystemPromptInspector): Conv
   return {
     kind: 'trajectory-system-message',
     target: 'trajectory',
-    match: event => event.type === 'system/message'
+    match: (source) => {
+      const event = source.type === 'assistant/live-chunk' ? source : readSessionInputEvent(source)
+      return event.type === 'system/message'
+      || event.type === 'user/message-edit'
+      || (event.type === 'user/message' && event.surfaceOp === 'append' && event.data.source.kind === 'user')
       || ('surfaceOp' in event && event.surfaceOp !== 'append')
-      ? { id: String(event.seq), role: 'start' }
-      : null,
+        ? { id: String(event.seq), role: 'start' }
+        : null
+    },
     start: (_context, match, reader) => {
       if (match.event.type === 'assistant/live-chunk') throw new Error('system-message requires a durable event')
       const prior = reader.previous<TrajectorySystemMessageState>('trajectory-system-message')?.state

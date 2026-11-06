@@ -167,6 +167,7 @@ export function createElectronBuilderConfig(
       // macOS matches the application locale against this bundle, not Electron Framework resources.
       extendInfo: {
         CFBundleDisplayName: '知了',
+        NSUserNotificationsUsageDescription: 'Zhiliao sends notifications when a session finishes or needs your attention.',
         CFBundleLocalizations: ['en', 'zh_CN', 'ja', 'es', 'fr', 'de', 'ru', 'pt'],
         NSMicrophoneUsageDescription: 'Zhiliao uses your microphone to transcribe speech into message drafts.',
       },

@@ -80,11 +80,11 @@ The bundle's single insert is the complete application tree: SDK stdio startup a
 
 #### What the model sees
 
-The system prompt is `DSH_SYSTEM_PROMPT` or `You are a helpful software engineer assistant.`. With no MCP server configured, the advertised tools are `read_image`, `working_directory`, and owner-scoped persistent `bash` on Linux/macOS or `pwsh` on Windows. Required user context supplies the current directory. Optional runtime context, text file tools, workspace instructions, skills, jobs controls, and Harness identity are absent.
+The system prompt is `DSH_SYSTEM_PROMPT` or `You are a helpful software engineer assistant.`. With no MCP server configured, the advertised tools are `read_image`, `working_directory`, and owner-scoped persistent `bash` on Linux/macOS or `pwsh` on Windows. Required user context supplies the current directory. Optional runtime context, text file tools, workspace instructions, skills, jobs controls, and Harness identity are absent. Configured MCP servers use [progressive discovery](../../mcp/mcp-discovery/README.md): the model searches a scoped catalog and loads selected tools and complete server instructions before request admission. The auxiliary selector remains disabled unless explicitly configured.
 
 #### Token effect
 
-By default, one stable persona, three tool schemas, and user context for the initial directory and subsequent changes. Configured MCP servers add their tools, shared resource tools, and available server instructions. Images consume model input tokens. When images exceed the route budget, [image offload](../../compaction/compaction-image-offload/README.md) permanently replaces older image occurrences with attachment/path placeholders and retries the request or compaction summary. Automatic compaction sends an additional summarization request when context pressure reaches the configured threshold and replaces older model-visible history with its summary; the durable JSONL log retains those events.
+By default, one stable persona, three tool schemas, and user context for the initial directory and subsequent changes. Configured MCP servers add discovery; admitted selections add their tool schemas, shared resource tools, and complete server instructions. Images consume model input tokens. When images exceed the route budget, [image offload](../../compaction/compaction-image-offload/README.md) permanently replaces older image occurrences with attachment/path placeholders and retries the request or compaction summary. Automatic compaction sends an additional summarization request when context pressure reaches the configured threshold and replaces older model-visible history with its summary; the durable JSONL log retains those events.
 
 #### KV Cache effect
 

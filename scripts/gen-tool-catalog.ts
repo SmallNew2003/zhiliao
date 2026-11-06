@@ -79,6 +79,11 @@ import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
 import * as PluginMarketTools from '@deepseek-ai/dsh-plugin-market/tools'
 import SandboxPolicy from '@deepseek-ai/dsh-sandbox-policy'
 import McpResources from '@deepseek-ai/dsh-mcp-resources'
+import McpDiscovery, { Config as McpDiscoveryConfig } from '@deepseek-ai/dsh-mcp-discovery'
+import MemoryRuntime from '@deepseek-ai/dsh-memory'
+import * as ToolMemory from '@deepseek-ai/dsh-tool-memory'
+import type AssistantTaskService from '@deepseek-ai/dsh-assistant-task'
+import * as ToolAssistantTask from '@deepseek-ai/dsh-tool-assistant-task'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import * as ToolSubagentOar from '@deepseek-ai/dsh-experimental-tool-subagent-oar'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
@@ -212,6 +217,40 @@ const TOOL_PACKAGES: ToolPackage[] = [
       // Schema harvest never fetches an index.
       ctx.provide('pluginMarket', {} as PluginMarket)
       await ctx.plugin(PluginMarketTools)
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-mcp-discovery',
+    dir: 'mcp-discovery',
+    source: 'packages/mcp/mcp-discovery/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.sessionProjections'],
+    writes: ['tool/call', 'tool/result', 'mcp/selection', 'mcp/request-snapshot'],
+    async mount(ctx) {
+      await ctx.plugin(McpDiscovery, McpDiscoveryConfig({}))
+      ctx.mcpDiscovery.registerServer('catalog', { connected: () => true, instructions: () => '' })
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-assistant-task',
+    dir: 'tool-task',
+    source: 'packages/assistant/tool-task/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.assistantTasks', 'a registered assistant Session'],
+    writes: ['tool/call', 'tool/result', 'assistant storage domain records and independent execution Session'],
+    async mount(ctx) {
+      // Schema harvest reads definitions without executing assistant operations or step conditions.
+      ctx.provide('assistantTasks', {} as AssistantTaskService)
+      await ctx.plugin(ToolAssistantTask)
+    },
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-memory',
+    dir: 'tool-memory',
+    source: 'packages/memory/tool-memory/src/tools.ts',
+    requires: ['ctx.tools', 'ctx.memory', 'a primary Session with a resolved workspace bank'],
+    writes: ['tool/call', 'tool/result', 'provider-owned memory bank for hindsight_remember'],
+    async mount(ctx) {
+      await ctx.plugin(MemoryRuntime)
+      await ctx.plugin(ToolMemory, ToolMemory.Config({}))
     },
   },
   {

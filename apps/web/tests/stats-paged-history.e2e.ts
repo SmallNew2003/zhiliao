@@ -121,9 +121,13 @@ describe('web e2e: whole-session stats survive history paging', () => {
     // turns are NOT loaded, yet the strip already reports the whole log —
     // the sessionStats projection, not the window fold.
     expect(await page.getByText('m1', { exact: true }).count()).toBe(0)
-    await expect.poll(() => page.getByText(FULL_COUNTS, { exact: false }).count(), { timeout: 10_000 }).toBe(1)
-    const strip = page.getByText(FULL_COUNTS, { exact: false }).locator('..')
+    const strip = page.locator('[data-composer-stat="activity"]')
+    await strip.waitFor({ timeout: 10_000 })
     const stripBeforePaging = await strip.textContent()
+    await strip.click()
+    await page.getByRole('dialog', { name: 'Session statistics' }).waitFor()
+    expect(await page.getByText(FULL_COUNTS, { exact: true }).count()).toBe(1)
+    await page.keyboard.press('Escape')
 
     // Auto paging: entering the history headroom pulls the older page in, and
     // prepending it must not move ANY strip figure — counts, wall times, or
@@ -131,6 +135,10 @@ describe('web e2e: whole-session stats survive history paging', () => {
     await page.locator('[data-conversation-scroll]').evaluate((host) => { host.scrollTop = 0 })
     await expect.poll(() => page.getByText('m1', { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     expect(await strip.textContent()).toBe(stripBeforePaging)
+    await strip.click()
+    await page.getByRole('dialog', { name: 'Session statistics' }).waitFor()
+    expect(await page.getByText(FULL_COUNTS, { exact: true }).count()).toBe(1)
+    await page.keyboard.press('Escape')
     // With the whole log loaded, the window mounts one turn-tail footer per
     // settled turn — the loaded-window probe the scroll/perf lanes count now
     // that the strip is whole-log-scoped.
