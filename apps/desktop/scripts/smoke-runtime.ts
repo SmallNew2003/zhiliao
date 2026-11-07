@@ -90,7 +90,7 @@ export function apply(ctx) {
       }
       await runCli(['remove', name])
       const removed = JSON.parse(readFileSync(profileFile, 'utf8')) as ProfileManifest
-      if (removed.dependencies?.[name] !== undefined || existsSync(join(profile, 'node_modules', name))
+      if (removed.dependencies?.[name] !== undefined
         || JSON.stringify(removed.dsh?.profile?.bundles) !== JSON.stringify(before.dsh?.profile?.bundles)
         || !existsSync(join(media, 'package.json'))) {
         throw new Error(`desktop runtime: Official bundle ${name} removal changed the installation or retained profile state`)

@@ -1830,6 +1830,7 @@ it('keeps installation-carried on-demand media uninstalled until the profile opt
   expect(await manager.removeBundle(name)).toMatchObject({ application: 'applied' })
   expect(existsSync(directory)).toBe(true)
   expect((await manager.listBundles()).find(item => item.name === name)).toMatchObject({ availability: 'missing', installed: false })
+  expect(await manager.setBundleEnabled(name, true)).toMatchObject({ application: 'failed', changed: false })
 })
 
 it('lists absent Official entries offline without resolving their packages or consulting registries', async () => {

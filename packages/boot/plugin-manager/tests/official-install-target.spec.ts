@@ -78,7 +78,7 @@ it('rejects a matching package outside the running installation instead of borro
   expect(() => officialBundleInstallTarget(name, anchor, version)).toThrow(/Official bundle/)
 })
 
-it('installs a packaged target in an offline profile through real pnpm without importing its provider', async () => {
+it('installs and removes a packaged target offline without importing its provider or removing installation media', async () => {
   const { temporary, anchor, directory } = packagedFixture()
   const profile = join(temporary, 'profile')
   initProfile(profile, [])
@@ -93,6 +93,14 @@ it('installs a packaged target in an offline profile through real pnpm without i
   expect(saved?.startsWith('link:')).toBe(true)
   expect(resolve(profile, saved?.slice(5) ?? '')).toBe(directory)
   expect(loadProfileDirectory('test', profile, anchor).layers.map(layer => layer.packageName)).toEqual([name])
+  const removed = await runProfilePnpm({ profile: 'test', dir: profile, installAnchor: anchor, cwd: temporary, home: temporary },
+    ['remove', name, '--config.offline=true', '--config.registry=http://127.0.0.1:1'], { execution: 'service', outputBytes: 16_384 })
+  expect(removed, removed.output).toMatchObject({ exitCode: 0 })
+  expect(removed.timedOut).not.toBe(true)
+  expect(readProfileManifest('test', profile).dependencies?.[name]).toBeUndefined()
+  expect(readProfileManifest('test', profile).dsh?.profile?.bundles).toEqual([])
+  expect(loadProfileDirectory('test', profile, anchor).layers).toEqual([])
+  expect(readFileSync(join(directory, 'lib/index.js'), 'utf8')).toContain('provider must not be imported')
 })
 
 it('finds the package by manifest name rather than assuming its workspace directory', () => {
