@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { checkPnpm } from './pnpm-smoke.mjs'
+import { checkCuaHelper } from './cua-helper-smoke.mjs'
 
 const runtime = process.argv[2]
 assert.ok(runtime, 'Pass the filtered resources/dsh directory')
@@ -133,6 +134,8 @@ function checkHtml() {
 }
 
 try {
+  console.error('runtime payload: CUA helper receipt and architecture')
+  await checkCuaHelper(root)
   const builtin = requireRuntime('node-addon-require-builtin')
   assert.equal(typeof builtin.requireBuiltin('internal/modules/esm/loader').getOrInitializeCascadedLoader, 'function')
   console.error('runtime payload: pnpm')

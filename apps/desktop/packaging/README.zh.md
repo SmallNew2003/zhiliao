@@ -140,6 +140,8 @@ pnpm run package:desktop:mac:x64:unsigned
 
 这些命令忽略 `.env.macos` 和继承的发布配置，使用 `com.deepseek.harness` 作为应用 ID，并省略自动更新和强制更新配置。构建工具、标准网络代理与 `DSH_DESKTOP_NPM_REGISTRY` 仍可从 shell 提供。它们跳过 Developer ID 签名、Apple 公证、临时签名钥匙串和公证代理修改。Electron 使用无需证书的本地 ad-hoc 签名，以便修改后的可执行文件能够运行；DMG 不签名。准备阶段和组装后的应用仍执行运行时完整性与冒烟检查。本地构建不生成更新源、ZIP 或发布完成记录，上传命令无法发布这些产物。macOS 可能要求在“系统设置 → 隐私与安全性”中批准打开未经公证的应用。
 
+本地未签名 macOS 构建在 `prepare:dsh` 中准备 CUA 原生辅助程序，位于通用原生签名之后、运行时元数据与最终文件清单封装之前。`runtime:cua-helper` 步骤使用 checkout 中的 `build_app.py`，以 ad-hoc 身份编译所选目标架构，将辅助程序 generation 和 `current.json` 写入物理 CUA 提供方的 `native/bin/darwin-<arch>`，并在不请求 macOS 权限的前提下验证代码与架构。构建需要 Apple Command Line Tools，包括 Swift 和 Python；已安装应用不需要 Xcode 或编译器。安装后的提供方只读取已准备的辅助程序 receipt，不会在首次启用时编译。完整 CUA 交付除 JavaScript 与 bundle patch 外，还包括这些原生文件。签名构建要求匹配的预构建 payload，并验证来源、版本、签名团队、签名和公证；payload 缺失或无效时直接失败，不回退到 ad-hoc 构建。实际组装应用与已安装更新验收仍独立于源码级测试。
+
 <a id="macos-release-signing"></a>
 
 ## macOS 发布签名与诊断

@@ -18,6 +18,8 @@ Desktop 通过 electron-builder 的 `extraResources` 将完整封装的 dsh 树�
 
 两条路径均在不导入提供方的前提下校验包身份、精确的运行中产品版本、公开 bundle 元数据、已构建入口和 bundle patch。缺失或不一致的文件会明确报错，要求修复 checkout 或重新安装应用；两条路径都不回退到 npm。移除 profile 依赖后，安装副本仍可供后续再次安装。
 
+CUA 还要求已准备的 macOS 辅助程序应用与原生 receipt；仅有 JavaScript 和 bundle patch 不构成完整提供方。Desktop 在 `prepare:dsh` 的 `runtime:cua-helper` 阶段准备该 payload，位于通用原生签名之后、元数据与最终文件清单封装之前。本地未签名构建通过既有 `build_app.py`，以 ad-hoc 身份编译所选架构。签名构建要求已验证、绑定来源/版本/团队并完成签名与公证的 payload，绝不替换为 ad-hoc 辅助程序。安装后运行时只读取 receipt，不执行编译。因此，Apple 构建工具是打包前提，不是最终用户依赖。辅助程序准备不请求系统权限，也不代表已安装应用验收通过。
+
 实验隔离仅豁免 CLI 安装指向获准按需 bundle 的已声明 `dependencies` 边。运行时导入、其他依赖段或消费方以及默认 profile 组合仍受隔离检查约束。携带 CUA 不会在默认产品中选择或加载其实验运行时。
 
 [按需目录决策](2026-10-05-official-on-demand-bundles.zh.md)保留离线发现、元信息归属、显式替换和 profile 生命周期。本决策取代其中的注册表交付与安装依赖排除政策。[随附可选 bundle 决策](../process/2026-09-15-shipped-optional-bundles.zh.md)保留不同的政策：`OPTIONAL_BUNDLES` 由安装拥有，不能从 profile 移除；按需 bundle 则具有可移除的 profile 依赖。
