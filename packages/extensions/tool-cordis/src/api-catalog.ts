@@ -2406,7 +2406,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: '@Remote async readBundleDetail(name: string, language: string, options?: { npmFileSources?: NpmFileSource[] }): Promise<BundleDetail>',
-        description: 'Read a bundle\'s long description: the Markdown file its locale `meta.detail` names in `language`, otherwise its README. An installed bundle is read from its directory without network access; an official bundle the installation offers before it is installed is read from the npm file CDNs at its offered version. Nothing is cached.',
+        description: 'Read a bundle\'s long description: the Markdown file its locale `meta.detail` names in `language`, otherwise its README. An installed bundle is read from its directory without network access; an official bundle the installation offers locally before installation is read from its directory. Explicit registry targets use npm file CDNs. Nothing is cached.',
         parameters: [{ name: 'name', description: 'the bundle\'s package name, as `listBundles()` lists it.' }, { name: 'language', description: 'the display language, such as `zh-CN`; documents fall back through its prefixes to English.' }, { name: 'options', description: '`npmFileSources` names npm file CDNs to ask first for an offered bundle, in order, such as the one a Client measured as fastest; configured CDNs it omits follow, and CDNs that are not configured are not asked.' }],
         returns: 'the document with its origin and path, or `none`.',
         throws: ['{RemoteError} `plugin-manager/unknown-bundle`, `plugin-manager/invalid-language`, or `plugin-manager/detail-unavailable`.'],

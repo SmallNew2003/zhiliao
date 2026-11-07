@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-mcp-discovery",
   "description": "Scoped progressive MCP discovery and atomic model context loading",
-  "version": "0.2.2-alpha.2",
+  "version": "0.1.0-alpha.1",
   "publishConfig": {
     "access": "public"
   },

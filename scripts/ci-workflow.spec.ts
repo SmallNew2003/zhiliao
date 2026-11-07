@@ -122,7 +122,6 @@ describe('CI workflow', () => {
       expect(job.steps).toContainEqual(expect.objectContaining({ run: command }))
     }
     for (const [file, command] of [
-      ['release-publish.yml', 'pnpm run build:official --serial'],
       ['release-vendor-publish.yml', 'pnpm run build:lib:host'],
     ] as const) {
       expect(workflowJob(loadWorkflow('.github/workflows/' + file), 'pack').steps)
@@ -215,7 +214,7 @@ describe('CI workflow', () => {
   })
 
   it('does not cancel protected publication or deployment transactions', () => {
-    for (const name of ['release-publish.yml', 'release-vendor-publish.yml']) {
+    for (const name of ['release-vendor-publish.yml']) {
       const publish = workflowJob(loadWorkflow('.github/workflows/' + name), 'publish')
       expect(publish.concurrency).toMatchObject({ 'cancel-in-progress': false })
     }
@@ -659,9 +658,9 @@ describe('CI workflow', () => {
     const expected = `version=1.2.3\ncommit=${'a'.repeat(40)}\n`
     expect(evaluate(false, 'branch', 'worktree/helper')).toBe(expected)
     expect(evaluate(false, 'tag', 'arbitrary-tag')).toBe(expected)
-    expect(evaluate(true, 'tag', 'dsh-v1.2.3')).toBe(expected)
-    for (const [type, name] of [['branch', 'dsh-v1.2.3'], ['tag', 'dsh-v1.2.2'], ['tag', 'python-v1.2.3']] as const) {
-      expect(() => evaluate(true, type, name)).toThrow('Publication requires the matching dsh-v<version> tag')
+    expect(evaluate(true, 'tag', 'zhiliao-v1.2.3')).toBe(expected)
+    for (const [type, name] of [['branch', 'zhiliao-v1.2.3'], ['tag', 'zhiliao-v1.2.2'], ['tag', 'python-v1.2.3'], ['tag', 'dsh-v1.2.3']] as const) {
+      expect(() => evaluate(true, type, name)).toThrow('Publication requires the matching zhiliao-v<version> tag')
     }
   })
 
@@ -1280,7 +1279,7 @@ describe('npm release workflows', () => {
 
     // publication is workflow_dispatch-only (never a PR check) and keeps the
     // npm-publish environment plus the shared dist-tag group.
-    for (const file of ['release-publish.yml', 'release-vendor-publish.yml']) {
+    for (const file of ['release-vendor-publish.yml']) {
       const workflow = loadWorkflow(`.github/workflows/${file}`)
       if (!isRecord(workflow.on) || !isRecord(workflow.jobs)) throw new TypeError(`${file} must define on and jobs`)
       expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
@@ -1312,7 +1311,7 @@ describe('npm release workflows', () => {
 })
 
 describe('Documentation site publication', () => {
-  it('keeps Pages deployment dispatch-only from a dsh-v* tag', () => {
+  it('keeps Pages deployment dispatch-only from a zhiliao-v* tag', () => {
     const workflow = loadWorkflow('.github/workflows/docs-pages.yml')
     const build = workflowJob(workflow, 'build')
     const deploy = workflowJob(workflow, 'deploy')
@@ -1324,9 +1323,8 @@ describe('Documentation site publication', () => {
     // publication must never appear as a PR check.
     expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
 
-    // RELEASE_PUBLISH makes release:verify reject every ref that is not a dsh-v*
-    // tag naming this tree's version, so the site and the npm sequence share one
-    // definition of a released version.
+    // RELEASE_PUBLISH makes release:verify reject every ref that is not a zhiliao-v*
+    // tag naming this tree's product version.
     const steps = build.steps.filter(isRecord)
     const verify = steps.find(step => step.name === 'Verify release version')
     const checkout = steps.find(

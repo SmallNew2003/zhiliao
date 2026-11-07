@@ -5,8 +5,8 @@ import { join, resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { expect, it } from 'vitest'
 
-it('macos packaging accepts test branches but preserves production and tag restrictions', () => {
-  const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, '../.github/workflows/macos-package.yml'), 'utf8')) as {
+it.each(['macos-package.yml', 'macos-intel-package.yml'])('%s accepts test branches but preserves production and tag restrictions', (file) => {
+  const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, '../.github/workflows', file), 'utf8')) as {
     jobs: { package: { steps: Array<{ name?: string; run?: string }> } }
   }
   const command = workflow.jobs.package.steps.find(step => step.name === 'Validate selected source and adapter support')!.run!
@@ -23,11 +23,13 @@ it('macos packaging accepts test branches but preserves production and tag restr
     mkdirSync(join(root, 'apps/desktop/scripts'), { recursive: true })
     writeFileSync(join(root, 'package.json'), '{"version":"1.0.0"}')
     writeFileSync(join(root, 'apps/desktop/scripts/desktop-ci-version.mjs'), 'PACKAGE_VERSION_MODE')
+    writeFileSync(join(root, 'apps/desktop/scripts/prepare-macos-ci.mjs'), 'resolveDesktopBuildTarget')
     git('add', '.')
     git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', 'fixture')
     const sha = git('rev-parse', 'HEAD')
     git('tag', 'dsh-v1.0.0')
-    git('tag', 'dsh-v2.0.0')
+    git('tag', 'zhiliao-v1.0.0')
+    git('tag', 'zhiliao-v2.0.0')
     const run = (preset: string, ref: string) => {
       const result = spawnSync(process.execPath, ['-e', script], {
         cwd: root, encoding: 'utf8', env: { ...env, DSH_PACKAGING_PRESET: preset, PACKAGE_SOURCE_REF: ref },
@@ -49,9 +51,12 @@ it('macos packaging accepts test branches but preserves production and tag restr
       expect(result.status).not.toBe(0)
       expect(result.stderr).toContain('Select a branch in this repository, not a SHA or PR ref')
     }
-    for (const preset of ['test', 'production']) expect(run(preset, 'dsh-v1.0.0').status).toBe(0)
-    expect(run('test', 'dsh-v2.0.0').status).not.toBe(0)
+    for (const preset of ['test', 'production']) {
+      expect(run(preset, 'zhiliao-v1.0.0').status).toBe(0)
+      expect(run(preset, 'dsh-v1.0.0').status).not.toBe(0)
+    }
+    expect(run('test', 'zhiliao-v2.0.0').status).not.toBe(0)
     writeFileSync(join(root, 'apps/desktop/scripts/desktop-ci-version.mjs'), 'old adapter')
-    expect(run('test', 'dsh-v1.0.0').status).not.toBe(0)
+    expect(run('test', 'zhiliao-v1.0.0').status).not.toBe(0)
   } finally { rmSync(root, { recursive: true, force: true, maxRetries: 3 }) }
 })

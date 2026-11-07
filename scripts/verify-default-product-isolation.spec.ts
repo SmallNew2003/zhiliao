@@ -113,7 +113,10 @@ describe('default product isolation', () => {
     expect(verifyDefaultProductIsolation(root).failures).toEqual([])
   })
 
-  it.each([true, false])('ships an optional bundle switched off with legacy icon=%s', (legacy) => {
+  it.each([
+    ['OPTIONAL_BUNDLES', true], ['OPTIONAL_BUNDLES', false],
+    ['ON_DEMAND_BUNDLES', true], ['ON_DEMAND_BUNDLES', false],
+  ] as const)('ships inactive bundles through %s with legacy icon=%s', (deliveryList, legacy) => {
     const root = fixture()
     const layer = '@deepseek-ai/dsh-experimental-layer'
     write(root, 'packages/experimental/layer/package.json', {
@@ -125,7 +128,7 @@ describe('default product isolation', () => {
     manifest(root, 'apps/cli/package.json', { dependencies: { [core]: 'workspace:^', [layer]: 'workspace:^' } })
     write(root, profile, `export const PROFILE_TEMPLATES = { web: { bundles: ['${base}'] } }\n`
       + `export const DEFAULT_PROFILE_BUNDLES = ['${base}']\n`
-      + `export const OPTIONAL_BUNDLES = ['${layer}']\n`)
+      + `export const ${deliveryList} = ['${layer}']\n`)
     expect(verifyDefaultProductIsolation(root)).toMatchObject({ failures: [], packageCount: 6 })
 
     // The exception covers the dependency edge alone: a runtime import or a default template still names the product.
@@ -134,7 +137,7 @@ describe('default product isolation', () => {
     write(root, 'apps/cli/src/bin.ts', 'export {}\n')
     write(root, profile, `export const PROFILE_TEMPLATES = { web: { bundles: ['${base}', '${layer}'] } }\n`
       + `export const DEFAULT_PROFILE_BUNDLES = ['${base}']\n`
-      + `export const OPTIONAL_BUNDLES = ['${layer}']\n`)
+      + `export const ${deliveryList} = ['${layer}']\n`)
     expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain(`optional bundle ${layer} must not be a default bundle`)
   })
 
@@ -162,6 +165,54 @@ describe('default product isolation', () => {
       expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain('must not include experimental packages')
     },
   )
+
+  describe('on-demand provider activation', () => {
+    const provider = '@deepseek-ai/dsh-subagent-codex'
+    const providerDirectory = 'packages/subagent/subagent-codex'
+    const onDemandFixture = (): string => {
+      const root = fixture()
+      write(root, `${providerDirectory}/package.json`, {
+        name: provider, icon: './icon.svg', exports: { './locale/*.json': './locale/*.json' },
+        dsh: { bundle: { patch: './cordis.patch.yml' } },
+      })
+      write(root, `${providerDirectory}/cordis.patch.yml`, [])
+      write(root, `${providerDirectory}/src/index.ts`, 'throw new Error("provider must not execute")\n')
+      manifest(root, 'apps/cli/package.json', { dependencies: { [core]: 'workspace:*', [provider]: 'workspace:*' } })
+      write(root, profile, `export const PROFILE_TEMPLATES = { web: { bundles: ['${base}'] } }\n`
+        + `export const DEFAULT_PROFILE_BUNDLES = ['${base}']\nexport const ON_DEMAND_BUNDLES = ['${provider}']\n`)
+      return root
+    }
+
+    it('keeps a nonexperimental carrier outside default runtime traversal', () => {
+      const root = onDemandFixture()
+      expect(verifyDefaultProductIsolation(root)).toMatchObject({ failures: [], packageCount: 6 })
+    })
+
+    it.each([
+      `import '${provider}'`,
+      `import '${provider}/client'`,
+      `await import('${provider}')`,
+      `export * from '${provider}'`,
+      `const provider = require('${provider}')`,
+      `import '../../../${providerDirectory}/src/index.ts'`,
+    ])('rejects default provider source activation: %s', (source) => {
+      const root = onDemandFixture()
+      write(root, 'apps/cli/src/bin.ts', source)
+      expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain(`${provider}: default product must not activate on-demand providers`)
+    })
+
+    it.each([provider, '../../subagent/subagent-codex/src/index.ts'])('rejects default configuration activation: %s', (name) => {
+      const root = onDemandFixture()
+      write(root, patch, [{ insert: [{ name }] }])
+      expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain(`${provider}: default product must not activate on-demand providers`)
+    })
+
+    it.each(['dependencies', 'optionalDependencies', 'peerDependencies'])('rejects a default transitive %s on the provider', (section) => {
+      const root = onDemandFixture()
+      manifest(root, 'packages/core/core/package.json', { [section]: { [provider]: 'workspace:*' } })
+      expect(verifyDefaultProductIsolation(root).failures.join('\n')).toContain(`${core} ${section} -> ${provider}`)
+    })
+  })
 
   it('requires each optional bundle to be a runtime dependency that declares a bundle patch, an icon, and locale metadata', () => {
     const root = fixture()

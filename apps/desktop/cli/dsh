@@ -16,4 +16,4 @@ if [ -x "$resources/../MacOS/Zhiliao" ]; then
 else
   executable="$resources/../MacOS/DeepSeek Harness"
 fi
-ELECTRON_RUN_AS_NODE=1 exec "$executable" --expose-internals "$resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js" "$@"
+ELECTRON_RUN_AS_NODE=1 exec "$executable" --expose-internals "$resources/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js" "$@"

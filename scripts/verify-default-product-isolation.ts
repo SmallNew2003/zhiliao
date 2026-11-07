@@ -1,7 +1,7 @@
 /**
  * Keep experimental packages outside default installations, runtime imports, and shipped compositions.
- * The one declared exception is a bundle the launcher names in `OPTIONAL_BUNDLES`: shipped for the person to
- * switch on, selected by no shipped template, its own dependency graph outside the default product's.
+ * Bundles named in `OPTIONAL_BUNDLES` or `ON_DEMAND_BUNDLES` ship for a person to switch on.
+ * No shipped template selects them. On-demand providers stay outside default dependency traversal, source imports, and configuration.
  */
 
 import { existsSync, globSync, readFileSync, statSync } from 'node:fs'
@@ -86,6 +86,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   const profilePath = resolve(root, PROFILE_SOURCE)
   const selection = existsSync(profilePath) ? profilePackages(readFileSync(profilePath, 'utf8')) : undefined
   const optionalBundles = new Set(selection?.optionalBundles ?? [])
+  const onDemandBundles = new Set(selection?.onDemandBundles ?? [])
   for (const name of optionalBundles) {
     if (cli?.manifest.dependencies?.[name] === undefined) {
       failures.push(`${PROFILE_SOURCE}: optional bundle ${name} must be a runtime dependency of apps/cli`)
@@ -110,7 +111,9 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   const isExperimental = (pkg: Package): boolean => isExperimentalPackageName(pkg.manifest.name)
     || display(pkg.directory).startsWith('packages/experimental/')
   const add = (pkg: Package, origin: string): void => {
-    if (isExperimental(pkg)) {
+    if (onDemandBundles.has(pkg.manifest.name)) {
+      failures.push(`${origin} -> ${pkg.manifest.name}: default product must not activate on-demand providers`)
+    } else if (isExperimental(pkg)) {
       failures.push(`${origin} -> ${pkg.manifest.name}: default product must not include experimental packages`)
     } else if (!visited.has(pkg.directory)) {
       visited.add(pkg.directory)
@@ -136,6 +139,10 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
       return
     }
     const packageName = barePackageName(name)
+    if (onDemandBundles.has(packageName)) {
+      failures.push(`${origin} -> ${packageName}: default product must not activate on-demand providers`)
+      return
+    }
     if (isExperimentalPackageName(packageName)) {
       failures.push(`${origin} -> ${name}: default product must not include experimental packages`)
       return
@@ -174,7 +181,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
       const target = resolveSource(local)
       const resolved = target ?? local
       const owner = directories.get(resolved) ?? ownerOf(resolved)
-      if (owner !== undefined && isExperimental(owner)) add(owner, display(path))
+      if (owner !== undefined && (isExperimental(owner) || onDemandBundles.has(owner.manifest.name))) add(owner, display(path))
       if (/cordis[^/]*\.ya?ml$/.test(basename(resolved))) scanConfig(resolved)
       if (followLocal && target !== undefined) scanSource(target, true)
     }
@@ -294,7 +301,8 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
     for (const section of RUNTIME_SECTIONS) {
       for (const [name, range] of Object.entries(manifest[section] ?? {})) {
         const target = packages.get(name)
-        if (pkg === cli && section === 'dependencies' && optionalBundles.has(name) && target !== undefined && isExperimental(target)) continue
+        if (pkg === cli && section === 'dependencies' && target !== undefined
+          && (onDemandBundles.has(name) || optionalBundles.has(name) && isExperimental(target))) continue
         dependency(name, range, pkg, `${manifest.name} ${section}`)
       }
     }
@@ -356,16 +364,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Read the literal package lists that define installation-owned profile defaults and the optional bundles it ships. */
-function profilePackages(source: string): { packages: string[]; webBundles: string[]; optionalBundles: string[] } {
+function profilePackages(source: string): {
+  packages: string[]
+  webBundles: string[]
+  optionalBundles: string[]
+  onDemandBundles: string[]
+} {
   const file = ts.createSourceFile(PROFILE_SOURCE, source, ts.ScriptTarget.Latest, true)
   const required = new Set(['PROFILE_TEMPLATES', 'DEFAULT_PROFILE_BUNDLES'])
   const found = new Set<string>()
   const packages: string[] = []
   const webBundles: string[] = []
   const optionalBundles: string[] = []
+  const onDemandBundles: string[] = []
   const literals = (node: ts.Node, path: string[]): void => {
     if (ts.isStringLiteralLike(node)) {
-      if (path[0] === 'OPTIONAL_BUNDLES') optionalBundles.push(node.text)
+      if (path[0] === 'ON_DEMAND_BUNDLES') {
+        onDemandBundles.push(node.text)
+        optionalBundles.push(node.text)
+      } else if (path[0] === 'OPTIONAL_BUNDLES') optionalBundles.push(node.text)
       else if (node.text.startsWith('@')) packages.push(node.text)
       if (path.join('.') === 'PROFILE_TEMPLATES.web.bundles') webBundles.push(node.text)
     } else if (ts.isArrayLiteralExpression(node)) node.elements.forEach((child) => { literals(child, path) })
@@ -385,19 +402,20 @@ function profilePackages(source: string): { packages: string[]; webBundles: stri
     for (const declaration of statement.declarationList.declarations) {
       if (!ts.isIdentifier(declaration.name)
         || !required.has(declaration.name.text) && declaration.name.text !== 'INSTALLATION_OWNED_PROFILE_TUPLES'
-        && declaration.name.text !== 'OPTIONAL_BUNDLES') continue
+        && declaration.name.text !== 'OPTIONAL_BUNDLES' && declaration.name.text !== 'ON_DEMAND_BUNDLES') continue
       if (declaration.initializer === undefined) continue
       if (required.has(declaration.name.text)) found.add(declaration.name.text)
       const before = packages.length
       literals(declaration.initializer, [declaration.name.text])
-      if (declaration.name.text !== 'OPTIONAL_BUNDLES' && packages.length === before) {
+      const offered = declaration.name.text === 'OPTIONAL_BUNDLES' || declaration.name.text === 'ON_DEMAND_BUNDLES'
+      if (!offered && packages.length === before) {
         throw new Error(`${PROFILE_SOURCE}: ${declaration.name.text} has no default bundles`)
       }
     }
   }
   if (found.size !== required.size) throw new Error(`${PROFILE_SOURCE}: missing default profile declarations`)
   if (webBundles.length === 0) throw new Error(`${PROFILE_SOURCE}: missing default Web bundle list`)
-  return { packages, webBundles, optionalBundles }
+  return { packages, webBundles, optionalBundles, onDemandBundles }
 }
 
 if (import.meta.main) {

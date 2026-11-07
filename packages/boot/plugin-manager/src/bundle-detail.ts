@@ -1,6 +1,6 @@
 /**
  * Detail documents of profile bundles: an installed bundle's `meta.detail` file or README from its directory, and an
- * official bundle the installation offers, before it is installed, from the npm file CDNs at its offered version. Reads
+ * locally supplied Official bundle before it is installed. Explicit registry targets use npm file CDNs. Reads
  * keep no state; an image request resolves its bundle and document again.
  */
 import semver from 'semver'
@@ -46,6 +46,8 @@ function filesOf(bundle: BundleInfo, preferred: readonly string[], options: Bund
   }
   const version = bundle.installTarget?.version
   if (version === undefined || semver.valid(version) !== version) return undefined
+  const spec = bundle.installTarget?.spec
+  if (spec?.startsWith('link:') === true) return localFiles(spec.slice(5), version)
   const sources = npmFileSourceOrder(options.npmFileSources, preferred)
   return npmFiles(bundle.name, version, sources, { timeoutMs: options.timeoutMs, lifetime: options.lifetime })
 }

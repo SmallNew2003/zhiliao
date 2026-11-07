@@ -412,7 +412,7 @@ it('lists bundle versions and current-profile plugin targets', async () => {
   const plugins = await manager.listPlugins()
   expect(plugins.find(row => row.entryId === 'include:managed')).toMatchObject({ patchId: 'managed', enabled: true })
   expect(plugins.find(row => row.entryId === 'include:manager')?.readOnlyReason).toBe('management-required')
-  expect((await manager.listBundles()).filter(bundle => bundle.installTarget === undefined)).toEqual([
+  expect((await manager.listBundles()).filter(bundle => !bundle.official)).toEqual([
     {
       name: 'core', version: '1.0.0', enabled: true, installed: false, official: false, availability: 'profile', optional: false, removable: false, updatable: false, readOnlyReason: 'management-required',
       meta: { title: 'core' },
@@ -988,10 +988,10 @@ it('reports a selected plain dependency as a problem, omits an unselected one, a
   writeFileSync(join(dir, 'node_modules', 'core', 'package.json'), '{"name":"core","dsh":{"bundle":{"patch":"./cordis.patch.yml"}}}')
   expect((await manager.listBundles())[0]?.version).toBeUndefined()
   writeFileSync(join(dir, 'package.json'), '{}')
-  expect((await manager.listBundles()).filter(bundle => bundle.installTarget === undefined)).toEqual([])
+  expect((await manager.listBundles()).filter(bundle => !bundle.official)).toEqual([])
   expect(await manager.setBundleEnabled('unknown', false)).toMatchObject({ application: 'failed' })
   writeFileSync(profile.installAnchor, '{"dependencies":{"missing-builtin":"1"}}')
-  expect((await manager.listBundles()).filter(bundle => bundle.installTarget === undefined)).toEqual([])
+  expect((await manager.listBundles()).filter(bundle => !bundle.official)).toEqual([])
 })
 
 it('refuses management bundle disablement and permits repeated bundle selections', async () => {
@@ -1800,6 +1800,38 @@ it.each([false, true])('rechecks installed bundle peers before accepting a disab
   expect(readProfileManifest('test', dir).dsh?.profile?.bundles).toEqual(['core', 'extra'])
 })
 
+it('keeps installation-carried on-demand media uninstalled until the profile opts in', async () => {
+  const { manager, dir, profile, bundle } = await fixture()
+  const name = OFFICIAL_ON_DEMAND_CATALOG[0]!.packageName
+  const version = getDshRuntimeVersion()
+  bundle(name, [], profile.home)
+  const directory = join(profile.home, 'node_modules', name)
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version, main: 'plugin.mjs', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+  writeFileSync(profile.installAnchor, JSON.stringify({ name: '@deepseek-ai/dsh', version, dependencies: { [name]: version } }))
+  const target = { spec: `link:${directory}`, version }
+  expect((await manager.listBundles()).find(item => item.name === name)).toMatchObject({
+    availability: 'missing', installed: false, enabled: false, removable: false, installTarget: target,
+  })
+  expect(await manager.inspect(target.spec)).toMatchObject({ status: 'accepted', name, kind: 'path' })
+  expect(await manager.setBundleEnabled(name, true)).toMatchObject({ application: 'failed', changed: false })
+  const manifest = readProfileManifest('test', dir)
+  manifest.dependencies = { ...manifest.dependencies, [name]: target.spec }
+  writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+  expect((await manager.listBundles()).find(item => item.name === name)).toMatchObject({
+    availability: 'profile', installed: true, enabled: false, removable: true, source: target.spec,
+  })
+  const pnpm = vi.spyOn(operations, 'runProfilePnpm').mockImplementation(async () => {
+    const installed = readProfileManifest('test', dir)
+    delete installed.dependencies?.[name]
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(installed))
+    return { exitCode: 0, output: '', truncated: false, logPath: '/install.log' }
+  })
+  onTestFinished(() => { pnpm.mockRestore() })
+  expect(await manager.removeBundle(name)).toMatchObject({ application: 'applied' })
+  expect(existsSync(directory)).toBe(true)
+  expect((await manager.listBundles()).find(item => item.name === name)).toMatchObject({ availability: 'missing', installed: false })
+})
+
 it('lists absent Official entries offline without resolving their packages or consulting registries', async () => {
   const { manager } = await fixture()
   const resolve = vi.spyOn(operations, 'bundleManifest')
@@ -1814,7 +1846,8 @@ it('lists absent Official entries offline without resolving their packages or co
       ...entry.listedByDefault === undefined ? {} : { listedByDefault: entry.listedByDefault },
       ...entry.platforms !== undefined && !entry.platforms.includes(process.platform)
         ? { listedByDefault: false, error: { code: 'unsupported-platform' } } : {},
-      installTarget: { spec: `${entry.packageName}@${getDshRuntimeVersion()}`, version: getDshRuntimeVersion() },
+      ...entry.platforms !== undefined && !entry.platforms.includes(process.platform)
+        ? {} : { error: { code: 'operation-error' } },
     }])
     expect(resolve.mock.calls.some(([name]) => name === entry.packageName)).toBe(false)
   }
@@ -1931,7 +1964,7 @@ it('reports and removes a saved Official selection whose dependency is absent', 
   manifest.dsh!.profile!.bundles!.push(name)
   writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
   expect((await manager.listBundles()).find(bundle => bundle.name === name)).toMatchObject({
-    official: true, installed: false, availability: 'missing', enabled: true, removable: true, error: { code: 'not-bundle' },
+    official: true, installed: false, availability: 'missing', enabled: true, removable: true, error: { code: 'operation-error' },
   })
   const pnpm = vi.spyOn(operations, 'runProfilePnpm')
   onTestFinished(() => { pnpm.mockRestore() })
@@ -1950,7 +1983,7 @@ it('keeps a broken installation-carried catalog entry visible with offline metad
   writeFileSync(join(broken, 'package.json'), '{')
   expect((await manager.listBundles()).find(bundle => bundle.name === entry.packageName)).toMatchObject({
     official: true, availability: 'missing', enabled: false, installed: false, optional: false, removable: false,
-    meta: entry.meta, installTarget: { version: getDshRuntimeVersion() }, error: { code: 'operation-error' },
+    meta: entry.meta, error: { code: 'operation-error' },
   })
 })
 

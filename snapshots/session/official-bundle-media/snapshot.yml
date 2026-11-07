@@ -1,0 +1,10 @@
+version: 1
+scenario: official-bundle-media
+profile: headless
+composition: plugin-manager
+recording: authored
+# Local link specs in this transcript use POSIX paths.
+platform: posix
+permission: danger-full-access
+header:
+  class: plugin-manager

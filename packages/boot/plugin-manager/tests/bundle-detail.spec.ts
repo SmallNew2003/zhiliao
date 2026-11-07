@@ -75,7 +75,7 @@ async function fixture(config: Config = {}) {
   const connection = RecordingConnection.current as RecordingConnection
   const image = (query: string) => (connection.routes.get('/api/plugin-manager/detail-file') as (request: Request) => Promise<Response>)(
     new Request(`http://dsh.local/api/plugin-manager/detail-file?${query}`))
-  return { manager: ctx.pluginManager, image, connection }
+  return { manager: ctx.pluginManager, image, connection, home }
 }
 
 const failureOf = async (promise: Promise<unknown>) => remoteErrorOf(await promise.catch((error: unknown) => error))
@@ -116,6 +116,35 @@ it('serves images beside a bundle document without caching and refuses other pat
   expect([...connection.routes.keys()]).toEqual(['/api/plugin-manager/detail-file'])
 })
 
+it('reads an uninstalled installation-carried Official bundle and images locally while offline', async () => {
+  const fetch = vi.fn(() => Promise.reject(new Error('offline')))
+  vi.stubGlobal('fetch', fetch)
+  const { manager, image, home } = await fixture()
+  const name = OFFICIAL_ON_DEMAND_CATALOG[0]!.packageName
+  const version = getDshRuntimeVersion()
+  const directory = join(home, 'node_modules', name)
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(home, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version, dependencies: { [name]: version } }))
+  writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version, main: 'index.js', dsh: { bundle: { patch: './cordis.patch.yml' } } }))
+  writeFileSync(join(directory, 'index.js'), 'throw new Error("must not import provider")')
+  writeFileSync(join(directory, 'cordis.patch.yml'), '[]')
+  writeFileSync(join(directory, 'README.md'), '# Local Official')
+  writeFileSync(join(directory, 'a.svg'), '<svg/>')
+  expect(await manager.readBundleDetail(name, 'en')).toMatchObject({ status: 'found', markdown: '# Local Official' })
+  const response = await image(`bundle=${encodeURIComponent(name)}&document=README.md&path=a.svg`)
+  expect(response.status).toBe(200)
+  expect(await response.text()).toBe('<svg/>')
+  expect(fetch).not.toHaveBeenCalled()
+})
+
+/** Retain support for explicitly supplied registry file targets. */
+function publishedTarget(manager: PluginManager, name: string): void {
+  const list = manager.listBundles.bind(manager)
+  vi.spyOn(manager, 'listBundles').mockImplementation(async () => (await list()).map(bundle => bundle.name === name
+    ? { ...bundle, installTarget: { spec: `${name}@${getDshRuntimeVersion()}`, version: getDshRuntimeVersion() } }
+    : bundle))
+}
+
 it('reads an offered official bundle from the npm CDNs at its offered version, npmmirror first when asked', async () => {
   const name = OFFICIAL_ON_DEMAND_CATALOG[0]!.packageName
   const version = getDshRuntimeVersion()
@@ -124,6 +153,7 @@ it('reads an offered official bundle from the npm CDNs at its offered version, n
     : url.includes('/files/') ? new Response('missing', { status: 404 }) : Promise.reject(new Error(`unexpected ${url}`))))
   vi.stubGlobal('fetch', fetch)
   const { manager, image } = await fixture()
+  publishedTarget(manager, name)
   expect(await manager.readBundleDetail(name, 'en', { npmFileSources: ['npmmirror'] })).toEqual({ status: 'found', origin: 'readme', path: 'README.md', markdown: '# Official' })
   expect(fetch.mock.calls[0]?.[0]).toBe(`https://registry.npmmirror.com/${name}/${version}/files/locale/en.json`)
   fetch.mockClear()
@@ -140,6 +170,7 @@ it.each([undefined, { npmFileSources: [] }])('asks the CDNs in configured order 
   const fetch = vi.fn(() => Promise.resolve(new Response('missing', { status: 404 })))
   vi.stubGlobal('fetch', fetch)
   const { manager } = await fixture({ detailNpmFileSources: ['unpkg', 'npmmirror'] })
+  publishedTarget(manager, name)
   expect(await manager.readBundleDetail(name, 'en', options)).toEqual({ status: 'none' })
   expect(fetch.mock.calls[0]).toEqual([`https://unpkg.com/${name}@${version}/locale/en.json`, expect.anything()])
 })

@@ -18,7 +18,7 @@ The [single-bundle reference](../../../../packages/experimental/agent-team-profi
 
 ## Alternatives considered
 
-**A catalog of installable official bundles.** The page would offer names to install from the registry on demand. That keeps the installation unchanged but needs network access at the moment of switching on and a version pin per release. Lightweight bundles retain the shipped policy; the [on-demand native-bundle decision](../architecture/2026-10-05-official-on-demand-bundles.md) owns the exception for costly native runtimes.
+**A catalog of installable official bundles.** The page would offer names to install from the registry on demand. That keeps the installation unchanged but needs network access at the moment of switching on and a version pin per release. Lightweight bundles retain the shipped policy; the [on-demand catalog decision](../architecture/2026-10-05-official-on-demand-bundles.md) owns discovery and profile installation. The [installation-carried delivery decision](../architecture/2026-11-07-installation-carried-official-bundles.md) supplies those bundles locally while retaining removable profile dependencies; `OPTIONAL_BUNDLES` remain installation-owned and never removable from a profile.
 
 **A flag on the bundle package.** A `dsh.bundle.optional` declaration would let any published bundle claim a place in the installation; the launcher's own list keeps the choice with the product.
 

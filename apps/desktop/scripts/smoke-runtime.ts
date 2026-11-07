@@ -1,12 +1,14 @@
 /** Boot the materialized target runtime without access to a user's Harness profile. */
 
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
+import { ON_DEMAND_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
+import type { ProfileManifest } from '@deepseek-ai/dsh-app-boot'
 import { readPrimaryRuntime, workspaceDependencyPaths } from '../../../packages/skill/tool-workspace-dependencies/src/index.ts'
 import { DesktopHostProcess } from '../src/host-process.ts'
 import { createPluginProfile } from '../src/project-manager.ts'
@@ -70,6 +72,31 @@ export function apply(ctx) {
     await runCli(['remove', installedName])
     if (existsSync(installedEntry)) throw new Error('desktop runtime: CLI did not remove the local plugin')
     console.log('desktop runtime: CLI offline plugin installation and removal passed')
+    for (const name of ON_DEMAND_BUNDLES) {
+      const media = join(root, 'node_modules', name)
+      const bundle = JSON.parse(readFileSync(join(media, 'package.json'), 'utf8')) as ProfileManifest
+      if (bundle.dsh?.bundle?.platforms !== undefined && !bundle.dsh.bundle.platforms.includes(runtime.platform)) {
+        console.log(`desktop runtime: Official bundle ${name} activation excludes ${runtime.platform}`)
+        continue
+      }
+      const profileFile = join(profile, 'package.json')
+      const before = JSON.parse(readFileSync(profileFile, 'utf8')) as ProfileManifest
+      await runCli(['add', `link:${media}`, '--offline', '--ignore-scripts', '--registry=http://127.0.0.1:1'])
+      const added = JSON.parse(readFileSync(profileFile, 'utf8')) as ProfileManifest
+      if (added.dependencies?.[name]?.startsWith('link:') !== true
+        || added.dsh?.profile?.bundles?.includes(name) !== true
+        || realpathSync(join(profile, 'node_modules', name)) !== realpathSync(media)) {
+        throw new Error(`desktop runtime: Official bundle ${name} was not installed and selected from physical media`)
+      }
+      await runCli(['remove', name])
+      const removed = JSON.parse(readFileSync(profileFile, 'utf8')) as ProfileManifest
+      if (removed.dependencies?.[name] !== undefined || existsSync(join(profile, 'node_modules', name))
+        || JSON.stringify(removed.dsh?.profile?.bundles) !== JSON.stringify(before.dsh?.profile?.bundles)
+        || !existsSync(join(media, 'package.json'))) {
+        throw new Error(`desktop runtime: Official bundle ${name} removal changed the installation or retained profile state`)
+      }
+      console.log(`desktop runtime: Official bundle ${name} offline installation, selection and removal passed`)
+    }
     const primary = join(resourcesRuntime, 'primary-runtime')
     const dependencies = workspaceDependencyPaths(primary, await readPrimaryRuntime(primary))
     await promisify(execFile)(dependencies.python, ['-I', '-B',

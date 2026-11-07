@@ -56,6 +56,7 @@ import { desktopErrorState } from './startup-error.ts'
 import { readDesktopLoginShellEnvironment, resolveDesktopLoginShellConfig } from './login-shell-environment.ts'
 import { DesktopMandatoryUpdatePolicy, resolveDesktopPolicyConfig, type DesktopPolicyState } from './mandatory-update-policy.ts'
 import { desktopClientMetadata, desktopClientVersion } from './client-metadata.ts'
+import { UPSTREAM_BASE_VERSION } from './upstream-base.ts'
 import { DesktopMandatoryUpdateWindow } from './mandatory-update-window.ts'
 import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
 import { readDesktopSettings } from './settings.ts'
@@ -210,7 +211,7 @@ function runtimeResources(): RuntimeResources {
     ?? (development ? join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
       : join(process.resourcesPath, 'runtime', 'primary-runtime', 'dependencies', 'pnpm', 'bin', 'pnpm.mjs'))
   const dsh = (development ? process.env.DSH_DESKTOP_DSH_DIR : undefined)
-    ?? (development ? join(app.getAppPath(), '.desktop-build', 'development', 'project') : join(app.getAppPath(), 'dsh'))
+    ?? (development ? join(app.getAppPath(), '.desktop-build', 'development', 'project') : join(process.resourcesPath, 'dsh'))
   return { node, nodeBin, pnpm, dsh }
 }
 
@@ -459,7 +460,10 @@ async function main(): Promise<void> {
   // chrome and its content never mix languages.
   const showAbout = async (): Promise<void> => {
     await ordinaryMessageBox({ type: 'info', title: locale.messages.aboutMenu, message: locale.messages.aboutProduct,
-      detail: formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+      detail: [
+        formatDesktopMessage(locale.messages.aboutVersion, { version: app.getVersion() }),
+        formatDesktopMessage(locale.messages.aboutUpstreamBase, { version: UPSTREAM_BASE_VERSION }),
+      ].join('\n'),
       buttons: [locale.messages.updateAcknowledge], cancelId: 0 })
   }
   const commandManager = new DesktopCommandManager({
@@ -1032,14 +1036,6 @@ async function main(): Promise<void> {
 
   const applicationIconPath = development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
     : join(process.resourcesPath, 'icon.png')
-  app.setAboutPanelOptions({
-    applicationName: currentDesktopLocale().messages.applicationName,
-    applicationVersion: app.getVersion(),
-    // The release has no separate build number; omit Electron's bundle version.
-    version: '',
-    copyright: '',
-    iconPath: applicationIconPath,
-  })
   // A custom application menu replaces Electron's default menu, so macOS needs
   // its standard menus and application hide commands declared explicitly.
   // Keep app.name stable: Electron derives its default userData directory from it.
@@ -1084,6 +1080,15 @@ async function main(): Promise<void> {
     devToolsF12Shortcut,
   ]
   const refreshApplicationMenu = (): void => {
+    app.setAboutPanelOptions({
+      applicationName: currentDesktopLocale().messages.applicationName,
+      applicationVersion: app.getVersion(),
+      // The release has no separate build number; omit Electron's bundle version.
+      version: '',
+      credits: formatDesktopMessage(currentDesktopLocale().messages.aboutUpstreamBase, { version: UPSTREAM_BASE_VERSION }),
+      copyright: '',
+      iconPath: applicationIconPath,
+    })
     Menu.setApplicationMenu(Menu.buildFromTemplate(process.platform === 'win32'
       ? windowsDevToolsShortcuts : [{
         label: darwin ? app.name : currentDesktopLocale().messages.application,

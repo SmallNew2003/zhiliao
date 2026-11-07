@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-memory-hindsight-http",
   "description": "Hindsight HTTP memory provider for the DeepSeek Harness — registers a ctx.memory provider backed by a hindsight daemon, with workspace-resolved banks and timeout-bounded recall, search, and retention",
-  "version": "0.2.2-alpha.2",
+  "version": "0.1.0-alpha.1",
   "publishConfig": {
     "access": "public"
   },

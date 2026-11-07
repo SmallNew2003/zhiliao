@@ -4,13 +4,13 @@ import { finished } from 'node:stream/promises'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createInstalledUpdateRun } from '../scripts/installed-update-qualification.ts'
 import { prepareInstalledUpdateBootstrap } from '../scripts/prepare-installed-update-bootstrap.ts'
 import { prepareInstalledUpdateApplication } from '../scripts/prepare-installed-update-application.ts'
 import { verifyInstalledUpdatePackageContent } from '../scripts/installed-update-package-content.ts'
-import { readDesktopRuntime, writeDesktopRuntime } from '../src/runtime-tree.ts'
+import { writeDesktopRuntime } from '../src/runtime-tree.ts'
 import { runtimeFixture } from './runtime-fixture.ts'
 import { validateInstalledUpdateArchivePaths, verifyInstalledUpdatePackage } from '../scripts/verify-installed-update-package.ts'
 
@@ -79,9 +79,9 @@ async function fixture(body: (context: {
       writeDesktopRuntime(directory, descriptor.release, descriptor.sharedPackages.map(entry => entry.name), { platform: 'win32', arch: 'x64' })
     }
     reseal(dsh)
-    await cp(dsh, join(source, 'dsh'), { recursive: true })
     const payload = join(root, 'payload')
     await mkdir(join(payload, 'resources'), { recursive: true })
+    await cp(dsh, join(payload, 'resources/dsh'), { recursive: true })
     await writeFile(join(payload, 'resources/app-update.yml'), JSON.stringify({ provider: 'generic', channel: 'nightly',
       url: `${run.origin}/${run.feedKey.slice(0, -'nightly.yml'.length)}`, publisherName: [publisher],
       updaterCacheDirName: `dsh-update-test-${run.id}-updater` }))
@@ -93,7 +93,7 @@ async function fixture(body: (context: {
     }
     await seal()
     await body({ manifest, source, payload, version, seal, resealRuntime: async () => {
-      reseal(join(source, 'dsh'))
+      reseal(join(payload, 'resources/dsh'))
       await seal()
     } })
   } finally {
@@ -107,7 +107,7 @@ describe('installed update archive contents', () => {
     await fixture(async ({ manifest, payload }) => {
       expect(await verifyInstalledUpdatePackageContent(manifest, version, payload, publisher)).toMatchObject({
         version, applicationFiles: 8, dependenciesFrozen: false, installed: false,
-        resignedExecutables: [join(payload, 'resources/app.asar.unpacked/dsh/tool.exe')],
+        resignedExecutables: [join(payload, 'resources/dsh/tool.exe')],
       })
     }, version)
   })
@@ -155,37 +155,20 @@ describe('installed update archive contents', () => {
     })
   })
 
-  it('accepts only the builder transformation of runtime dependency manifests', async () => {
-    await fixture(async ({ manifest, source, payload, version, seal }) => {
-      const preparedRoot = join(dirname(manifest), version, 'dsh')
-      const packagePath = 'node_modules/@deepseek-ai/dsh/package.json'
-      const preparedPath = join(preparedRoot, packagePath)
-      const data = JSON.parse(await readFile(preparedPath, 'utf8')) as Record<string, unknown>
-      data.scripts = { test: 'inert' }
-      data.bugs = { url: 'https://example.com/issues' }
-      await writeFile(preparedPath, JSON.stringify(data))
-      const descriptor = readDesktopRuntime(preparedRoot)
-      writeDesktopRuntime(preparedRoot, descriptor.release, descriptor.sharedPackages.map(entry => entry.name),
-        { platform: 'win32', arch: 'x64' })
-      await cp(join(preparedRoot, 'desktop-runtime.json'), join(source, 'dsh/desktop-runtime.json'))
-      const packagedPath = join(source, 'dsh', packagePath)
-      const packaged = { ...data }
-      delete packaged.scripts
-      delete packaged.bugs
-      await writeFile(packagedPath, JSON.stringify(packaged, null, 2))
-      await seal()
-      await expect(verifyInstalledUpdatePackageContent(manifest, version, payload, publisher)).resolves.toMatchObject({ version })
-      packaged.version = '0.0.0'
-      await writeFile(packagedPath, JSON.stringify(packaged, null, 2))
-      await seal()
+  it('rejects transformed runtime manifests instead of accepting bytes absent from the preparation seal', async () => {
+    await fixture(async ({ payload, manifest, version }) => {
+      const packaged = join(payload, 'resources/dsh/node_modules/@deepseek-ai/dsh/package.json')
+      const data = JSON.parse(await readFile(packaged, 'utf8')) as Record<string, unknown>
+      data.scripts = { test: 'unexpected' }
+      await writeFile(packaged, JSON.stringify(data))
       await expect(verifyInstalledUpdatePackageContent(manifest, version, payload, publisher)).rejects.toThrow('runtime bytes differ')
     })
   })
 
   it.each(['unsealed', 'resealed-change', 'resealed-addition'])(
     'rejects %s runtime content even when metadata is regenerated', async (failure) => {
-      await fixture(async ({ manifest, source, payload, version, seal, resealRuntime }) => {
-        await writeFile(join(source, 'dsh', failure === 'resealed-addition' ? 'extra.js' : 'package.json'), '{}')
+      await fixture(async ({ manifest, payload, version, seal, resealRuntime }) => {
+        await writeFile(join(payload, 'resources/dsh', failure === 'resealed-addition' ? 'extra.js' : 'package.json'), '{}')
         if (failure !== 'unsealed') await resealRuntime()
         else await seal()
         await expect(verifyInstalledUpdatePackageContent(manifest, version, payload, publisher)).rejects.toThrow()
@@ -193,9 +176,9 @@ describe('installed update archive contents', () => {
     })
 
   it('identifies changed executable resources for separate signature verification', async () => {
-    await fixture(async ({ manifest, source, payload, version, resealRuntime }) => {
-      const executable = join(payload, 'resources/app.asar.unpacked/dsh/tool.exe')
-      await writeFile(join(source, 'dsh/tool.exe'), 'inert changed executable, not a signature')
+    await fixture(async ({ manifest, payload, version, resealRuntime }) => {
+      const executable = join(payload, 'resources/dsh/tool.exe')
+      await writeFile(join(payload, 'resources/dsh/tool.exe'), 'inert changed executable, not a signature')
       await resealRuntime()
       expect((await verifyInstalledUpdatePackageContent(manifest, version, payload, publisher)).resignedExecutables).toEqual([executable])
     })

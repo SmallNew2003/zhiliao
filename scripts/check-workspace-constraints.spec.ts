@@ -229,6 +229,24 @@ describe('experimental workspace constraints', () => {
     ])
   })
 
+  it('offers the bundled on-demand CUA package only through the CLI installation', () => {
+    const cua = { dir: 'packages/experimental/cua-bundle', manifest: { name: '@deepseek-ai/dsh-cua-bundle' } }
+    const dependencies = { '@deepseek-ai/dsh-cua-bundle': 'workspace:*' }
+    expect(checkExperimentalDependencyIsolation([cua, {
+      dir: 'apps/cli', manifest: { name: '@deepseek-ai/dsh', dependencies },
+    }])).toEqual([])
+    expect(checkExperimentalDependencyIsolation([cua, {
+      dir: 'python/sdk-runtime', manifest: { name: 'dsh-python-runtime-closure', dependencies },
+    }])).toEqual([
+      'dsh-python-runtime-closure: dependencies.@deepseek-ai/dsh-cua-bundle must not reference an experimental package',
+    ])
+    expect(checkExperimentalDependencyIsolation([cua, {
+      dir: 'apps/cli', manifest: { name: '@deepseek-ai/dsh', peerDependencies: dependencies },
+    }])).toEqual([
+      '@deepseek-ai/dsh: peerDependencies.@deepseek-ai/dsh-cua-bundle must not reference an experimental package',
+    ])
+  })
+
   it('allows development and experimental consumers but rejects the Python release runtime', () => {
     const manifests: WorkspaceManifest[] = [experimental, {
       dir: 'packages/core/test-only',

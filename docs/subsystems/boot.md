@@ -10,7 +10,7 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 `PluginInfo` carries module identity, effective enablement, fiber phase and optional display `meta`, plus a unique `patchId` or a `readOnlyReason`.
 
-`BundleInfo.official` identifies project-maintained shipped optional bundles and on-demand catalog entries independently of installation. `availability` identifies a readable installation-provided or profile package, or `missing`; on-demand catalog entries exclude undeclared transitive copies. `installed` records the profile dependency declaration. An on-demand `installTarget` carries the host-derived exact spec and version. `BundleInfo` also carries the package name, optional installed version, selected enablement, removal availability, update eligibility (`updatable`), optional resolution or unsupported-platform error, and, for a bundle the profile's own dependency supplies and the installation does not, `source`: that dependency as a spec `pnpm add` accepts. Its optional `meta` and each `BundleRowInfo.meta` contain display text or a metadata diagnostic; Clients select a language at render time.
+`BundleInfo.official` identifies project-maintained shipped optional bundles and on-demand catalog entries independently of installation. `availability` identifies a readable installation-provided or profile package, or `missing`; on-demand catalog entries exclude undeclared transitive copies. `installed` records the profile dependency declaration. An on-demand `installTarget` carries a validated local `link:` spec and the running version; installation media remains uninstalled until the profile declares it. `BundleInfo` also carries the package name, optional installed version, selected enablement, removal availability, update eligibility (`updatable`), optional resolution or unsupported-platform error, and, for a profile-managed bundle, including on-demand local media, `source`: that dependency as a spec `pnpm add` accepts. Its optional `meta` and each `BundleRowInfo.meta` contain display text or a metadata diagnostic; Clients select a language at render time.
 
 `InstallBundleOptions.saveExact` passes `--save-exact` to the shared package installer. `InstallBundleOptions.enabled` defaults to true. False installs without selecting the bundle layer. `approvedBuilds` grants persistent script permission to the supplied pending package names before installation. `registry` names the registry asked first; absent, the configured one.
 
@@ -205,7 +205,7 @@ Manage profile files and apply their declared reload lifecycle.
 /**
  * Read a bundle's long description: the Markdown file its locale `meta.detail` names in `language`, otherwise its
  * README. An installed bundle is read from its directory without network access; an official bundle the installation
- * offers before it is installed is read from the npm file CDNs at its offered version. Nothing is cached.
+ * offers locally before installation is read from its directory. Explicit registry targets use npm file CDNs. Nothing is cached.
  * @param name - the bundle's package name, as `listBundles()` lists it.
  * @param language - the display language, such as `zh-CN`; documents fall back through its prefixes to English.
  * @param options - `npmFileSources` names npm file CDNs to ask first for an offered bundle, in order, such as the one

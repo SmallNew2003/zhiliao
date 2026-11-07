@@ -27,6 +27,17 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
+it('keeps the installation-carried on-demand CUA runtime outside the default graph', () => {
+  const root = fixture()
+  const cua = '@deepseek-ai/dsh-cua-bundle'
+  const entry = writePackage(root, '@deepseek-ai/dsh', { dependencies: { core: '1.0.0', [cua]: '1.0.0' } })
+  writePackage(root, 'core', {})
+  writePackage(root, cua, { dependencies: { '@deepseek-ai/dsh-experimental-inner': '1.0.0' } })
+  expect(verifyInstalledProductIsolation(entry)).toBe(2)
+  writePackage(root, 'core', { dependencies: { [cua]: '1.0.0' } })
+  expect(() => verifyInstalledProductIsolation(entry)).toThrow(`core -> ${cua}`)
+})
+
 describe.each([experimental, ...Object.values(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS)])('installed default-product isolation: %s', (experimental) => {
   it('ignores development dependencies and unrelated installed experimental packages', () => {
     const root = fixture()

@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.1.0-alpha.1/zhiliao-version-line/guide.md
+/:
+  en: 2afdd2764ac78c3f
+  zh: 93fbd89810524682
+/use-the-zhiliao-product-version-and-release-tags:
+  en: b5dbf49a48da2e39
+  zh: 350fda3e388f30fb
+/use-the-zhiliao-product-version-and-release-tags/change:
+  en: 5f7346a35eaceb0c
+  zh: 5e98bba05f07d462
+/use-the-zhiliao-product-version-and-release-tags/migration:
+  en: 78712e2e841ca906
+  zh: c799c92364e09021

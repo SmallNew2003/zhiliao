@@ -1392,6 +1392,25 @@ describe('headless recorded-session snapshots', () => {
           },
           inspect: async (cwd) => {
             actualLogs = await persistedSessions(cwd)
+            if (scenario.name === 'official-bundle-media') {
+              const results = parseSessionLog(actualLogs[0]!.content).flatMap(event =>
+                event.type === 'tool/result' ? [event.data.message] : [])
+              expect(results).toHaveLength(1)
+              expect(results[0]?.isError).toBe(false)
+              const text = results[0]?.content.find(block => block.type === 'text')
+              if (text?.type !== 'text') throw new Error('Official catalog snapshot has no tool result text')
+              const catalog = JSON.parse(text.text) as { entries: JsonObject[]; total: number; nextOffset: number }
+              expect(catalog).toMatchObject({ total: 3, nextOffset: 2 })
+              expect(catalog.entries).toHaveLength(2)
+              const fixtureCwd = await realpath(cwd)
+              for (const [index, name] of ['@deepseek-ai/dsh-subagent-claude-code', '@deepseek-ai/dsh-subagent-codex'].entries()) {
+                expect(catalog.entries[index]).toMatchObject({
+                  name, official: true, availability: 'missing', installed: false, enabled: false, removable: false,
+                  installTarget: { spec: `link:${join(fixtureCwd, '.dsh', 'official-runtime', 'node_modules', name)}` },
+                })
+                expect(catalog.entries[index]).not.toHaveProperty('error')
+              }
+            }
             if (scenario.name === 'empty-response-retry-current') {
               const events = parseSessionLog(actualLogs[0]!.content)
               expect(events.filter(event => event.type === 'assistant/attempt' || event.type === 'llm/retry'

@@ -1,0 +1,6 @@
+- id: plugin-manager
+  disabled: true
+
+- insert:
+    - id: official-bundle-media
+      name: '../../../packages/boot/plugin-manager/tests/fixtures/official-bundle-media.ts'

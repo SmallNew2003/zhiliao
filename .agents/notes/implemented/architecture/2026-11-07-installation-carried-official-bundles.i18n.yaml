@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-11-07-installation-carried-official-bundles.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-11-07-installation-carried-official-bundles.md
+/agent-note-carry-official-on-demand-bundles-with-the-installation:
+  en: 698a182df3156579
+  zh: ad92aacc5870be59
+/agent-note-carry-official-on-demand-bundles-with-the-installation/problem:
+  en: 609fceb181df5b19
+  zh: b2ce82fa49d48a85
+/agent-note-carry-official-on-demand-bundles-with-the-installation/decision:
+  en: 7c386f8c6d21efee
+  zh: f8994593643c41f1
+/agent-note-carry-official-on-demand-bundles-with-the-installation/alternatives-considered:
+  en: 86c90d40a870883d
+  zh: 86912a0e6113ad27
+/agent-note-carry-official-on-demand-bundles-with-the-installation/consequences:
+  en: 56be3e488b394bc3
+  zh: 7c78bda2f6c4183a

@@ -338,6 +338,9 @@ importers:
       '@deepseek-ai/dsh-cordis-client-runner':
         specifier: workspace:*
         version: link:../../packages/extensions/cordis-client-runner
+      '@deepseek-ai/dsh-cua-bundle':
+        specifier: workspace:*
+        version: link:../../packages/experimental/cua-bundle
       '@deepseek-ai/dsh-experimental-agent-team-profile':
         specifier: workspace:*
         version: link:../../packages/experimental/agent-team-profile
@@ -458,6 +461,12 @@ importers:
       '@deepseek-ai/dsh-skill-office':
         specifier: workspace:*
         version: link:../../packages/skill/skill-office
+      '@deepseek-ai/dsh-subagent-claude-code':
+        specifier: workspace:*
+        version: link:../../packages/subagent/subagent-claude-code
+      '@deepseek-ai/dsh-subagent-codex':
+        specifier: workspace:*
+        version: link:../../packages/subagent/subagent-codex
       '@deepseek-ai/dsh-terminal':
         specifier: workspace:*
         version: link:../../packages/terminal/terminal
@@ -18527,6 +18536,9 @@ importers:
       '@deepseek-ai/dsh-compaction-tool-result-pruner':
         specifier: workspace:*
         version: link:../../packages/compaction/compaction-tool-result-pruner
+      '@deepseek-ai/dsh-computer-use':
+        specifier: workspace:*
+        version: link:../../packages/computer-use/computer-use
       '@deepseek-ai/dsh-config-editor':
         specifier: workspace:*
         version: link:../../packages/boot/config-editor

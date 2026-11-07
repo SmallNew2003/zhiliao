@@ -171,6 +171,7 @@
     "@deepseek-ai/dsh-client-ui-assistant": "workspace:*",
     "@deepseek-ai/dsh-client-ui-notification": "workspace:*",
     "@deepseek-ai/dsh-mcp-discovery": "workspace:*",
-    "@deepseek-ai/dsh-api-remote-access": "workspace:*"
+    "@deepseek-ai/dsh-api-remote-access": "workspace:*",
+    "@deepseek-ai/dsh-computer-use": "workspace:*"
   }
 }

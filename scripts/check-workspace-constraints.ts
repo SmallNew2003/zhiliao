@@ -21,7 +21,7 @@ import { hasTypertRemoteNavigation, isForbiddenPublicationFile } from './publica
 import type { DshBundleManifest } from '../packages/util/package-manifest/src/types.ts'
 import { detailPath } from '../packages/util/plugin-detail/src/document.ts'
 import { bundlePatchFiles } from '../packages/boot/app-boot/src/profile.ts'
-import { OPTIONAL_BUNDLES } from '../packages/util/official-bundles/src/bundles.ts'
+import { ON_DEMAND_BUNDLES, OPTIONAL_BUNDLES } from '../packages/util/official-bundles/src/bundles.ts'
 import {
   PACKAGE_ASSET_EXPORT,
   PACKAGE_ASSET_EXPORT_TARGET,
@@ -647,14 +647,14 @@ const runtimeDependencySections = ['dependencies', 'optionalDependencies', 'peer
 
 /**
  * Prevent an official runtime from requiring an experimental package. The dsh installation's `dependencies`
- * may hold the bundles the launcher's `OPTIONAL_BUNDLES` names: shipped switched off, they are not a requirement
+ * may hold the bundles the official catalog names: shipped switched off, they are not a requirement
  * ([rationale](../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.md)).
  * @param manifests - release, private experimental, and deployment-root manifests.
  * @param optionalBundles - the bundles the installation ships switched off; the launcher's list by default.
  * @returns One error for each forbidden runtime dependency.
  */
 export function checkExperimentalDependencyIsolation(
-  manifests: readonly WorkspaceManifest[], optionalBundles: readonly string[] = OPTIONAL_BUNDLES,
+  manifests: readonly WorkspaceManifest[], optionalBundles: readonly string[] = [...OPTIONAL_BUNDLES, ...ON_DEMAND_BUNDLES],
 ): string[] {
   const experimentalNames = new Set(manifests
     .filter(entry => experimentalPackageDirectory.test(entry.dir))

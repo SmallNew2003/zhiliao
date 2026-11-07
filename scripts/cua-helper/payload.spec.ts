@@ -4,6 +4,8 @@ import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, r
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { runInNewContext } from 'node:vm'
+import { load } from 'js-yaml'
 import { execa } from 'execa'
 import { create } from 'tar'
 import { expect, it, onTestFinished } from 'vitest'
@@ -123,8 +125,21 @@ it('keeps company signing outside pull-request release rehearsals', () => {
   expect(workflow).toContain('workflow_call:')
   expect(workflow).not.toContain('pull_request:')
   expect(workflow).toContain('dsh-mac-package-trial')
-  const release = readFileSync(resolve('.github/workflows/release-publish.yml'), 'utf8')
-  expect(release).toContain('needs: cua-helper')
-  expect(release).toContain('scripts/cua-helper/stage.ts')
   expect(readFileSync(resolve('.github/workflows/release.yml'), 'utf8')).not.toContain('cua-helper-package.yml')
+})
+
+it('pins CUA helper product tags to the independent version line', () => {
+  const workflow = load(readFileSync(resolve('.github/workflows/cua-helper-package.yml'), 'utf8')) as {
+    jobs: { package: { steps: Array<{ name?: string; run?: string }> } }
+  }
+  const command = workflow.jobs.package.steps.find(step => step.name === 'Validate source selection')!.run!.trim()
+  const program = command.slice("node -e '".length, -1)
+  const evaluate = (ref: string): void => { runInNewContext(program, {
+    process: { env: { PACKAGE_SOURCE_REF: ref, DSH_PACKAGING_PRESET: 'production' } },
+    require: (name: string) => name === 'node:fs' ? { readFileSync: () => '{"version":"1.0.0"}' } : {},
+  }, { timeout: 1000 }) }
+  expect(() => { evaluate('zhiliao-v1.0.0') }).not.toThrow()
+  expect(() => { evaluate('refs/tags/zhiliao-v1.0.0') }).not.toThrow()
+  expect(() => { evaluate('zhiliao-v2.0.0') }).toThrow(/match product version/u)
+  expect(() => { evaluate('dsh-v1.0.0') }).toThrow(/match product version/u)
 })

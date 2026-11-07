@@ -88,3 +88,18 @@ it('matches Intel artifacts to the Intel workflow on a machine serving both arch
   f.source.target = 'mac-arm64'
   expect(() => resolveDesktopPublishRoute('owner/repo', f.run, { source: f.source }, f.jobs, routes)).toThrow(/does not match/u)
 })
+
+it.each(['master', 'zhiliao-v0.1.0-alpha.1'])('accepts production publication from %s', (sourceRef) => {
+  const f = fixture()
+  f.source.preset = 'production'
+  f.source.sourceRef = sourceRef
+  expect(resolveDesktopPublishRoute('owner/repo', f.run, { source: f.source }, f.jobs, f.routes))
+    .toMatchObject({ sourceRef, preset: 'production' })
+})
+
+it('rejects production publication from a retained upstream product tag', () => {
+  const f = fixture()
+  f.source.preset = 'production'
+  f.source.sourceRef = 'dsh-v1.0.0'
+  expect(() => resolveDesktopPublishRoute('owner/repo', f.run, { source: f.source }, f.jobs, f.routes)).toThrow(/Production source/u)
+})

@@ -16,7 +16,7 @@ afterEach(() => {
 
 it.each(['system-bin', undefined])('dispatches with bundled pnpm when PATH is %s', async (path) => {
   vi.stubEnv('PATH', path)
-  const runtime = join('Application 中文 with spaces', 'resources', 'app.asar', 'dsh')
+  const runtime = join('Application 中文 with spaces', 'resources', 'dsh')
   const support = join('Application 中文 with spaces', 'resources', 'runtime')
 
   await runDesktopCli(runtime, support)

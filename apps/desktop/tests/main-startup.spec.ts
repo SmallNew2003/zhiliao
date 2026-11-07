@@ -178,7 +178,7 @@ const harness = await vi.hoisted(async () => {
     whenReady: () => Promise.resolve(),
     getLocale: (): string => 'en-US',
     getPreferredSystemLanguages: () => ['en-US'],
-    getVersion: () => '1.0.0',
+    getVersion: (): string => '1.0.0',
     getAppPath: (): string => 'desktop-test-app',
     setAppLogsPath: vi.fn(),
     getPath: vi.fn<(name: string) => string>(),
@@ -598,6 +598,27 @@ describe('desktop main startup', () => {
   })
 
   it.each([
+    ['en-US', 'Based on DeepSeek Harness V0.2.2-alpha.2', 'zh', '基于 DeepSeek Harness V0.2.2-alpha.2'],
+    ['zh-CN', '基于 DeepSeek Harness V0.2.2-alpha.2', 'en', 'Based on DeepSeek Harness V0.2.2-alpha.2'],
+  ] as const)('shows the product version and localized upstream baseline in the macOS About panel (%s)', async (language, credits, nextLanguage, nextCredits) => {
+    vi.stubGlobal('process', { ...process, platform: 'darwin' })
+    vi.spyOn(harness.app, 'getVersion').mockReturnValue('0.1.0-alpha.9')
+    vi.spyOn(harness.app, 'getPreferredSystemLanguages').mockReturnValue([language])
+    await readyForUpdate()
+    expect(applicationMenuItems()[0]).toMatchObject({ role: 'about' })
+    expect(harness.app.setAboutPanelOptions.mock.lastCall?.[0]).toMatchObject({
+      applicationVersion: '0.1.0-alpha.9', credits,
+    })
+    const sender = harness.windows[0]!.webContents
+    harness.ipcOn.mock.calls.find(([channel]) => channel === DESKTOP_IPC.localeChanged)![1](
+      { sender, senderFrame: sender.mainFrame }, nextLanguage,
+    )
+    expect(harness.app.setAboutPanelOptions.mock.lastCall?.[0]).toMatchObject({
+      applicationVersion: '0.1.0-alpha.9', credits: nextCredits,
+    })
+  })
+
+  it.each([
     ['darwin', true, 'en-US'],
     ['darwin', false, 'zh-CN'],
     ['win32', true, 'zh-CN'],
@@ -606,7 +627,6 @@ describe('desktop main startup', () => {
     vi.stubGlobal('process', { ...process, platform })
     harness.app.isPackaged = packaged
     vi.spyOn(harness.app, 'getLocale').mockReturnValue(locale)
-    vi.spyOn(harness.app, 'getPreferredSystemLanguages').mockReturnValue([locale])
     vi.spyOn(harness.app, 'getPreferredSystemLanguages').mockReturnValue([locale])
     await readyForUpdate()
     const submenu = applicationMenuItems()
@@ -625,7 +645,8 @@ describe('desktop main startup', () => {
     const zh = locale === 'zh-CN'
     expect(harness.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.objectContaining({
       type: 'info', title: zh ? '关于 知了' : 'About Zhiliao', message: zh ? '知了' : 'Zhiliao',
-      detail: zh ? '版本 V1.0.0' : 'Version V1.0.0', buttons: [zh ? '确定' : 'OK'], cancelId: 0,
+      detail: zh ? '版本 V1.0.0\n基于 DeepSeek Harness V0.2.2-alpha.2' : 'Version V1.0.0\nBased on DeepSeek Harness V0.2.2-alpha.2',
+      buttons: [zh ? '确定' : 'OK'], cancelId: 0,
     }))
     // A dialog that cannot open is logged, not surfaced as an unhandled rejection.
     harness.dialog.showMessageBox.mockRejectedValueOnce(new Error('overlay unavailable'))
@@ -2557,7 +2578,7 @@ describe('desktop main startup', () => {
     expect(harness.applyRelease).toHaveBeenCalledTimes(1)
     expect(harness.hosts[0]).toMatchObject({
       node: process.execPath,
-      runtime: join(harness.app.getAppPath(), 'dsh'),
+      runtime: join('desktop-test-resources', 'dsh'),
       primaryRuntime: join('desktop-test-resources', 'runtime', 'primary-runtime'),
       profile: 'desktop-test-profile',
     })

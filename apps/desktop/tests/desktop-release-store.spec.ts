@@ -82,3 +82,16 @@ it('retains test branch identity while rejecting production branch manifests', a
   await writeFile(path, JSON.stringify(manifest))
   await expect(verifyRetainedDesktopRelease(root, source.runId, source.attempt)).rejects.toThrow(/Production source/u)
 })
+
+it('retains new product tags while preserving reads of historical upstream manifests', async () => {
+  const { root, file, source } = await fixture()
+  source.preset = 'production'
+  source.sourceRef = 'zhiliao-v0.1.0-alpha.1'
+  const directory = await retainDesktopRelease(root, source, [file])
+  const manifest = await verifyRetainedDesktopRelease(root, source.runId, source.attempt)
+  expect(manifest.source.sourceRef).toBe(source.sourceRef)
+  source.sourceRef = 'dsh-v1.0.0'
+  await expect(retainDesktopRelease(root, { ...source, attempt: '2' }, [file])).rejects.toThrow(/Production source/u)
+  await writeFile(join(directory, 'manifest.json'), JSON.stringify({ ...manifest, source }))
+  expect((await verifyRetainedDesktopRelease(root, source.runId, source.attempt)).source.sourceRef).toBe('dsh-v1.0.0')
+})

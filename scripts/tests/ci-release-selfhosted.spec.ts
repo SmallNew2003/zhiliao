@@ -1,5 +1,5 @@
 /** Release rehearsal routing and persistent-runner isolation, without executing release builds. */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { load } from 'js-yaml'
@@ -180,75 +180,12 @@ it('keeps vendor publication manual and entirely hosted', () => {
   expect(Object.keys(publish.on)).toEqual(['workflow_dispatch'])
   for (const job of Object.values(publish.jobs)) expect(job['runs-on']).toBe(hosted)
 })
-it('keeps DSH publication manual with hosted npm jobs and an explicit signed-helper producer', () => {
-  const publish = workflow('release-publish.yml')
-  expect(Object.keys(publish.on)).toEqual(['workflow_dispatch'])
-  for (const [name, job] of Object.entries(publish.jobs)) {
-    if (name === 'cua-helper') {
-      expect(job).toEqual({
-        if: "(startsWith(github.ref, 'refs/tags/dsh-v') || inputs.skip-tag-check) && inputs.cua_run_id == '' && inputs.cua_run_attempt == ''",
-        uses: './.github/workflows/cua-helper-package.yml',
-        with: { source_ref: '${{ github.ref }}', preset: 'production' },
-      })
-    } else expect(job['runs-on']).toBe(hosted)
+it('keeps DSH packages out of public npm publication workflows', () => {
+  expect(existsSync(resolve(root, '.github/workflows/release-publish.yml'))).toBe(false)
+  const files = readdirSync(resolve(root, '.github/workflows')).filter(file => /\.ya?ml$/u.test(file))
+  expect(files.length).toBeGreaterThan(0)
+  for (const file of files) {
+    expect(readFileSync(resolve(root, '.github/workflows', file), 'utf8'), file)
+      .not.toMatch(/release:publish\s+--family\s+dsh\b/u)
   }
-})
-it.each([
-  ['refs/tags/dsh-v0.2.1-rc.4', false, '', '', true],
-  ['refs/heads/master', false, '', '', false],
-  ['refs/heads/master', true, '', '', true],
-  ['refs/tags/dsh-v0.2.1-rc.4', false, '123', '', false],
-  ['refs/heads/master', true, '123', '2', false],
-  ['refs/tags/dsh-v0.2.1-rc.4', false, '', '2', false],
-] as const)('selects the helper producer for ref %s, skip=%s, run=%s, attempt=%s', (ref, skip, runId, attempt, expected) => {
-  const expression = workflow('release-publish.yml').jobs['cua-helper']!.if!
-  expect(evaluate(expression, { 'github.ref': ref, 'inputs.skip-tag-check': skip,
-    'inputs.cua_run_id': runId, 'inputs.cua_run_attempt': attempt })).toBe(expected)
-})
-
-it.each([
-  ['success', '', '', false, true],
-  ['failure', '', '', false, false],
-  ['failure', '123', '', false, false],
-  ['cancelled', '', '', false, false],
-  ['skipped', '', '', false, false],
-  ['skipped', '123', '', false, true],
-  ['skipped', '123', '2', false, true],
-  ['skipped', '', '2', false, true],
-  ['skipped', '123', '2', true, false],
-] as const)('gates npm packing with helper=%s, run=%s, attempt=%s, cancelled=%s', (result, runId, attempt, cancelled, expected) => {
-  const pack = workflow('release-publish.yml').jobs['pack']!
-  expect(pack.needs).toBe('cua-helper')
-  expect(evaluate(pack.if!, { 'needs.cua-helper.result': result,
-    'inputs.cua_run_id': runId, 'inputs.cua_run_attempt': attempt, cancelled })).toBe(expected)
-})
-
-it('validates retained attempts before downloading exactly one artifact with read-only Actions access', () => {
-  const publish = workflow('release-publish.yml')
-  expect(publish.permissions).toEqual({ contents: 'read' })
-  const pack = publish.jobs['pack']!
-  expect(pack.permissions).toEqual({ contents: 'read', actions: 'read' })
-  const select = pack.steps.find(step => step.name === 'Select retained CUA helper')!
-  const retained = pack.steps.find(step => step.name === 'Download retained CUA helper')!
-  const fresh = pack.steps.find(step => step.name === 'Download freshly built CUA helper')!
-  expect(select.run).toBe('pnpm exec tsx scripts/cua-helper/select-artifact.ts')
-  expect(pack.steps.indexOf(select)).toBeLessThan(pack.steps.indexOf(retained))
-  expect(retained).toMatchObject({ uses: 'actions/download-artifact@v8.0.1', with: {
-    'artifact-ids': '${{ steps.retained-cua.outputs.artifact-id }}', 'run-id': '${{ inputs.cua_run_id }}',
-    'github-token': '${{ github.token }}', path: 'dist/cua-helper',
-  } })
-  expect(retained.with?.name).toBeUndefined()
-  expect(fresh.with).toEqual({ name: '${{ needs.cua-helper.outputs.artifact }}', path: 'dist/cua-helper' })
-  for (const [runId, attempt, reuse] of [['', '', false], ['123', '', true], ['123', '2', true], ['', '2', true]] as const) {
-    const context = { 'inputs.cua_run_id': runId, 'inputs.cua_run_attempt': attempt }
-    expect(evaluate(select.if!, context)).toBe(reuse)
-    expect(evaluate(retained.if!, context)).toBe(reuse)
-    expect(evaluate(fresh.if!, context)).toBe(!reuse)
-  }
-  const stage = pack.steps.find(step => step.name === 'Stage verified native helper applications')!
-  expect(stage.if).toBeUndefined()
-  expect(stage.run).toContain('scripts/cua-helper/stage.ts --from dist/cua-helper/extracted')
-  expect(pack.steps.indexOf(stage)).toBeGreaterThan(pack.steps.indexOf(retained))
-  expect(pack.steps.indexOf(stage)).toBeGreaterThan(pack.steps.indexOf(fresh))
-  expect(pack.steps.indexOf(stage)).toBeLessThan(pack.steps.findIndex(step => step.name === 'Pack release tarballs'))
 })

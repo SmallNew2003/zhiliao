@@ -4,7 +4,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { hasExperimentalPackageReference } from '../experimental-package-policy.ts'
-import { OPTIONAL_BUNDLES } from '../../packages/util/official-bundles/src/bundles.ts'
+import { ON_DEMAND_BUNDLES, OPTIONAL_BUNDLES } from '../../packages/util/official-bundles/src/bundles.ts'
 
 interface InstalledManifest {
   name: string
@@ -18,9 +18,12 @@ interface InstalledManifest {
  * Reject experimental dependencies reachable from one installed product entry.
  * Other packages installed beside the entry and development dependencies do not join its graph.
  * @param directory - installed entry package directory.
+ * @param optionalBundles - installation-carried bundles excluded from default runtime traversal.
  * @returns number of distinct installed packages visited.
  */
-export function verifyInstalledProductIsolation(directory: string, optionalBundles: readonly string[] = OPTIONAL_BUNDLES): number {
+export function verifyInstalledProductIsolation(
+  directory: string, optionalBundles: readonly string[] = [...OPTIONAL_BUNDLES, ...ON_DEMAND_BUNDLES],
+): number {
   const visited = new Set<string>()
   const queue = [{ directory, chain: [] as string[] }]
   for (const item of queue) {

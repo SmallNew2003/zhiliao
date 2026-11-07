@@ -18,7 +18,7 @@ Web 插件页只管理用户装进 profile 的组合包。像 Agent Teams 这样
 
 ## 考虑过的替代方案
 
-**可安装官方组合包目录。** 页面按需提供从注册表安装的包名。安装本身不变，但开启那一刻需要网络，并且每次发布都要钉一个版本。轻量 bundle 仍采用随附策略；[按需原生 bundle 决策](../architecture/2026-10-05-official-on-demand-bundles.zh.md)管理原生运行时成本较高的例外。
+**可安装官方组合包目录。** 页面按需提供从注册表安装的包名。安装本身不变，但开启那一刻需要网络，并且每次发布都要钉一个版本。轻量 bundle 仍采用随附策略；[按需目录决策](../architecture/2026-10-05-official-on-demand-bundles.zh.md)负责发现和 profile 安装。[安装介质携带的交付决策](../architecture/2026-11-07-installation-carried-official-bundles.zh.md)在本地提供这些 bundle，同时保留可移除的 profile 依赖；`OPTIONAL_BUNDLES` 仍由安装拥有，不能从 profile 移除。
 
 **组合包自身的标记。** `dsh.bundle.optional` 声明会让任何已发布的组合包都能自称随安装提供；由启动器自己的列表来决定，选择权留在产品手里。
 

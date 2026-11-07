@@ -74,9 +74,9 @@ export interface BundleInfo {
   name: string
   /** Project-maintained shipped optional bundle or on-demand catalog entry, independent of installation and selection. */
   official: boolean
-  /** Readable package location; on-demand catalog entries exclude undeclared transitive copies, and declared files may be missing. */
+  /** Readable package location; on-demand bundles require a profile declaration even when installation media carries their files. */
   availability: 'installation' | 'profile' | 'missing'
-  /** Exact released Host version or same-checkout development link offered for an on-demand catalog entry. */
+  /** Validated installation or source-checkout link and its running DSH version for an on-demand catalog entry. */
   installTarget?: { spec: string; version: string }
   version?: string
   /** Local display text with available translations or literal fallbacks, or a metadata diagnostic. */
@@ -90,7 +90,7 @@ export interface BundleInfo {
   /** Whether the profile declares this dependency; availability separately reports whether its files can be read. */
   installed: boolean
   /**
-   * Present for a profile dependency the installation does not also supply: the spec `pnpm add` accepts, with local
+   * Present for a profile-managed dependency, including on-demand local media: the spec `pnpm add` accepts, with local
    * paths made absolute and the user information of an http(s) URL removed.
    */
   source?: string

@@ -22,7 +22,7 @@ const OUTPUT = 'packages/util/official-bundles/src/catalog.generated.ts'
  */
 export function generateOfficialBundleCatalog(root: string, names: readonly string[] = ON_DEMAND_BUNDLES): OfficialBundleCatalogEntry[] {
   if (names.length === 0 || new Set(names).size !== names.length) throw new Error('Official on-demand catalog must contain distinct package names')
-  const manifests = new Map<string, { path: string; private: boolean; bundle: boolean; platforms?: DshBundleManifest['platforms']; listedByDefault?: boolean; runtime: string[] }>()
+  const manifests = new Map<string, { path: string; private: boolean; bundle: boolean; platforms?: DshBundleManifest['platforms']; listedByDefault?: boolean; runtime: Array<{ name: string; section: string }> }>()
   for (const path of globSync(['packages/*/*/package.json', 'apps/*/package.json', 'vendor/*/package.json'], { cwd: root }).map(path => path.replaceAll('\\', '/')).sort()) {
     const manifest = JSON.parse(readFileSync(resolve(root, path), 'utf8')) as {
       name: string
@@ -39,16 +39,25 @@ export function generateOfficialBundleCatalog(root: string, names: readonly stri
     manifests.set(manifest.name, { path, private: manifest.private === true, bundle: manifest.dsh?.bundle?.patch !== undefined,
       ...manifest.dsh?.bundle?.platforms === undefined ? {} : { platforms: manifest.dsh.bundle.platforms },
       ...listedByDefault === undefined ? {} : { listedByDefault },
-      runtime: runtime.flatMap(section => Object.keys(manifest[section] ?? {})) })
+      runtime: runtime.flatMap(section => Object.keys(manifest[section] ?? {}).map(name => ({ name, section }))) })
   }
   const visited = new Set<string>()
   const checkInstallation = (name: string): void => {
     if (visited.has(name)) return
     visited.add(name)
-    if (names.includes(name)) throw new Error(`${name}: on-demand providers must not be installed by the DSH distribution`)
-    for (const dependency of manifests.get(name)?.runtime ?? []) checkInstallation(dependency)
+    if (names.includes(name)) throw new Error(`${name}: on-demand providers must not be required by the default runtime`)
+    for (const dependency of manifests.get(name)?.runtime ?? []) {
+      if (name === '@deepseek-ai/dsh' && dependency.section === 'dependencies' && names.includes(dependency.name)) continue
+      checkInstallation(dependency.name)
+    }
   }
-  if (!manifests.has('@deepseek-ai/dsh')) throw new Error('Official catalog requires the DSH installation manifest')
+  const installation = manifests.get('@deepseek-ai/dsh')
+  if (installation === undefined) throw new Error('Official catalog requires the DSH installation manifest')
+  for (const name of names) {
+    if (!installation.runtime.some(entry => entry.section === 'dependencies' && entry.name === name)) {
+      throw new Error(`${name}: Official bundle must be a direct installation dependency`)
+    }
+  }
   checkInstallation('@deepseek-ai/dsh')
   return names.map((packageName) => {
     const entry = manifests.get(packageName)

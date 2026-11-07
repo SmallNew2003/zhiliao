@@ -25,8 +25,8 @@ const sourceSchema = z.strictObject({
   // Older retained manifests carry this flag; manual publication does not depend on it.
   publishRequested: z.boolean().optional(),
   qualification: z.enum(['signed', 'notarized', 'unsigned', 'unnotarized']),
-}).refine(source => source.preset === 'test' || /^(?:master|dsh-v[0-9][0-9A-Za-z.-]*)$/u.test(source.sourceRef),
-  'Production source must be master or dsh-v*')
+}).refine(source => source.preset === 'test' || /^(?:master|(?:zhiliao|dsh)-v[0-9][0-9A-Za-z.-]*)$/u.test(source.sourceRef),
+  'Production source must be master or a recognized product release tag')
 const manifestSchema = z.strictObject({
   schemaVersion: z.literal(1),
   source: sourceSchema,
@@ -74,10 +74,13 @@ export function retainedDesktopPath(root: string, runId: string, attempt: string
  * @param root Persistent releases root owned by this runner.
  * @param source Packaging identity and selected public settings.
  * @param paths Complete artifact and completion-record paths; directory trees are not accepted.
- * @returns Published attempt directory. An existing attempt is never replaced.
+ * @returns Retained attempt directory. An existing attempt is never replaced; new production sources require master or zhiliao-v*.
  */
 export async function retainDesktopRelease(root: string, source: DesktopRetainedSource, paths: readonly string[]): Promise<string> {
   sourceSchema.parse(source)
+  if (source.preset === 'production' && !/^(?:master|zhiliao-v[0-9][0-9A-Za-z.-]*)$/u.test(source.sourceRef)) {
+    throw new Error('Production source must be master or zhiliao-v*')
+  }
   const destination = retainedDesktopPath(root, source.runId, source.attempt)
   const names = paths.map(path => filename.parse(basename(path)))
   if (names.length === 0 || new Set(names).size !== names.length) throw new Error('desktop release store: empty or duplicate file inventory')
@@ -125,7 +128,7 @@ export async function retainDesktopRelease(root: string, source: DesktopRetained
  * @param root Persistent releases root.
  * @param runId Expected source run ID.
  * @param attempt Expected source attempt.
- * @returns Parsed inventory; missing, linked, changed or mismatched files reject.
+ * @returns Parsed inventory, including historical dsh-v* sources; missing, linked, changed or mismatched files reject.
  */
 export async function verifyRetainedDesktopRelease(root: string, runId: string, attempt: string): Promise<DesktopRetainedManifest> {
   const path = retainedDesktopPath(root, runId, attempt)

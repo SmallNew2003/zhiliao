@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for 2026-10-31-zhiliao-own-version-line.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-31-zhiliao-own-version-line.md
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline:
+  en: 51e1d16c46925e25
+  zh: 3f5bf6faed586c0f
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/problem:
+  en: aca14b02e975d979
+  zh: f2f3dc251fc7de48
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision:
+  en: a15c7c13f167e5ac
+  zh: 63bcc2ef60c2f344
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-version-line-starts-at-0-1-0:
+  en: 695842735537ecdc
+  zh: 74be4b25cca3fce9
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-release-tag-prefix-is-zhiliao-v:
+  en: c4a80debe95b9ee3
+  zh: 3ecd9a01bee9b43e
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-dsh-sequence-stops-publishing-to-npm:
+  en: 4bd54188e3bd699b
+  zh: 17741170ec862a6a
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/the-upstream-baseline-is-recorded-beside-the-version:
+  en: ba2a9e2c377e9888
+  zh: b734062fbd73dc47
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/decision/absorbing-upstream-preserves-the-product-version:
+  en: d7d5c0862b0b0f9d
+  zh: 8279ee5522824dcc
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/consequences:
+  en: 62bf02532b678b66
+  zh: f796cd4fe99667aa
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/alternatives-considered:
+  en: a92842edaae4c24c
+  zh: fbc9b4ef51973e7d
+/agent-note-zhiliao-s-own-version-line-beside-a-recorded-upstream-baseline/related-decisions:
+  en: df2821d11b6fbf48
+  zh: 2c27ba9f94ac6952

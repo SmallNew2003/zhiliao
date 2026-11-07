@@ -70,7 +70,7 @@ export const OPTIONAL_BUNDLES: readonly string[] = [
   '@deepseek-ai/dsh-experimental-forge-bundle',
 ]
 
-/** Public DSH release members available through the ordinary on-demand bundle installer. */
+/** Installation-supplied Official bundles a profile installs on demand. */
 export const ON_DEMAND_BUNDLES: readonly string[] = [
   '@deepseek-ai/dsh-subagent-claude-code',
   '@deepseek-ai/dsh-subagent-codex',

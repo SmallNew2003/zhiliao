@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: '同仓库可信源码分支或 dsh-v* tag'
+        description: '同仓库可信源码分支或 zhiliao-v* tag'
         type: string
         default: master
         required: true
@@ -56,7 +56,7 @@ jobs:
           node -e 'const cp=require("node:child_process"); const fs=require("node:fs"); const ref=process.env.PACKAGE_SOURCE_REF;
           if(ref.startsWith("refs/pull/") || /^[a-f0-9]{40}$/i.test(ref)) throw Error("Select a trusted repository branch or release tag");
           const tag=ref.replace(/^refs\/tags\//, "");
-          if(tag.startsWith("dsh-v") && tag!=="dsh-v"+JSON.parse(fs.readFileSync("package.json","utf8")).version) throw Error("Release tag must match product version");
+          if((tag.startsWith("zhiliao-v") || tag.startsWith("dsh-v")) && tag!=="zhiliao-v"+JSON.parse(fs.readFileSync("package.json","utf8")).version) throw Error("Release tag must match product version");
           if(!["test","production"].includes(process.env.DSH_PACKAGING_PRESET)) throw Error("Invalid preset");'
       - uses: pnpm/action-setup@v5.0.0
         with:

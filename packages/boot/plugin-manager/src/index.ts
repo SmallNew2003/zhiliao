@@ -392,7 +392,7 @@ export class PluginManager extends TypertRemoteService {
   /**
    * Read a bundle's long description: the Markdown file its locale `meta.detail` names in `language`, otherwise its
    * README. An installed bundle is read from its directory without network access; an official bundle the installation
-   * offers before it is installed is read from the npm file CDNs at its offered version. Nothing is cached.
+   * offers locally before installation is read from its directory. Explicit registry targets use npm file CDNs. Nothing is cached.
    * @param name - the bundle's package name, as `listBundles()` lists it.
    * @param language - the display language, such as `zh-CN`; documents fall back through its prefixes to English.
    * @param options - `npmFileSources` names npm file CDNs to ask first for an offered bundle, in order, such as the one
@@ -506,7 +506,7 @@ export class PluginManager extends TypertRemoteService {
       const installed = dependencies.includes(name)
       const optional = OPTIONAL_BUNDLES.includes(name)
       const enabled = selected.includes(name)
-      const shipped = Object.hasOwn(installation.dependencies ?? {}, name)
+      const shipped = !catalog.has(name) && Object.hasOwn(installation.dependencies ?? {}, name)
       const offered = catalog.get(name)
       const official = optional || offered !== undefined
       let target: Pick<BundleInfo, 'installTarget'> = {}
@@ -612,7 +612,9 @@ export class PluginManager extends TypertRemoteService {
     const manifest = readProfileManifest('dsh', this.profile.dir)
     const installation = JSON.parse(readFileSync(this.profile.installAnchor, 'utf8')) as InstallationManifest
     const known = new Set([
-      ...bundleSelection(manifest), ...Object.keys(manifest.dependencies ?? {}), ...Object.keys(installation.dependencies ?? {}),
+      ...bundleSelection(manifest), ...Object.keys(manifest.dependencies ?? {}),
+      ...Object.keys(installation.dependencies ?? {}).filter(name =>
+        !OFFICIAL_ON_DEMAND_CATALOG.some(entry => entry.packageName === name)),
     ])
     const plan = registryPlan(options?.registry, await this.registries())
     const registry = plan[0] as Registry
@@ -1169,6 +1171,8 @@ export class PluginManager extends TypertRemoteService {
   private async selectBundle(name: string, enabled: boolean): Promise<void> {
     const manifest = readProfileManifest('dsh', this.profile.dir)
     const previous = bundleSelection(manifest)
+    if (enabled && OFFICIAL_ON_DEMAND_CATALOG.some(entry => entry.packageName === name)
+      && !Object.hasOwn(manifest.dependencies ?? {}, name)) throw new ManagementFailure('not-bundle')
     if (enabled || !previous.includes(name)) {
       const metadata = bundleManifest(name, this.profile.dir, this.profile.installAnchor)
       if (metadata === undefined) throw new ManagementFailure('not-bundle')

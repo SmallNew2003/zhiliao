@@ -43,15 +43,15 @@ kind: "package-reference"
 
 `listBundles` 保留默认隐藏的组合包，根据各包的展示声明和 Host 平台支持范围生成 `listedByDefault`。不支持的组合包默认不出现在主列表或“更多”中；profile 显式安装的依赖和已保存的选择仍可管理，显示平台原因并允许关闭。官方离线目录携带同一份包级平台声明，因此无需解析提供方代码或查询注册表，也能检查未安装的条目。这些检查不改变选择或激活状态。声明不是布尔值时返回元数据诊断。已选择但无法加载的组合包仍会出现在 `listBundles` 中，并携带 `error`；`enabled` 表示保存的选择，不代表加载成功。插件页面显示错误并允许取消选择。损坏的组合包无法启用。管理组合包的文件变得不可读后仍受保护。
 
-`listBundles` 为各组合包及其声明的插件行提供可选的展示 `meta`，包括已禁用的组合包。Client 从这些值中选择语言。单独的 `description` 字段是该组合包原始的 `package.json.description`；元信息诊断不会阻止管理操作。`source` 以 `pnpm add` 接受的 spec 给出 profile 依赖：git 地址或 URL 按记录给出，但去掉 http(s) URL 的 user information（查询字符串保持原样）；`file:` 或 `link:` 路径按 profile 目录解析为绝对路径，`~` 展开为主目录；注册表版本范围、标签或别名接在包名的 `@` 之后，以别名安装的包的 spec 也是如此。安装提供的组合包没有该字段，即使 profile 也依赖它，因为实际加载的是安装中的副本。`plugin_manager` 工具的列表结果不包含 UI 展示元信息和更新资格。
+`listBundles` 为各组合包及其声明的插件行提供可选的展示 `meta`，包括已禁用的组合包。Client 从这些值中选择语言。单独的 `description` 字段是该组合包原始的 `package.json.description`；元信息诊断不会阻止管理操作。`source` 以 `pnpm add` 接受的 spec 给出 profile 依赖：git 地址或 URL 按记录给出，但去掉 http(s) URL 的 user information（查询字符串保持原样）；`file:` 或 `link:` 路径按 profile 目录解析为绝对路径，`~` 展开为主目录；注册表版本范围、标签或别名接在包名的 `@` 之后，以别名安装的包的 spec 也是如此。安装所有的默认或可选组合包没有该字段，即使 profile 也依赖它，因为实际加载的是安装中的副本。`plugin_manager` 工具的列表结果不包含 UI 展示元信息和更新资格。
 
 `listBundles` 将随附可选组合包和按需目录项标为 `official`，与包的安装状态独立。`availability` 表示可读取的安装随附包、profile 包，或 `missing`；按需目录项不计入未声明的传递依赖副本。`installed` 仅表示 profile 是否声明该依赖。尚未安装的按需条目携带内嵌的本地化元信息，以及 Host 生成、包含当前 DSH 版本与安装 spec 的 `installTarget`，无需访问注册表。profile 已声明但文件不可读的包保留依赖声明，并展示原有错误。
 
 `inspect(spec, options)` 在任何东西安装之前读出 spec 指向什么：注册表包名通过 `pnpm view` 询问注册表，在 profile 目录中运行，因而与安装使用同样的代理与认证设置；绝对路径读取其 `package.json`；git 地址或 tarball 只答复自己的形式和它被拉取的 `host`。答复携带名称、版本、描述、该包是否声明组合包，以及作答的 `registry`，否则给出 `problem`：`invalid-spec`、`already-installed`、`not-found`、`not-a-package`、`not-a-bundle`、`network` 或 `unknown`，并附上问过的 `registries`。调用方的 `signal` 或 `inspectTimeoutMs` 会结束查询。
 
-已发布的安装提供 `package@<当前 DSH 版本>`。源码 Web 与开发 Desktop 提供 `link:<工作区包的绝对目录>`，目录来自当前 CLI 的安装位置，包括其开发符号链接。包名通过工作区清单解析；当前工作目录和预发布版本后缀不用于选择 checkout。包、bundle patch 或已构建入口缺失时报告诊断，不回退到注册表。使用 `pnpm install` 和 `pnpm run build` 准备 checkout。链接包使用该 checkout 的依赖与 peer；代码改变后仍需重新构建并重启。即使版本相同，注册表副本或其他 checkout 的链接也可能需要替换。
+打包安装为三个官方按需组合包提供 `link:<安装中包的绝对目录>`。包必须由当前 CLI 声明、匹配其 DSH 版本，并包含已构建入口与 bundle patch。链接保留逻辑安装路径，支持应用升级。安装不完整时报告诊断，要求重新安装应用。源码 Web 与开发 Desktop 提供 `link:<工作区包的绝对目录>`，目录来自当前 CLI 的安装位置，包括其开发符号链接。包名通过工作区清单解析；当前工作目录和预发布版本后缀不用于选择 checkout。包、bundle patch 或已构建入口缺失时报告诊断，不回退到注册表。使用 `pnpm install` 和 `pnpm run build` 准备 checkout。链接包使用该 checkout 的依赖与 peer；代码改变后仍需重新构建并重启。即使版本相同，注册表副本或其他 checkout 的链接也可能需要替换。
 
-官方按需安装调用和其他组合包相同的 `installBundle` 操作。注册表目标使用 `saveExact: true`；开发目标保留普通 `link:` 依赖。显式更新先删除已安装的包，再以当前 `enabled` 选择状态安装目标；没有 HMR 时，自启动起运行的组合包无法删除，因此安装直接覆盖它并报告 `restart-required`。删除之后安装失败或被取消时，该包保持未安装，重新安装的组合包排在选择列表末尾。关闭仅取消选择配置层，移除使用原有移除检查。安装失败恢复 profile 清单和锁文件；安装成功后激活失败可能保留已保存的依赖和选择。原有 peer 兼容性检查继续生效，不增加仅针对官方条目的版本准入规则。
+官方按需安装调用和其他组合包相同的 `installBundle` 操作。本地目标保留普通 `link:` 依赖。安装介质不会选中这些组合包或在 profile 中声明它们：用户请求前仍为未安装，移除 profile 依赖也保留介质中的文件。显式更新先删除已安装的包，再以当前 `enabled` 选择状态安装目标；没有 HMR 时，自启动起运行的组合包无法删除，因此安装直接覆盖它并报告 `restart-required`。删除之后安装失败或被取消时，该包保持未安装，重新安装的组合包排在选择列表末尾。关闭仅取消选择配置层，移除使用原有移除检查。安装失败恢复 profile 清单和锁文件；安装成功后激活失败可能保留已保存的依赖和选择。原有 peer 兼容性检查继续生效，不增加仅针对官方条目的版本准入规则。
 
 `listVersions(name, options)` 读取 `listBundles` 标为 `updatable` 的已安装组合包的新版本：以自身包名、按注册表 spec 保存（不是 `npm:` 别名）的第三方 profile 依赖，清单声明 semver 版本，且不承载插件管理。一次 `pnpm view <name> versions time dist-tags` 按注册表计划询问，计划从 `options.registry` 开始，否则从本进程上次安装该包所用的注册表开始，否则从配置的注册表开始。随后从作答的注册表逐个读取比已安装版本新的最新 `versionListLimit` 个版本，每个版本一次 `pnpm view <name>@<version>`，同时最多 `versionLookupConcurrency` 个，因为 pnpm 对范围只打印最高的匹配版本。列表按从新到旧排列，带有各版本的 dist-tag、发布时间、预发布标记、弃用说明、是否声明组合包，以及在其 `engines.dsh` 或 DSH peer 拒绝当前运行版本且没有豁免时的 `incompatible` 记录；`omitted` 统计未列出的新版本数，`attempts` 列出问过的每个注册表及其失败原因。拒绝为 `not-updatable`、`not-found`、`network` 或 `unknown`；任一版本查询失败都会拒绝整个列表。官方组合包跟随 DSH 版本，不会列出。
 
@@ -107,7 +107,7 @@ CLI 提供 `dsh plugin --profile <profile> version-exemptions`、`allow-version 
 
 `readBundleDetail(name, language, { npmFileSources? })` 为 `listBundles()` 列出的组合包读取**插件**页中该组合包页面显示的详细介绍：locale `meta.detail` 文件，否则为 README，即[文档顺序](../../util/plugin-detail/README.zh.md#document-order)第 1 步和第 2 步的定义。两者都没有时，结果为 `{ status: 'none' }`；不读取组合包声明的仓库。`npmFileSources` 按顺序列出读取当前安装提供、尚未安装的组合包时先请求的 npm 文件 CDN；它未列出的已配置 CDN 排在其后，`detailNpmFileSources` 未列出的 CDN 不会被请求。找到的文档携带其 `origin`（`locale` 或 `readme`）、在包内的 `path`，以及去掉开头 YAML front matter 块后的 Markdown 内容。
 
-已安装的组合包从其目录读取，不访问网络。当前安装提供、尚未安装的官方组合包按其提供的版本从 npm 文件 CDN 读取；以开发链接形式提供的组合包没有文档。结果不被缓存，因此重新安装的组合包显示其自身的文档。
+已安装的组合包与本地提供的官方组合包均从其目录读取，不访问网络。显式注册表目标按其提供的版本使用配置的 npm 文件 CDN。结果不被缓存，因此重新安装的组合包显示其自身的文档。
 
 `GET /api/plugin-manager/detail-file?bundle=<name>&document=<path>&path=<destination>`（加上 `&sources=<cdn>,...` 时先请求这些 CDN）向已通过认证的 owner 连接提供组合包文档旁的图片。目标路径相对于该文档；以 `/` 开头时相对于包根目录。只提供包内的 PNG、JPEG、GIF、WebP、AVIF 和 SVG 文件，响应带有 `Content-Security-Policy: sandbox`、`X-Content-Type-Options: nosniff` 和 `Cache-Control: no-store`；其他路径或未列出的组合包返回 404。
 

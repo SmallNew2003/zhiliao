@@ -5,10 +5,12 @@ const { verifyDesktopRuntime } = vi.hoisted(() => ({
 }))
 // The hook imports the built tree, which a clean checkout has not produced; this is the path it resolves.
 vi.mock('/apps/desktop/lib/types/runtime-tree.js', () => ({ verifyDesktopRuntime }))
-vi.mock('../scripts/windows-asar-unpack.mjs', async importOriginal => ({
-  ...await importOriginal<typeof import('../scripts/windows-asar-unpack.mjs')>(),
-  verifyWindowsAsarUnpack: async () => undefined,
+vi.mock('../scripts/windows-runtime-copy.mjs', async importOriginal => ({
+  ...await importOriginal<typeof import('../scripts/windows-runtime-copy.mjs')>(),
+  verifyWindowsRuntimeCopy: async () => undefined,
 }))
+
+vi.mock('../scripts/verify-packaged-runtime.ts', () => ({ verifyPackagedRuntime: vi.fn(async () => {}) }))
 
 const ENVIRONMENT = {
   DSH_DESKTOP_APP_ID: 'com.example.installer',

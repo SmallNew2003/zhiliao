@@ -22,7 +22,9 @@ function directory(name: string): string { return `packages/subagent/${name.slic
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), 'dsh-official-catalog-'))
   roots.push(root)
-  write(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh' })
+  write(root, 'apps/cli/package.json', {
+    name: '@deepseek-ai/dsh', dependencies: Object.fromEntries(ON_DEMAND_BUNDLES.map(name => [name, 'workspace:*'])),
+  })
   for (const name of ON_DEMAND_BUNDLES) {
     const dir = directory(name)
     write(root, `${dir}/package.json`, {
@@ -98,12 +100,24 @@ describe('Official bundle catalog generation', () => {
     expect(() => generateOfficialBundleCatalog(root)).toThrow('dsh.bundle.platforms')
   })
 
-  it.each([false, true])('rejects an on-demand provider in the installed dependency closure (indirect=%s)', (indirect) => {
+  it.each(['missing', 'optionalDependencies', 'peerDependencies'])('requires a direct installation dependency instead of %s', (section) => {
     const root = fixture()
     const name = ON_DEMAND_BUNDLES[0]!
-    write(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh', dependencies: { [indirect ? '@deepseek-ai/dsh-layer' : name]: '*' } })
-    if (indirect) write(root, 'packages/bundle/layer/package.json', { name: '@deepseek-ai/dsh-layer', dependencies: { [name]: '*' } })
-    expect(() => generateOfficialBundleCatalog(root)).toThrow('must not be installed by the DSH distribution')
+    const dependencies = Object.fromEntries(ON_DEMAND_BUNDLES.slice(1).map(name => [name, '*']))
+    write(root, 'apps/cli/package.json', {
+      name: '@deepseek-ai/dsh', dependencies, ...section === 'missing' ? {} : { [section]: { [name]: '*' } },
+    })
+    expect(() => generateOfficialBundleCatalog(root)).toThrow('must be a direct installation dependency')
+  })
+
+  it('rejects a default runtime dependency on an on-demand provider', () => {
+    const root = fixture()
+    const name = ON_DEMAND_BUNDLES[0]!
+    write(root, 'apps/cli/package.json', { name: '@deepseek-ai/dsh', dependencies: {
+      ...Object.fromEntries(ON_DEMAND_BUNDLES.map(name => [name, '*'])), '@deepseek-ai/dsh-layer': '*',
+    } })
+    write(root, 'packages/bundle/layer/package.json', { name: '@deepseek-ai/dsh-layer', dependencies: { [name]: '*' } })
+    expect(() => generateOfficialBundleCatalog(root)).toThrow('must not be required by the default runtime')
   })
 
   it('requires distinct nonempty catalog admission', () => {
