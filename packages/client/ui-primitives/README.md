@@ -89,6 +89,8 @@ The atoms cannot read the application locale, so every piece of user-facing copy
 
 -----
 
+`Slider` can show only the current value above its track and restores the accepted value when its owner resets it.
+
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 

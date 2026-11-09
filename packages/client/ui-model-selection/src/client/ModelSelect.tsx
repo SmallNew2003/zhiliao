@@ -117,10 +117,12 @@ export function ModelSelect(
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const anchor = useRef<{ left: number; right: number; alignedRight: number } | null>(null)
   const [menuPos, setMenuPos] = useState<CSSProperties | null>(null)
   // Whether a model row's own write is open: the rows refuse a second one while
   // it is, and nothing else dims them.
   const [rowWrite, setRowWrite] = useState(false)
+  const [sliderReset, setSliderReset] = useState(0)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   // A slider write runs one at a time, and a step the pointer reaches while one
   // is in flight replaces the step still waiting: a drag submits where it ends.
@@ -243,7 +245,7 @@ export function ModelSelect(
      that hook only places from the anchor's LEFT edge, while this card aligns
      right edges (x = rect.right - width), so the measure-and-clamp plumbing repeats. */
   useLayoutEffect(() => {
-    if (!open) { setMenuPos(null); return }
+    if (!open) { anchor.current = null; setMenuPos(null); return }
     const place = (): void => {
       /* v8 ignore next 2 -- the trigger ref is attached whenever the menu is open. */
       const rect = triggerRef.current?.getBoundingClientRect()
@@ -251,7 +253,15 @@ export function ModelSelect(
       const MARGIN = 12
       const lw = menuRef.current?.offsetWidth ?? 0
       const lh = menuRef.current?.offsetHeight ?? 0
-      let x = rect.right - lw
+      // Text changes resize either edge depending on the surrounding flex layout.
+      // Follow the edge that moved least; equal movement tracks a relocated anchor.
+      const previous = anchor.current
+      const leftMove = previous === null ? 0 : rect.left - previous.left
+      const rightMove = previous === null ? 0 : rect.right - previous.right
+      const alignedRight = previous === null ? rect.right : previous.alignedRight
+        + (Math.abs(leftMove) < Math.abs(rightMove) ? leftMove : rightMove)
+      anchor.current = { left: rect.left, right: rect.right, alignedRight }
+      let x = alignedRight - lw
       let y = rect.top - 8 - lh
       if (lw > 0) x = Math.min(Math.max(x, MARGIN), window.innerWidth - lw - MARGIN)
       if (lh > 0) y = Math.min(Math.max(y, MARGIN), window.innerHeight - lh - MARGIN)
@@ -387,6 +397,10 @@ export function ModelSelect(
       if (!stayOpen && rootRef.current !== null) close(true)
       return
     }
+    if (stayOpen) {
+      queuedStep.current = null
+      setSliderReset(value => value + 1)
+    }
     const { error } = result
     toastSeq.current += 1
     setToast({
@@ -413,14 +427,14 @@ export function ModelSelect(
    * one to run once the in-flight write returns. Mid-drag pointer movements
    * replace the waiting step instead of queuing alongside it.
    */
-  const drainSteps = (step: SliderStep): void => {
+  const drainSteps = (step: SliderStep, accepted = state.current): void => {
     if (state.current === null) return
     if (writingRef.current) {
       queuedStep.current = step
       return
     }
     writingRef.current = true
-    const current = state.current
+    const current = accepted ?? state.current
     const selection: ModelSelection = step.kind === 'effort'
       ? {
         provider: current.provider,
@@ -431,7 +445,9 @@ export function ModelSelect(
       : { ...current, contextWindow: step.value }
     lastActionRef.current = 'select'
     const smaller = step.kind === 'window' && contextWindow !== undefined && step.value < contextWindow
+    let acceptedSelection = current
     void select(selection).then((result) => {
+      if (result?.ok === true) acceptedSelection = selection
       settleSelection(result, true)
       if (result?.ok === true && smaller && rootRef.current !== null) {
         toastSeq.current += 1
@@ -441,12 +457,13 @@ export function ModelSelect(
       writingRef.current = false
       const next = queuedStep.current
       queuedStep.current = null
-      if (next !== null) drainSteps(next)
+      if (next !== null) drainSteps(next, acceptedSelection)
     })
   }
 
   const chooseStep = (step: SliderStep): void => {
     if (state.current === null) return
+    if (writingRef.current) { queuedStep.current = step; return }
     const inUse = step.kind === 'effort' ? effectiveEffort === step.effort : contextWindow === step.value
     if (inUse) return
     drainSteps(step)
@@ -480,7 +497,18 @@ export function ModelSelect(
   )
 
   return (
-    <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}>
+    <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}
+      onMouseDown={(event) => {
+        if (!(event.target instanceof Element)) return
+        if (event.target.closest('button') !== null) {
+          event.preventDefault()
+          return
+        }
+        if (menuRef.current?.contains(event.target) === true
+          && event.target.closest('input, textarea, select, a[href], [contenteditable="true"], [role="slider"]') === null) {
+          event.preventDefault()
+        }
+      }}>
       <button
         ref={triggerRef}
         type="button"
@@ -552,7 +580,7 @@ export function ModelSelect(
               </div>
             </div>
           )}
-          {state.status === 'loading' && (
+          {state.status === 'loading' && choices.length === 0 && (
             <div className={css.status}>{t('status.loading')}</div>
           )}
           {state.error !== null && lastActionRef.current === 'load' && (
@@ -638,18 +666,17 @@ export function ModelSelect(
           {(reasoning !== undefined || state.current !== null) && (
             <div className={css.controls}>
               {reasoning !== undefined && (
-                <section role="group" aria-labelledby={`${id}-effort`} className={css.control}>
-                  <div className={css.controlTitle}>
-                    <span id={`${id}-effort`}>{t('menu.effort')}</span>
-                  </div>
+                <section role="group" aria-label={t('menu.effort')} className={css.control}>
                   {effortChoices.length === 0
-                    ? <div className={css.empty}>{t('empty.efforts')}</div>
+                    ? <><div className={css.empty}>{t('menu.effort')}</div><div className={css.empty}>{t('empty.efforts')}</div></>
                     : (
                       <div className={css.sliderPane}>
                         <Slider
                           steps={effortChoices.map(choice => choice.label)}
                           value={Math.max(0, effortChoices.findIndex(choice => choice.effort === effectiveEffort))}
                           label={t('menu.effort')}
+                          compact
+                          resetToken={sliderReset}
                           disabled={locked}
                           onChange={(index) => {
                             const choice = effortChoices[index]
@@ -662,16 +689,15 @@ export function ModelSelect(
                 </section>
               )}
               {state.current !== null && (
-                <section role="group" aria-labelledby={`${id}-context`} className={css.control}>
-                  <div className={css.controlTitle}>
-                    <span id={`${id}-context`}>{t('menu.contextWindow')}</span>
-                    <span>{t('context.current', { value: contextWindow === undefined ? t('context.unknown') : contextWindow.toLocaleString('en-US') })}</span>
-                  </div>
+                <section role="group" aria-label={t('menu.contextWindow')} className={css.control}>
                   <div className={css.sliderPane}>
                     <Slider
                       steps={contextSteps.map(contextStepLabel)}
                       value={Math.max(0, contextSteps.indexOf(contextWindow ?? -1))}
                       label={t('menu.contextWindow')}
+                      compact
+                      resetToken={sliderReset}
+                      unknownLabel={contextWindow === undefined ? t('context.unknown') : undefined}
                       disabled={locked}
                       onChange={(index) => {
                         const next = contextSteps[index]

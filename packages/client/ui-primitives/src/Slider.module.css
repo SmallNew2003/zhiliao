@@ -46,19 +46,19 @@
   box-shadow: 0 0 8px 1px rgba(20, 184, 166, 0.4), 0 0 16px -2px rgba(56, 189, 248, 0.3);
 }
 
-/* Ticks mark the snap positions; the one in use reads as part of the fill. */
+/* Ticks contrast with the track on both sides of the thumb. */
 .tick {
   position: absolute;
   top: 50%;
-  width: 2px;
-  height: 2px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-label-secondary);
   transform: translate(-50%, -50%);
 }
 
-.tickCurrent {
-  background: var(--dsw-alias-brand-primary);
+.tickFilled {
+  background: var(--dsw-specific-menu);
 }
 
 /* The disc carries a surface-colored ring so it stays legible where it
@@ -151,4 +151,15 @@
   color: var(--dsw-alias-brand-primary);
   font-weight: 600;
   text-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
 }

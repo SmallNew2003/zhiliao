@@ -271,22 +271,6 @@
   min-width: 0;
 }
 
-/* The name it asks for sits beside the value it holds, on the row above the
-   track: the block spends one line saying what and one line saying where. */
-.controlTitle {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 8px 0;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 500;
-}
-
-/* The step labels under the track name the step in use, so the pane only
-   frames the control. */
 .sliderPane {
   padding: 0 8px 2px;
 }

@@ -89,6 +89,8 @@ kind: "package-library"
 
 -----
 
+`Slider` 可仅在轨道上方显示当前值，并在拥有者重置时恢复已生效的值。
+
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
