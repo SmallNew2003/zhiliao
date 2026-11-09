@@ -39,16 +39,22 @@ function stepAt(clientX: number, box: TrackBox | null, last: number, shown: numb
  * @param props.disabled - whether the control refuses a press or key. Owners set it for a
  * deployment lock; a write the owner has not settled yet leaves the control live, so a
  * drag is not cut off halfway across the track.
+ * @param props.compact - show the label and current step above the track instead of all step labels below.
+ * @param props.resetToken - changes when the owner rejects a requested step.
+ * @param props.unknownLabel - label for an unknown current value until a step is requested.
  * @param props.className - extra class for layout placement.
  * @returns the slider element.
  */
-export function Slider({ steps, value, onChange, label, disabled = false, className }: {
+export function Slider({ steps, value, onChange, label, disabled = false, className, compact = false, unknownLabel, resetToken }: {
   steps: readonly string[]
   value: number
   onChange: (index: number) => void
   label: string
   disabled?: boolean
   className?: string | undefined
+  compact?: boolean
+  resetToken?: number | undefined
+  unknownLabel?: string | undefined
 }) {
   const last = steps.length - 1
   // A value the owner does not hold (a stored selection the current steps no
@@ -60,8 +66,14 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
   // again, including one the owner settled somewhere other than the ask.
   const [asked, setAsked] = useState<{ from: number; to: number } | null>(null)
   const shown = asked !== null && asked.from === current ? asked.to : current
+  const shownLabel = asked === null && unknownLabel !== undefined ? unknownLabel : steps[shown]
   // One measured box serves a whole drag: the track holds still while the pointer
   // travels it, so the move handler reads no layout per event.
+  useEffect(() => {
+    setAsked(null)
+    setDragging(false)
+  }, [resetToken])
+
   const boxRef = useRef<TrackBox | null>(null)
   // The window listeners read live props through this ref, which is what lets one
   // drag register them once instead of again at every step it reports.
@@ -139,21 +151,25 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
       aria-valuemin={0}
       aria-valuemax={last}
       aria-valuenow={shown}
-      aria-valuetext={steps[shown]}
+      aria-valuetext={shownLabel}
       aria-disabled={disabled || undefined}
       tabIndex={disabled ? -1 : 0}
       className={clsx(css.slider, className)}
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
     >
+      {compact && <div className={css.heading}>
+        <span>{label}</span>
+        <span>{shownLabel}</span>
+      </div>}
       <div className={css.track}>
         <div className={clsx(css.fill, atMax && css.fillAtMax)} style={{ width: position(shown) }} />
         {steps.map((step, index) => (
-          <div key={step} className={clsx(css.tick, index === shown && css.tickCurrent)} style={{ left: position(index) }} />
+          <div key={step} className={clsx(css.tick, index <= shown && css.tickFilled)} style={{ left: position(index) }} />
         ))}
         <div className={clsx(css.thumb, atMax && css.thumbAtMax)} style={{ left: position(shown) }} />
       </div>
-      <div className={css.labels}>
+      {!compact && <div className={css.labels}>
         {steps.map((step, index) => {
           const isFirst = index === 0
           const isLast = index === last && last > 0
@@ -174,7 +190,7 @@ export function Slider({ steps, value, onChange, label, disabled = false, classN
             </span>
           )
         })}
-      </div>
+      </div>}
     </div>
   )
 }

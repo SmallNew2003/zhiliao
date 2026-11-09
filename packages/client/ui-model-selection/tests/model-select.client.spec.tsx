@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -77,8 +77,9 @@ describe('ModelSelect reasoning effort', () => {
     // The effort section is one slider over the effort names, descriptions dropped.
     const slider = within(screen.getByRole('group', { name: '推理等级' })).getByRole('slider')
     expect(slider.getAttribute('aria-valuetext')).toBe('High')
-    expect(screen.getByText('Off')).toBeTruthy()
-    expect(screen.getByText('Max')).toBeTruthy()
+    expect(screen.queryByText('Off')).toBeNull()
+    expect(screen.queryByText('Max')).toBeNull()
+    expect(within(screen.getByRole('group', { name: '推理等级' })).getByText('High')).toBeTruthy()
     expect(screen.queryByText('Largest budget')).toBeNull()
 
     // The keyboard steps the slider: High → Max.
@@ -122,7 +123,7 @@ describe('ModelSelect reasoning effort', () => {
     // No adapter default: the provider-default step leads the track.
     expect(slider.getAttribute('aria-valuetext')).toBe('Default')
     expect(slider.getAttribute('aria-valuenow')).toBe('0')
-    expect(screen.getByText('Standard')).toBeTruthy()
+    expect(screen.queryByText('Standard')).toBeNull()
   })
 
   it('shows the durable model id when the catalog has no matching display name', () => {
@@ -210,6 +211,23 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.queryByRole('button', { name: '重试' })).toBeNull()
   })
 
+  it('keeps focus and the menu open on non-interactive space, while allowing outside dismissal', () => {
+    render(<ModelSelect
+      locked={false} available directory={createSnapshotStore(state())} load={vi.fn()} select={vi.fn()} t={t} />)
+    const trigger = screen.getByRole('button', { name: /选择模型/ })
+    trigger.focus()
+    fireEvent.click(trigger)
+    const heading = screen.getByText('DeepSeek')
+    expect(document.activeElement).toBe(trigger)
+    expect(fireEvent.mouseDown(heading)).toBe(false)
+    expect(document.activeElement).toBe(trigger)
+    expect(screen.getByRole('menu')).toBeTruthy()
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    expect(fireEvent.mouseDown(slider)).toBe(true)
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
   it('portals the placed menu card to body and closes only on truly-outside mousedown', () => {
     const offsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')!
     const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!
@@ -247,7 +265,62 @@ describe('ModelSelect reasoning effort', () => {
     }
   })
 
-  it('shows loading, partial-provider failures, and retries beside available models', () => {
+  it('keeps the menu in place when the selected effort changes the trigger width', () => {
+    const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')!
+    const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 200 })
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 300 })
+    try {
+      const directory = createSnapshotStore(state())
+      render(<ModelSelect
+        locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+      const trigger = screen.getByRole('button', { name: /选择模型/ })
+      let right = 500
+      trigger.getBoundingClientRect = () => ({ left: 300, right, top: 500, bottom: 528, width: right - 300, height: 28,
+        x: 300, y: 500, toJSON: () => ({}) })
+      fireEvent.click(trigger)
+      const menu = screen.getByRole('menu')
+      expect(menu.style.left).toBe('300px')
+      right = 530
+      act(() => { directory.set(state({ current: { provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max' } })) })
+      expect(menu.style.left).toBe('300px')
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', width)
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', height)
+    }
+  })
+
+  it('keeps the menu in place when a right-aligned trigger shrinks', () => {
+    const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')!
+    const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')!
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => 200 })
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 300 })
+    try {
+      const directory = createSnapshotStore(state())
+      render(<ModelSelect
+        locked={false} available directory={directory} load={vi.fn()} select={vi.fn()} t={t} />)
+      const trigger = screen.getByRole('button', { name: /选择模型/ })
+      let left = 300
+      let right = 500
+      trigger.getBoundingClientRect = () => ({ left, right, top: 500, bottom: 528, width: right - left, height: 28,
+        x: left, y: 500, toJSON: () => ({}) })
+      fireEvent.click(trigger)
+      const menu = screen.getByRole('menu')
+      expect(menu.style.left).toBe('300px')
+      left = 320
+      act(() => { directory.set(state({ current: { provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max' } })) })
+      expect(menu.style.left).toBe('300px')
+      left += 30
+      right += 30
+      fireEvent.scroll(window)
+      expect(menu.style.left).toBe('330px')
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', width)
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', height)
+    }
+  })
+
+  it('keeps available models in place while refreshing and displays provider failures', () => {
     const load = vi.fn()
     render(<ModelSelect
       locked={false}
@@ -261,11 +334,20 @@ describe('ModelSelect reasoning effort', () => {
       t={t}
     />)
     fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
-    expect(screen.getByText('正在刷新模型列表…')).toBeTruthy()
+    expect(screen.queryByText('正在刷新模型列表…')).toBeNull()
+    expect(screen.getByRole('menu').getAttribute('aria-busy')).toBe('true')
     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
     expect(screen.getByText('Offline provider 加载失败：unreachable')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
     expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows loading when no model catalog is available yet', () => {
+    render(<ModelSelect
+      locked={false} available directory={createSnapshotStore(state({ status: 'loading', groups: [], current: null }))}
+      load={vi.fn()} select={vi.fn()} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: /选择模型|加载/ }))
+    expect(screen.getByText('正在刷新模型列表…')).toBeTruthy()
   })
 
   it('shows an empty catalog without effort options', () => {
@@ -500,6 +582,14 @@ describe('ModelSelect single-panel navigation', () => {
     expect(select).not.toHaveBeenCalled()
   })
 
+  it('keeps the selected model marker stable while a slider selection is pending', () => {
+    const { directory } = mountOpen()
+    const row = screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })
+    const marker = row.lastElementChild!.innerHTML
+    act(() => { directory.set(state({ status: 'selecting' })) })
+    expect(row.lastElementChild!.innerHTML).toBe(marker)
+  })
+
   it('refuses a second model row while the first row is still writing', async () => {
     /** What the seat's `select` verb settles with. */
     type Settled = { ok: true; value: undefined } | { ok: false; error: RemoteError<'session/writer-held'> }
@@ -561,13 +651,10 @@ describe('ModelSelect context window', () => {
     const group = screen.getByRole('group', { name: '上下文窗口' })
     // The presets are the slider's steps; an off-preset capacity joins them as
     // its own step, so the thumb never claims a preset the session is not using.
-    const steps = capacity === undefined || capacity === 320_000
-      ? ['320K', '640K', '960K']
-      : ['131,072', '320K', '640K', '960K']
-    for (const step of steps) expect(within(group).getByText(step)).toBeTruthy()
     const expectedText = capacity === undefined ? '320K' : capacity === 320_000 ? '320K' : '131,072'
-    expect(within(group).getByRole('slider').getAttribute('aria-valuetext')).toBe(expectedText)
-    expect(within(group).getByText(capacity === undefined ? '当前：未知' : `当前：${capacity.toLocaleString('en-US')}`)).toBeTruthy()
+    expect(within(group).getByRole('slider').getAttribute('aria-valuetext')).toBe(capacity === undefined ? '未知' : expectedText)
+    expect(within(group).getByText(capacity === undefined ? '未知' : expectedText)).toBeTruthy()
+    expect(within(group).queryByText('960K')).toBeNull()
     expect(trigger.textContent).not.toMatch(/320K|640K|960K/)
     expect(select).not.toHaveBeenCalled()
   })
@@ -664,11 +751,71 @@ describe('ModelSelect context window', () => {
     expect(calls).toHaveLength(1)
     // The step in view is the one the pointer holds, write open or not.
     expect(slider.getAttribute('aria-valuetext')).toBe('960K')
+    expect(within(screen.getByRole('group', { name: '上下文窗口' })).getByText('960K')).toBeTruthy()
     release?.()
     await waitFor(() => { expect(calls).toHaveLength(2) })
     expect(calls[1]).toEqual({
       provider: 'deepseek-official', model: 'deepseek-v4-flash', reasoningEffort: 'max', contextWindow: 960_000,
     })
+  })
+
+  it('applies a drag back to the original step after the first write settles', async () => {
+    const { props, directory, rerender, initial } = mount()
+    const calls: ModelSelection[] = []
+    let release: (() => void) | undefined
+    const select = (selection: ModelSelection) => new Promise<{ ok: true; value: undefined }>((resolve) => {
+      calls.push(selection)
+      const settle = () => { directory.set({ ...initial, current: selection }); resolve({ ok: true, value: undefined }) }
+      if (calls.length === 1) release = settle
+      else settle()
+    })
+    rerender(<ModelSelect {...props} select={select} />)
+    const slider = screen.getByRole('slider', { name: '上下文窗口' })
+    slider.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 20, right: 300, bottom: 20,
+      x: 0, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(slider, { clientX: 150, pointerId: 1 })
+    fireEvent.pointerMove(slider, { clientX: 0, pointerId: 1 })
+    release?.()
+    await waitFor(() => { expect(calls).toHaveLength(2) })
+    expect(calls[1]).toMatchObject({ contextWindow: 320_000 })
+  })
+
+  it('preserves the accepted window when an effort change waits for it', async () => {
+    const { props, directory, rerender, initial } = mount()
+    let release: (() => void) | undefined
+    const calls: ModelSelection[] = []
+    const select = (selection: ModelSelection) => new Promise<{ ok: true; value: undefined }>((resolve) => {
+      calls.push(selection)
+      const settle = () => {
+        directory.set({ ...initial, current: selection })
+        resolve({ ok: true, value: undefined })
+      }
+      if (calls.length === 1) release = settle
+      else settle()
+    })
+    rerender(<ModelSelect
+      {...props} select={select} />)
+    fireEvent.keyDown(screen.getByRole('slider', { name: '上下文窗口' }), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByRole('slider', { name: '推理等级' }), { key: 'ArrowLeft' })
+    release?.()
+    await waitFor(() => { expect(calls).toHaveLength(2) })
+    expect(calls[1]).toMatchObject({ contextWindow: 640_000, reasoningEffort: 'high' })
+  })
+
+  it('restores the current value after a pointer selection is refused', async () => {
+    const { props, rerender, initial, directory } = mount()
+    const select = vi.fn(async () => {
+      directory.set({ ...initial, status: 'error', error: 'refused' })
+      return { ok: false as const, error: new RemoteError('session/writer-held', 'writer held', { sessionId: SessionId('owned') }) }
+    })
+    rerender(<ModelSelect {...props} select={select} />)
+    const slider = screen.getByRole('slider', { name: '上下文窗口' })
+    slider.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 20, right: 300, bottom: 20,
+      x: 0, y: 0, toJSON: () => ({}) })
+    fireEvent.pointerDown(slider, { clientX: 290, pointerId: 1 })
+    await screen.findByRole('alert')
+    expect(screen.getByRole('slider', { name: '上下文窗口' }).getAttribute('aria-valuetext')).toBe('320K')
+    expect(within(screen.getByRole('group', { name: '上下文窗口' })).getByText('320K')).toBeTruthy()
   })
 
   it('announces a refused context change while retaining the current window', async () => {

@@ -94,6 +94,7 @@ async function bench(locale: 'zh' | 'en' = 'zh') {
       selected = {
         provider: payload.provider,
         model: payload.model,
+        ...payload.contextWindow === undefined ? {} : { contextWindow: payload.contextWindow },
         ...payload.reasoningEffort === undefined
           ? {}
           : { reasoningEffort: payload.reasoningEffort },
@@ -266,6 +267,16 @@ describe('ui-model-selection dual entry', () => {
     // The POPUP's next options pass reflects it without a seat-side reload.
     const options = await b.popup().options(projection('s1'), new AbortController().signal)
     expect(options.find((o: SelectOption) => o.label === 'DeepSeek-V4-Pro')).toMatchObject({ active: true })
+  })
+
+  it('forwards a context window selection to the host and reflects it', async () => {
+    const b = await bench()
+    b.mint('s1')
+    const face = b.seat().inject!(sid('s1'))
+    await face.select({ provider: 'deepseek-official', model: 'deepseek-v4-flash', contextWindow: 640_000 })
+    expect(b.hostCurrent()).toMatchObject({ contextWindow: 640_000 })
+    expect(face.directory.getSnapshot().current).toMatchObject({ contextWindow: 640_000 })
+    await b.ctx.fiber.dispose()
   })
 
   it('a popup selection lands on the seat store — the reverse direction of the same state', async () => {
