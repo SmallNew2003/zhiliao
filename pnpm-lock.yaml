@@ -648,6 +648,9 @@ importers:
       '@deepseek-ai/dsh-sandbox-policy':
         specifier: workspace:*
         version: link:../../packages/sandbox/sandbox-policy
+      '@deepseek-ai/dsh-scope':
+        specifier: workspace:*
+        version: link:../../packages/core/scope
       '@deepseek-ai/dsh-sdk-client':
         specifier: workspace:*
         version: link:../../packages/sdk/client

@@ -1,7 +1,10 @@
 /** Test-only IPC assertions over real Creator presets and profile management. */
 import { executeModelToolFixture } from '@deepseek-ai/dsh-tool-testkit'
+import { LlmAttemptId, createSystemMessage } from '@deepseek-ai/dsh-llm'
+import { scopeTarget } from '@deepseek-ai/dsh-scope'
+import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 
-export const inject = ['agents', 'agentPresets', 'tools', 'pluginManager', 'permissionPresets']
+export const inject = ['agents', 'agentPresets', 'tools', 'pluginManager', 'permissionPresets', 'mcpDiscovery', 'systemPrompt']
 
 export function apply(ctx, config) {
   const receive = message => {
@@ -47,8 +50,24 @@ export function apply(ctx, config) {
       const second = await make(`${phase}-second`)
       const after = names(first)
       const other = names(second)
-      const ping = await executeModelToolFixture(ctx, { name: 'mcp__demo__ping', arguments: {}, agent: first,
-        callId: `${phase}-ping`, signal: new AbortController().signal })
+      const selection = ctx.mcpDiscovery.load(first, ['mcp__demo__ping'])
+      if (!selection.ok) throw new Error('MCP fixture selection failed')
+      const signal = new AbortController().signal
+      const modelSelection = { provider: 'fixture', model: 'fixture' }
+      const toolSet = await ctx.tools.resolve({ agent: first, modelSelection, signal })
+      first.session.append('step/start', { turn: 1, step: 1 })
+      let ping
+      try {
+        const assembly = await ctx.systemPrompt.assemble({ scope: first, agent: first, modelSelection, toolSet,
+          stepInput: { turn: 1, step: 1, messages: [] } })
+        first.session.append('system/message', { turn: 1, step: 1, message: createSystemMessage(renderPrompt(assembly)) }, { surfaceOp: 'append' })
+        first.session.append('request/header', { header: { config: modelSelection, tools: assembly.tools }, reason: 'initial' })
+        ctx.emit(scopeTarget(first, first), 'agent/assistant-stream', { agent: first, frame: {
+          type: 'start', attemptId: LlmAttemptId(`${phase}-attempt`), revision: 1, turn: 1, step: 1,
+        } })
+        ping = await executeModelToolFixture(ctx, { name: 'mcp__demo__ping', arguments: {}, agent: first,
+          callId: `${phase}-ping`, signal, toolSet })
+      } finally { toolSet.dispose() }
       const removed = phase === 'restart'
         ? JSON.parse((await manage({ action: 'remove_bundle', target: '@test/creator-mcp' })).value) : undefined
       return { approvals, permission: ctx.permissionPresets.current(first.session), before, denied, afterDenied, bundlesAfterDenied, result, after, other, ping, removed, remaining: names(first) }
