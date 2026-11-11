@@ -1,0 +1,25 @@
+# Bilingual-pair consistency record for assistant-experience_20261111.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/superpowers/plans/assistant-experience_20261111.md
+/personal-assistant-follow-through-implementation-plan:
+  en: 754096e08a72aab7
+  zh: 6415d6b240fb5766
+/personal-assistant-follow-through-implementation-plan/global-constraints:
+  en: da81976df87a4fc3
+  zh: 19e4a7f2c05a0790
+/personal-assistant-follow-through-implementation-plan/acceptance-requirements:
+  en: b0a770f63ce3d9b4
+  zh: c45db6957f51222e
+/personal-assistant-follow-through-implementation-plan/acceptance-requirements/task-1-durable-task-follow-through-and-lifecycle:
+  en: 32a85a7b97aa67db
+  zh: aabc45458fc1876e
+/personal-assistant-follow-through-implementation-plan/acceptance-requirements/task-2-assistant-workspace-live-cards-and-client-recovery:
+  en: f86cdcbb28d4f818
+  zh: b45a931a5d4d1b8f
+/personal-assistant-follow-through-implementation-plan/acceptance-requirements/task-3-reusable-embedded-conversation-and-real-flow-verification:
+  en: bb700209be9badd0
+  zh: 32c4d7defeced0f4
+/personal-assistant-follow-through-implementation-plan/controller-verification-and-review:
+  en: 6198a3f81ef3a9b3
+  zh: 397800c78a3e8711

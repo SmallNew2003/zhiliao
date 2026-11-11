@@ -483,10 +483,28 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'One bounded page of task views.',
       },
       {
-        signature: '@Remote(\'cancelTask\') async cancelTask(request: AssistantTasksCancelRequest): Promise<AssistantTaskView>',
-        description: 'Cancel one assistant task.',
+        signature: '@Remote(\'task\') task(request: AssistantTaskRequest): AssistantTaskView',
+        description: 'Read one task after authorizing the execution Session and target Workspace.',
         parameters: [{ name: 'request', description: 'Task identity.' }],
-        returns: 'The updated task view, or the unchanged terminal task.',
+        returns: 'Current task details.',
+      },
+      {
+        signature: 'listForAssistant(caller: SessionId, page: Pick<AssistantTasksListRequest, \'limit\' | \'offset\'>): AssistantTaskView[]',
+        description: 'List the calling assistant\'s own tasks.',
+        parameters: [{ name: 'caller', description: 'Calling conversation.' }, { name: 'page', description: 'Task-list page bounds.' }],
+        returns: 'Current task details in newest-first order.',
+      },
+      {
+        signature: 'taskForAssistant(caller: SessionId, id: AssistantTaskId): AssistantTaskView',
+        description: 'Read a task belonging to the calling assistant.',
+        parameters: [{ name: 'caller', description: 'Calling conversation.' }, { name: 'id', description: 'Task identity supplied by the model.' }],
+        returns: 'Current task details.',
+      },
+      {
+        signature: '@Remote(\'cancelTask\') async cancelTask(request: AssistantTasksCancelRequest): Promise<AssistantTaskView>',
+        description: 'Stop admission and join the execution Agent and its descendants.',
+        parameters: [{ name: 'request', description: 'Task identity.' }],
+        returns: 'The task after quiescence, or its unchanged terminal state.',
       },
       {
         signature: '@Remote(\'visibility\') visibility(): AssistantVisibilityValue',
@@ -5914,6 +5932,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type AssistantTaskId = Branded<\'assistant-task-id\'>;',
   },
   {
+    name: 'AssistantTaskRequest',
+    declaration: 'export interface AssistantTaskRequest {\n    readonly id: AssistantTaskId;\n}',
+  },
+  {
     name: 'AssistantTasksCancelRequest',
     declaration: 'export interface AssistantTasksCancelRequest {\n    readonly id: AssistantTaskId;\n}',
   },
@@ -5923,11 +5945,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AssistantTaskStatus',
-    declaration: 'export type AssistantTaskStatus = \'created\' | \'running\' | \'waiting-approval\' | \'waiting-answer\' | \'done\' | \'failed\' | \'cancelled\';',
+    declaration: 'export type AssistantTaskStatus = \'created\' | \'running\' | \'waiting-approval\' | \'waiting-answer\' | \'cancelling\' | \'done\' | \'failed\' | \'cancelled\';',
   },
   {
     name: 'AssistantTaskView',
-    declaration: 'export interface AssistantTaskView {\n    readonly id: AssistantTaskId;\n    readonly assistantId: AssistantId;\n    readonly workspaceId?: WorkspaceId;\n    readonly title: string;\n    readonly status: AssistantTaskStatus;\n    readonly sessionId: SessionId;\n    readonly sessionAvailable: boolean;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly failure?: AssistantTaskFailure;\n}',
+    declaration: 'export interface AssistantTaskView {\n    readonly id: AssistantTaskId;\n    readonly assistantId: AssistantId;\n    readonly workspaceId?: WorkspaceId;\n    readonly title: string;\n    readonly status: AssistantTaskStatus;\n    readonly sessionId: SessionId;\n    readonly sessionAvailable: boolean;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly resultSummary?: string;\n    readonly failure?: AssistantTaskFailure;\n}',
   },
   {
     name: 'AssistantView',

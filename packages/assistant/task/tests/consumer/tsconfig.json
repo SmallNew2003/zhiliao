@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "module": "NodeNext",
+    "target": "ES2024",
+    "noEmit": true
+  },
+  "files": ["notice.mts"]
+}

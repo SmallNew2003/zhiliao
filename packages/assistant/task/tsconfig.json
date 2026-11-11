@@ -18,6 +18,12 @@
       "path": "../../util/brand"
     },
     {
+      "path": "../../llm/llm"
+    },
+    {
+      "path": "../../subagent/subagent"
+    },
+    {
       "path": "../../core/session"
     },
     {
@@ -34,6 +40,9 @@
     },
     {
       "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../session-query/session-query"
     },
     {
       "path": "../../session/session-projection"

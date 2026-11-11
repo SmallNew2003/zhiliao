@@ -315,6 +315,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   AssistantsEnsureRequest: 'assistant.md',
   AssistantsListRequest: 'assistant.md',
   AssistantTasksListRequest: 'assistant.md',
+  AssistantTaskRequest: 'assistant.md',
   AssistantTasksCancelRequest: 'assistant.md',
   AssistantVisibilityRequest: 'assistant.md',
   AssistantConversationEntry: 'assistant.md',

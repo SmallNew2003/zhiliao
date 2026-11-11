@@ -70,6 +70,7 @@ import {
   parseSessionLog,
   prepareSessionSnapshotFixtureForComparison,
 } from '@deepseek-ai/dsh-llm-replay'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type { SessionFormatEvent } from '@deepseek-ai/dsh-session-format'
 import { sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import {
@@ -84,6 +85,7 @@ import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-j
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-agent'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
+import { normalizeAssistantFixtureStream } from './assistant-follow-through-fixture.ts'
 import { startPrefixProxy, type PrefixProxy } from './prefix-proxy.ts'
 import { REPO_ROOT, requireBuilt, requireDist } from './support.ts'
 
@@ -372,9 +374,9 @@ export interface LaunchOptions {
   /**
    * Optional replay.override.json sidecar (whole-script replacement or
    * `{ patches }` augmentation) for throw/hang scenarios not expressible as
-   * recorded chunks; replay/refresh only.
+   * recorded chunks; replay/refresh only. A factory receives this run’s allocated workspace root.
    */
-  replayOverride?: string
+  replayOverride?: string | ((workspaceCwd: string) => Promise<string>)
   /**
    * Retry policy registered on every replay provider route, for failure-
    * injection scenarios that must exhaust recovery quickly instead of walking
@@ -885,13 +887,15 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       }
     }
     if (mode !== 'record' && replayFixture !== undefined) {
+      const overrideFile = typeof options.replayOverride === 'function'
+        ? await options.replayOverride(workspaceCwd) : options.replayOverride
       replayHandle = installLlmReplay(ctx, {
         file: replayFixture,
         providers: (options.replayProviders ?? replayProviders(options.replayContextWindow)).map(provider => ({
           ...provider,
           ...(options.replayRetryPolicy === undefined ? {} : { retryPolicy: options.replayRetryPolicy }),
         })),
-        ...(options.replayOverride === undefined ? {} : { overrideFile: options.replayOverride }),
+        ...(overrideFile === undefined ? {} : { overrideFile }),
         ...(replayChildFixtures === undefined ? {} : { childFiles: replayChildFixtures }),
         ...(options.paceMs === undefined ? {} : { paceMs: options.paceMs }),
       })
@@ -1043,13 +1047,13 @@ export function rawSessionLog(session: Session): string {
   ].join('\n')
 }
 
-function mapJsonStringValues(value: unknown, map: (value: string) => string): unknown {
-  if (typeof value === 'string') return map(value)
+function mapJsonStringValues(value: unknown, map: (value: string, key?: string) => string, key?: string): unknown {
+  if (typeof value === 'string') return map(value, key)
   if (Array.isArray(value)) return value.map(item => mapJsonStringValues(item, map))
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [
       key,
-      mapJsonStringValues(item, map),
+      mapJsonStringValues(item, map, key),
     ]))
   }
   return value
@@ -1172,27 +1176,135 @@ export function normalizeWebSessionVolatiles(log: string, workspaceCwd?: string)
   }).join('\n')
 }
 
-function stableSessionFixture(
-  session: Session,
-  existing: string,
+/** Explicitly registered Workspace identities selected by one scenario. */
+export interface SessionFixtureIdentityContext {
+  readonly workspaces?: readonly { readonly id: WorkspaceId; readonly token: `{{workspace:${number}}}` }[]
+}
+
+function normalizeFixtureWorkspaceIds(log: string, context: SessionFixtureIdentityContext): string {
+  if (!context.workspaces?.length) return log
+  const workspaces = new Map<string, string>(context.workspaces.map(({ id, token }) => [id, token]))
+  return log.split(/\r?\n/).map((line) => {
+    if (line === '') return line
+    const event = JSON.parse(line) as SessionEvent
+    const record = event.type === 'assistant/message' || event.type === 'assistant/attempt'
+      ? { ...event, data: { ...event.data, stream: normalizeAssistantFixtureStream(event.data.stream, workspaces) } } : event
+    return JSON.stringify(mapJsonStringValues(record, (value, key) => {
+      if (key === 'workspaceId') return workspaces.get(value) ?? value
+      if (key !== 'arguments' && key !== 'text') return value
+      return value.replace(/("workspaceId"\s*:\s*")([^"\\]*)"/g, (match: string, prefix: string, id: string) => {
+        const token = workspaces.get(id)
+        return token === undefined ? match : prefix + token + '"'
+      })
+    }))
+  }).join('\n')
+}
+
+function stableSessionFixtures(
+  sessions: readonly Session[],
+  existing: readonly string[],
   workspaceCwd: string,
   harnessHome: string,
+  identities: SessionFixtureIdentityContext = {},
+  mode?: 'record' | 'refresh',
+): string[] {
+  const prepared = sessions.map(session => prepareSessionSnapshotFixtureForComparison(
+    normalizeWebSessionVolatiles(normalizeFixtureWorkspaceIds(rawSessionLog(session), identities), workspaceCwd),
+  ))
+  const portable = mode === 'refresh' ? redactSessionSnapshotIds(prepared) : prepared
+  const fresh = portable.map((log, index) => {
+    const previous = existing[index] ?? ''
+    const stabilized = mode === 'record' || previous === '' ? log : stabilizeRefreshLog(log, previous, [], {
+      sessionIds: sessions.map(item => String(item.id)), cwd: workspaceCwd,
+    }, mode === 'refresh' ? 'preserve' : 'legacy')
+    return scrubSessionSnapshot(stabilized).split(harnessHome).join('{{harnessHome}}')
+  })
+  return redactSessionSnapshotIds(stabilizeFixtureMessageIds(fresh, mode === 'record' ? [] : existing))
+}
+
+function stableSessionFixture(
+  session: Session, existing: string, workspaceCwd: string, harnessHome: string,
 ): string {
-  const prepared = prepareSessionSnapshotFixtureForComparison(
-    normalizeWebSessionVolatiles(rawSessionLog(session), workspaceCwd),
-  )
-  const stabilized = existing === ''
-    ? prepared
-    : stabilizeRefreshLog(prepared, existing, [], {
-      sessionIds: [String(session.id)],
-      cwd: workspaceCwd,
-    })
-  const fresh = scrubSessionSnapshot(stabilized)
-    .split(session.id).join('{{session:1}}')
-    .split(harnessHome).join('{{harnessHome}}')
-  const stable = redactSessionSnapshotIds(stabilizeFixtureMessageIds([fresh], [existing]))[0]
+  const stable = stableSessionFixtures([session], [existing], workspaceCwd, harnessHome)[0]
   if (stable === undefined) throw new Error('session harvest produced no stabilized fixture')
   return stable
+}
+
+/**
+ * Compare complete persisted logs with the standard Web and Session normalizers.
+ * @param actual - Live logs in primary-first role order.
+ * @param expected - Recorded logs in the same role order.
+ * @param actualContext - Live identities and working-directory spellings.
+ * @param expectedContext - Recorded identities and working-directory spellings.
+ * @param harnessHome - Optional isolated home whose spelling varies per run.
+ * @param identities - Explicit registered identities selected by this scenario only.
+ * @throws when any persisted event or relationship differs after normalization.
+ */
+export function assertSessionFixtureSnapshots(
+  actual: readonly string[], expected: readonly string[],
+  actualContext: NormalizeContext, expectedContext: NormalizeContext, harnessHome?: string,
+  identities: SessionFixtureIdentityContext = {},
+): void {
+  const normalize = (logs: readonly string[], context: NormalizeContext): string[] =>
+    normalizeSessionSnapshots(logs.map(log => normalizeWebSessionVolatiles(
+      normalizeFixtureWorkspaceIds(log, identities), context.cwd,
+    )), context)
+      .map(log => harnessHome === undefined ? log : log.split(harnessHome).join('{{harnessHome}}'))
+  expect(normalize(actual, actualContext), 'persisted replay').toEqual(normalize(expected, expectedContext))
+}
+
+/** One exact live Session and its corresponding recorded role. */
+export interface SessionFixtureRole {
+  readonly sessionId: SessionId
+  readonly fixturePath: string
+}
+
+/**
+ * Record, refresh or compare exact live Session roles, including roots without cwd.
+ * Every mode compares persisted files with live logs; writes are read back before comparison.
+ * Request-header sidecars remain the scenario owner's responsibility.
+ * @param scaffold - Running Web world and snapshot mode.
+ * @param roles - Primary-first Session identities and owned fixture paths.
+ * @param identities - Explicit registered identities selected by this scenario only.
+ * @throws when a Session is absent, a fixture is invalid, or persisted replay differs.
+ */
+export async function verifySessionFixtures(
+  scaffold: Pick<WebScaffold, 'ctx' | 'mode' | 'workspaceCwd' | 'harnessHome'>,
+  roles: readonly SessionFixtureRole[],
+  identities: SessionFixtureIdentityContext = {},
+): Promise<void> {
+  const sessions = roles.map(({ sessionId }) => {
+    const agent = scaffold.ctx.agents.get(sessionId)
+    if (agent === undefined) throw new Error(`session fixture: no live agent for ${sessionId}`)
+    return agent.session
+  })
+  const selected = await Promise.all(roles.map(async ({ fixturePath }) => {
+    const path = scaffold.mode === 'record' && !existsSync(fixturePath)
+      ? fixturePath : await selectedSessionFixture(fixturePath)
+    const manifestPath = join(dirname(path), 'snapshot.yml')
+    return {
+      path,
+      existing: existsSync(path) ? await readFile(path, 'utf8') : '',
+      manifest: parseSnapshotManifest(await readFile(manifestPath, 'utf8'), manifestPath),
+    }
+  }))
+  const expected = selected.map(item => item.existing)
+  if (scaffold.mode !== 'replay') {
+    const fresh = stableSessionFixtures(sessions, expected, scaffold.workspaceCwd, scaffold.harnessHome, identities, scaffold.mode)
+    for (const [index, item] of selected.entries()) {
+      if (!writesCurrentSessionFixtures(item.manifest, scaffold.mode)) continue
+      const session = sessions[index]!
+      const content = fresh[index]!
+      const target = recordedSessionFixturePath(item.path, session.header.version)
+      await writeFile(target, content)
+      expected[index] = await readFile(target, 'utf8')
+    }
+  }
+  assertSessionFixtureSnapshots(
+    sessions.map(rawSessionLog), expected,
+    { sessionIds: sessions.map(session => String(session.id)), cwd: scaffold.workspaceCwd },
+    { sessionIds: [], cwd: '{{cwd}}' }, scaffold.harnessHome, identities,
+  )
 }
 
 async function assertReplaySession(
@@ -1219,8 +1331,7 @@ async function assertReplaySession(
   })
   expect(candidates, `Web replay fixture ${fixturePath} must match one live root session`).toHaveLength(1)
   const session = candidates[0] as Session
-  const sessionCwd = session.header.cwd
-  if (sessionCwd === undefined) throw new Error(`${fixturePath}: replayed session has no cwd`)
+  const sessionCwd = session.header.cwd ?? '\0no-cwd\0'
   const actual = rawSessionLog(session)
   if (mode === 'refresh' && writesCurrentSessionFixtures(manifest, mode)) {
     expected = stableSessionFixture(session, expected, sessionCwd, harnessHome)
@@ -1236,11 +1347,7 @@ async function assertReplaySession(
     sessionIds: typeof expectedHeader.id === 'string' ? [expectedHeader.id] : [],
     cwd: typeof expectedHeader.cwd === 'string' ? expectedHeader.cwd : '\0no-cwd\0',
   }
-  const actualSnapshot = normalizeSessionSnapshots([normalizeWebSessionVolatiles(actual)], actualContext)[0]
-    ?.split(harnessHome).join('{{harnessHome}}')
-  const expectedSnapshot = normalizeSessionSnapshots([normalizeWebSessionVolatiles(expected)], expectedContext)[0]
-    ?.split(harnessHome).join('{{harnessHome}}')
-  expect(actualSnapshot, `${fixturePath}: persisted replay`).toBe(expectedSnapshot)
+  assertSessionFixtureSnapshots([actual], [expected], actualContext, expectedContext, harnessHome)
 
   if (manifest.header?.pin !== true) return
   const normalizePrompt = (value: string): string => value

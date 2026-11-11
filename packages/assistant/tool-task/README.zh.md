@@ -1,5 +1,5 @@
 ---
-description: "面向模型的 create_task 工具，基于 Host 助理任务服务。"
+description: "已登记助理可创建任务，并查询其进度和结果。"
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-assistant-task` 在解析到 Host `ctx.assistantTasks` 服务的作用域中注册 `create_task` 模型工具。助理 preset 挂载它；步骤级条件使它只对已登记助理会话可见。调用通过 Session 控制器创建独立根会话，并返回任务与会话标识。
+`dsh-tool-assistant-task` 在解析到 Host `ctx.assistantTasks` 服务的作用域中注册 `create_task`、`list_tasks` 与 `get_task` 模型工具。助理 preset 挂载它；步骤级条件使它只对已登记助理会话可见。创建操作通过 Session 控制器创建独立根会话，并返回任务与会话标识。
 
 ## 目录
 
@@ -35,7 +35,7 @@ kind: "package-reference"
 <a id="model-experience"></a>
 ## 模型体验
 
-### 任务创建工具
+### 创建任务
 
 #### 模型看到什么
 
@@ -49,12 +49,26 @@ kind: "package-reference"
 
 已准入工具与项目目录不变时，schema 和指导文本保持稳定。任务结果追加普通工具历史。
 
+### 查询任务
+
+#### 模型看到什么
+
+`list_tasks({ offset?, limit? })` 按最近更新优先，分页返回调用助理的任务。`get_task({ id })` 读取该助理的一项任务。二者都返回任务和执行 Session 标识、状态及已有的有界终态摘要，均不接受其他助理的 ID。
+
+#### Token 影响
+
+列表结果的长度取决于页内任务数及各项结果摘要的长度。单项查询只返回一个任务。
+
+#### KV Cache 影响
+
+每次查询都将当时的状态作为新的工具结果追加到已有对话历史。
+
 ## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 - 仅在 Host 挂载 `assistantTasks` 服务时可用。
-- 工具不提供任务列表、取消或状态读取；这些操作属于助理界面。
+- 取消任务是助理界面中由用户执行的操作。
 - 未登记为全局或项目助理的会话不能创建任务。
 
 <a id="dev-note"></a>

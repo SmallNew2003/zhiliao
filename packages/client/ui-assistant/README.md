@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-client-ui-assistant` adds one assistant entry to the Web and Desktop sidebar and one main panel. The panel selects the global assistant or a project assistant, opens that assistant's conversation, shows its task list, opens task execution Sessions, and cancels active tasks. The plugin also registers a conversation card for `create_task`, a Session-header marker with a return action for assistant conversations and task Sessions, and a client separation source so assistant Sessions stay out of ordinary user Workspace groups, the ungrouped bucket, and search while remaining reachable from the assistant surface.
+Choose the global assistant or a project assistant in the Web or Desktop sidebar. The conversation stays beside the task list on wide panels and above it on narrow panels. Tasks are grouped into needs attention, active, and finished. Open a task to review its execution Session, or return from the Session header to its owning assistant.
 
 ## Table of Contents
 
@@ -28,6 +28,8 @@ Mount the plugin in the web bundle after the Host assistant task service and the
   name: '@deepseek-ai/dsh-client-ui-assistant'
 ```
 
+The global list includes all authorized tasks. Selecting a project limits the list to that project. Load earlier tasks to extend the history. A task’s creation card follows its current status and displays the worker’s result summary when available. Cancellation remains pending until execution stops. If stopping fails, retry cancellation from the task.
+
 The entry appears only while the Host assistant service is readable. An owner selecting a project for the first time creates that project assistant through the Host service; non-owner callers can open only an existing authorized assistant.
 
 <a id="model-experience"></a>
@@ -44,12 +46,11 @@ Navigation, task cards, and status updates do not change model requests.
 <a id="known-limitations-and-deferred-work"></a>
 
 - Separation is a client rendering seam; clients without this plugin can still list assistant task Sessions.
-- The global task list is bounded by the Host page size; older tasks are not paginated in the first release.
 - Scheduled tasks remain on the existing Automation page and are not aggregated here.
-- Task rows without a usable execution Session show the failed state and offer no open action.
+- A task can be opened only when its execution Session is available.
 - The assistant page does not restore the exact user conversation that was open before a task.
 
 <a id="dev-note"></a>
 ### Dev Note
 
-The plugin registers its main panel, sidebar row, task card, and hidden-Session source inside `remoteAccess.whenAccess('assistantTasks/assistants', ...)`, so no surface appears without read access. The hidden source reads the Host-provided visibility snapshot, which also names each assistant conversation and task execution Session; the header action uses those roles to mark the Session and return to its owning assistant. Both registrations are disposed with the plugin.
+The plugin registers its surfaces and hidden-Session source under `remoteAccess.whenAccess('assistantTasks/assistants', ...)`. The panel retains the selected Session and renders `conversation.embedded` in its scope. Task cards read `assistantTasks/task` and refresh on their own task’s change events. A temporary read failure preserves the open conversation, task history, and previously read task details. If the Host denies access or reports a missing task, the card withdraws its details. The ordinary workspace list hides each newly discovered Session until an ownership check covering that Session succeeds. Sessions arriving during a check trigger a follow-up check together. If a check fails, previously confirmed ordinary Sessions stay visible. The workspace Session list and the assistant task panel both offer a retry. Switching projects discards the previous project’s pending selection and reads.

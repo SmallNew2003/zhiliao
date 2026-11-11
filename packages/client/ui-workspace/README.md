@@ -125,6 +125,8 @@ Built-in Session menu actions register structured contributions through `ctx.con
 
 The legacy `sidebar.workspaces.session.menu.item` Slot remains for external React entries. It receives `sessionId`, `displayTitle`, and `useMenuOpenState` for dismissal. Legacy entries retain their own order and render together before Archive; their priority no longer replaces built-in data actions. New contributions use the [menu service](../ui-context-menu/README.md). Built-in visibility tracks permissions and pin/archive membership while open; dialogs and notices remain frame-wide overlays.
 
+Plugins that temporarily hide Session rows can explain the missing rows and offer recovery in the root-scoped list Slot `sidebar.workspaces.feedback`, above the expanded Session list.
+
 The existing notice overlay dispatches `workspace.toast` by notice kind. Keyed registrations inject localized display mappings and their own actions; only archive notices subscribe to the viewing filter. They render the package-local `workspace.toast.content` Factory, which reuses the Toast primitive once for all presentations. The existing notice state, display sequence, latest-notice replacement, and dismissal remain shared; locale or filter changes do not restart the same notice's timer.
 
 #### Packaged client plugin

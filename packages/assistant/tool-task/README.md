@@ -1,5 +1,5 @@
 ---
-description: "Model-facing create_task tool over the Host assistant task service."
+description: "Create tasks and read their progress and results from a registered assistant."
 kind: "package-reference"
 ---
 
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-tool-assistant-task` registers the `create_task` model tool in the scope that resolves the Host `ctx.assistantTasks` service. The assistant preset mounts it; a step-time condition keeps it invisible to assistant-preset Sessions that are not registered assistants. A call creates an independent root Session through the Session controller and returns the task and Session identities.
+`dsh-tool-assistant-task` registers `create_task`, `list_tasks`, and `get_task` in the scope that resolves the Host `ctx.assistantTasks` service. The assistant preset mounts it; a step-time condition keeps it invisible to assistant-preset Sessions that are not registered assistants. A creation call creates an independent root Session through the Session controller and returns the task and Session identities.
 
 ## Table of Contents
 
@@ -35,7 +35,7 @@ Guidance and tool declarations use the same step admission. An ordinary Session 
 <a id="model-experience"></a>
 ## Model Experience
 
-### Task creation tool
+### Task creation
 
 #### What the model sees
 
@@ -49,12 +49,26 @@ Admitted assistant steps include the tool schema and guidance, including the reg
 
 The schema and guidance remain stable while the admitted tool and project directory are unchanged. Task results append ordinary tool history.
 
+### Task reads
+
+#### What the model sees
+
+`list_tasks({ offset?, limit? })` returns a newest-first page for the calling assistant. `get_task({ id })` reads one of its tasks. Both include task and execution identities, status, and any bounded terminal summary; neither accepts another assistant’s id.
+
+#### Token effect
+
+List output grows with the page size and the length of each result summary. A detail read returns one task.
+
+#### KV Cache effect
+
+Each read appends the current status as a new tool result after the existing conversation history.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
 
 - The tool is available only when the Host `assistantTasks` service is mounted and the calling Session is a registered assistant. Step-time activation excludes other Sessions from both model declarations and execution.
-- The tool does not expose task listing, cancellation, or status reads; the assistant surface owns those operations.
+- Task cancellation is a user action available on the assistant surface.
 - A registered assistant that is not the global or project record cannot create tasks.
 
 <a id="dev-note"></a>

@@ -102,6 +102,8 @@ async function baseContext(remote: RemoteInput = {
   const workspaces: WorkspaceSnapshot = {
     items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
   }
+  ctx.provide('resources', { register: () => () => {} } as never)
+  ctx.provide('sessions', { retain: vi.fn(), list: { getSnapshot: () => ({ ids: [] }), subscribe: () => () => {} } } as never)
   ctx.provide('workspaces', { list: { getSnapshot: () => workspaces, subscribe: () => () => {} } } as never)
   const selectPanel = vi.fn()
   ctx.provide('layout', { selectPanel } as never)
@@ -122,6 +124,7 @@ function declareSeats(ctx: Context): void {
     name: 'root',
     children: {
       main: { kind: 'keyed', scope: 'root' },
+      'sidebar.workspaces.feedback': { kind: 'list', scope: 'root' },
       'sidebar.panellist': { kind: 'list', scope: 'root' },
       'conversation.session.header.actions': { kind: 'list', scope: 'session' },
       'tool.call.toolview': { kind: 'keyed', scope: 'session' },
@@ -136,6 +139,7 @@ describe('ui-assistant browser half', () => {
     await ctx.plugin({ inject: [...inject], apply })
     expect(ctx.slots.entries('main')).toEqual([])
     expect(ctx.slots.entries('sidebar.panellist')).toEqual([])
+    expect(ctx.slots.entries('sidebar.workspaces.feedback')).toEqual([])
     expect(hiddenSource()).toBeUndefined()
     await ctx.fiber.dispose()
   })
@@ -156,11 +160,11 @@ describe('ui-assistant browser half', () => {
     const stop = page.hooks.state.subscribe(() => {})
     await vi.waitFor(() => {
       expect(page.hooks.state.getSnapshot().phase).toBe('ready')
-      expect(page.hooks.state.getSnapshot().assistants).toEqual([globalAssistant])
+      expect(page.hooks.state.getSnapshot().selected).toEqual(globalAssistant)
     })
     expect(hiddenSource()?.getSnapshot()).toEqual(expect.arrayContaining([globalAssistant.sessionId, task.sessionId]))
-    page.openAssistant(globalAssistant.sessionId)
-    expect(openSession).toHaveBeenCalledExactlyOnceWith(globalAssistant.sessionId)
+    page.openTask(task.sessionId)
+    expect(openSession).toHaveBeenCalledExactlyOnceWith(task.sessionId)
     stop()
     await fiber.dispose()
     await ctx.fiber.dispose()
@@ -183,7 +187,7 @@ describe('ui-assistant browser half', () => {
     })
     header.returnToAssistant(task.sessionId)
     const state = header.hooks.state.getSnapshot()
-    expect(state.selected).toBe(globalAssistant.id)
+    expect(state.selected?.id).toBe(globalAssistant.id)
     expect(state.selectedWorkspace).toBeNull()
     expect(selectPanel).toHaveBeenCalledExactlyOnceWith('assistant')
     stop()
@@ -198,6 +202,7 @@ describe('ui-assistant browser half', () => {
     await fiber.await()
     expect(hiddenSource()).toBeDefined()
     await fiber.dispose()
+    expect(ctx.slots.entries('sidebar.workspaces.feedback')).toEqual([])
     expect(hiddenSource()).toBeUndefined()
     await ctx.fiber.dispose()
   })

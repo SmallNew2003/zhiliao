@@ -1409,6 +1409,8 @@ export function WorkspaceBrowser({
         </Tooltip>
       </div>}
 
+      {wide && renderSlot('sidebar.workspaces.feedback', {})}
+
       {/* Always-mounted seat keeps the region's flex slot while the list
           itself is wide-only. */}
       <div className={css.listArea}>

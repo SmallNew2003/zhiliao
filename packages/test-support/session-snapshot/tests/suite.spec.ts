@@ -1142,6 +1142,21 @@ describe('refreshFixtureReplacements', () => {
 })
 
 describe('stabilizeRefreshLog', () => {
+  it('retains literal UUID strings on request while sharing the legacy refresh clock behavior', () => {
+    const freshId = '11111111-2222-4333-8444-555555555555'
+    const previousId = '66666666-7777-4888-8999-aaaaaaaaaaaa'
+    const log = (signature: string, time: number) => [
+      JSON.stringify({ type: 'session', id: 'same', createdAt: 0 }),
+      JSON.stringify({ type: 'assistant/message', time, data: { message: { source: { replayState: { signature } } } } }),
+      '',
+    ].join('\n')
+    const fresh = log(freshId, 200)
+    const previous = log(previousId, 100)
+    const context = { sessionIds: ['same'], cwd: '/workspace' }
+    expect(stabilizeRefreshLog(fresh, previous, [], context)).toBe(previous)
+    expect(stabilizeRefreshLog(fresh, previous, [], context, 'preserve')).toBe(log(freshId, 100))
+  })
+
   it('preserves unpacked member times when refresh first packs a chunk run', () => {
     const fresh = [
       '{"type":"session","id":"same","createdAt":200}',

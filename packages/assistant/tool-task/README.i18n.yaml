@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/assistant/tool-task/README.md
 /:
-  en: 7d3da25aaa314d15
-  zh: 5d6052ac762429d3
+  en: b630fc1f1c38db0f
+  zh: 8245290feb1414bb
 /deepseek-ai-dsh-tool-assistant-task:
   en: 7ce91a60e7c98f4a
   zh: bbfa40642bfc2813
 /deepseek-ai-dsh-tool-assistant-task/summary:
-  en: 2c2f4a8bfc9d0c03
-  zh: 512e43a6b4b64e4b
+  en: a49995d235c4d1d9
+  zh: 90261695513d96fb
 /deepseek-ai-dsh-tool-assistant-task/table-of-contents:
   en: 2e89ddb1e73218cb
   zh: 65e6e399d6b474c7
@@ -20,21 +20,33 @@
 /deepseek-ai-dsh-tool-assistant-task/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
-/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation-tool:
-  en: 04b5ab3663952f8f
-  zh: 519c1d4f70841796
-/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation-tool/what-the-model-sees:
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation:
+  en: 6d13da0aeda04234
+  zh: 3c23d8f4bad8873f
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation/what-the-model-sees:
   en: a8c13eac1d0f3696
   zh: c3d27812bd91d9c7
-/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation-tool/token-effect:
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation/token-effect:
   en: 0addba23af3af6d5
   zh: 6667493e4689f26c
-/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation-tool/kv-cache-effect:
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-creation/kv-cache-effect:
   en: 083d23a6697aed4f
   zh: 4ac569e4254e6e65
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-reads:
+  en: 2808eeb45f678139
+  zh: 4b22cb0e7e700bd2
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-reads/what-the-model-sees:
+  en: 44f6ab9a2cd24520
+  zh: 74749d0b45ff9083
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-reads/token-effect:
+  en: 27c713b52209af6e
+  zh: 4c9519b2412c2a35
+/deepseek-ai-dsh-tool-assistant-task/model-experience/task-reads/kv-cache-effect:
+  en: bb6967500bb18dd7
+  zh: 93076748488225bc
 /deepseek-ai-dsh-tool-assistant-task/known-limitations-and-deferred-work:
-  en: b8ed294148438ca1
-  zh: 4db2d8702e4bd29d
+  en: fc8979316313ba02
+  zh: 46bb773db293ec46
 /deepseek-ai-dsh-tool-assistant-task/known-limitations-and-deferred-work/dev-note:
   en: f756719273c4e28c
   zh: 098e61c3bddf79be

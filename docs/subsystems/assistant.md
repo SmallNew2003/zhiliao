@@ -4,7 +4,7 @@ English | [中文](assistant.zh.md)
 
 ## Summary
 
-Assistants keep a persistent conversation for the Host or one registered Workspace and delegate work to separate task Sessions. The [assistant service](../../packages/assistant/task/README.md) owns durable assistant and task records, status reconciliation, cancellation, and the visibility feed. The [assistant tool](../../packages/assistant/tool-task/README.md) creates tasks only from an assistant Session.
+Assistants keep a persistent conversation for the Host or one registered Workspace and delegate work to separate task Sessions. The [assistant service](../../packages/assistant/task/README.md) owns durable assistant and task records, status reconciliation, cancellation, and the visibility feed. The [assistant tool](../../packages/assistant/tool-task/README.md) allows only registered assistant Sessions to create and read their tasks.
 
 ## Table of Contents
 
@@ -15,14 +15,14 @@ Assistants keep a persistent conversation for the Host or one registered Workspa
 <a id="identity-and-views"></a>
 ## Identity and views
 
-The [assistant types](../../packages/assistant/task/src/types.ts) define `AssistantId` and `AssistantTaskId` as distinct branded identities. `AssistantKind` selects global or project ownership. `AssistantView` exposes the current conversation Session and retired Session ids; `AssistantTaskView` exposes task title, state, execution Session identity, availability, and optional `AssistantTaskFailure`.
+The [assistant types](../../packages/assistant/task/src/types.ts) define `AssistantId` and `AssistantTaskId` as distinct branded identities. `AssistantKind` selects global or project ownership. `AssistantView` exposes the current conversation Session and retired Session ids; `AssistantTaskView` exposes task title, state, execution Session identity, availability, optional final `resultSummary`, and optional `AssistantTaskFailure`.
 
-`AssistantTaskStatus` distinguishes `created`, `running`, `waiting-approval`, `waiting-answer`, `done`, `failed`, and `cancelled`. Task identity can exist before its execution Session becomes available. Storage owns these relationships independently of Session headers; ordinary Session origin and recovery rules remain authoritative.
+`AssistantTaskStatus` distinguishes `created`, `running`, `waiting-approval`, `waiting-answer`, `cancelling`, `done`, `failed`, and `cancelled`. Task identity can exist before its execution Session becomes available. Storage owns these relationships independently of Session headers; ordinary Session origin and recovery rules remain authoritative.
 
 <a id="requests-and-failures"></a>
 ## Requests and failures
 
-`AssistantsEnsureRequest` creates or reuses an assistant in an explicit scope. `AssistantsListRequest` and `AssistantTasksListRequest` filter durable views; task listing also accepts bounded pagination. `AssistantTasksCancelRequest` names one task. Host-only `AssistantTaskCreateRequest` identifies the calling assistant Session, prompt, optional target Workspace, idempotency key, and cancellation signal; `AssistantTaskCreateValue` returns reserved task and Session ids.
+`AssistantsEnsureRequest` creates or reuses an assistant in an explicit scope. `AssistantsListRequest` and `AssistantTasksListRequest` filter durable views; task listing also accepts bounded pagination. `AssistantTaskRequest` and `AssistantTasksCancelRequest` identify one task for an authorized detail read or cancellation. Host-only `AssistantTaskCreateRequest` identifies the calling assistant Session, prompt, optional target Workspace, idempotency key, and cancellation signal; `AssistantTaskCreateValue` returns reserved task and Session ids.
 
 `AssistantTaskErrorCode` classifies rejected scope, unavailable Workspace or preset, invalid input, quota, storage, Session creation, and delivery failures. `AssistantTaskErrorDetails` retains task and Session identities when creation has progressed; `AssistantTaskError` carries that classification and actionable detail. Callers can distinguish a task that was never created from a durable failed task.
 
@@ -70,9 +70,32 @@ Assistant conversations are ordinary Sessions; task execution Sessions are ordin
 @Remote('tasks') listTasks(request?: AssistantTasksListRequest): AssistantTaskView[]
 
 /**
- * Cancel one assistant task.
+ * Read one task after authorizing the execution Session and target Workspace.
  * @param request - Task identity.
- * @returns The updated task view, or the unchanged terminal task.
+ * @returns Current task details.
+ */
+@Remote('task') task(request: AssistantTaskRequest): AssistantTaskView
+
+/**
+ * List the calling assistant's own tasks.
+ * @param caller - Calling conversation.
+ * @param page - Task-list page bounds.
+ * @returns Current task details in newest-first order.
+ */
+listForAssistant(caller: SessionId, page: Pick<AssistantTasksListRequest, 'limit' | 'offset'>): AssistantTaskView[]
+
+/**
+ * Read a task belonging to the calling assistant.
+ * @param caller - Calling conversation.
+ * @param id - Task identity supplied by the model.
+ * @returns Current task details.
+ */
+taskForAssistant(caller: SessionId, id: AssistantTaskId): AssistantTaskView
+
+/**
+ * Stop admission and join the execution Agent and its descendants.
+ * @param request - Task identity.
+ * @returns The task after quiescence, or its unchanged terminal state.
  */
 @Remote('cancelTask') async cancelTask(request: AssistantTasksCancelRequest): Promise<AssistantTaskView>
 

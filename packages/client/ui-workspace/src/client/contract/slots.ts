@@ -135,6 +135,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /** Directory-flow hole under the conversation empty-state picker (declared by the WorkspacePicker entry). */
     'conversation.hero.workspace.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
+    /** Persistent feedback and recovery actions above the ordinary Session list. */
+    'sidebar.workspaces.feedback': { kind: 'list'; scope: 'root' }
     /** Directory-flow hole under the sidebar browsing region (declared by the WorkspaceBrowser entry). */
     'sidebar.workspaces.directoryFlow': { kind: 'single'; scope: 'root'; owner: DirectoryFlowOwnerProps }
     /**
@@ -501,6 +503,7 @@ export type RowToastProps =
 export type WorkspaceBrowserProps =
   PropsRuntime<'sidebar.workspaces'>
   & PropsRenderSlots<
+    | 'sidebar.workspaces.feedback'
     | 'sidebar.workspaces.directoryFlow'
     | 'sidebar.workspaces.session.row.action'
     | 'sidebar.session.row.trailing'

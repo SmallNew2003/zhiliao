@@ -336,6 +336,7 @@ export function apply(ctx: Context): void {
     {
       name: 'sidebar.workspaces',
       children: {
+        'sidebar.workspaces.feedback': { kind: 'list', scope: 'root' },
         'sidebar.workspaces.directoryFlow': { kind: 'single', scope: 'root' },
         'sidebar.workspaces.session.row.action': { kind: 'list', scope: 'root' },
         'sidebar.session.row.leading': { kind: 'list', scope: 'root', inline: true },

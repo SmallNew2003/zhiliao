@@ -4,7 +4,7 @@
 
 ## 概述
 
-助理为 Host 或某个已注册 Workspace 保留持久对话，并将工作委派到独立任务 Session。[助理服务](../../packages/assistant/task/README.zh.md)负责持久助理与任务记录、状态协调、取消和可见性数据流。[助理工具](../../packages/assistant/tool-task/README.zh.md)仅从助理 Session 创建任务。
+助理为 Host 或某个已注册 Workspace 保留持久对话，并将工作委派到独立任务 Session。[助理服务](../../packages/assistant/task/README.zh.md)负责持久助理与任务记录、状态协调、取消和可见性数据流。[助理工具](../../packages/assistant/tool-task/README.zh.md)仅允许已登记助理 Session 创建和查询自己的任务。
 
 ## 目录
 
@@ -15,14 +15,14 @@
 <a id="identity-and-views"></a>
 ## 标识与视图
 
-[助理类型](../../packages/assistant/task/src/types.ts)将 `AssistantId` 与 `AssistantTaskId` 定义为不同的品牌标识。`AssistantKind` 选择全局或项目归属。`AssistantView` 提供当前对话 Session 与已退役 Session ID；`AssistantTaskView` 提供任务标题、状态、执行 Session 标识、可用性及可选的 `AssistantTaskFailure`。
+[助理类型](../../packages/assistant/task/src/types.ts)将 `AssistantId` 与 `AssistantTaskId` 定义为不同的品牌标识。`AssistantKind` 选择全局或项目归属。`AssistantView` 提供当前对话 Session 与已退役 Session ID；`AssistantTaskView` 提供任务标题、状态、执行 Session 标识、可用性，以及可选的最终 `resultSummary` 和 `AssistantTaskFailure`。
 
-`AssistantTaskStatus` 区分 `created`、`running`、`waiting-approval`、`waiting-answer`、`done`、`failed` 与 `cancelled`。任务标识可以先于执行 Session 的可用状态存在。存储独立于 Session 头部管理这些关系，普通 Session 的来源与恢复规则仍然有效。
+`AssistantTaskStatus` 区分 `created`、`running`、`waiting-approval`、`waiting-answer`、`cancelling`、`done`、`failed` 与 `cancelled`。任务标识可以先于执行 Session 的可用状态存在。存储独立于 Session 头部管理这些关系，普通 Session 的来源与恢复规则仍然有效。
 
 <a id="requests-and-failures"></a>
 ## 请求与失败
 
-`AssistantsEnsureRequest` 在显式范围中创建或复用助理。`AssistantsListRequest` 与 `AssistantTasksListRequest` 过滤持久视图，任务列表还接受有界分页。`AssistantTasksCancelRequest` 指定一个任务。仅限 Host 的 `AssistantTaskCreateRequest` 指定调用助理 Session、提示词、可选目标 Workspace、幂等键与取消信号；`AssistantTaskCreateValue` 返回预留的任务与 Session ID。
+`AssistantsEnsureRequest` 在显式范围中创建或复用助理。`AssistantsListRequest` 与 `AssistantTasksListRequest` 过滤持久视图，任务列表还接受有界分页。`AssistantTaskRequest` 与 `AssistantTasksCancelRequest` 指定待授权查询或取消的任务。仅限 Host 的 `AssistantTaskCreateRequest` 指定调用助理 Session、提示词、可选目标 Workspace、幂等键与取消信号；`AssistantTaskCreateValue` 返回预留的任务与 Session ID。
 
 `AssistantTaskErrorCode` 对范围拒绝、Workspace 或 preset 不可用、输入无效、配额、存储、Session 创建及投递失败分类。`AssistantTaskErrorDetails` 在创建已有进展时保留任务与 Session 标识；`AssistantTaskError` 携带分类与可操作详情。调用者可区分未曾创建的任务与已持久化的失败任务。
 
@@ -70,9 +70,32 @@ Assistant conversations are ordinary Sessions; task execution Sessions are ordin
 @Remote('tasks') listTasks(request?: AssistantTasksListRequest): AssistantTaskView[]
 
 /**
- * Cancel one assistant task.
+ * Read one task after authorizing the execution Session and target Workspace.
  * @param request - Task identity.
- * @returns The updated task view, or the unchanged terminal task.
+ * @returns Current task details.
+ */
+@Remote('task') task(request: AssistantTaskRequest): AssistantTaskView
+
+/**
+ * List the calling assistant's own tasks.
+ * @param caller - Calling conversation.
+ * @param page - Task-list page bounds.
+ * @returns Current task details in newest-first order.
+ */
+listForAssistant(caller: SessionId, page: Pick<AssistantTasksListRequest, 'limit' | 'offset'>): AssistantTaskView[]
+
+/**
+ * Read a task belonging to the calling assistant.
+ * @param caller - Calling conversation.
+ * @param id - Task identity supplied by the model.
+ * @returns Current task details.
+ */
+taskForAssistant(caller: SessionId, id: AssistantTaskId): AssistantTaskView
+
+/**
+ * Stop admission and join the execution Agent and its descendants.
+ * @param request - Task identity.
+ * @returns The task after quiescence, or its unchanged terminal state.
  */
 @Remote('cancelTask') async cancelTask(request: AssistantTasksCancelRequest): Promise<AssistantTaskView>
 
