@@ -3,7 +3,7 @@
 
 - insert:
     - id: official-bundle-media
-      name: '../../../packages/boot/plugin-manager/tests/fixtures/official-bundle-media.ts'
+      name: '../../../packages/boot/plugin-manager/tests/fixtures/official-bundle-media.mjs'
 
 - id: headless-runner
   inject: [headlessStartup, officialBundleMediaReady]

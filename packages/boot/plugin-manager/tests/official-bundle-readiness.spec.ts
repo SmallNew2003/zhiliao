@@ -3,7 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import Tools, { defineTool } from '@deepseek-ai/dsh-tools'
 import { expect, it } from 'vitest'
-import { exposeReadiness } from './fixtures/official-bundle-media.ts'
+import { exposeReadiness } from './fixtures/official-bundle-media.mjs'
 
 it('publishes and withdraws runner readiness with the management tool', async () => {
   const ctx = new Context()
