@@ -33,7 +33,10 @@ it('excludes create_task from ordinary sessions and dispatch outside an admitted
   const assistantPrompt = await ctx.systemPrompt.assemble({ scope: registered, agent: registered, toolSet: assistantSet })
   expect(assistantPrompt.sections.find(section => section.name === 'tool:create_task')?.text).toContain('Create assistant tasks')
   expect(ctx.tools.executable('create_task', registered)).toBeUndefined()
-  expect(ctx.tools.schemas(registered, assistantSet).map(tool => tool.name)).toContain('create_task')
+  for (const name of ['create_task', 'list_tasks', 'get_task']) {
+    expect(ctx.tools.schemas(registered, assistantSet).map(tool => tool.name)).toContain(name)
+    expect(ctx.tools.executable(name, ordinary, ordinarySet)).toBeUndefined()
+  }
   assistantSet.dispose()
   expect(ctx.tools.executable('create_task', registered, assistantSet)).toBeUndefined()
 })

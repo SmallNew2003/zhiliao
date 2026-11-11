@@ -319,6 +319,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 
   interface SlotFactoryMap {
+    /** Header-free Conversation inheriting the caller's retained Session. */
+    'conversation.embedded': {
+      scope: 'session'
+      props: ConversationEmbeddedInputProps
+    }
     /** Reusable Conversation content instantiated by presentation hosts. */
     'conversation.content': {
       scope: 'session-maybe'
@@ -595,8 +600,14 @@ export type ConversationSlotProps =
   & PropsRenderSlots<'conversation.header'>
   & PropsRenderFactories
 
+/** Workspace prerequisite for an explicitly scoped embedded Conversation. */
+export interface ConversationEmbeddedInputProps {
+  /** Defaults to required; optional permits an ungrouped Session without changing Host permissions. */
+  workspaceMode?: 'required' | 'optional'
+}
+
 /** Inputs shared by main and embedded Conversation content occurrences. */
-export interface ConversationContentInputProps {
+export interface ConversationContentInputProps extends ConversationEmbeddedInputProps {
   variant: 'main' | 'embedded'
   phase: 'settling' | 'hero' | 'active'
   hero: boolean
@@ -609,6 +620,9 @@ export interface ConversationWidthControlsInputProps {
   /** Current body phase; handles render only for an active transcript. */
   phase: ConversationContentInputProps['phase']
 }
+
+/** Full props of the Session-scoped embedded Conversation Factory. */
+export type ConversationEmbeddedProps = FactoryComponentPropsOf<'conversation.embedded'>
 
 /** Full props of the reusable Conversation Factory definition. */
 export type ConversationContentProps = FactoryComponentPropsOf<'conversation.content'>

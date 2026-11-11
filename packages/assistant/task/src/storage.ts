@@ -25,6 +25,15 @@ export const assistantRecord = z.object({
   updatedAt: instant,
 }).strict()
 
+/** One terminal result awaiting durable inbox acknowledgement. */
+export const taskNotice = z.object({
+  id: z.string().min(1),
+  state: z.enum(['pending', 'sending']),
+  status: z.enum(['done', 'failed']),
+  resultSummary: z.string().optional(),
+  failureCode: z.string().optional(),
+}).strict()
+
 /** Durable assistant task record. */
 export const assistantTaskRecord = z.object({
   id: assistantTaskId,
@@ -34,10 +43,17 @@ export const assistantTaskRecord = z.object({
   title: z.string().min(1),
   prompt: z.string().min(1),
   sessionId,
-  status: z.enum(['created', 'running', 'waiting-approval', 'waiting-answer', 'done', 'failed', 'cancelled']),
+  status: z.enum(['created', 'running', 'waiting-approval', 'waiting-answer', 'cancelling', 'done', 'failed', 'cancelled']),
+  /** Exact conversation that created the task; legacy records cannot establish it. */
+  creatorSessionId: sessionId.optional(),
+  resultSummary: z.string().optional(),
+  /** Unacknowledged terminal results, including failed attempts followed by a safe retry. */
+  outbox: z.array(taskNotice).optional(),
   creatorTurn: z.number().int().nonnegative(),
   /** Caller idempotency key shared by retries of one creation. */
   requestId: z.string().min(1).optional(),
+  /** Durable admission intent; absence on a legacy task cannot prove the prompt was never attempted. */
+  promptAttempted: z.boolean().optional(),
   /** Whether the first prompt reached the execution Session. */
   promptDelivered: z.boolean().optional(),
   createdAt: instant,
@@ -59,7 +75,8 @@ export const assistantDomainState = z.object({
 /** The assistant domain: assistant records, task records, and the global assistant identity. */
 export const assistantDomain = defineDomain({
   name: 'assistant',
-  version: 1,
+  version: 2,
+  compatibleVersions: [1],
   global: {
     schema: assistantDomainState,
     initial: {},

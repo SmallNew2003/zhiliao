@@ -5,6 +5,19 @@ export const NS = 'assistant'
 
 /** Localized assistant navigation, task status, and failure messages. */
 export interface AssistantLocale {
+  readonly taskUnavailable: string
+  readonly selectionRefreshError: string
+  readonly visibilityPending: string
+  readonly active: string
+  readonly waiting: string
+  readonly finished: string
+  readonly loadMore: string
+  readonly emptyHint: string
+  readonly selectionError: string
+  readonly visibilityError: string
+  readonly statusCancelling: string
+  readonly retryCancel: string
+  readonly failureCancel: string
   readonly panel: string
   readonly title: string
   readonly selector: string
@@ -35,6 +48,7 @@ export interface AssistantLocale {
   readonly failureInterrupted: string
   readonly failureTurnError: string
   readonly failureExecution: string
+  readonly failurePromptUnknown: string
   readonly failurePrompt: string
   readonly failureStore: string
   readonly failureQuota: string
@@ -45,6 +59,19 @@ export interface AssistantLocale {
 
 /** Chinese assistant messages. */
 export const zh: AssistantLocale = {
+  taskUnavailable: '任务不存在或当前无权查看',
+  selectionRefreshError: '未能刷新当前助理',
+  visibilityPending: '正在确认会话归属，普通会话列表会在确认后显示。',
+  active: '进行中',
+  waiting: '待处理',
+  finished: '已结束',
+  loadMore: '加载更早的任务',
+  emptyHint: '在对话中告诉助理你想完成什么。创建的任务会显示在这里。',
+  selectionError: '无法打开助理会话',
+  visibilityError: '暂时无法加载完整的会话列表。',
+  statusCancelling: '正在取消',
+  retryCancel: '重试取消',
+  failureCancel: '未能确认执行已停止',
   panel: '助理',
   title: '助理',
   selector: '选择助理',
@@ -72,9 +99,10 @@ export const zh: AssistantLocale = {
   statusFailed: '失败',
   statusCancelled: '已取消',
   failureNotStarted: '任务没有创建执行会话',
-  failureInterrupted: '任务因主机重启而中断',
+  failureInterrupted: '任务中断，结果尚未确认。请先查看执行会话。',
   failureTurnError: '任务执行出错',
   failureExecution: '任务执行环境不可用',
+  failurePromptUnknown: '无法确认指令是否送达，请先打开执行会话查看。',
   failurePrompt: '任务指令未能送达',
   failureStore: '任务记录写入失败',
   failureQuota: '已达到助理任务上限',
@@ -85,6 +113,19 @@ export const zh: AssistantLocale = {
 
 /** English assistant messages. */
 export const en: AssistantLocale = {
+  taskUnavailable: 'This task is unavailable',
+  selectionRefreshError: 'Could not refresh the selected assistant',
+  visibilityPending: 'Checking which sessions belong in the workspace list.',
+  active: 'Active',
+  waiting: 'Needs attention',
+  finished: 'Finished',
+  loadMore: 'Load earlier tasks',
+  emptyHint: 'Ask the assistant to create a task in the conversation. Its progress will appear here.',
+  selectionError: 'Could not open the assistant conversation',
+  visibilityError: 'Could not load the full session list.',
+  statusCancelling: 'Cancelling',
+  retryCancel: 'Retry cancellation',
+  failureCancel: 'Could not confirm that execution stopped',
   panel: 'Assistant',
   title: 'Assistant',
   selector: 'Choose an assistant',
@@ -112,9 +153,10 @@ export const en: AssistantLocale = {
   statusFailed: 'Failed',
   statusCancelled: 'Cancelled',
   failureNotStarted: 'The task never reached an execution Session',
-  failureInterrupted: 'The task was interrupted when the Host restarted',
+  failureInterrupted: 'The task was interrupted. Check the execution session before repeating it.',
   failureTurnError: 'The task execution failed',
   failureExecution: 'The task execution environment is unavailable',
+  failurePromptUnknown: 'Delivery is unconfirmed. Check the execution session before repeating the task.',
   failurePrompt: 'The task instruction could not be delivered',
   failureStore: 'The task record could not be stored',
   failureQuota: 'The assistant reached its task limit',
@@ -125,6 +167,19 @@ export const en: AssistantLocale = {
 
 /** Japanese assistant messages. */
 export const ja: AssistantLocale = {
+  taskUnavailable: 'このタスクは表示できません',
+  selectionRefreshError: '選択したアシスタントを更新できませんでした',
+  visibilityPending: 'ワークスペースに表示するセッションを確認しています。',
+  active: '進行中',
+  waiting: '対応待ち',
+  finished: '終了',
+  loadMore: '以前のタスクを読み込む',
+  emptyHint: '会話でアシスタントにタスクの作成を依頼すると、ここに進捗が表示されます。',
+  selectionError: 'アシスタントの会話を開けませんでした',
+  visibilityError: 'セッション一覧をすべて読み込めませんでした。',
+  statusCancelling: 'キャンセル中',
+  retryCancel: 'キャンセルを再試行',
+  failureCancel: '実行の停止を確認できませんでした',
   panel: 'アシスタント',
   title: 'アシスタント',
   selector: 'アシスタントを選択',
@@ -152,9 +207,10 @@ export const ja: AssistantLocale = {
   statusFailed: '失敗',
   statusCancelled: 'キャンセル済み',
   failureNotStarted: 'タスクの実行セッションが作成されませんでした',
-  failureInterrupted: 'ホストの再起動によりタスクが中断されました',
+  failureInterrupted: 'タスクが中断されました。再実行の前に実行セッションを確認してください。',
   failureTurnError: 'タスクの実行に失敗しました',
   failureExecution: 'タスクの実行環境を利用できません',
+  failurePromptUnknown: '指示が届いたか確認できません。再実行の前に実行セッションを確認してください。',
   failurePrompt: 'タスクの指示を配信できませんでした',
   failureStore: 'タスクの記録を保存できませんでした',
   failureQuota: 'アシスタントのタスク上限に達しました',
@@ -165,6 +221,19 @@ export const ja: AssistantLocale = {
 
 /** Spanish assistant messages. */
 export const es: AssistantLocale = {
+  taskUnavailable: 'Esta tarea no está disponible',
+  selectionRefreshError: 'No se pudo actualizar el asistente seleccionado',
+  visibilityPending: 'Comprobando las sesiones que deben aparecer en el espacio de trabajo.',
+  active: 'En curso',
+  waiting: 'Requieren atención',
+  finished: 'Finalizadas',
+  loadMore: 'Cargar tareas anteriores',
+  emptyHint: 'Pide al asistente que cree una tarea en la conversación. Aquí verás su progreso.',
+  selectionError: 'No se pudo abrir la conversación con el asistente',
+  visibilityError: 'No se pudo cargar la lista completa de sesiones.',
+  statusCancelling: 'Cancelando',
+  retryCancel: 'Reintentar cancelación',
+  failureCancel: 'No se pudo confirmar que la ejecución se detuviera',
   panel: 'Asistente',
   title: 'Asistente',
   selector: 'Elegir un asistente',
@@ -192,9 +261,10 @@ export const es: AssistantLocale = {
   statusFailed: 'Fallida',
   statusCancelled: 'Cancelada',
   failureNotStarted: 'La tarea nunca llegó a una sesión de ejecución',
-  failureInterrupted: 'La tarea se interrumpió al reiniciar el Host',
+  failureInterrupted: 'Se interrumpió la tarea. Revisa la sesión de ejecución antes de repetirla.',
   failureTurnError: 'La ejecución de la tarea falló',
   failureExecution: 'El entorno de ejecución de la tarea no está disponible',
+  failurePromptUnknown: 'No se ha confirmado la entrega. Revisa la sesión de ejecución antes de repetir la tarea.',
   failurePrompt: 'No se pudo entregar la instrucción de la tarea',
   failureStore: 'No se pudo guardar el registro de la tarea',
   failureQuota: 'El asistente alcanzó su límite de tareas',
@@ -205,6 +275,19 @@ export const es: AssistantLocale = {
 
 /** French assistant messages. */
 export const fr: AssistantLocale = {
+  taskUnavailable: 'Cette tâche est indisponible',
+  selectionRefreshError: 'Impossible d’actualiser l’assistant sélectionné',
+  visibilityPending: 'Vérification des sessions à afficher dans l’espace de travail.',
+  active: 'En cours',
+  waiting: 'À traiter',
+  finished: 'Terminées',
+  loadMore: 'Charger les tâches précédentes',
+  emptyHint: 'Demandez à l’assistant de créer une tâche dans la conversation. Sa progression apparaîtra ici.',
+  selectionError: 'Impossible d’ouvrir la conversation',
+  visibilityError: 'Impossible de charger la liste complète des sessions.',
+  statusCancelling: 'Annulation en cours',
+  retryCancel: 'Réessayer l’annulation',
+  failureCancel: 'Impossible de confirmer l’arrêt de l’exécution',
   panel: 'Assistant',
   title: 'Assistant',
   selector: 'Choisir un assistant',
@@ -232,9 +315,10 @@ export const fr: AssistantLocale = {
   statusFailed: 'Échouée',
   statusCancelled: 'Annulée',
   failureNotStarted: 'La tâche n’a jamais atteint de session d’exécution',
-  failureInterrupted: 'La tâche a été interrompue au redémarrage de l’hôte',
+  failureInterrupted: 'La tâche a été interrompue. Vérifiez la session avant de la relancer.',
   failureTurnError: 'L’exécution de la tâche a échoué',
   failureExecution: 'L’environnement d’exécution de la tâche est indisponible',
+  failurePromptUnknown: 'Livraison non confirmée. Vérifiez la session avant de relancer la tâche.',
   failurePrompt: 'L’instruction de la tâche n’a pas pu être livrée',
   failureStore: 'L’enregistrement de la tâche n’a pas pu être écrit',
   failureQuota: 'L’assistant a atteint sa limite de tâches',
@@ -245,6 +329,19 @@ export const fr: AssistantLocale = {
 
 /** German assistant messages. */
 export const de: AssistantLocale = {
+  taskUnavailable: 'Diese Aufgabe ist nicht verfügbar',
+  selectionRefreshError: 'Der ausgewählte Assistent konnte nicht aktualisiert werden',
+  visibilityPending: 'Die Sitzungsliste für den Arbeitsbereich wird geprüft.',
+  active: 'Aktiv',
+  waiting: 'Aktion erforderlich',
+  finished: 'Beendet',
+  loadMore: 'Frühere Aufgaben laden',
+  emptyHint: 'Bitte den Assistenten im Gespräch, eine Aufgabe zu erstellen. Hier siehst du ihren Fortschritt.',
+  selectionError: 'Das Gespräch konnte nicht geöffnet werden',
+  visibilityError: 'Die Sitzungsliste konnte nicht vollständig geladen werden.',
+  statusCancelling: 'Wird abgebrochen',
+  retryCancel: 'Abbruch erneut versuchen',
+  failureCancel: 'Das Ende der Ausführung konnte nicht bestätigt werden',
   panel: 'Assistent',
   title: 'Assistent',
   selector: 'Assistent auswählen',
@@ -272,9 +369,10 @@ export const de: AssistantLocale = {
   statusFailed: 'Fehlgeschlagen',
   statusCancelled: 'Abgebrochen',
   failureNotStarted: 'Die Aufgabe hat nie eine Ausführungssitzung erreicht',
-  failureInterrupted: 'Die Aufgabe wurde beim Neustart des Hosts unterbrochen',
+  failureInterrupted: 'Die Aufgabe wurde unterbrochen. Prüfe die Ausführungssitzung vor einem erneuten Versuch.',
   failureTurnError: 'Die Aufgabenausführung ist fehlgeschlagen',
   failureExecution: 'Die Ausführungsumgebung der Aufgabe ist nicht verfügbar',
+  failurePromptUnknown: 'Die Zustellung ist unbestätigt. Prüfe die Ausführungssitzung vor einem erneuten Versuch.',
   failurePrompt: 'Die Aufgabenanweisung konnte nicht zugestellt werden',
   failureStore: 'Der Aufgabendatensatz konnte nicht geschrieben werden',
   failureQuota: 'Der Assistent hat sein Aufgabenlimit erreicht',
@@ -285,6 +383,19 @@ export const de: AssistantLocale = {
 
 /** Russian assistant messages. */
 export const ru: AssistantLocale = {
+  taskUnavailable: 'Задача недоступна',
+  selectionRefreshError: 'Не удалось обновить выбранного ассистента',
+  visibilityPending: 'Проверяем, какие сессии показывать в рабочем пространстве.',
+  active: 'В работе',
+  waiting: 'Требуют внимания',
+  finished: 'Завершены',
+  loadMore: 'Загрузить предыдущие задачи',
+  emptyHint: 'Попросите ассистента создать задачу в разговоре. Здесь появится ход её выполнения.',
+  selectionError: 'Не удалось открыть разговор с ассистентом',
+  visibilityError: 'Не удалось загрузить полный список сессий.',
+  statusCancelling: 'Отмена',
+  retryCancel: 'Повторить отмену',
+  failureCancel: 'Не удалось подтвердить остановку выполнения',
   panel: 'Ассистент',
   title: 'Ассистент',
   selector: 'Выберите ассистента',
@@ -312,9 +423,10 @@ export const ru: AssistantLocale = {
   statusFailed: 'Ошибка',
   statusCancelled: 'Отменена',
   failureNotStarted: 'Задача так и не получила сессию выполнения',
-  failureInterrupted: 'Задача была прервана при перезапуске хоста',
+  failureInterrupted: 'Задача прервана. Проверьте сессию выполнения перед повтором.',
   failureTurnError: 'Выполнение задачи завершилось ошибкой',
   failureExecution: 'Среда выполнения задачи недоступна',
+  failurePromptUnknown: 'Доставка не подтверждена. Проверьте сессию выполнения перед повтором задачи.',
   failurePrompt: 'Инструкция задачи не была доставлена',
   failureStore: 'Не удалось сохранить запись задачи',
   failureQuota: 'Ассистент достиг лимита задач',
@@ -325,6 +437,19 @@ export const ru: AssistantLocale = {
 
 /** Portuguese assistant messages. */
 export const pt: AssistantLocale = {
+  taskUnavailable: 'Esta tarefa está indisponível',
+  selectionRefreshError: 'Não foi possível atualizar o assistente selecionado',
+  visibilityPending: 'Verificando quais sessões devem aparecer no espaço de trabalho.',
+  active: 'Em andamento',
+  waiting: 'Precisam de atenção',
+  finished: 'Encerradas',
+  loadMore: 'Carregar tarefas anteriores',
+  emptyHint: 'Peça ao assistente para criar uma tarefa na conversa. O progresso aparecerá aqui.',
+  selectionError: 'Não foi possível abrir a conversa com o assistente',
+  visibilityError: 'Não foi possível carregar a lista completa de sessões.',
+  statusCancelling: 'Cancelando',
+  retryCancel: 'Tentar cancelar novamente',
+  failureCancel: 'Não foi possível confirmar a interrupção da execução',
   panel: 'Assistente',
   title: 'Assistente',
   selector: 'Escolher um assistente',
@@ -352,9 +477,10 @@ export const pt: AssistantLocale = {
   statusFailed: 'Falhou',
   statusCancelled: 'Cancelada',
   failureNotStarted: 'A tarefa nunca chegou a uma sessão de execução',
-  failureInterrupted: 'A tarefa foi interrompida quando o Host reiniciou',
+  failureInterrupted: 'A tarefa foi interrompida. Verifique a sessão de execução antes de repeti-la.',
   failureTurnError: 'A execução da tarefa falhou',
   failureExecution: 'O ambiente de execução da tarefa não está disponível',
+  failurePromptUnknown: 'A entrega não foi confirmada. Verifique a sessão de execução antes de repetir a tarefa.',
   failurePrompt: 'A instrução da tarefa não pôde ser entregue',
   failureStore: 'O registro da tarefa não pôde ser gravado',
   failureQuota: 'O assistente atingiu o limite de tarefas',

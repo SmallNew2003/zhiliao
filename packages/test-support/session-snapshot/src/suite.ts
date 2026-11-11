@@ -41,6 +41,7 @@ import {
 import {
   type CwdPathMode,
   type NormalizeContext,
+  type NormalizeOptions,
   extractSnapshotSpillPaths,
   normalizeSessionLog,
   normalizeSessionSnapshots,
@@ -984,8 +985,9 @@ function preserveNormalizedVolatiles(
 function normalizedRefreshRecord(
   record: Record<string, unknown>,
   context: NormalizeContext,
+  identityMode: NonNullable<NormalizeOptions['identityMode']>,
 ): Record<string, unknown> {
-  return JSON.parse(normalizeSessionLog(`${JSON.stringify(record)}\n`, context)) as Record<string, unknown>
+  return JSON.parse(normalizeSessionLog(`${JSON.stringify(record)}\n`, context, { identityMode })) as Record<string, unknown>
 }
 
 /**
@@ -1074,6 +1076,7 @@ function normalizedStringMappings(
   existingRecords: Record<string, unknown>[],
   freshContext: NormalizeContext,
   existingContext: NormalizeContext,
+  identityMode: NonNullable<NormalizeOptions['identityMode']>,
 ): Map<string, string> | undefined {
   const excludedStrings = new Set<string>()
   for (const record of [...freshRecords, ...existingRecords]) {
@@ -1098,8 +1101,8 @@ function normalizedStringMappings(
       if (!collectNormalizedStringMappings(
         record,
         existingRecord,
-        normalizedRefreshRecord(freshRecords[recordIndex] as Record<string, unknown>, freshContext),
-        normalizedRefreshRecord(existingRecord, existingContext),
+        normalizedRefreshRecord(freshRecords[recordIndex] as Record<string, unknown>, freshContext, identityMode),
+        normalizedRefreshRecord(existingRecord, existingContext, identityMode),
         excludedStrings,
         forward,
         reverse,
@@ -1126,6 +1129,8 @@ function normalizedStringMappings(
  * @param existing The committed fixture JSONL being refreshed.
  * @param replacements Cross-log literal replacements from {@link refreshFixtureReplacements}.
  * @param freshContext The harvested run's ids, cwd, and every cwd alias.
+ * @param identityMode Identity comparison for string reuse. Legacy mode (default) treats UUIDs as volatile.
+ * Preserve mode keeps literal provider values.
  * @returns The stabilized JSONL content to write back.
  */
 export function stabilizeRefreshLog(
@@ -1133,6 +1138,7 @@ export function stabilizeRefreshLog(
   existing: string,
   replacements: FixtureReplacement[],
   freshContext: NormalizeContext,
+  identityMode: NonNullable<NormalizeOptions['identityMode']> = 'legacy',
 ): string {
   const freshRecords = parseJsonlRecords(fresh)
   const stable = applyFixtureReplacements(fresh, replacements)
@@ -1145,6 +1151,7 @@ export function stabilizeRefreshLog(
     existingRecords,
     freshContext,
     existingContext,
+    identityMode,
   )
   let existingIndex = 0
   let previousEventTime: unknown
@@ -1167,8 +1174,8 @@ export function stabilizeRefreshLog(
         record = preserveNormalizedVolatiles(
           record,
           existingRecord,
-          normalizedRefreshRecord(freshRecords[i] as Record<string, unknown>, freshContext),
-          normalizedRefreshRecord(existingRecord, existingContext),
+          normalizedRefreshRecord(freshRecords[i] as Record<string, unknown>, freshContext, identityMode),
+          normalizedRefreshRecord(existingRecord, existingContext, identityMode),
           stringMappings,
         ) as Record<string, unknown>
         records[i] = record

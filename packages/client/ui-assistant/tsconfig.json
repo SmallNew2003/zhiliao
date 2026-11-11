@@ -61,6 +61,15 @@
     },
     {
       "path": "../../api/remote-access/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/ui-primitives"
+    },
+    {
+      "path": "../resources"
+    },
+    {
+      "path": "../../typert/protocol"
     }
   ]
 }

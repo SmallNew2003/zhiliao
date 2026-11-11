@@ -81,6 +81,7 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'assistantTasks/assistants': 'owner-only',
   'assistantTasks/cancelTask': 'owner-only',
   'assistantTasks/ensureAssistant': 'owner-only',
+  'assistantTasks/task': 'owner-only',
   'assistantTasks/tasks': 'owner-only',
   'assistantTasks/visibility': 'owner-only',
   'memoryController/list': 'owner-only',

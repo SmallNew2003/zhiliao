@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { AssistantTaskError, type AssistantTaskErrorCode } from '@deepseek-ai/dsh-assistant-task'
+import { AssistantTaskError, type AssistantTaskErrorCode, type AssistantTaskId, type AssistantTaskView } from '@deepseek-ai/dsh-assistant-task'
 import type {} from '@deepseek-ai/dsh-assistant-task'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -38,6 +38,7 @@ const ERROR_CODES = [
   'worker_preset_unavailable',
   'session_create_failed',
   'prompt_rejected',
+  'prompt_outcome_unknown',
   'task_store_failed',
   'task_not_found',
   'assistant_session_unavailable',
@@ -69,16 +70,35 @@ const OUTPUT_SCHEMA = {
 
 const DESCRIPTION =
   'Create one independent task for the user. The task runs in its own Session and can outlive this conversation. '
-  + 'This conversation keeps only the task card and its status; do not claim the task finished until its status says so. '
+  + 'The assistant receives a task result notice when the worker turn ends. Use list_tasks or get_task for the current status. '
   + 'Use it when the user asks you to do or track work beyond this turn. '
   + 'A project assistant creates the task in its own project; the global assistant may name a registered project by id. '
-  + 'If a creation call fails after the task record exists, retry with the same requestId to reuse the task and its Session. '
+  + 'Reuse the same requestId for a rejected creation. If admission is unknown, inspect the task before repeating the work. '
   + 'Do not use this tool for reminders or recurring schedules.'
 
 const AUTHORIZATION =
   'Create assistant tasks only at the user\'s explicit request. A task is an independent Session that runs with the '
   + 'normal tool approval and permission policy; this conversation does not own its history. '
   + 'Do not create a task merely because a plan mentions future work.'
+
+const TASK_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    id: { type: 'string', required: true }, title: { type: 'string', required: true },
+    sessionId: { type: 'string', required: true }, status: { type: 'string', required: true },
+    workspaceId: { type: 'string' }, resultSummary: { type: 'string' }, failureCode: { type: 'string' },
+  },
+} as const
+
+/** Project bounded worker results and execution identity into both read tools. */
+function modelTask(task: AssistantTaskView) {
+  return {
+    id: task.id, title: task.title, sessionId: task.sessionId, status: task.status,
+    ...task.workspaceId === undefined ? {} : { workspaceId: task.workspaceId },
+    ...task.resultSummary === undefined ? {} : { resultSummary: task.resultSummary },
+    ...task.failure === undefined ? {} : { failureCode: task.failure.code },
+  }
+}
 
 /** Render the complete tool value as canonical JSON. */
 function renderValue(_args: unknown, value: unknown) {
@@ -108,6 +128,34 @@ function registerAssistantTool(ctx: Context): void {
         : `${AUTHORIZATION}\n\nRegistered projects:\n${projects}`
     },
   })
+
+  const admission = { when: ({ agent }: { agent: Agent }) => ctx.assistantTasks.isAssistant(agent.session.id) }
+  ctx.tools.register(defineTool({
+    name: 'list_tasks',
+    description: 'List this assistant’s own tasks newest first. Use offset to continue through older tasks.',
+    parameters: {
+      limit: { type: 'integer', description: 'Maximum rows; omit to use the Host page size.' },
+      offset: { type: 'integer', description: 'Number of rows to skip, starting at zero.' },
+    },
+    output: { schema: { type: 'array', items: TASK_SCHEMA }, render: renderValue },
+    execute(args, exec) {
+      if (exec.agent === undefined) throw new Error('A registered assistant is required.')
+      return Promise.resolve(ctx.assistantTasks.listForAssistant(exec.agent.session.id, args).map(modelTask))
+    },
+    presentCall: () => present('List assistant tasks'),
+  }), admission)
+  ctx.tools.register(defineTool({
+    name: 'get_task',
+    description: 'Read a task owned by this assistant, including its current status and bounded final worker text. A completed turn does not independently verify external effects.',
+    parameters: { id: { type: 'string', required: true, description: 'Task id returned by create_task or list_tasks.' } },
+    output: { schema: TASK_SCHEMA, render: renderValue },
+    execute(args, exec) {
+      if (exec.agent === undefined) throw new Error('A registered assistant is required.')
+      const task = ctx.assistantTasks.taskForAssistant(exec.agent.session.id, brandString<AssistantTaskId>(args.id))
+      return Promise.resolve(modelTask(task))
+    },
+    presentCall: args => present('Read assistant task', args.id),
+  }), admission)
 
   ctx.tools.register(defineTool({
     name: 'create_task',
@@ -162,7 +210,7 @@ function registerAssistantTool(ctx: Context): void {
       }
     },
     presentCall: args => present('Create assistant task', args.title),
-  }), { when: ({ agent }) => ctx.assistantTasks.isAssistant(agent.session.id) })
+  }), admission)
 }
 
 /**

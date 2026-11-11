@@ -33,6 +33,7 @@ export type AssistantTaskStatus =
   | 'running'
   | 'waiting-approval'
   | 'waiting-answer'
+  | 'cancelling'
   | 'done'
   | 'failed'
   | 'cancelled'
@@ -57,6 +58,8 @@ export interface AssistantTaskView {
   readonly sessionAvailable: boolean
   readonly createdAt: string
   readonly updatedAt: string
+  /** Bounded final worker text, or its failure explanation. */
+  readonly resultSummary?: string
   readonly failure?: AssistantTaskFailure
 }
 
@@ -83,6 +86,11 @@ export interface AssistantTasksListRequest {
   readonly limit?: number
   /** Number of newest-first rows to skip. */
   readonly offset?: number
+}
+
+/** Task identity for an authorized detail read. */
+export interface AssistantTaskRequest {
+  readonly id: AssistantTaskId
 }
 
 /** Request to cancel one assistant task. */
@@ -157,6 +165,7 @@ export type AssistantTaskErrorCode =
   | 'worker_preset_unavailable'
   | 'session_create_failed'
   | 'prompt_rejected'
+  | 'prompt_outcome_unknown'
   | 'task_store_failed'
   | 'task_not_found'
   | 'assistant_session_unavailable'
@@ -181,6 +190,19 @@ export class AssistantTaskError extends Error {
   ) {
     super(message)
     this.name = 'AssistantTaskError'
+  }
+}
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** The execution Session produced a terminal result for its creating assistant. */
+    'assistant-task': {
+      kind: 'assistant-task'
+      form: 'notice'
+      summary: string
+      taskId: AssistantTaskId
+      sessionId: SessionId
+    }
   }
 }
 

@@ -1,5 +1,12 @@
 /** Host-wide assistant records and assistant tasks with scoped execution Sessions. */
 import { randomUUID } from 'node:crypto'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
+import type {} from '@deepseek-ai/dsh-subagent'
+import { readColdSessionLog } from '@deepseek-ai/dsh-session-query'
+import { SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { MAX_RESULT_CHARS, WORKER_SESSION_PREFIX, publicFailure, turnOutcome, workerOutcome, type WorkerOutcome } from './outcome.ts'
+import { noticeReceipts, resultNotice } from './notices.ts'
 import z from '@deepseek-ai/schemastery'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -32,6 +39,7 @@ import {
   type AssistantTaskFailure,
   type AssistantTaskId,
   type AssistantTaskStatus,
+  type AssistantTaskRequest,
   type AssistantTasksCancelRequest,
   type AssistantTasksListRequest,
   type AssistantTaskView,
@@ -64,6 +72,8 @@ export interface Config {
   maxPromptBytes?: number
   /** Maximum characters of one task title; omission defaults to 120. */
   maxTitleChars?: number
+  /** Maximum UTF-16 units retained from a task result; omission defaults to 2,048. */
+  maxResultChars?: number
   /** Default task-list page size; omission defaults to 50. */
   listPageSize?: number
 }
@@ -74,6 +84,7 @@ const DEFAULT_MAX_TASKS_PER_TURN = 3
 const DEFAULT_MAX_ACTIVE_TASKS = 5
 const DEFAULT_MAX_PROMPT_BYTES = 65_536
 const DEFAULT_MAX_TITLE_CHARS = 120
+const DEFAULT_MAX_RESULT_CHARS = 2_048
 const DEFAULT_LIST_PAGE_SIZE = 50
 
 /** Stable refusal when task creation has no Session controller to create with. */
@@ -91,7 +102,7 @@ type SessionToolCallId = Extract<SessionEvent, { readonly type: 'tool/call' }>['
  * and separation identity; it never writes task markers into Session headers.
  */
 export class AssistantTaskService extends TypertRemoteService {
-  static inject = ['storageDomain', 'sessions', 'agents', 'remoteAccess']
+  static inject = ['storageDomain', 'sessions', 'agents', 'remoteAccess', 'sessionProjections']
 
   static Config: z<Config> = z.object({
     assistantPreset: z.string().default(DEFAULT_ASSISTANT_PRESET),
@@ -100,15 +111,20 @@ export class AssistantTaskService extends TypertRemoteService {
     maxActiveTasks: z.number().step(1).min(1).max(1_000).default(DEFAULT_MAX_ACTIVE_TASKS),
     maxPromptBytes: z.number().step(1).min(1).max(16 * 1024 * 1024).default(DEFAULT_MAX_PROMPT_BYTES),
     maxTitleChars: z.number().step(1).min(1).max(1_000).default(DEFAULT_MAX_TITLE_CHARS),
+    maxResultChars: z.number().step(1).min(1).max(MAX_RESULT_CHARS).default(DEFAULT_MAX_RESULT_CHARS),
     listPageSize: z.number().step(1).min(1).max(500).default(DEFAULT_LIST_PAGE_SIZE),
   })
 
   private readonly config: Config
-  private readonly ready: Promise<Domain<typeof assistantDomain>>
   private readonly initialized: PromiseLike<unknown>
   private chain: Promise<unknown> = Promise.resolve()
   private domain: Domain<typeof assistantDomain> | undefined
-  private stopping = false
+  private phase: 'recovering' | 'ready' | 'stopping' = 'recovering'
+  private outcomes!: ProjectionHandle<WorkerOutcome>
+  private readonly starts = new Map<AssistantTaskId, { stop: AbortController; done: Promise<AssistantTaskCreateValue> }>()
+  private receipts!: ProjectionHandle<string[]>
+  private readonly cancellations = new Map<AssistantTaskId, Promise<AssistantTaskView>>()
+  private readonly deliveries = new Map<string, Promise<void>>()
   private readonly executionTasks = new Map<SessionId, AssistantTaskId>()
   private readonly assistantSessions = new Map<SessionId, AssistantId>()
   private readonly missingSessions = new Set<SessionId>()
@@ -124,46 +140,92 @@ export class AssistantTaskService extends TypertRemoteService {
   constructor(ctx: Context, config: Config) {
     super(ctx, 'assistantTasks')
     this.config = config
-    this.ready = ctx.storageDomain.open(assistantDomain)
-    this.initialized = ctx.effect(async () => {
-      const domain = await this.ready
-      this.domain = domain
-      for (const [id, record] of domain.table('assistants').entries()) {
-        this.indexAssistant(id, record)
-      }
-      for (const [id, record] of domain.table('tasks').entries()) {
-        this.executionTasks.set(record.sessionId, id)
-      }
-      const offSession = ctx.on('session/event', (session, event) => {
-        this.observeSessionEvent(session, event)
-      }, { global: true })
-      const offAgent = ctx.on('agent/status', ({ agent, status }) => {
-        if (status !== 'running') return
-        const taskId = this.executionTasks.get(agent.id)
-        if (taskId === undefined) return
-        const current = domain.table('tasks').get(taskId)
-        if (current === undefined || isTerminalTaskStatus(current.status)) return
-        if ((this.pendingApprovals.get(agent.id) ?? 0) > 0) return
-        if (this.questionPending(agent.id)) return
-        this.queueStatus(taskId, 'running')
-      })
-      await this.reconcile()
-      return async () => {
-        this.stopping = true
-        offSession()
-        offAgent()
-        await this.chain
-        await domain.close()
-      }
-    })
-  }
-
-  async [Service.init](): Promise<void> {
-    const assistantPreset = this.config.assistantPreset ?? DEFAULT_ASSISTANT_PRESET
-    const workerPreset = this.config.workerPreset ?? DEFAULT_WORKER_PRESET
+    const assistantPreset = config.assistantPreset ?? DEFAULT_ASSISTANT_PRESET
+    const workerPreset = config.workerPreset ?? DEFAULT_WORKER_PRESET
     if (workerPreset === assistantPreset) {
       throw new Error('assistant task config: workerPreset must differ from assistantPreset')
     }
+    const admission = ctx.on('agent/pre-step', async ({ agent }, next) => {
+      const id = this.executionTasks.get(agent.id)
+      if (id !== undefined && (this.cancellations.has(id) || this.domain?.table('tasks').get(id)?.status === 'cancelling')) {
+        return { kind: 'reject' }
+      }
+      return await next()
+    }, { global: true })
+    const initialized = ctx.effect(async function* (this: AssistantTaskService) {
+      try {
+        const domain = await ctx.storageDomain.open(assistantDomain)
+        yield () => domain.close()
+        yield await this.activateDomain(ctx, domain)
+      } catch (error: unknown) {
+        admission()
+        throw error
+      }
+    }.bind(this), 'assistantTasks.openDomain()')
+    this.initialized = initialized
+    ctx.effect(function* () {
+      yield admission
+      yield initialized
+    }, 'assistantTasks.drainBeforeRemovingAdmission()')
+  }
+
+  private async activateDomain(ctx: Context, domain: Domain<typeof assistantDomain>): Promise<() => Promise<void>> {
+    this.receipts = await ctx.sessionProjections.register(noticeReceipts)
+    this.outcomes = await ctx.sessionProjections.register(workerOutcome)
+    this.domain = domain
+    for (const [id, record] of domain.table('assistants').entries()) {
+      this.indexAssistant(id, record)
+    }
+    for (const [id, record] of domain.table('tasks').entries()) {
+      this.executionTasks.set(record.sessionId, id)
+    }
+    const offSession = ctx.on('session/event', (session, event) => {
+      this.observeSessionEvent(session, event)
+    }, { global: true })
+    const offAgent = ctx.on('agent/status', ({ agent, status }) => {
+      if (status !== 'running') return
+      const taskId = this.executionTasks.get(agent.id)
+      if (taskId === undefined) return
+      const current = domain.table('tasks').get(taskId)
+      if (current === undefined || isTerminalTaskStatus(current.status)) return
+      if ((this.pendingApprovals.get(agent.id) ?? 0) > 0) return
+      if (this.questionPending(agent.id)) return
+      this.queueStatus(taskId, 'running')
+    })
+    const stop = async () => {
+      this.phase = 'stopping'
+      offSession()
+      offAgent()
+      await this.chain
+      for (const start of this.starts.values()) start.stop.abort()
+      await Promise.allSettled([...this.starts.values()].map(start => start.done))
+      await Promise.allSettled([...this.deliveries.values(), ...this.cancellations.values()])
+      await this.chain
+      await this.outcomes.dispose()
+      await this.receipts.dispose()
+    }
+    try {
+      await this.serialize(() => this.reconcile())
+      this.phase = 'ready'
+      ctx.inject(['sessionController'], () => {
+        for (const [id, task] of domain.table('tasks').entries()) {
+          if (task.status === 'cancelling') {
+            void this.cancelTask({ id }).catch((error: unknown) => {
+              ctx.logger.warn(`assistant task cancellation ${id}: ${String(error)}`)
+            })
+          } else {
+            this.scheduleNotices(task)
+          }
+        }
+      })
+      return stop
+    } catch (error) {
+      await stop()
+      throw error
+    }
+  }
+
+  async [Service.init](): Promise<void> {
     await this.initialized
   }
 
@@ -227,27 +289,106 @@ export class AssistantTaskService extends TypertRemoteService {
   }
 
   /**
-   * Cancel one assistant task.
+   * Read one task after authorizing the execution Session and target Workspace.
    * @param request - Task identity.
-   * @returns The updated task view, or the unchanged terminal task.
+   * @returns Current task details.
+   */
+  @Remote('task')
+  task(request: AssistantTaskRequest): AssistantTaskView {
+    const record = this.requireTasks().get(request.id)
+    if (record === undefined) this.rethrowRemote(new AssistantTaskError('task_not_found', 'Assistant task not found.'))
+    this.assertEntityVisible(record.sessionId, record.workspaceId)
+    return this.taskViewOf(record)
+  }
+
+  /**
+   * List the calling assistant's own tasks.
+   * @param caller - Calling conversation.
+   * @param page - Task-list page bounds.
+   * @returns Current task details in newest-first order.
+   */
+  listForAssistant(caller: SessionId, page: Pick<AssistantTasksListRequest, 'limit' | 'offset'>): AssistantTaskView[] {
+    return this.listTasks({ ...page, assistantId: this.requireCaller(caller) })
+  }
+
+  /**
+   * Read a task belonging to the calling assistant.
+   * @param caller - Calling conversation.
+   * @param id - Task identity supplied by the model.
+   * @returns Current task details.
+   */
+  taskForAssistant(caller: SessionId, id: AssistantTaskId): AssistantTaskView {
+    const assistantId = this.requireCaller(caller)
+    const task = this.requireTasks().get(id)
+    if (task === undefined || task.assistantId !== assistantId || !this.entityVisible(task.sessionId, task.workspaceId)) {
+      throw new AssistantTaskError('task_not_found', 'Assistant task not found.')
+    }
+    return this.taskViewOf(task)
+  }
+
+  private requireCaller(caller: SessionId): AssistantId {
+    const id = this.assistantIdForSession(caller)
+    if (id === undefined) throw new AssistantTaskError('not_an_assistant', 'Only a registered assistant can read its tasks.')
+    return id
+  }
+
+  /**
+   * Stop admission and join the execution Agent and its descendants.
+   * @param request - Task identity.
+   * @returns The task after quiescence, or its unchanged terminal state.
    */
   @Remote('cancelTask')
   async cancelTask(request: AssistantTasksCancelRequest): Promise<AssistantTaskView> {
     try {
-      return await this.serialize(async () => {
-        const tasks = this.requireTasks()
-        const record = tasks.get(request.id)
-        if (record === undefined) throw new AssistantTaskError('task_not_found', `assistant task "${request.id}" not found`)
-        this.assertEntityVisible(record.sessionId, record.workspaceId)
-        if (isTerminalTaskStatus(record.status)) return this.taskViewOf(record)
-        const agent = this.ctx.agents.get(record.sessionId)
-        agent?.cancel({ kind: 'user' })
-        await this.writeStatus(request.id, 'cancelled')
-        return this.taskViewOf(tasks.get(request.id) ?? record)
-      })
+      const task = this.task(request)
+      if (isTerminalTaskStatus(task.status)) return task
+      const existing = this.cancellations.get(task.id)
+      if (existing !== undefined) return await existing
+      if (this.phase === 'stopping') throw new RemoteError('gateway/internal', 'The assistant task service is stopping.', {})
+      const drain = this.cancelAndJoin(task).finally(() => this.cancellations.delete(task.id))
+      this.cancellations.set(task.id, drain)
+      return await drain
     } catch (error: unknown) {
       this.rethrowRemote(error)
     }
+  }
+
+  private async cancelAndJoin(task: AssistantTaskView): Promise<AssistantTaskView> {
+    const start = this.starts.get(task.id)
+    start?.stop.abort()
+    await this.serialize(() => this.writeStatus(task.id, 'cancelling'))
+    const current = this.requireRecord(task.id)
+    if (isTerminalTaskStatus(current.status)) return this.taskViewOf(current)
+    try {
+      if (start !== undefined) await Promise.allSettled([start.done])
+      const sessionId = this.requireRecord(task.id).sessionId
+      let agent = this.ctx.agents.get(sessionId)
+      if (agent === undefined && await this.sessionExists(sessionId)) {
+        const resolved = await this.requireSessionController().resolveAgent(sessionId)
+        if ('error' in resolved) throw resolved.error
+        agent = resolved.agent
+      }
+      if (agent !== undefined) await this.drainAgent(agent)
+      await this.serialize(() => this.writeStatus(task.id, 'cancelled', undefined, true))
+      return this.taskViewOf(this.requireRecord(task.id))
+    } catch (error: unknown) {
+      const failure = publicFailure('cancel_failed')
+      this.ctx.logger.warn(`assistant task cancellation ${task.id}: ${String(error)}`)
+      await this.serialize(() => this.writeStatus(task.id, 'cancelling', failure))
+      throw new RemoteError('gateway/internal', failure.message, {})
+    }
+  }
+
+  private async drainAgent(agent: Agent): Promise<void> {
+    const descendants = this.ctx.get('subagents')?.drainDescendants([agent])
+    const root = async () => {
+      agent.cancel({ kind: 'user' })
+      await agent.whenIdle()
+    }
+    const outcomes = await Promise.allSettled([descendants, root()])
+    // Descendant teardown can enqueue one last follow-up after an earlier root idle.
+    if (descendants !== undefined) await root()
+    for (const result of outcomes) if (result.status === 'rejected') throw result.reason
   }
 
   /**
@@ -293,7 +434,9 @@ export class AssistantTaskService extends TypertRemoteService {
    * @returns The task and its reserved execution Session.
    */
   async createTask(request: AssistantTaskCreateRequest): Promise<AssistantTaskCreateValue> {
-    return await this.serialize(() => this.createTaskLocked(request))
+    if (this.phase === 'stopping') throw new AssistantTaskError('assistant_session_unavailable', 'The assistant task service is stopping.')
+    const start = await this.serialize(() => this.createTaskLocked(request))
+    return await start.done
   }
 
   /**
@@ -405,7 +548,7 @@ export class AssistantTaskService extends TypertRemoteService {
     return record
   }
 
-  private async createTaskLocked(request: AssistantTaskCreateRequest): Promise<AssistantTaskCreateValue> {
+  private async createTaskLocked(request: AssistantTaskCreateRequest): Promise<{ done: Promise<AssistantTaskCreateValue> }> {
     const callerId = this.assistantIdForSession(request.callerSessionId)
     if (callerId === undefined) {
       throw new AssistantTaskError('not_an_assistant', 'create_task is only available to a registered assistant Session')
@@ -427,13 +570,16 @@ export class AssistantTaskService extends TypertRemoteService {
     if (request.requestId !== undefined) {
       const existing = [...tasks.entries()]
         .map(([, record]) => record)
-        .find(record => record.assistantId === callerId && record.requestId === request.requestId)
+        .find(record => record.assistantId === callerId
+          && (record.creatorSessionId === undefined || record.creatorSessionId === request.callerSessionId)
+          && record.requestId === request.requestId)
       if (existing !== undefined) return await this.retryExisting(existing, request)
     } else {
       const turn = this.currentTurns.get(request.callerSessionId) ?? 0
       const retry = [...tasks.entries()]
         .map(([, record]) => record)
         .find(record => record.assistantId === callerId
+          && (record.creatorSessionId === undefined || record.creatorSessionId === request.callerSessionId)
           && record.creatorTurn === turn
           && record.workspaceId === targetWorkspaceId
           && record.prompt === prompt
@@ -460,7 +606,7 @@ export class AssistantTaskService extends TypertRemoteService {
     }
     const title = this.titleOf(request.title, prompt)
     const taskId = brandString<AssistantTaskId>(`assistant-task-${randomUUID()}`)
-    const reservedSessionId = brandString<SessionId>(`session-assistant-task-${randomUUID()}`)
+    const reservedSessionId = brandString<SessionId>(`${WORKER_SESSION_PREFIX}${randomUUID()}`)
     const now = new Date().toISOString()
     const record: AssistantTaskRecord = {
       id: taskId,
@@ -471,6 +617,8 @@ export class AssistantTaskService extends TypertRemoteService {
       prompt,
       sessionId: reservedSessionId,
       status: 'created',
+      creatorSessionId: request.callerSessionId,
+      promptAttempted: false,
       creatorTurn: turn,
       ...(request.requestId === undefined ? {} : { requestId: request.requestId }),
       createdAt: now,
@@ -479,113 +627,89 @@ export class AssistantTaskService extends TypertRemoteService {
     try {
       await tasks.put(taskId, record)
     } catch (error: unknown) {
-      throw new AssistantTaskError('task_store_failed', `the task record could not be written: ${String(error)}`, { taskId })
+      this.ctx.logger.warn(`assistant task storage ${taskId}: ${String(error)}`)
+      throw new AssistantTaskError('task_store_failed', 'The task record could not be saved.', { taskId })
     }
     this.executionTasks.set(reservedSessionId, taskId)
-    const controller = this.requireSessionController()
-    let sessionId = reservedSessionId
-    let sessionReady = false
-    try {
-      if (!await this.sessionExists(sessionId)) {
-        const created = await controller.create({
-          sessionId,
-          cwd,
-          agentPreset: this.config.workerPreset ?? DEFAULT_WORKER_PRESET,
-        })
-        if (created.sessionId !== sessionId) {
-          this.executionTasks.delete(sessionId)
-          sessionId = created.sessionId
-          this.executionTasks.set(sessionId, taskId)
-          await this.putTask(taskId, { ...record, sessionId, updatedAt: new Date().toISOString() })
-        }
-      }
-      sessionReady = true
-      request.signal?.throwIfAborted()
-      await controller.prompt({
-        requestId: brandString<SessionRequestId>(`assistant-task-${taskId}`),
-        sessionId,
-        mode: 'queue',
-        content: [{ type: 'text', text: prompt }],
-      }, request.signal ?? new AbortController().signal)
-    } catch (error: unknown) {
-      const failure = this.failureOf(error)
-      if (!sessionReady && !await this.sessionExists(sessionId)) this.missingSessions.add(sessionId)
-      await this.failTask(taskId, failure)
-      throw new AssistantTaskError(this.createErrorCode(failure.code), failure.message, { taskId, sessionId })
-    }
-    const delivered: AssistantTaskRecord = {
-      ...record,
-      sessionId,
-      status: 'running',
-      promptDelivered: true,
-      updatedAt: new Date().toISOString(),
-    }
-    await this.putTask(taskId, delivered)
-    this.missingSessions.delete(sessionId)
-    this.ctx.emit('assistant-task/changed', taskId)
-    return { taskId, sessionId }
+    return this.startWorker(record, request)
   }
 
-  /**
-   * Retry one partial creation without duplicating its task or Session.
-   * @param record - Existing task found by the caller's idempotency key.
-   * @param request - Retry carrying the same key and the caller's cancellation.
-   * @returns The existing task identity, or the retried running task.
-   */
   private async retryExisting(
-    record: AssistantTaskRecord,
-    request: AssistantTaskCreateRequest,
-  ): Promise<AssistantTaskCreateValue> {
-    const retryable = (record.status === 'failed' || record.status === 'created') && record.promptDelivered !== true
-    if (!retryable) return { taskId: record.id, sessionId: record.sessionId }
+    record: AssistantTaskRecord, request: AssistantTaskCreateRequest,
+  ): Promise<{ done: Promise<AssistantTaskCreateValue> }> {
+    const existing = this.starts.get(record.id)
+    if (existing !== undefined) return existing
+    const retryable = record.status === 'failed' && record.promptDelivered !== true
+      && (record.failure?.code === 'not_started' || record.failure?.code === 'worker_preset_unavailable'
+        || record.failure?.code === 'session_create_failed' && record.promptAttempted === false && !await this.sessionExists(record.sessionId))
+    if (!retryable) return { done: Promise.resolve({ taskId: record.id, sessionId: record.sessionId }) }
+    const attempt = { ...record, status: 'created' as const, failure: undefined, resultSummary: undefined }
+    await this.putTask(record.id, attempt)
+    return this.startWorker(attempt, request)
+  }
+
+  private startWorker(record: AssistantTaskRecord, request: AssistantTaskCreateRequest) {
+    const stop = new AbortController()
+    const signal = request.signal === undefined ? stop.signal : AbortSignal.any([stop.signal, request.signal])
+    const done = this.deliverFirstPrompt(record, signal).finally(() => this.starts.delete(record.id))
+    const start = { stop, done }
+    this.starts.set(record.id, start)
+    return start
+  }
+
+  private async deliverFirstPrompt(record: AssistantTaskRecord, signal: AbortSignal): Promise<AssistantTaskCreateValue> {
     const controller = this.requireSessionController()
     let sessionId = record.sessionId
-    let sessionReady = false
+    let attempted = false
     try {
       if (!await this.sessionExists(sessionId)) {
         const created = await controller.create({
-          sessionId,
-          cwd: record.cwd,
-          agentPreset: this.config.workerPreset ?? DEFAULT_WORKER_PRESET,
+          sessionId, cwd: record.cwd, agentPreset: this.config.workerPreset ?? DEFAULT_WORKER_PRESET,
         })
         if (created.sessionId !== sessionId) {
           this.executionTasks.delete(sessionId)
           sessionId = created.sessionId
           this.executionTasks.set(sessionId, record.id)
-          await this.putTask(record.id, { ...record, sessionId, updatedAt: new Date().toISOString() })
+          await this.serialize(() => this.putTask(record.id, {
+            ...this.requireRecord(record.id), sessionId, updatedAt: new Date().toISOString(),
+          }))
         }
       }
-      sessionReady = true
-      request.signal?.throwIfAborted()
+      signal.throwIfAborted()
+      await this.serialize(() => this.putTask(record.id, {
+        ...this.requireRecord(record.id), sessionId, promptAttempted: true, updatedAt: new Date().toISOString(),
+      }))
+      signal.throwIfAborted()
+      attempted = true
       await controller.prompt({
         requestId: brandString<SessionRequestId>(`assistant-task-${record.id}`),
-        sessionId,
-        mode: 'queue',
-        content: [{ type: 'text', text: record.prompt }],
-      }, request.signal ?? new AbortController().signal)
+        sessionId, mode: 'queue', content: [{ type: 'text', text: record.prompt }],
+      }, signal)
     } catch (error: unknown) {
-      const failure = this.failureOf(error)
-      if (!sessionReady && !await this.sessionExists(sessionId)) this.missingSessions.add(sessionId)
-      await this.failTask(record.id, failure)
+      let failure = this.failureOf(error)
+      if (attempted && failure.code !== 'prompt_rejected') {
+        failure = publicFailure('prompt_outcome_unknown')
+      }
+      if (!attempted && !await this.sessionExists(sessionId)) this.missingSessions.add(sessionId)
+      await this.serialize(() => this.failTask(record.id, failure))
       throw new AssistantTaskError(this.createErrorCode(failure.code), failure.message, { taskId: record.id, sessionId })
     }
-    const delivered: AssistantTaskRecord = {
-      ...record,
-      sessionId,
-      status: 'running',
-      promptDelivered: true,
-      failure: undefined,
-      updatedAt: new Date().toISOString(),
-    }
-    await this.putTask(record.id, delivered)
+    await this.serialize(async () => {
+      const current = this.requireRecord(record.id)
+      await this.putTask(record.id, {
+        ...current, sessionId, status: current.status === 'created' ? 'running' : current.status,
+        promptAttempted: true, promptDelivered: true, updatedAt: new Date().toISOString(),
+      })
+    })
     this.missingSessions.delete(sessionId)
     this.ctx.emit('assistant-task/changed', record.id)
     return { taskId: record.id, sessionId }
   }
 
-  private createErrorCode(code: string): 'worker_preset_unavailable' | 'prompt_rejected' | 'session_create_failed' {
+  private createErrorCode(code: string): 'prompt_outcome_unknown' | 'worker_preset_unavailable' | 'prompt_rejected' | 'session_create_failed' {
     switch (code) {
       case 'worker_preset_unavailable': return 'worker_preset_unavailable'
+      case 'prompt_outcome_unknown': return 'prompt_outcome_unknown'
       case 'prompt_rejected': return 'prompt_rejected'
       default: return 'session_create_failed'
     }
@@ -635,26 +759,26 @@ export class AssistantTaskService extends TypertRemoteService {
   }
 
   private failureOf(error: unknown): AssistantTaskFailure {
-    if (error instanceof AssistantTaskError) return { code: error.code, message: error.message }
+    if (error instanceof AssistantTaskError) return publicFailure(error.code)
     if (error instanceof RemoteError) {
       if (error.code === 'agent-preset/not-found' || error.code === 'agent-preset/invalid') {
-        return { code: 'worker_preset_unavailable', message: error.message }
+        return publicFailure('worker_preset_unavailable')
       }
       if (error.code === 'workspace/not-found') {
-        return { code: 'workspace_not_registered', message: error.message }
+        return publicFailure('workspace_not_registered')
       }
-      if (error.code === 'session/agent-busy' || error.code === 'session/not-found') {
-        return { code: 'prompt_rejected', message: error.message }
+      if (error.code === 'session/not-found' || error.code === 'session/attachment-invalid' || error.code === 'gateway/bad-request') {
+        return publicFailure('prompt_rejected')
       }
     }
-    return { code: 'session_create_failed', message: error instanceof Error ? error.message : String(error) }
+    return publicFailure('session_create_failed')
   }
 
   private mapAssistantCreateError(error: unknown): AssistantTaskError {
     if (error instanceof RemoteError && (error.code === 'agent-preset/not-found' || error.code === 'agent-preset/invalid')) {
-      return new AssistantTaskError('worker_preset_unavailable', error.message)
+      return new AssistantTaskError('worker_preset_unavailable', publicFailure('worker_preset_unavailable').message)
     }
-    return new AssistantTaskError('assistant_session_unavailable', error instanceof Error ? error.message : String(error))
+    return new AssistantTaskError('assistant_session_unavailable', 'The assistant Session could not be created.')
   }
 
   private observeSessionEvent(session: Session, event: SessionEvent): void {
@@ -702,12 +826,18 @@ export class AssistantTaskService extends TypertRemoteService {
         if (current?.status === 'cancelled') return
         this.pendingQuestionCalls.delete(session.id)
         this.pendingApprovals.delete(session.id)
-        const reason = event.data.reason
-        if (reason.kind === 'completed') this.queueStatus(taskId, 'done')
-        else if (reason.kind === 'aborted') this.queueStatus(taskId, 'cancelled')
-        else if (reason.kind === 'interrupted') this.queueStatus(taskId, 'failed', { code: 'interrupted', message: 'The turn was interrupted.' })
-        else if (reason.kind === 'error') this.queueStatus(taskId, 'failed', { code: 'turn_error', message: reason.error.message })
-        else this.queueStatus(taskId, 'failed', { code: reason.kind, message: `The turn ended with ${reason.kind}.` })
+        const observed = this.outcomes.stateOf(session)
+        const outcome = observed.phase === 'done' || observed.phase === 'cancelled' || observed.phase === 'failed'
+          ? observed : turnOutcome(event.data.reason, '')
+        if (outcome.phase === 'cancelled') {
+          void this.cancelTask({ id: taskId }).catch((error: unknown) => {
+            this.ctx.logger.warn(`assistant task cancellation ${taskId}: ${String(error)}`)
+          })
+        } else if (outcome.phase === 'done') {
+          this.queueStatus(taskId, 'done', undefined, outcome.text)
+        } else if (outcome.phase === 'failed') {
+          this.queueStatus(taskId, 'failed', publicFailure(outcome.code))
+        }
         return
       }
       default:
@@ -731,27 +861,82 @@ export class AssistantTaskService extends TypertRemoteService {
     this.queueStatus(taskId, this.questionPending(sessionId) ? 'waiting-answer' : 'running')
   }
 
-  private queueStatus(taskId: AssistantTaskId, status: AssistantTaskStatus, failure?: AssistantTaskFailure): void {
+  private queueStatus(taskId: AssistantTaskId, status: AssistantTaskStatus, failure?: AssistantTaskFailure, text?: string): void {
     void this.serialize(async () => {
-      await this.writeStatus(taskId, status, failure)
+      await this.writeStatus(taskId, status, failure, false, text)
+    }).catch((error: unknown) => {
+      this.ctx.logger.warn(`assistant task transition ${taskId}: ${String(error)}`)
     })
   }
 
-  private async writeStatus(taskId: AssistantTaskId, status: AssistantTaskStatus, failure?: AssistantTaskFailure): Promise<void> {
-    if (this.stopping) return
+  private boundedResult(text: string): string {
+    return text.slice(0, this.config.maxResultChars ?? DEFAULT_MAX_RESULT_CHARS).replace(/[\uD800-\uDBFF]$/, '')
+  }
+
+  private async writeStatus(
+    taskId: AssistantTaskId, status: AssistantTaskStatus, failure?: AssistantTaskFailure, drained = false, text?: string,
+  ): Promise<void> {
     const tasks = this.domain?.table('tasks')
     if (tasks === undefined) return
     const current = tasks.get(taskId)
     if (current === undefined || isTerminalTaskStatus(current.status)
+      || current.status === 'cancelling' && status !== 'cancelling' && !drained
       || current.status === status && current.failure?.code === failure?.code) return
+    const publicText = status === 'failed' && failure !== undefined ? failure.message : text
+    const resultSummary = publicText === undefined ? current.resultSummary : this.boundedResult(publicText)
     const next: AssistantTaskRecord = {
       ...current,
       status,
+      resultSummary,
+      ...(current.creatorSessionId !== undefined && (status === 'done' || status === 'failed') ? {
+        outbox: [...current.outbox ?? [], {
+          id: randomUUID(), state: 'pending', status, resultSummary, failureCode: failure?.code,
+        }],
+      } : {}),
       updatedAt: new Date().toISOString(),
       ...(failure === undefined ? { failure: undefined } : { failure }),
     }
     await tasks.put(taskId, next)
+    this.scheduleNotices(next)
     this.ctx.emit('assistant-task/changed', taskId)
+  }
+
+  private scheduleNotices(record: AssistantTaskRecord): void {
+    if (this.phase !== 'ready' || this.ctx.get('sessionController') === undefined || record.creatorSessionId === undefined) return
+    for (const notice of record.outbox ?? []) {
+      if (this.deliveries.has(notice.id)) continue
+      const delivery = this.deliverNotice(record, record.creatorSessionId, notice).catch((error: unknown) => {
+        this.ctx.logger.warn(`assistant task notice ${record.id}: ${String(error)}`)
+      }).finally(() => this.deliveries.delete(notice.id))
+      this.deliveries.set(notice.id, delivery)
+    }
+  }
+
+  private async deliverNotice(record: AssistantTaskRecord, creator: SessionId, notice: NonNullable<AssistantTaskRecord['outbox']>[number]): Promise<void> {
+    const resolved = await this.requireSessionController().resolveAgent(creator)
+    if ('error' in resolved) throw resolved.error
+    const { agent } = resolved
+    if (!this.receipts.stateOf(agent.session).includes(notice.id)) {
+      if (notice.state === 'sending') throw new Error('Previous notice admission is unknown; the notice was not resent.')
+      await this.setNoticeState(record.id, notice.id, 'sending')
+      const publicNotice = notice.status === 'failed' ? publicFailure(notice.failureCode ?? 'execution_failed') : undefined
+      agent.followup(resultNotice(record, publicNotice === undefined ? notice : {
+        ...notice, failureCode: publicNotice.code, resultSummary: this.boundedResult(publicNotice.message),
+      }))
+    }
+    if (!await this.ctx.sessions.flush(agent.session)) throw new Error('Session persistence did not acknowledge the task notice.')
+    await this.setNoticeState(record.id, notice.id, 'delivered')
+  }
+
+  private setNoticeState(id: AssistantTaskId, noticeId: string, state: 'sending' | 'delivered'): Promise<void> {
+    return this.serialize(async () => {
+      const record = this.requireRecord(id)
+      const outbox = (record.outbox ?? []).flatMap((item) => {
+        if (item.id !== noticeId) return [item]
+        return state === 'delivered' ? [] : [{ ...item, state }]
+      })
+      await this.putTask(id, { ...record, outbox })
+    })
   }
 
   private async failTask(taskId: AssistantTaskId, failure: AssistantTaskFailure): Promise<void> {
@@ -763,18 +948,43 @@ export class AssistantTaskService extends TypertRemoteService {
   }
 
   private async reconcile(): Promise<void> {
-    if (this.stopping) return
+    if (this.phase === 'stopping') return
     const tasks = this.requireTasks()
     for (const [id, record] of tasks.entries()) {
-      if (isTerminalTaskStatus(record.status)) continue
-      const live = this.ctx.agents.get(record.sessionId)
-      if (live !== undefined) continue
-      const exists = await this.sessionExists(record.sessionId)
-      const failure: AssistantTaskFailure = exists
-        ? { code: 'interrupted', message: 'The Host restarted before the task finished.' }
-        : { code: 'not_started', message: 'The task never reached an execution Session.' }
+      if (isTerminalTaskStatus(record.status) || record.status === 'cancelling') continue
+      const resident = this.ctx.agents.get(record.sessionId)
+      const exists = resident !== undefined || await this.sessionExists(record.sessionId)
+      if (resident !== undefined || exists && (record.promptAttempted !== false || record.promptDelivered === true)) {
+        const outcome = resident === undefined ? await this.readWorkerOutcome(record.sessionId) : this.outcomes.stateOf(resident.session)
+        if (outcome.phase === 'done') { await this.writeStatus(id, 'done', undefined, false, outcome.text); continue }
+        if (outcome.phase === 'failed') { await this.writeStatus(id, 'failed', publicFailure(outcome.code)); continue }
+        if (outcome.phase === 'cancelled') {
+          await this.writeStatus(id, this.ctx.agents.get(record.sessionId) === undefined ? 'cancelled' : 'cancelling')
+          continue
+        }
+      }
+      if (this.ctx.agents.get(record.sessionId) !== undefined) continue
+      const failure = record.promptDelivered !== true && record.promptAttempted !== false
+        ? publicFailure('prompt_outcome_unknown')
+        : publicFailure(exists || record.promptDelivered === true ? 'interrupted' : 'not_started')
+      if (!exists) this.missingSessions.add(record.sessionId)
       await this.writeStatus(id, 'failed', failure)
     }
+  }
+
+  private async readWorkerOutcome(id: SessionId): Promise<WorkerOutcome> {
+    const live = this.ctx.sessions.get(id)
+    if (live !== undefined) return this.outcomes.stateOf(live)
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) throw new AssistantTaskError('assistant_session_unavailable', 'Session persistence is unavailable.')
+    const log = await readColdSessionLog(persistence, id)
+    const attached = this.ctx.sessions.get(id)
+    if (attached !== undefined) return this.outcomes.stateOf(attached)
+    const prepared = this.ctx.sessions.prepare(id, {
+      seed: log.events, meta: log.header, eventState: log.eventState, inheritedEventCount: log.inheritedEventCount,
+    })
+    this.ctx.sessionProjections.hydrate(prepared, {}, log.events, SessionLogOffset(0))
+    return this.outcomes.stateOf(prepared)
   }
 
   private async sessionExists(sessionId: SessionId): Promise<boolean> {
@@ -813,6 +1023,8 @@ export class AssistantTaskService extends TypertRemoteService {
   }
 
   private taskViewOf(record: AssistantTaskRecord): AssistantTaskView {
+    const failure = record.failure === undefined ? undefined : publicFailure(record.failure.code)
+    const summary = record.status === 'failed' && failure !== undefined ? this.boundedResult(failure.message) : record.resultSummary
     const unavailable = this.missingSessions.has(record.sessionId)
       || record.failure?.code === 'not_started'
       || record.failure?.code === 'session_create_failed'
@@ -827,7 +1039,8 @@ export class AssistantTaskService extends TypertRemoteService {
       sessionAvailable: !unavailable,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      ...(record.failure === undefined ? {} : { failure: record.failure }),
+      ...(summary && (record.status === 'done' || record.status === 'failed') ? { resultSummary: summary } : {}),
+      ...(failure === undefined ? {} : { failure }),
     }
   }
 
@@ -847,6 +1060,12 @@ export class AssistantTaskService extends TypertRemoteService {
 
   private requireAssistants() {
     return this.requireDomain().table('assistants')
+  }
+
+  private requireRecord(id: AssistantTaskId): AssistantTaskRecord {
+    const record = this.requireTasks().get(id)
+    if (record === undefined) throw new AssistantTaskError('task_not_found', 'Assistant task not found.')
+    return record
   }
 
   private requireTasks() {

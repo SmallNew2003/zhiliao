@@ -18,7 +18,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
 | `@deepseek-ai/dsh-plugin-market` | `plugin_market` | `ctx.tools`, `ctx.pluginMarket` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-mcp-discovery` | `discover_mcp_tools` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionProjections` | `tool/call`, `tool/result`, `mcp/selection`, `mcp/request-snapshot` | - | - |
-| `@deepseek-ai/dsh-tool-assistant-task` | `create_task` | `ctx.tools`, `ctx.systemPrompt`, `ctx.assistantTasks`, `a registered assistant Session` | `tool/call`, `tool/result`, `assistant storage domain records and independent execution Session` | - | - |
+| `@deepseek-ai/dsh-tool-assistant-task` | `create_task`, `get_task`, `list_tasks` | `ctx.tools`, `ctx.systemPrompt`, `ctx.assistantTasks`, `a registered assistant Session` | `tool/call`, `tool/result`, `assistant storage domain records and independent execution Session` | - | - |
 | `@deepseek-ai/dsh-tool-memory` | `hindsight_remember`, `hindsight_search` | `ctx.tools`, `ctx.memory`, `a primary Session with a resolved workspace bank` | `tool/call`, `tool/result`, `provider-owned memory bank for hindsight_remember` | - | - |
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`, `stagehand_extract`, `stagehand_navigate`, `stagehand_observe`, `stagehand_screenshot`, `stagehand_tabs` | `ctx.browserUse`, `ctx.agents`, `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | - |
@@ -224,7 +224,7 @@ Source: [`packages/mcp/mcp-discovery/src/index.ts`](../packages/mcp/mcp-discover
 
 ### `create_task`
 
-Create one independent task for the user. The task runs in its own Session and can outlive this conversation. This conversation keeps only the task card and its status; do not claim the task finished until its status says so. Use it when the user asks you to do or track work beyond this turn. A project assistant creates the task in its own project; the global assistant may name a registered project by id. If a creation call fails after the task record exists, retry with the same requestId to reuse the task and its Session. Do not use this tool for reminders or recurring schedules.
+Create one independent task for the user. The task runs in its own Session and can outlive this conversation. The assistant receives a task result notice when the worker turn ends. Use list_tasks or get_task for the current status. Use it when the user asks you to do or track work beyond this turn. A project assistant creates the task in its own project; the global assistant may name a registered project by id. Reuse the same requestId for a rejected creation. If admission is unknown, inspect the task before repeating the work. Do not use this tool for reminders or recurring schedules.
 
 ```json
 {
@@ -250,6 +250,49 @@ Create one independent task for the user. The task runs in its own Session and c
   "required": [
     "prompt"
   ]
+}
+```
+
+Source: [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts)
+
+### `get_task`
+
+Read a task owned by this assistant, including its current status and bounded final worker text. A completed turn does not independently verify external effects.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Task id returned by create_task or list_tasks."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+Source: [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts)
+
+### `list_tasks`
+
+List this assistant’s own tasks newest first. Use offset to continue through older tasks.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "integer",
+      "description": "Maximum rows; omit to use the Host page size."
+    },
+    "offset": {
+      "type": "integer",
+      "description": "Number of rows to skip, starting at zero."
+    }
+  }
 }
 ```
 

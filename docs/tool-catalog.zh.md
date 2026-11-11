@@ -22,7 +22,7 @@
 | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
 | `@deepseek-ai/dsh-plugin-market` | `plugin_market` | `ctx.tools`, `ctx.pluginMarket` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-mcp-discovery` | `discover_mcp_tools` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionProjections` | `tool/call`, `tool/result`, `mcp/selection`, `mcp/request-snapshot` | - | - |
-| `@deepseek-ai/dsh-tool-assistant-task` | `create_task` | `ctx.tools`, `ctx.systemPrompt`, `ctx.assistantTasks`, `a registered assistant Session` | `tool/call`, `tool/result`, `assistant storage domain records and independent execution Session` | - | - |
+| `@deepseek-ai/dsh-tool-assistant-task` | `create_task`, `get_task`, `list_tasks` | `ctx.tools`, `ctx.systemPrompt`, `ctx.assistantTasks`, `a registered assistant Session` | `tool/call`, `tool/result`, `assistant storage domain records and independent execution Session` | - | - |
 | `@deepseek-ai/dsh-tool-memory` | `hindsight_remember`, `hindsight_search` | `ctx.tools`, `ctx.memory`, `a primary Session with a resolved workspace bank` | `tool/call`, `tool/result`, `provider-owned memory bank for hindsight_remember` | - | - |
 | `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`、`stagehand_extract`、`stagehand_navigate`、`stagehand_observe`、`stagehand_screenshot`、`stagehand_tabs` | `ctx.browserUse`、`ctx.agents`、`ctx.tools`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | - |
@@ -228,7 +228,7 @@
 
 ### `create_task`
 
-为用户创建一个独立任务。任务在独立 Session 中运行，可以持续到本次对话结束之后。本对话只保留任务卡片及其状态；在状态显示完成前，不得声称任务已完成。用户要求执行或跟踪超出当前轮次的工作时使用本工具。项目助理在自己的项目中创建任务；全局助理可以通过标识指定已注册项目。创建调用在任务记录已存在后失败时，使用相同 requestId 重试以复用任务与 Session。不要用本工具设置提醒或周期计划。
+为用户创建一个独立任务。任务在自己的 Session 中运行，可以持续到本次对话结束之后。工作轮次结束时，助理收到任务结果通知。使用 `list_tasks` 或 `get_task` 查询当前状态。用户要求执行或跟踪超出当前轮次的工作时使用本工具。项目助理在自己的项目中创建任务，全局助理可以按标识指定已注册项目。如果创建请求已被拒绝，重试时复用相同的 `requestId`。如果无法确认请求是否已被接纳，再次执行前先检查任务。提醒和周期计划应使用相应的计划工具。
 
 ```json
 {
@@ -254,6 +254,49 @@
   "required": [
     "prompt"
   ]
+}
+```
+
+来源： [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts)
+
+### `get_task`
+
+读取当前助理的一项任务，返回当前状态和限长的工作智能体最终文字。轮次结束表示智能体已完成这一轮，外部操作的结果仍需独立验证。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Task id returned by create_task or list_tasks."
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+来源： [`packages/assistant/tool-task/src/index.ts`](../packages/assistant/tool-task/src/index.ts)
+
+### `list_tasks`
+
+按最近更新优先列出当前助理的任务。使用 `offset` 继续读取较早的任务。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "integer",
+      "description": "Maximum rows; omit to use the Host page size."
+    },
+    "offset": {
+      "type": "integer",
+      "description": "Number of rows to skip, starting at zero."
+    }
+  }
 }
 ```
 

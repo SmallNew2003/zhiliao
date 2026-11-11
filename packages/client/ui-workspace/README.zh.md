@@ -126,6 +126,8 @@ Session 行可通过 Tab 聚焦，使用不带修饰键的 Enter 或空格打开
 
 旧 `sidebar.workspaces.session.menu.item` Slot 保留给外部 React 条目，提供 `sessionId`、`displayTitle` 和用于关闭菜单的 `useMenuOpenState`。旧条目保持彼此顺序，集中显示在归档之前；其 priority 不再替换内置数据动作。新贡献使用[菜单服务](../ui-context-menu/README.zh.md)。内置动作在菜单打开时持续响应权限和置顶／归档状态；对话框与提示仍为应用级浮层。
 
+临时隐藏 Session 行的插件可在根作用域的列表 Slot `sidebar.workspaces.feedback` 中说明缺少会话的原因并提供恢复操作，位置在展开的会话列表上方。
+
 现有通知浮层按通知 kind 分派 `workspace.toast`。各 keyed 注册注入本地化展示映射与自己的操作，只有归档通知订阅查看筛选状态。它们渲染包内的 `workspace.toast.content` Factory，所有展示共用一处 Toast primitive。现有通知状态、显示序号、最新提示替换及关闭逻辑仍共享；语言或筛选变化不会重新启动同一条提示的计时。
 
 #### 打包客户端插件

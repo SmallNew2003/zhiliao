@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
+import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
@@ -121,7 +122,7 @@ describe('assistant task service', () => {
     const session = ctx.sessions.create(result.sessionId)
     const changed = vi.fn()
     ctx.on('assistant-task/changed', changed)
-    const wait = () => new Promise(resolve => setTimeout(resolve, 20))
+    const wait = () => service.ensureAssistant({ kind: 'global' })
 
     ctx.emit('session/event', session, {
       seq: 0, time: 0, type: 'approval/asked', data: { id: 'approval-1', toolName: 'bash' },
@@ -205,7 +206,7 @@ describe('assistant task service', () => {
     const { service, prompt, sessions } = await harness()
     const assistant = await service.ensureAssistant({ kind: 'global' })
     sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
-    prompt.mockRejectedValueOnce(new RemoteError('session/agent-busy', 'busy', { reason: 'busy' }))
+    prompt.mockRejectedValueOnce(new RemoteError('session/not-found', 'missing', { sessionId: assistant.sessionId }))
     const error = await rejectedTask(service.createTask({
       callerSessionId: assistant.sessionId,
       prompt: 'Run and fail',
@@ -282,7 +283,7 @@ describe('task cancellation ownership', () => {
       const session = ctx.sessions.create(task.sessionId)
       const queued = ['queued input']
       const cancelAgent = vi.fn<Agent['cancel']>((_cause, options) => { if (!options?.keepInbox) queued.length = 0 })
-      vi.spyOn(ctx.agents, 'get').mockReturnValue({ id: task.sessionId, session, cancel: cancelAgent } as never)
+      vi.spyOn(ctx.agents, 'get').mockReturnValue({ id: task.sessionId, session, cancel: cancelAgent, whenIdle: async () => {} } as never)
       await service.cancelTask({ id: task.taskId })
       expect(cancelAgent).toHaveBeenCalledWith({ kind: 'user' })
       expect(queued).toEqual([])
@@ -301,10 +302,9 @@ describe('task cancellation ownership', () => {
       const assistant = await service.ensureAssistant({ kind: 'global' })
       sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
       const task = await service.createTask({ callerSessionId: assistant.sessionId, prompt: 'Queued task' })
-      const previous = service.getTask(task.taskId)?.status
       vi.spyOn(ctx.agents, 'get').mockReturnValue({ cancel: () => { throw new Error('inbox unavailable') } } as never)
-      await expect(service.cancelTask({ id: task.taskId })).rejects.toThrow('inbox unavailable')
-      expect(service.getTask(task.taskId)?.status).toBe(previous)
+      await expect(service.cancelTask({ id: task.taskId })).rejects.toThrow('Task cancellation could not be confirmed')
+      expect(service.getTask(task.taskId)).toMatchObject({ status: 'cancelling', failure: { code: 'cancel_failed' } })
     } finally {
       await ctx.fiber.dispose()
     }
@@ -340,4 +340,235 @@ it('preserves the assistant mapping when Session persistence is unavailable', as
   } finally {
     await ctx.fiber.dispose()
   }
+})
+
+it('holds cancelling while the Agent drains and lets writes needed by settlement complete', async () => {
+  const { ctx, service, sessions } = await harness()
+  const idle = Promise.withResolvers<undefined>()
+  const children = Promise.withResolvers<undefined>()
+  try {
+    const assistant = await service.ensureAssistant({ kind: 'global' })
+    sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
+    const task = await service.createTask({ callerSessionId: assistant.sessionId, prompt: 'Drain' })
+    const worker = ctx.sessions.create(task.sessionId)
+    const finishing = Promise.withResolvers<undefined>()
+    ctx.provide('subagents', { drainDescendants: (parents: readonly Agent[]) => {
+      expect(parents[0]?.id).toBe(task.sessionId)
+      finishing.resolve(undefined)
+      return children.promise
+    } } as never)
+    const signaled = Promise.withResolvers<undefined>()
+    vi.spyOn(ctx.agents, 'get').mockReturnValue({
+      id: task.sessionId, cancel: () => { signaled.resolve(undefined) }, whenIdle: () => idle.promise,
+    } as never)
+    const cancel = service.cancelTask({ id: task.taskId })
+    await Promise.all([signaled.promise, finishing.promise])
+    const next = vi.fn(async () => ({ kind: 'reject' as const }))
+    await ctx.waterfall('agent/pre-step', {
+      agent: ctx.agents.get(task.sessionId)!, messages: [], turn: 2, step: 1,
+      signal: new AbortController().signal, modelSelection: { provider: 'test', model: 'test' },
+    }, next)
+    expect(next).not.toHaveBeenCalled()
+    worker.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await service.ensureAssistant({ kind: 'global' })
+    expect(service.getTask(task.taskId)?.status).toBe('cancelling')
+    idle.resolve(undefined)
+    await service.ensureAssistant({ kind: 'global' })
+    expect(service.getTask(task.taskId)?.status).toBe('cancelling')
+    children.resolve(undefined)
+    await expect(cancel).resolves.toMatchObject({ status: 'cancelled' })
+  } finally {
+    children.resolve(undefined)
+    idle.resolve(undefined)
+    await ctx.fiber.dispose()
+  }
+})
+
+it('records bounded final text and delivers one attributed notice to the creating conversation', async () => {
+  const { ctx, service, sessions, followup, resolveAgent } = await harness({ config: { maxResultChars: 6 } })
+  try {
+    const assistant = await service.ensureAssistant({ kind: 'global' })
+    sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
+    const creator = ctx.sessions.create(assistant.sessionId)
+    const task = await service.createTask({ callerSessionId: assistant.sessionId, prompt: 'Summarize' })
+    const worker = ctx.sessions.create(task.sessionId)
+    worker.append('assistant/message', {
+      turn: 1, step: 1, stream: [], message: createAssistantMessage({
+        source: { provider: 'test', model: 'test' }, content: [{ type: 'text', text: 'Result details' }],
+      }),
+    }, { surfaceOp: 'append' })
+    worker.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await service.ensureAssistant({ kind: 'global' })
+    expect(service.getTask(task.taskId)).toMatchObject({ status: 'done', resultSummary: 'Result' })
+    await expect.poll(() => followup.mock.calls.length).toBe(1)
+    expect(followup.mock.calls[0]?.[1]).toMatchObject({
+      source: { kind: 'assistant-task', form: 'notice', taskId: task.taskId, sessionId: worker.id },
+    })
+    expect(resolveAgent).toHaveBeenCalledWith(creator.id)
+  } finally { await ctx.fiber.dispose() }
+})
+
+it('never replays a first prompt whose admission outcome is unknown', async () => {
+  const { ctx, service, prompt, sessions } = await harness()
+  try {
+    const assistant = await service.ensureAssistant({ kind: 'global' })
+    sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
+    const request = { callerSessionId: assistant.sessionId, prompt: 'Charge once', requestId: 'once' }
+    prompt.mockRejectedValueOnce(new Error('response lost'))
+    const error = await rejectedTask(service.createTask(request))
+    expect(service.getTask(error.details!.taskId!)).toMatchObject({ status: 'failed', failure: { code: 'prompt_outcome_unknown' } })
+    await service.createTask(request)
+    expect(prompt).toHaveBeenCalledTimes(1)
+  } finally { await ctx.fiber.dispose() }
+})
+
+it('reads only tasks belonging to the calling registered assistant', async () => {
+  const { ctx, service, create, sessions } = await harness({
+    workspaces: new Map([[workspaceId, { id: workspaceId, path: '/project', title: 'Project' }]]),
+  })
+  try {
+    const global = await service.ensureAssistant({ kind: 'global' })
+    sessions.set(global.sessionId, storedSession(global.sessionId))
+    const task = await service.createTask({ callerSessionId: global.sessionId, prompt: 'Private' })
+    create.mockResolvedValueOnce({ sessionId: brandString<SessionId>('other-assistant'), agentPreset: 'assistant' })
+    const other = await service.ensureAssistant({ kind: 'project', workspaceId })
+    expect(service.listForAssistant(other.sessionId, {})).toEqual([])
+    expect(() => service.taskForAssistant(other.sessionId, task.taskId)).toThrow('not found')
+    expect(() => service.listForAssistant(task.sessionId, {})).toThrow('registered assistant')
+    expect(service.taskForAssistant(global.sessionId, task.taskId)).toMatchObject({ id: task.taskId })
+  } finally { await ctx.fiber.dispose() }
+})
+
+it.each([true, false])('reconciles an unacknowledged notice after restart with a persisted receipt: %s', async (persisted) => {
+  const first = await harness()
+  const assistant = await first.service.ensureAssistant({ kind: 'global' })
+  first.sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
+  const task = await first.service.createTask({ callerSessionId: assistant.sessionId, prompt: 'Finish once' })
+  const flush = Promise.withResolvers<undefined>()
+  try {
+    first.ctx.on('session/flush', () => { flush.resolve(undefined); throw new Error('acknowledgement lost') }, { global: true })
+    const worker = first.ctx.sessions.create(task.sessionId)
+    worker.append('turn/end', { turn: 1, reason: { kind: 'interrupted' } })
+    await flush.promise
+    expect(first.followup).toHaveBeenCalledTimes(1)
+  } finally { await first.ctx.fiber.dispose() }
+  const message = first.followup.mock.calls[0]![1]
+  const stored = first.pool.media.values().next().value!.tables.get('tasks')!
+  expect(stored.get(task.taskId)).toMatchObject({ creatorSessionId: assistant.sessionId, outbox: [{ id: message.id, state: 'sending' }] })
+  const restarted = await harness({ pool: first.pool, sessions: first.sessions, ...(persisted ? { logs: first.logs } : {}) })
+  try {
+    await expect.poll(() => restarted.resolveAgent.mock.calls.length).toBe(1)
+    if (persisted) {
+      await expect.poll(() => assistantTaskRecord.parse(stored.get(task.taskId)).outbox).toEqual([])
+      expect(restarted.ctx.logger.buffer.filter(line => line.type === 'warn')).toHaveLength(0)
+    }
+    expect(restarted.service.getTask(task.taskId)).toMatchObject({
+      status: 'failed', resultSummary: 'The turn was interrupted.', failure: { code: 'interrupted' },
+    })
+  } finally { await restarted.ctx.fiber.dispose() }
+  expect(restarted.followup).not.toHaveBeenCalled()
+  expect(stored.get(task.taskId)).toMatchObject({ outbox: persisted ? [] : [{ id: message.id, state: 'sending' }] })
+})
+
+it('keeps a legacy task without guessing which conversation should receive historical results', async () => {
+  const first = await harness()
+  const original = await first.service.ensureAssistant({ kind: 'global' })
+  first.sessions.set(original.sessionId, storedSession(original.sessionId))
+  const task = await first.service.createTask({ callerSessionId: original.sessionId, prompt: 'Legacy' })
+  await first.ctx.fiber.dispose()
+  const stored = first.pool.media.values().next().value!.tables.get('tasks')!
+  const raw = assistantTaskRecord.parse(stored.get(task.taskId))
+  const { creatorSessionId, ...legacy } = raw
+  expect(creatorSessionId).toBe(original.sessionId)
+  stored.set(task.taskId, { ...legacy, status: 'done' })
+  for (const key of first.pool.versions.keys()) first.pool.versions.set(key, 1)
+  const restarted = await harness({ pool: first.pool, sessions: first.sessions })
+  try {
+    expect(restarted.service.listTasks()).toEqual([expect.objectContaining({ id: task.taskId, status: 'done' })])
+    expect(restarted.resolveAgent).not.toHaveBeenCalled()
+  } finally { await restarted.ctx.fiber.dispose() }
+})
+
+it('joins a final root wake from descendant teardown before declaring cancellation', async () => {
+  const { ctx, service, sessions } = await harness()
+  const child = Promise.withResolvers<undefined>()
+  const lateIdle = Promise.withResolvers<undefined>()
+  const didCancel = Promise.withResolvers<undefined>()
+  const didJoinLate = Promise.withResolvers<undefined>()
+  let late = false
+  try {
+    const assistant = await service.ensureAssistant({ kind: 'global' })
+    sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
+    const task = await service.createTask({ callerSessionId: assistant.sessionId, prompt: 'Child result' })
+    const worker = {
+      id: task.sessionId, cancel: () => { didCancel.resolve(undefined) },
+      whenIdle: () => {
+        if (late) { didJoinLate.resolve(undefined); return lateIdle.promise }
+        return Promise.resolve()
+      },
+    }
+    vi.spyOn(ctx.agents, 'get').mockReturnValue(worker as never)
+    ctx.provide('subagents', { drainDescendants: () => child.promise } as never)
+    const cancelling = service.cancelTask({ id: task.taskId })
+    await didCancel.promise
+    late = true
+    child.resolve(undefined)
+    const boundary = await Promise.race([didJoinLate.promise.then(() => 'joining'), cancelling.then(() => 'finished')])
+    expect(boundary).toBe('joining')
+    expect(service.getTask(task.taskId)?.status).toBe('cancelling')
+    lateIdle.resolve(undefined)
+    await expect(cancelling).resolves.toMatchObject({ status: 'cancelled' })
+  } finally { child.resolve(undefined); lateIdle.resolve(undefined); await ctx.fiber.dispose() }
+})
+
+it('sends an interrupted result to its retired creator, not the replacement conversation', async () => {
+  const first = await harness()
+  const creator = await first.service.ensureAssistant({ kind: 'global' })
+  first.sessions.set(creator.sessionId, storedSession(creator.sessionId))
+  const task = await first.service.createTask({ callerSessionId: creator.sessionId, prompt: 'Persist work' })
+  first.sessions.set(task.sessionId, storedSession(task.sessionId))
+  first.sessions.delete(creator.sessionId)
+  first.create.mockResolvedValueOnce({ sessionId: brandString<SessionId>('replacement'), agentPreset: 'assistant' })
+  const replacement = await first.service.ensureAssistant({ kind: 'global' })
+  expect(replacement.retiredSessionIds).toContain(creator.sessionId)
+  first.sessions.set(creator.sessionId, storedSession(creator.sessionId))
+  await first.ctx.fiber.dispose()
+
+  const restarted = await harness({ pool: first.pool, sessions: first.sessions, logs: first.logs })
+  try {
+    await expect.poll(() => restarted.followup.mock.calls.length).toBe(1)
+    const [recipient, notice] = restarted.followup.mock.calls[0]!
+    expect(recipient.id).toBe(creator.sessionId)
+    expect(notice.source).toMatchObject({ kind: 'assistant-task', taskId: task.taskId, sessionId: task.sessionId })
+    expect(restarted.service.getTask(task.taskId)).toMatchObject({ status: 'failed', failure: { code: 'interrupted' } })
+    expect(restarted.prompt).not.toHaveBeenCalled()
+  } finally { await restarted.ctx.fiber.dispose() }
+})
+
+it('records admission intent before the worker prompt, so a missing Session cannot authorize replay', async () => {
+  const h = await harness()
+  const entered = Promise.withResolvers<undefined>()
+  const accepted = Promise.withResolvers<{ accepted: boolean }>()
+  try {
+    const assistant = await h.service.ensureAssistant({ kind: 'global' })
+    h.sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
+    h.prompt.mockImplementationOnce(() => { entered.resolve(undefined); return accepted.promise })
+    const request = { callerSessionId: assistant.sessionId, prompt: 'Run once', requestId: 'once' }
+    const pending = h.service.createTask(request)
+    await entered.promise
+    const table = h.pool.media.values().next().value!.tables.get('tasks')!
+    const raw = [...table.values()][0]
+    accepted.resolve({ accepted: true })
+    await pending
+    expect(raw).toMatchObject({ promptAttempted: true, status: 'created' })
+    await h.ctx.fiber.dispose()
+    const record = assistantTaskRecord.parse(raw)
+    table.set(record.id, record)
+    const restarted = await harness({ pool: h.pool, sessions: h.sessions })
+    try {
+      expect(restarted.service.getTask(record.id)).toMatchObject({ status: 'failed', failure: { code: 'prompt_outcome_unknown' } })
+      await restarted.service.createTask(request)
+      expect(restarted.prompt).not.toHaveBeenCalled()
+    } finally { await restarted.ctx.fiber.dispose() }
+  } finally { accepted.resolve({ accepted: true }); await h.ctx.fiber.dispose() }
 })

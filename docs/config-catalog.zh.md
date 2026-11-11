@@ -375,8 +375,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-assistant-task`
 
-- `inject`: `storageDomain` · `sessions` · `agents` · `remoteAccess`
-- `source`: [`packages/assistant/task/src/index.ts:54`](../packages/assistant/task/src/index.ts)
+- `inject`: `storageDomain` · `sessions` · `agents` · `remoteAccess` · `sessionProjections`
+- `source`: [`packages/assistant/task/src/index.ts:62`](../packages/assistant/task/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the Host assistant domain. */
@@ -393,6 +393,8 @@ export interface Config {
   maxPromptBytes?: number
   /** Maximum characters of one task title; omission defaults to 120. */
   maxTitleChars?: number
+  /** Maximum UTF-16 units retained from a task result; omission defaults to 2,048. */
+  maxResultChars?: number
   /** Default task-list page size; omission defaults to 50. */
   listPageSize?: number
 }

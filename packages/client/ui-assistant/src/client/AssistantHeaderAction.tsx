@@ -1,5 +1,6 @@
 /** Session-header marker and return action for assistant conversations and task Sessions. */
 
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AssistantState } from './index.ts'
@@ -39,7 +40,7 @@ export function AssistantHeaderAction({ sessionId, useState, returnToAssistant, 
       <span className={css.meta}>
         {t(role === 'assistant' ? 'headerAssistant' : 'headerAssistantTask')}
       </span>
-      <button type="button" onClick={() => { returnToAssistant(sessionId) }}>{t('backToAssistant')}</button>
+      <Button size="sm" onClick={() => { returnToAssistant(sessionId) }}>{t('backToAssistant')}</Button>
     </div>
   )
 }

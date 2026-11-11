@@ -16,6 +16,8 @@ pnpm --filter @deepseek-ai/dsh-web-frontend exec playwright install --with-deps 
 
 当天消息的 golden 使用共享的 `WEB_FIXTURE_TIME`：预置会话将它传为 `createdAt`，并通过 `pinBrowserClock` 固定浏览器日期；提交实时消息的场景还使用 `pinHostClock`，在清理后恢复。固定后的时钟随真实耗时前进，保留原生定时器，因此跨午夜不会改变场景的日期标签。
 
+[助理任务跟进](assistant-follow-through.e2e.ts)通过助理页面验证作用域 Conversation、独立执行 Session、带归属的完成通知，以及 `list_tasks`/`get_task` 读取。真实录制分别保存助理和执行者日志及各自的请求头侧车。回放和刷新采用两个角色共同录制的模型选择、适配器提供的请求默认值和上下文能力；两份元数据矛盾时，在写入任一 fixture 前停止。`verifySessionFixtures` 将两份日志绑定到准确的实时 Session 身份，在每种模式下比较完整持久输出，record 或 refresh 写回后先重新读取文件再校验，并在 refresh 中更新两个当前代；身份归一化跨角色联合执行，并允许全局助理不含 cwd。执行者流屏障使运行中任务断言不依赖模型速度；回放从录制日志派生脚本，并依据录制中的类型化字段及实时请求解析 Workspace 和任务引用。模型目录必须恰有一行同时匹配所选项目的标题和规范目录。fixture 将流式参数和最终工具参数绑定到同一个 Workspace 或任务，并保留分片顺序和时间。每次真实录制都保存提供方当次返回的回放签名。场景失败和清理失败同时保留。此场景同时检查项目选择、普通导航保留、任务打开与返回，以及含真实输入和任务操作点击的 390px 布局。Conversation 卡片按 `create_task` 调用身份定位，在执行者完成前后分别核对。
+
 ## 完成状态观察
 
 依赖状态的用例使用 Workspace、接纳、附件和模型流屏障，区分可见中间状态与已完成操作。模型选择器的持久化断言等待默认设置保存完成，不以菜单关闭作为完成信号。详情关闭等待框架过渡结束；归档验证为 seed Session 设置显式标题，并跨重载跟踪该身份。[CI 测试可靠性工作流](../../../.agents/skills/dsh-ci-test-reliability/SKILL.md#synchronize-on-state)负责这些同步规则。

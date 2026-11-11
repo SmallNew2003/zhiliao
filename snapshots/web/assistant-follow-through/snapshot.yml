@@ -1,0 +1,10 @@
+version: 1
+scenario: assistant-follow-through
+profile: web
+composition: web-default
+recording: live
+header:
+  class: assistant-follow-through
+  pin: true
+  childSystemPrompts: [1]
+  childToolSchemas: [1]

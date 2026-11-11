@@ -25,7 +25,7 @@ it('filters inaccessible entities and refuses cancellation without every entity 
     const assistant = await service.ensureAssistant({ kind: 'project', workspaceId })
     sessions.set(assistant.sessionId, storedSession(assistant.sessionId))
     const task = await service.createTask({ callerSessionId: assistant.sessionId, workspaceId, prompt: 'Private task' })
-    const actions: RemoteAccessAction[] = ['assistantTasks/tasks', 'assistantTasks/assistants', 'assistantTasks/visibility', 'assistantTasks/cancelTask', 'assistantTasks/ensureAssistant']
+    const actions: RemoteAccessAction[] = ['assistantTasks/task', 'assistantTasks/tasks', 'assistantTasks/assistants', 'assistantTasks/visibility', 'assistantTasks/cancelTask', 'assistantTasks/ensureAssistant']
     const bindings: RemoteAccessBinding[] = [{ role: { name: 'endpoint', resource: 'global', actions }, resource: { kind: 'global' } }]
     ctx.remoteAccess.registerPolicy('assistant-test-peer', { bindings: () => bindings })
     const peer = new Peer(ctx, { principal: { kind: 'assistant-test-peer' } })
@@ -33,11 +33,14 @@ it('filters inaccessible entities and refuses cancellation without every entity 
     await expect(call('tasks', { request: {} })).resolves.toEqual([])
     await expect(call('assistants', { request: {} })).resolves.toEqual([])
     await expect(call('visibility')).resolves.toEqual({ sessionIds: [], conversations: [], executions: [] })
+    await expect(call('task', { request: { id: task.taskId } })).rejects.toMatchObject({ code: 'remote-access/denied' })
     await expect(call('cancelTask', { request: { id: task.taskId } })).rejects.toMatchObject({ code: 'remote-access/denied' })
     bindings.push({ role: { name: 'session', resource: 'session', actions }, resource: { kind: 'session', id: task.sessionId } })
     await expect(call('tasks', { request: {} })).resolves.toEqual([])
+    await expect(call('task', { request: { id: task.taskId } })).rejects.toMatchObject({ code: 'remote-access/denied' })
     await expect(call('cancelTask', { request: { id: task.taskId } })).rejects.toMatchObject({ code: 'remote-access/denied' })
     bindings.push({ role: { name: 'workspace', resource: 'workspace', actions }, resource: { kind: 'workspace', id: workspaceId } })
+    await expect(call('task', { request: { id: task.taskId } })).resolves.toMatchObject({ id: task.taskId })
     await expect(call('tasks', { request: {} })).resolves.toEqual([expect.objectContaining({ id: task.taskId })])
     await expect(call('assistants', { request: {} })).resolves.toEqual([])
     await expect(call('visibility')).resolves.toEqual({ sessionIds: [task.sessionId], conversations: [], executions: [expect.objectContaining({ taskId: task.taskId })] })

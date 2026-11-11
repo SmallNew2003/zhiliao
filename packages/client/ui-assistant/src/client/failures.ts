@@ -12,6 +12,7 @@ export type AssistantFailureKey = Extract<keyof AssistantLocale, `failure${strin
  */
 export function failureKey(code: string | undefined): AssistantFailureKey {
   switch (code) {
+    case 'cancel_failed': return 'failureCancel'
     case 'not_started': return 'failureNotStarted'
     case 'interrupted': return 'failureInterrupted'
     case 'turn_error':
@@ -21,6 +22,7 @@ export function failureKey(code: string | undefined): AssistantFailureKey {
     case 'assistant_session_unavailable':
     case 'worker_preset_unavailable':
     case 'workspace_unavailable': return 'failureExecution'
+    case 'prompt_outcome_unknown': return 'failurePromptUnknown'
     case 'prompt_rejected':
     case 'prompt_empty':
     case 'prompt_too_large': return 'failurePrompt'

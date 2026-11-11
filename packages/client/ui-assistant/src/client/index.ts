@@ -1,242 +1,125 @@
-/** Assistant surface plugin: one entry for the global assistant and each project assistant. */
-
+/** Assistant surface plugin for scoped conversations and task history. */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-remote-access/client'
-import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type {
-  AssistantConversationEntry,
-  AssistantExecutionEntry,
-  AssistantId,
-  AssistantTaskId,
-  AssistantTaskView,
-  AssistantView,
-} from '@deepseek-ai/dsh-assistant-task/client'
+import type { AssistantTaskId } from '@deepseek-ai/dsh-assistant-task/client'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { AssistantHeaderAction } from './AssistantHeaderAction.tsx'
+import { SessionListNotice } from './SessionListNotice.tsx'
 import { AssistantIcon } from './AssistantIcon.tsx'
-import { AssistantPage, type AssistantPageInjected } from './AssistantPage.tsx'
-import { CreateTaskCard } from './CreateTaskCard.tsx'
-import { en, zh, NS } from './locales.ts'
+import { AssistantPage, AssistantConversation, type AssistantPageInjected } from './AssistantPage.tsx'
+import { CreateTaskCard, type CreateTaskCardInjected } from './CreateTaskCard.tsx'
+import { de, en, es, fr, ja, pt, ru, zh, NS } from './locales.ts'
+import { createAssistantWorkspace } from './state.ts'
+import { createTaskResources } from './task-resource.ts'
+
+export type { AssistantState } from './state.ts'
 
 const PANEL_ID = 'assistant' as MainPanelId
+
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap {
+    /** Assistant conversation retained while its panel is visible. */
+    assistantPanel: unknown
+  }
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Assistant surface copy. */
     assistant: keyof typeof zh
   }
+  interface SlotMap {
+    /** Conversation of the assistant selected in the parent panel. */
+    'assistant.conversation': { kind: 'single'; scope: 'session' }
+  }
 }
 
-/** Required services for the assistant surface. */
+/** Required services for Assistant navigation, live reads and scoped conversation. */
 export const inject = [
-  'slots', 'locale', 'remoteAccess', 'remote', 'remote.assistantTasks', 'uiWorkspace', 'workspaces', 'layout',
+  'slots', 'locale', 'remoteAccess', 'remote', 'remote.assistantTasks', 'resources', 'sessions', 'uiWorkspace', 'workspaces', 'layout',
 ]
 
-/** One assistant surface snapshot. */
-export interface AssistantState {
-  assistants: readonly AssistantView[]
-  tasks: readonly AssistantTaskView[]
-  /** Every assistant conversation Session with its owning assistant. */
-  conversations: readonly AssistantConversationEntry[]
-  /** Every task execution Session with its owning task. */
-  executions: readonly AssistantExecutionEntry[]
-  /** All assistant-owned Session ids that must stay out of ordinary user browsing. */
-  hidden: readonly SessionId[]
-  selected: AssistantId | null
-  selectedWorkspace: WorkspaceId | null
-  phase: 'loading' | 'ready' | 'error'
-}
-
-/** Read a Remote result, folding transport rejection into a missing value. */
-async function read<Value>(
-  call: () => Promise<{ readonly ok: true; readonly value: Value } | { readonly ok: false }>,
-): Promise<Value | undefined> {
-  try {
-    const result = await call()
-    return result.ok ? result.value : undefined
-  } catch (_error: unknown) {
-    return undefined
-  }
-}
-
 /**
- * Register the assistant main panel, sidebar entry, task separation source, and
- * Host change subscriptions.
- * @param ctx - Browser services used by the surface.
+ * Register the workspace, task cards and Session separation while the user has access.
+ * @param ctx - Client services used by the surface.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-assistant: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-assistant: dictionaries')
   const t = ctx.locale.bind(NS)
-  const state = createSnapshotStore<AssistantState>({
-    assistants: [],
-    tasks: [],
-    conversations: [],
-    executions: [],
-    hidden: [],
-    selected: null,
-    selectedWorkspace: null,
-    phase: 'loading',
-  })
-  let refreshEpoch = 0
-  const hiddenSessions = {
-    getSnapshot: () => state.getSnapshot().hidden,
-    subscribe: (listener: () => void) => state.subscribe(listener),
-  }
-
-  const refresh = async (): Promise<void> => {
-    const epoch = ++refreshEpoch
-    const assistants = await read(() => ctx.remote.assistantTasks.assistants({}))
-    if (assistants === undefined && epoch === refreshEpoch) {
-      state.update((draft) => { draft.phase = 'error' })
-      return
-    }
-    const selected = state.getSnapshot().selected
-    const selectedWorkspace = state.getSnapshot().selectedWorkspace
-    const tasks = await read(() => ctx.remote.assistantTasks.tasks(selectedWorkspace === null ? {} : { workspaceId: selectedWorkspace }))
-    const visibility = await read(() => ctx.remote.assistantTasks.visibility())
-    if (epoch !== refreshEpoch) return
-    state.update((draft) => {
-      draft.assistants = assistants ?? []
-      draft.tasks = tasks ?? []
-      draft.conversations = visibility?.conversations ?? []
-      draft.executions = visibility?.executions ?? []
-      draft.hidden = visibility?.sessionIds ?? []
-      draft.phase = tasks === undefined ? 'error' : 'ready'
-      draft.selected = selected
-      draft.selectedWorkspace = selectedWorkspace
-    })
-  }
-
-  const ensureGlobal = async (): Promise<void> => {
-    state.update((draft) => { draft.phase = 'loading' })
-    const assistant = await read(() => ctx.remote.assistantTasks.ensureAssistant({ kind: 'global' }))
-    if (assistant === undefined) {
-      state.update((draft) => { draft.phase = 'error' })
-      return
-    }
-    state.update((draft) => {
-      draft.selected = assistant.id
-      draft.selectedWorkspace = null
-    })
-    await refresh()
-  }
-
-  const selectGlobal = (): void => {
-    const global = state.getSnapshot().assistants.find(assistant => assistant.kind === 'global')
-    state.update((draft) => {
-      draft.selected = global?.id ?? null
-      draft.selectedWorkspace = null
-    })
-    void refresh()
-  }
-
-  const selectProject = async (workspaceId: WorkspaceId): Promise<void> => {
-    state.update((draft) => {
-      draft.selectedWorkspace = workspaceId
-      draft.phase = 'loading'
-    })
-    const assistant = await read(() => ctx.remote.assistantTasks.ensureAssistant({ kind: 'project', workspaceId }))
-    if (assistant === undefined) {
-      state.update((draft) => { draft.phase = 'error' })
-      return
-    }
-    state.update((draft) => { draft.selected = assistant.id })
-    await refresh()
-  }
-
-  const cancelTask = async (id: AssistantTaskId): Promise<void> => {
-    const result = await read(() => ctx.remote.assistantTasks.cancelTask({ id }))
-    if (result === undefined) {
-      state.update((draft) => { draft.phase = 'error' })
-      return
-    }
-    await refresh()
-  }
-
-  const openTask = (sessionId: SessionId): void => {
-    ctx.uiWorkspace.openSession(sessionId)
-  }
-
-  const openAssistant = (sessionId: SessionId): void => {
-    ctx.uiWorkspace.openSession(sessionId)
-  }
-
-  const returnToAssistant = (sessionId: SessionId): void => {
-    const snapshot = state.getSnapshot()
-    const execution = snapshot.executions.find(entry => entry.sessionId === sessionId)
-    const conversation = snapshot.conversations.find(entry => entry.sessionId === sessionId)
-    const assistantId = execution?.assistantId ?? conversation?.assistantId
-    const workspaceId = execution?.workspaceId ?? conversation?.workspaceId
-    if (assistantId !== undefined) {
-      state.update((draft) => {
-        draft.selected = assistantId
-        draft.selectedWorkspace = workspaceId ?? null
-      })
-      void refresh()
-    }
-    ctx.layout.selectPanel(PANEL_ID)
-  }
-
-  const injected = (): AssistantPageInjected => ({
-    hooks: {
-      state,
-      workspaces: ctx.workspaces.list,
-    },
-    selectGlobal,
-    selectProject: (workspaceId) => { void selectProject(brandString<WorkspaceId>(workspaceId)) },
-    refresh: () => { void refresh() },
-    cancelTask: (id) => { void cancelTask(brandString<AssistantTaskId>(id)) },
-    openTask: (sessionId) => { openTask(brandString<SessionId>(sessionId)) },
-    openAssistant: (sessionId) => { openAssistant(brandString<SessionId>(sessionId)) },
-  })
 
   ctx.remoteAccess.whenAccess('assistantTasks/assistants', function* () {
-    yield ctx.uiWorkspace.registerHiddenSessionSource(hiddenSessions)
-    yield ctx.remote.$on('assistant-task/changed', () => { void refresh() })
-    yield ctx.remote.$on('assistant/changed', () => { void refresh() })
-    yield () => { refreshEpoch += 1 }
-    void ensureGlobal()
+    const workspace = createAssistantWorkspace(ctx)
+    const { state } = workspace
+    yield () => { workspace.dispose() }
+    yield ctx.uiWorkspace.registerHiddenSessionSource(workspace.hiddenSessions)
+    const details = createTaskResources(ctx, (row) => { workspace.remember([row.sessionId]) })
+    yield ctx.resources.register(details.provider)
+    const openTask = (id: string): void => { ctx.uiWorkspace.openSession(brandString<SessionId>(id)) }
+    const cancelTask = (id: AssistantTaskId): void => { void workspace.cancelTask(id) }
+    const page: AssistantPageInjected = {
+      hooks: { state },
+      select: (id) => { void workspace.select(id) },
+      refresh: workspace.refresh,
+      loadMore: () => { void workspace.refreshTasks(true) },
+      cancelTask, openTask,
+      refreshCatalog: () => ctx.sessions.refresh(),
+      retain: id => ctx.sessions.retain(id, { source: 'assistantPanel' }),
+    }
+    const card: CreateTaskCardInjected = {
+      hooks: { state },
+      openTask, cancelTask,
+      retryTask: details.refresh,
+    }
+
+    yield ctx.remote.$on('assistant-task/changed', (id) => {
+      details.refresh(id)
+      void workspace.refreshVisibility()
+      void workspace.refreshTasks()
+    })
+    yield ctx.remote.$on('assistant/changed', () => {
+      void workspace.refreshVisibility()
+      void workspace.select(state.getSnapshot().selectedWorkspace)
+    })
+    workspace.refresh()
     yield ctx.slots.inject('main', () => ctx.slots.register({
-      name: 'main',
-      key: PANEL_ID,
-      locale: NS,
-      inject: injected,
+      name: 'main', key: PANEL_ID, locale: NS,
+      children: { 'assistant.conversation': { kind: 'single', scope: 'session' } },
+      inject: () => page,
     }, AssistantPage))
+    yield ctx.slots.inject('assistant.conversation', () => ctx.slots.register({
+      name: 'assistant.conversation',
+    }, AssistantConversation))
+    yield ctx.slots.inject('sidebar.workspaces.feedback', () => ctx.slots.register({
+      name: 'sidebar.workspaces.feedback', id: 'assistant-session-list', locale: NS,
+      inject: () => ({ hooks: { state }, retry: () => { void workspace.refreshVisibility() } }),
+    }, SessionListNotice))
     yield ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-      name: 'sidebar.panellist',
-      id: PANEL_ID,
-      order: 5,
-      locale: NS,
-      label: () => t('panel'),
+      name: 'sidebar.panellist', id: PANEL_ID, order: 5, locale: NS, label: () => t('panel'),
     }, AssistantIcon))
     yield ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
-      name: 'conversation.session.header.actions',
-      id: 'assistant-session',
-      // After the assistant preset label (-10) and beside background tasks (20).
-      order: 15,
-      locale: NS,
+      name: 'conversation.session.header.actions', id: 'assistant-session', order: 15, locale: NS,
       inject: () => ({
         hooks: { state },
-        returnToAssistant: (sessionId: string) => { returnToAssistant(brandString<SessionId>(sessionId)) },
+        returnToAssistant: (id: string) => {
+          const { executions, conversations } = state.getSnapshot()
+          const execution = executions.find(row => row.sessionId === id)
+          const owner = conversations.find(row => execution === undefined
+            ? row.sessionId === id : row.assistantId === execution.assistantId)
+          if (owner !== undefined) void workspace.select(owner.workspaceId ?? null)
+          ctx.layout.selectPanel(PANEL_ID)
+        },
       }),
     }, AssistantHeaderAction))
     yield ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
-      name: 'tool.call.toolview',
-      key: 'create_task',
-      locale: NS,
-      inject: () => ({
-        openTask: (sessionId: string) => { openTask(brandString<SessionId>(sessionId)) },
-      }),
+      name: 'tool.call.toolview', key: 'create_task', locale: NS, inject: () => card,
     }, CreateTaskCard))
   })
 }
