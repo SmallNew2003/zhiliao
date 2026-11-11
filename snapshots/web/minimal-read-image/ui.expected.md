@@ -9,12 +9,14 @@
   - button "More conversation views"
 - text: Use read_image to inspect red.png. Then reply exactly MINIMAL_IMAGE_OK and stop. {{clock}}
 - button "Copy"
+- button "Edit message"
 - status: Completed
 - button "Completed in {{duration}}" [expanded]
 - button "Read images" [expanded]
-- button "Read image red.png" [expanded]:
+- button "Read image red.png {{duration}}" [expanded]:
   - text: Read image
   - button "red.png"
+  - text: {{duration}}
 - button "red.png, click to view original":
   - img "red.png"
 - text: {{cwd}}/red.png 1x1px, 69 bytes
@@ -30,6 +32,6 @@
 - 'button "Access mode, current: Workspace Write"': Workspace Write
 - button "Select model, current DeepSeek-V4-Flash-Vision-Exp, reasoning effort high": DeepSeek-V4-Flash-Vision-Exp high
 - button "Send message" [disabled]
-- button "1 turns 2 steps · {{throughput}} tok/s": 1 turns 2 steps{{throughput}} tok/s
+- button "Model time {{duration}}"
 - button "28 tok · Cache hit 0%": 28 tokCache hit 0%
 - button "0% of context used": 0%

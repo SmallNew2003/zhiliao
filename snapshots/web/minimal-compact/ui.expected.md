@@ -24,6 +24,7 @@
 - paragraph: Implement minimal image reading through the existing filesystem tool, preserving permissions, model capability checks, and standard mode. Enable automatic and manual compaction.
 - text: Continue using the project requirements. Reply exactly MINIMAL_COMPACT_OK and stop. {{clock}}
 - button "Copy"
+- button "Edit message"
 - status: Completed
 - button "Completed in {{duration}}" [disabled]
 - paragraph: MINIMAL_COMPACT_OK
@@ -37,6 +38,6 @@
 - 'button "Access mode, current: Workspace Write"': Workspace Write
 - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
 - button "Send message" [disabled]
-- button "2 turns 2 steps"
+- button "Model time {{duration}}"
 - button "28 tok · Cache hit 0%": 28 tokCache hit 0%
 - button "0% of context used": 0%

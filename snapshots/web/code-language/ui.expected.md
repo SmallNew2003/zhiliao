@@ -1,8 +1,9 @@
 ## Read sample.pyi
 
-- button "Read sample.pyi" [expanded]:
+- button "Read sample.pyi {{duration}}" [expanded]:
   - text: Read
   - button "sample.pyi"
+  - text: {{duration}}
 - text: py sample.pyi
 - button "Wrap lines"
 - button "Copy"
@@ -17,9 +18,10 @@
 
 ## Read deploy.ps1
 
-- button "Read deploy.ps1" [expanded]:
+- button "Read deploy.ps1 {{duration}}" [expanded]:
   - text: Read
   - button "deploy.ps1"
+  - text: {{duration}}
 - text: ps1 deploy.ps1
 - button "Wrap lines"
 - button "Copy"
@@ -34,9 +36,10 @@
 
 ## Read table.csv
 
-- button "Read table.csv" [expanded]:
+- button "Read table.csv {{duration}}" [expanded]:
   - text: Read
   - button "table.csv"
+  - text: {{duration}}
 - text: csv table.csv
 - button "Wrap lines"
 - button "Copy"
