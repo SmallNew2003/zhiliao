@@ -11,16 +11,19 @@
   - button "Jump to turn 2"
 - text: "Use the read tool twice in one assistant message: read a.txt and b.txt. Then reply with the single word DONE and stop. {{clock}}"
 - button "Copy"
+- button "Edit message"
 - status: Completed
 - button "Completed in {{duration}}" [expanded]
 - button "Read files" [expanded]
 - button "Think The user wants me to read a.txt and b.txt, then reply with \"DONE\". Let me do both reads in parallel."
-- button "Read a.txt":
+- button "Read a.txt {{duration}}":
   - text: Read
   - button "a.txt"
-- button "Read b.txt":
+  - text: {{duration}}
+- button "Read b.txt {{duration}}":
   - text: Read
   - button "b.txt"
+  - text: {{duration}}
 - button "Think Both files have been read. a.txt contains \"alpha\" and b.txt contains \"beta\". I'll now reply with DONE as instructed."
 - paragraph: DONE
 - button "Copy"
@@ -36,5 +39,5 @@
 - 'button "Access mode, current: Read Only"': Read Only
 - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
 - button "Send message" [disabled]
-- button "1 turns 2 steps · {{throughput}} tok/s": 1 turns 2 steps{{throughput}} tok/s
+- button "Model time {{duration}}"
 - button "16K tok · Cache hit 98%": 16K tokCache hit 98%

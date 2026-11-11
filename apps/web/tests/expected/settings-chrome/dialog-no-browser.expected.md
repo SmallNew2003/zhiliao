@@ -26,7 +26,15 @@
   - button "On completion"
   - text: Replies After Collapse Choose which assistant replies stay visible when work details collapse
   - button "All replies"
-  - text: Show coding view Shows trajectory, code diffs, and all Agent presets
+  - text: System notifications Get a system notification when a task needs you
+  - switch "Enable system notifications" [checked]
+  - text: When a session finishes Announce a session that finished in the background
+  - switch "When a session finishes" [checked]
+  - text: When approval or an answer is needed Announce a request that blocks the session on you
+  - switch "When approval or an answer is needed" [checked]
+  - text: When something fails Announce a failed session run
+  - switch "When something fails" [checked]
+  - text: System notification permission is denied; allow it in system settings Show coding view Shows trajectory, code diffs, and all Agent presets
   - switch "Show coding view"
   - text: Keyboard shortcuts
   - paragraph: View and edit available shortcuts and input actions
