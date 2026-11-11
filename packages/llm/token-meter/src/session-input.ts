@@ -3,6 +3,7 @@ import { readSessionInputEvent, type SessionEvent, type SessionSeq } from '@deep
 import type { Message } from '@deepseek-ai/dsh-llm'
 
 /**
+ * Convert a legacy edited-input materialization into an admission event.
  * @param sourceEvent - next persisted Session event.
  * @param previous - latest input retained by the caller.
  * @returns the event with legacy edited input represented as an admission.
