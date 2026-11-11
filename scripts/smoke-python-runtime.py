@@ -411,7 +411,7 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
             if result.get("is_error") or "python" not in json.loads(tool_text):
                 raise AssertionError(f"packaged Python query failed: {tool_text}")
             return text_chunks(EXPECTED_TEXT)
-        mcp = mcp_tool_followup(call_id, tool_name, tool_text)
+        mcp = mcp_tool_followup(body, call_id, tool_name, tool_text)
         if mcp is not None:
             return mcp
         fs_search = fs_search_tool_followup(call_id, tool_name, tool_text)
@@ -566,11 +566,11 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
             {"command": SPAWN_NODE_COMMAND, "description": "Report the reachable Node version"},
         )
     if prompt == MCP_PROMPT:
-        assert_advertised_tool(body, "mcp__fixture__add")
+        assert_advertised_tool(body, "discover_mcp_tools")
         return tool_call_chunks(
-            "mcp-add",
-            "mcp__fixture__add",
-            {"a": 19, "b": 23},
+            "mcp-discover",
+            "discover_mcp_tools",
+            {"action": "load", "names": ["mcp__fixture__add"]},
         )
     if prompt == PROFILE_PLUGIN_PROMPT:
         system_text = message_text(body.get("system")) + "\n" + "\n".join(
@@ -585,11 +585,17 @@ def completion_chunks(body: dict[str, object]) -> list[dict[str, object]]:
 
 
 def mcp_tool_followup(
+    body: dict[str, object],
     call_id: str,
     tool_name: str,
     tool_text: str,
 ) -> list[dict[str, object]] | None:
     """Verify one tool call through the packaged MCP client."""
+    if call_id == "mcp-discover":
+        if tool_name != "discover_mcp_tools" or not json.loads(tool_text).get("ok"):
+            raise AssertionError(f"packaged MCP discovery failed: {tool_name}: {tool_text}")
+        assert_advertised_tool(body, "mcp__fixture__add")
+        return tool_call_chunks("mcp-add", "mcp__fixture__add", {"a": 19, "b": 23})
     if call_id != "mcp-add":
         return None
     if tool_name != "mcp__fixture__add" or "42" not in tool_text:
