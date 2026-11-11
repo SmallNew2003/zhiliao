@@ -2,9 +2,14 @@
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-tools'
 import { getDshRuntimeVersion, initProfile } from '@deepseek-ai/dsh-app-boot'
 import { ON_DEMAND_BUNDLES } from '@deepseek-ai/dsh-official-bundles'
 import PluginManager from '../../src/index.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context { officialBundleMediaReady: true }
+}
 
 export const name = 'official-bundle-media'
 export const inject = ['profileContext']
@@ -35,4 +40,21 @@ export function apply(ctx: Context): void {
   scoped.provide('profileContext', { ...ctx.profileContext, dir, installAnchor,
     patchPath: join(dir, 'cordis.patch.yml'), startedBundles: [], overlays: [] })
   scoped.plugin(PluginManager)
+  exposeReadiness(ctx)
+}
+
+/** Publish readiness only while the manager tool is registered.
+ * @param ctx - Scope owning the fixture and its readiness marker.
+ */
+export function exposeReadiness(ctx: Context): void {
+  ctx.inject(['tools'], (scope) => {
+    let release: (() => void) | undefined
+    const update = () => {
+      if (scope.tools.get('plugin_manager') !== undefined) release ??= scope.provide('officialBundleMediaReady', true)
+      else { release?.(); release = undefined }
+    }
+    const stop = scope.on('tools/change', update)
+    update()
+    scope.effect(() => () => { stop(); release?.() })
+  })
 }
