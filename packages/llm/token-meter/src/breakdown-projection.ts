@@ -7,13 +7,13 @@
  */
 
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import { canonicalHeader, deriveEventMessage, isSurfaceEvent, SessionSeq } from '@deepseek-ai/dsh-session'
-import type { SessionEvent, SurfaceEvent } from '@deepseek-ai/dsh-session'
+import type { SurfaceEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 // Type-only: the `compaction/*` SessionEventMap merges (shadow-price events).
 import type {} from '@deepseek-ai/dsh-compaction'
+import { tokenInputEvent } from './session-input.ts'
 import { estimateMessage, estimateToolsTokens } from './estimate.ts'
 // Type-only: the client projection key and value declaration.
 import type {} from './projection.ts'
@@ -158,11 +158,7 @@ export const contextBreakdownProjectionDefinition = {
     breakdown: { systemTokens: 0, toolsTokens: 0, messageTokens: 0 },
   }),
   apply: (state, sourceEvent) => {
-    const input = readSessionInputEvent(sourceEvent)
-    const previousInput = state.latestInput
-    const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
-      && previousInput.messageId === input.data.id
-      ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
+    const event = tokenInputEvent(sourceEvent, state.latestInput)
     if (event.type === 'user/message-admit') {
       const previous = state.latestInput
       if (previous?.seq !== event.data.targetSeq) throw new Error('context breakdown: admitted input is not the latest input')
