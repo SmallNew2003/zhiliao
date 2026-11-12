@@ -4,7 +4,6 @@
  * @module @deepseek-ai/dsh-token-meter
  */
 
-import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction-image-offload/projection'
 import z from '@deepseek-ai/schemastery'
@@ -34,6 +33,7 @@ import type {
 import { contextBreakdownProjectionDefinition } from './breakdown-projection.ts'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from './usage-projection.ts'
 import type { ContextPressureState } from './usage-projection.ts'
+import { tokenInputEvent } from './session-input.ts'
 import { estimateMessage, estimateToolsTokens } from './estimate.ts'
 import { advanceMeasurement, measurementProjectionDefinition } from './measurement-projection.ts'
 import type { MeasurementState } from './measurement-projection.ts'
@@ -283,11 +283,7 @@ export class TokenMeter extends Service {
 
   /** Update only discardable positional prices and the pre-assistant view. */
   private _foldEvent(state: ReplayState, sourceEvent: SessionEvent): void {
-    const input = readSessionInputEvent(sourceEvent)
-    const previousInput = state.latestInput
-    const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
-      && previousInput.messageId === input.data.id
-      ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
+    const event = tokenInputEvent(sourceEvent, state.latestInput)
     if (event.type === 'user/message-admit') {
       state.surface = state.surface.map(node => node.seq === event.data.targetSeq
         ? { ...analyzeNode(node.seq, event.data.message), images: node.images } : node)

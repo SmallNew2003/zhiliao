@@ -141,7 +141,7 @@ it('keeps MCP resource-listing diagnostics off stdout for a tools-only client se
     })
     await expect(launched.client.prompt({
       sessionId: created.sessionId,
-      prompt: [{ type: 'text', text: 'list the fixture resources' }],
+      prompt: [{ type: 'text', text: 'list resources for mcp__fixture__add' }],
     })).resolves.toEqual({ stopReason: 'end_turn' })
     expect(launched.updates).toContainEqual(expect.objectContaining({ sessionUpdate: 'tool_call_update', status: 'completed' }))
     await launched.client.closeSession({ sessionId: created.sessionId })

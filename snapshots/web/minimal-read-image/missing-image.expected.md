@@ -1,6 +1,7 @@
-- button "Read image red.png" [expanded]:
+- button "Read image red.png {{duration}}" [expanded]:
   - text: Read image
   - button "red.png"
+  - text: {{duration}}
 - button "Image failed to load; click to retry"
 - text: {{cwd}}/red.png 1x1px, 69 bytes
 - button "Inspect"

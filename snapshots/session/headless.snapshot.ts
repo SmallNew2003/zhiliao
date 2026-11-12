@@ -1396,7 +1396,7 @@ describe('headless recorded-session snapshots', () => {
               const results = parseSessionLog(actualLogs[0]!.content).flatMap(event =>
                 event.type === 'tool/result' ? [event.data.message] : [])
               expect(results).toHaveLength(1)
-              expect(results[0]?.isError).toBe(false)
+              expect(results[0]?.isError, JSON.stringify(results[0])).toBe(false)
               const text = results[0]?.content.find(block => block.type === 'text')
               if (text?.type !== 'text') throw new Error('Official catalog snapshot has no tool result text')
               const catalog = JSON.parse(text.text) as { entries: JsonObject[]; total: number; nextOffset: number }

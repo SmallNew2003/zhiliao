@@ -205,7 +205,7 @@ def test_child_prompt_precedes_runtime_context(prompt_name: str, expected: str) 
 def test_mcp_smoke_requests_the_discovered_tool() -> None:
     chunks = SMOKE["completion_chunks"]({
         "messages": [{"role": "user", "content": [{"type": "text", "text": SMOKE["MCP_PROMPT"]}]}],
-        "tools": [{"name": "mcp__fixture__add", "input_schema": {"type": "object"}}],
+        "tools": [{"name": "discover_mcp_tools", "input_schema": {"type": "object"}}],
     })
 
     calls = [
@@ -213,6 +213,24 @@ def test_mcp_smoke_requests_the_discovered_tool() -> None:
         for chunk in chunks
         if chunk.get("type") == "content_block_start"
     ]
+    assert calls == [{"type": "tool_use", "id": "mcp-discover", "name": "discover_mcp_tools", "input": {}}]
+    arguments = next(chunk["delta"]["partial_json"] for chunk in chunks if chunk.get("type") == "content_block_delta")
+    assert json.loads(arguments) == {"action": "load", "names": ["mcp__fixture__add"]}
+
+
+def test_mcp_smoke_calls_the_tool_after_discovery() -> None:
+    chunks = SMOKE["completion_chunks"]({
+        "messages": [
+            {"role": "assistant", "content": [{
+                "type": "tool_use", "id": "mcp-discover", "name": "discover_mcp_tools", "input": {},
+            }]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "mcp-discover", "content": [{"type": "text", "text": '{"ok": true}'}],
+            }]},
+        ],
+        "tools": [{"name": "mcp__fixture__add", "input_schema": {"type": "object"}}],
+    })
+    calls = [chunk["content_block"] for chunk in chunks if chunk.get("type") == "content_block_start"]
     assert calls == [{"type": "tool_use", "id": "mcp-add", "name": "mcp__fixture__add", "input": {}}]
     arguments = next(chunk["delta"]["partial_json"] for chunk in chunks if chunk.get("type") == "content_block_delta")
     assert json.loads(arguments) == {"a": 19, "b": 23}

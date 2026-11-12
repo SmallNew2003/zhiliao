@@ -55,7 +55,7 @@ it('configures MCP on a live profile, restores it on restart, and removes its to
       child.once('close', () => { resolve() })
       child.once('error', reject)
     })
-    const stop = async () => { if (child.exitCode === null) child.kill('SIGTERM'); await completion }
+    const stop = async () => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM'); await completion }
     test.onTestFinished(stop)
     for (const stream of [child.stdout, child.stderr]) stream!.on('data', (data) => { output = (output + String(data)).slice(-30_000) })
     await expect.poll(() => {

@@ -24,6 +24,12 @@ export const remoteDefaultResponses: RemoteTable = {
       groups: [],
       failures: [],
     }),
+    // ui-assistant loads the global assistant and its task list at startup.
+    'assistantTasks/assistants': ok([]),
+    'assistantTasks/ensureAssistant': ok({ id: 'assistant-global', kind: 'global', sessionId: 'assistant-global-chat',
+      retiredSessionIds: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }),
+    'assistantTasks/visibility': ok({ sessionIds: ['assistant-global-chat'], conversations: [], executions: [] }),
+    'assistantTasks/tasks': ok([]),
     // ui-agent-preset hero chip and header label on first mount.
     'agentPresets/list': ok({ presets: [] }),
     // cordis-client-runner `ClientCordisInspectRegistry.sync` at apply and on `connection/reset`.

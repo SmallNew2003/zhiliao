@@ -3,15 +3,15 @@
  */
 
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import { readSessionInputEvent } from '@deepseek-ai/dsh-session'
 import { z } from 'zod'
 import { lastAssistantStreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
-import { SessionSeq } from '@deepseek-ai/dsh-session'
+import { readSessionInputEvent, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
+import { tokenInputEvent } from './session-input.ts'
 import { estimateMessage } from './estimate.ts'
 
 const zeroBuckets = (): TokenUsageProjection => ({
@@ -182,11 +182,7 @@ export const contextPressureProjectionDefinition = {
   stateSchema: contextPressureStateSchema,
   init: () => ({ surfaceTokens: 0 }),
   apply: (state, sourceEvent) => {
-    const input = readSessionInputEvent(sourceEvent)
-    const previousInput = state.latestInput
-    const event: SessionEvent = input.type === 'user/message' && previousInput?.edited === true
-      && previousInput.messageId === input.data.id
-      ? { type: 'user/message-admit', seq: input.seq, time: input.time, data: { targetSeq: previousInput.seq, message: input.data } } : input
+    const event = tokenInputEvent(sourceEvent, state.latestInput)
     if (event.type === 'user/message-admit') {
       const previous = state.latestInput
       if (previous?.seq !== event.data.targetSeq) throw new Error('context pressure: admitted input is not the latest input')
