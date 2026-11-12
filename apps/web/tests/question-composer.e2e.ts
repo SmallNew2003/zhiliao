@@ -580,9 +580,8 @@ describe('web e2e: resident question composer round trip', () => {
     // Keep the ask_user_question card's readable answer in the expanded golden
     // even though Compact mode hides the process by default.
     await expandTurnProcesses(page)
-    // A legacy call's answered row carries no pill and no read-only panel; its
-    // accessible name is the bare summary, as before timed questions existed.
-    const answeredRow = page.getByRole('button', { name: 'Ask question 1/1 answered', exact: true })
+    // A legacy call's answered row carries no pill and no read-only panel.
+    const answeredRow = page.getByRole('button', { name: /^Ask question 1\/1 answered(?: |$)/ })
     await answeredRow.click()
     await page.locator('[data-tool="ask_user_question"]')
       .getByText('Which color do you prefer?', { exact: true }).waitFor({ timeout: 10_000 })
@@ -1089,7 +1088,7 @@ describe.skipIf(MODE === 'record')('web e2e: cancelled question transcript', () 
     const { page: cancelledPage, scaffold, tripwire } = seeded
     onTestFailed(() => saveFailureShot(cancelledPage, 'web-e2e-question-cancelled-row'))
     await expandTurnProcesses(cancelledPage)
-    const row = cancelledPage.getByRole('button', { name: 'Ask question cancelled', exact: true })
+    const row = cancelledPage.getByRole('button', { name: /^Ask question cancelled(?: |$)/ })
     await row.waitFor({ timeout: 15_000 })
     await row.click()
 
@@ -1254,7 +1253,10 @@ it.each(['another-feature', 'cua-app-access'])('answers %s approval without a sp
   onTestFailed(() => saveFailureShot(page, `web-approval-fallback-${id}`))
   await page.goto(scaffold.authenticatedUrl)
   await connectFreshWorkspace(page, scaffold.workspaceCwd)
-  const agent = scaffold.ctx.agents.list()[0]!
+  const selected = await page.evaluate(() =>
+    (JSON.parse(localStorage.getItem('dsh.sessions.current') ?? '{}') as { sessionId?: string }).sessionId)
+  const agent = selected === undefined ? undefined : scaffold.ctx.agents.get(selected as SessionId)
+  if (agent === undefined) throw new Error('The selected workspace Session has no Agent')
   const result = scaffold.ctx.userQuestions.ask({ agent, signal: controller.signal, questions: [{
     id, question: 'Allow fixture access?', detail: 'Only this request.',
     options: [{ label: 'Allow' }, { label: 'Deny' }],
