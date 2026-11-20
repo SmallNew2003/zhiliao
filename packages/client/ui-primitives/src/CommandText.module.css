@@ -1,9 +1,14 @@
 .text {
   display: block;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: clip;
   white-space: var(--dsl-command-whitespace, pre);
   overflow-wrap: anywhere;
+}
+
+/* A native scroll container can enter the Tab order even without tabindex. */
+.text[tabindex="0"] {
+  overflow-x: auto;
 }
 
 .text:focus-visible {
