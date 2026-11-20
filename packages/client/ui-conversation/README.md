@@ -68,11 +68,11 @@ The existing semantic `DraftSnapshot` retains quote text and clipboard-coordinat
 <a id="shell-and-standard-props"></a>
 ## Shell and standard props
 
-Below 768px, Web view tabs align with the header's 20px left inset. Desktop and wider Web windows retain the additional 8px tab inset.
+The active view has a leaf-green label and underline. Below 768px, Web view tabs align with the header's 20px left inset. Desktop and wider Web windows retain the additional 8px tab inset.
 
 The shared image slot props keep display choices separate from durable references: `thumbnail` requests a contained attachment-list thumbnail, while `compact` requests a cropped gallery tile. An optional per-image `label` supplies the accessible display name; loading and cache identity still use the original attachment reference. `MessageImagesContentInput` adds optional complete `MessageImageLabels` for the root-scoped `conversation.images.content` Factory. Message, tool, and Factory inputs carry the view's authorized `loadImage` callback explicitly; loading and URL caching remain with the resource owner. [ui-attachment](../ui-attachment/README.md) provides this Factory and owns rendering and the lightbox.
 
-The composer uses a minimum 16px draft font on coarse-pointer devices to avoid focus-triggered browser zoom; larger font preferences still apply.
+New and active Sessions share the same input card. Its outline strengthens when a control inside has focus. The composer uses a minimum 16px draft font on coarse-pointer devices to avoid focus-triggered browser zoom; larger font preferences still apply.
 
 The composer measures its expanded control groups after size, content, visibility, or font-loading changes. If they cannot share a line, the row sets `--dsh-composer-model-text-display: none` and `--dsh-composer-model-icon-display: block` for the model seat; their defaults are `block` and `none`. The model seat is measured at its content width, capped at 360px, rather than at a share of the row, so a long name stays visible in the measurement. Wrapping remains available if even the icon cannot fit.
 

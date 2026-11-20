@@ -68,7 +68,7 @@ function officialEntry(id: string): 'plugin' | 'cron' | undefined {
 function PanelRow({ id, label, wide, usePanelInfo, selectPanel, trackEntryClick, renderSlot }: PanelRowProps) {
   const active = usePanelInfo(info => info.activePanelId === id)
   return (
-    <Tooltip label={label} delayMs={500} disabled={wide}>
+    <Tooltip label={label} delayMs={500} onlyWhenClipped={wide} portal>
       <button
         type="button"
         className={clsx(css.panelRow, active && css.panelActive)}
@@ -107,7 +107,7 @@ function PanelMoreMenu({ wide, label, entries, onOpen, onPinnedChange, trackEntr
   return (
     <Menu open={open} onClose={onDismiss} portal autoFocus className={css.moreAnchor} listClassName={css.moreMenu}
       anchor={(
-        <Tooltip label={label} delayMs={500} disabled={wide}>
+        <Tooltip label={label} delayMs={500} onlyWhenClipped={wide} portal>
           <button type="button" className={css.panelRow} aria-label={label} aria-haspopup="menu" aria-expanded={open}
             onClick={() => {
               trackEntryClick({ menu_name: 'more', position: 'sidebar' })

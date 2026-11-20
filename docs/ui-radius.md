@@ -33,8 +33,10 @@ H means designed outer height in CSS pixels, including borders. R means CSS `bor
 | Compact control | H20–28; small buttons, compact icon buttons, compact menu items | R8 | `--dsw-radius-sm` |
 | Standard control or single-line cell | H32–40; buttons, inputs, selects, navigation rows | R12 | `--dsw-radius-md` |
 | Large control or grouped content | Large buttons, deliberately multiline cells, nested form groups | R16 | `--dsw-radius-lg` |
-| Independent content card | Settings cards, message bubbles, guide entry cards | R20 | `--dsw-radius-xl` |
-| Main enclosing surface | Composer, dialogs, main or floating panels | R28 | `--dsw-radius-panel` |
+| Independent content card | Settings cards and guide entry cards | R20 | `--dsw-radius-xl` |
+| Main enclosing surface | Dialogs and floating panels | R28 | `--dsw-radius-panel` |
+
+The inset window pane uses R13, sidebar session rows R10, sidebar tiles and the send button R11, and the composer R17. User messages use R16 with an R6 trailing bottom corner.
 
 Prefer an existing shared size variant when a proposed control falls between these bands. A taller card remains a card: do not promote it to R28 merely because it exceeds a button's height. A multiline cell intentionally designed for multiple lines uses R16; an ordinary button whose label wraps retains its button variant.
 

@@ -618,7 +618,8 @@ describe('web e2e: long Chat scroll contract', () => {
         seeds: [{ fixture, id: `visible-fold-${scenario.name}` }],
       }, async (world) => {
         const { page } = world
-        await page.setViewportSize({ width: 1280, height: 720 })
+        // The capped multiline draft still leaves a portion of the last process row on screen.
+        await page.setViewportSize({ width: 1280, height: scenario.name === 'large-input' ? 780 : 720 })
         await page.emulateMedia({ reducedMotion: scenario.reduced ? 'reduce' : 'no-preference' })
         await openSeed(page, fixture, bodyMarker)
         await openSettings(page, 'en')

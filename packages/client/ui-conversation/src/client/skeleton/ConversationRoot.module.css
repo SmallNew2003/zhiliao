@@ -20,7 +20,8 @@
   box-sizing: border-box;
   min-height: 76px;
   padding: 10px 28px 0 20px;
-  border-bottom: 0.5px solid var(--dsw-alias-border-l3);
+  border-bottom: 0.5px solid var(--dsw-alias-message-border);
+  background: var(--dsw-alias-bg-base);
 }
 
 .header:where(:not(:has(.tabs))) {
@@ -168,7 +169,10 @@
 }
 
 .crumbCurrent {
+  font-size: 16px;
+  line-height: 20px;
   font-weight: 500;
+  letter-spacing: -0.02em;
   color: var(--dsw-alias-label-primary);
   cursor: default;
 }
@@ -272,15 +276,12 @@
   background: transparent;
 }
 
-/* Selected tab is blue, not ink: brand-primary resolves to neutral black in
-   this token sheet, so the selected state rides the business blue — the
-   nearest semantic token that stays blue in both themes. */
 .tabActive {
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-leaf-ink);
 }
 
 .tabActive::after {
-  background: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-leaf);
 }
 
 /* The More launcher centers its 22px box on the tab's 16px text line. */
@@ -296,7 +297,7 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-.viewsMoreActive { color: var(--dsw-alias-state-business-primary); }
+.viewsMoreActive { color: var(--dsw-alias-leaf-ink); }
 
 .tabLabel { display: block; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

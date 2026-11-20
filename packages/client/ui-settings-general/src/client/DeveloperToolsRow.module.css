@@ -8,13 +8,14 @@
 }
 
 .title {
+  font-weight: 500;
   font-size: 14px;
   line-height: 20px;
 }
 
 .description {
   margin-top: 4px;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-reading-muted);
   font-size: 12px;
   line-height: 18px;
 }

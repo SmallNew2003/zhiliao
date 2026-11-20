@@ -62,8 +62,6 @@
   white-space: nowrap;
 }
 
-/* Full-viewport layer (figma Mask 501:29946 #000@24%): mask tokens match the
-   Modal primitive (--dsw-alias-bg-mask-1 + --dsw-mask-blur). */
 .overlay {
   position: fixed;
   inset: 0;
@@ -77,8 +75,8 @@
 .mask {
   position: absolute;
   inset: var(--dsh-frame-chrome-top, 0px) 0 0;
-  background: var(--dsw-alias-bg-mask-1);
-  backdrop-filter: var(--dsw-mask-blur);
+  background: linear-gradient(var(--dsw-alias-settings-scrim), var(--dsw-alias-settings-scrim)), var(--dsw-alias-bg-mask-1);
+  backdrop-filter: blur(2px);
 }
 
 /* Settings uses a shared 800×800 panel; longer sections scroll
@@ -101,13 +99,15 @@
   grid-template-areas:
     'title header'
     'nav options';
+  box-sizing: border-box;
   width: 800px;
   height: min(800px, calc(100vh - 2 * max(24px, var(--dsh-frame-overlay-top, 24px))));
   max-width: calc(100vw - 48px);
-  border-radius: var(--dsw-radius-panel);
+  border: 1px solid var(--dsw-alias-glass-edge);
+  border-radius: var(--dsw-radius-xl);
   overflow: hidden;
-  background: var(--dsw-alias-bg-layer-2);
-  box-shadow: var(--dsw-elevation-prominent);
+  box-shadow: var(--dsw-alias-settings-shadow);
+  color: var(--dsw-alias-reading-ink);
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens.
      Declared on the panel rather than the scrolling `.options` child so the
      elevation choice sits with the surface; the custom properties inherit
@@ -117,12 +117,25 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
+/* Isolate the filtered background from fixed-position controls in the panel. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--dsw-alias-settings-shell);
+  backdrop-filter: blur(23px) saturate(0.7);
+}
+
+.panel [role='switch'] {
+  --dsw-alias-brand-primary: var(--dsw-alias-leaf);
+}
+
 .panel:focus {
   outline: none;
 }
 
-/* Nav rail (figma .Setting-nav 501:29958): the 188px track's cells, pad
-   (12,0), no own fill — the panel white shows through. */
 .nav {
   grid-area: nav;
   min-width: 0;
@@ -133,15 +146,13 @@
   box-sizing: border-box;
 }
 
-/* Title row (figma 501:29959): 16/500 lh24, at the rail's 24px text inset.
-   Its 54px row aligns with the content header; the nav adds the remaining
-   10px before the first cell. */
 .navTitle {
   grid-area: title;
   padding: 22px 12px 8px 24px;
-  font-size: 16px;
+  font-size: var(--dsw-font-l-20-font-size);
   line-height: 24px;
   font-weight: 500;
+  letter-spacing: -0.025em;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -154,8 +165,6 @@
   overflow-y: auto;
 }
 
-/* Nav cell (figma .Setting-nav-cell 501:29962): 164x40, r12, pad
-   (12,9,16,9), gap 8; label 14/400 lh22; selected fill #EBEEF2. */
 .navCell {
   display: flex;
   align-items: center;
@@ -164,14 +173,14 @@
   padding: 9px 16px 9px 12px;
   box-sizing: border-box;
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
   line-height: 22px;
   font-weight: 400;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-settings-control-ink);
   text-align: left;
 }
 
@@ -182,7 +191,9 @@
 }
 
 .navCell.active {
-  background: var(--dsw-specific-sidebar-nav-item-active);
+  color: var(--dsw-alias-leaf-ink);
+  background: var(--dsw-alias-glass-selected);
+  box-shadow: var(--dsw-alias-glass-shadow);
 }
 
 .navIcon {
@@ -200,6 +211,9 @@
 /* Header (figma .Header 501:29981): h54, pad (10,20,14,8), close right. */
 .header {
   grid-area: header;
+  margin: 6px 6px 0 0;
+  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+  background: var(--dsw-alias-bg-layer-2);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -243,6 +257,9 @@
 /* Options area (figma Options 501:29983): pad (24,0,24,24), scrolls. */
 .options {
   grid-area: options;
+  margin: 0 6px 6px 0;
+  border-radius: 0 0 var(--dsw-radius-lg) var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-2);
   min-width: 0;
   min-height: 0;
   padding: 0 24px 24px;
@@ -271,7 +288,9 @@
     width: 100%;
     max-width: none;
     height: 100%;
+    border: 0;
     border-radius: 0;
+    box-shadow: none;
   }
 
   :global(html:not([data-windows-titlebar]):not([data-platform='darwin'])) .navTitle {
@@ -283,7 +302,9 @@
 
   :global(html:not([data-windows-titlebar]):not([data-platform='darwin'])) .header {
     height: auto;
+    margin: 0;
     padding: 20px 16px 0 10px;
+    background: transparent;
   }
 
   :global(html:not([data-windows-titlebar]):not([data-platform='darwin'])) .nav {
@@ -321,7 +342,9 @@
   }
 
   :global(html:not([data-windows-titlebar]):not([data-platform='darwin'])) .options {
+    margin: 0;
     padding: 0 16px 24px;
+    border-radius: 0;
   }
 }
 

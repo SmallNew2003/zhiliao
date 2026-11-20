@@ -12,17 +12,13 @@
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
 }
 
 @media (hover: hover) {
   .projectRow:hover {
     background-color: var(--dsw-alias-interactive-bg-hover);
   }
-}
-
-.sessionRow.selected {
-  background-color: var(--dsw-alias-interactive-bg-hover);
 }
 
 .dragPreview {
@@ -44,7 +40,7 @@
   background-clip: padding-box;
   cursor: pointer;
   text-align: left;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
 }
 
 @media (hover: hover) {
@@ -148,8 +144,12 @@
   white-space: nowrap;
 }
 
+.folder {
+  color: var(--dsw-alias-glass-ink);
+}
+
 .folderActive {
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-leaf-ink);
 }
 
 
@@ -365,6 +365,16 @@
   background-color: var(--dsw-alias-interactive-bg-hover);
 }
 
+.sessionRow.selected {
+  border-radius: var(--dsw-radius-session-row);
+  background-color: var(--dsw-alias-glass-selected);
+  background-image: linear-gradient(var(--dsw-alias-leaf), var(--dsw-alias-leaf));
+  background-position: 4px center;
+  background-size: 2px 13px;
+  background-repeat: no-repeat;
+  box-shadow: var(--dsw-alias-glass-shadow);
+}
+
 /* Session drag insert marker: a leading chevron and 2px rule between rows,
    absolutely positioned so it neither resembles a row border nor changes layout. */
 .sessionRow.dropBefore,
@@ -473,12 +483,10 @@
 
 @media (hover: hover) {
   .iconButton:hover {
-    color: var(--dsw-alias-label-primary);
+    color: var(--dsw-alias-glass-ink);
   }
 }
 
-/* Chevrons ride the caption grey (#ADB2B8); the folder glyph stays one step
-   darker (tertiary, #81858C) per the cell spec. */
 .chevron {
   color: var(--dsw-alias-label-caption);
 }

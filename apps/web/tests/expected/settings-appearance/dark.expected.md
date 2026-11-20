@@ -6,11 +6,32 @@
     "fill": "rgb(44, 44, 46)"
   },
   "selector": {
-    "radius": "12px",
+    "radius": "8px",
     "border": "0px",
-    "stroke": "rgb(249, 250, 251)",
-    "fill": "rgb(53, 54, 56)",
+    "stroke": "rgb(209, 216, 211)",
+    "fill": "rgb(49, 53, 50)",
     "height": 36
+  },
+  "selectedTheme": {
+    "radius": "12px",
+    "border": "1px",
+    "stroke": "rgb(88, 127, 101)",
+    "fill": "rgb(40, 56, 46)",
+    "height": 84
+  },
+  "activeSection": {
+    "radius": "8px",
+    "border": "0px",
+    "stroke": "rgb(165, 214, 183)",
+    "fill": "rgb(65, 74, 67)",
+    "height": 40
+  },
+  "enabledSwitch": {
+    "radius": "999px",
+    "border": "0px",
+    "stroke": "rgb(255, 255, 255)",
+    "fill": "rgb(121, 185, 150)",
+    "height": 20
   },
   "usage": {
     "radius": "12px",

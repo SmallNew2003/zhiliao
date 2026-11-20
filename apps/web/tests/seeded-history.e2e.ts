@@ -393,6 +393,21 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // only — the prompt and full tool output must stay on screen.
     expect(await page.getByText(PROMPT, { exact: true }).count()).toBe(1)
 
+    const bubble = await page.locator('[data-message-bubble]').filter({ hasText: PROMPT }).evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { fill: style.backgroundColor, corners: style.borderRadius }
+    })
+    const chatTab = page.getByRole('tab', { selected: true, name: 'Chat', exact: true })
+    const activeTabInk = await chatTab.evaluate(element => getComputedStyle(element).color)
+    const composerCorners = await page.locator('[data-composer-card]').evaluate(element => getComputedStyle(element).borderRadius)
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'conversation-style.expected.md'), [
+      '# Conversation appearance',
+      '',
+      `- Selected Chat tab: ${activeTabInk}`,
+      `- User message: ${bubble.fill}, radius ${bubble.corners}`,
+      `- Composer radius: ${composerCorners}`,
+    ].join('\n'), MODE)
+
     await expect.poll(
       () => scaffold.ctx.agents.get(SessionId(SEED_ID)) !== undefined,
       { timeout: 10_000 },
@@ -921,7 +936,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(REASONING_EXPECTED_DIR, ['blank-reasoning.expected.md'])
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'command-row.expected.md', 'feedback-row.expected.md', 'file-preview.expected.md',
+      'command-row.expected.md', 'conversation-style.expected.md', 'feedback-row.expected.md', 'file-preview.expected.md',
       'session.v3.jsonl', 'sticky-geometry.expected.md', 'thinking-expanded.expected.md',
       'ui.expected.md', 'ui-expanded.expected.md',
     ])

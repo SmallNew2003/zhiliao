@@ -217,10 +217,11 @@ export async function expectCommandFocusAfterResize(container: Locator, command:
 async function expectNoCommandTabStop(command: Locator): Promise<void> {
   await expect.poll(() => command.evaluate(element => ({
     overflow: element.scrollWidth > element.clientWidth + 1,
+    overflowX: getComputedStyle(element).overflowX,
     tabIndex: element.getAttribute('tabindex'),
     role: element.getAttribute('role'),
     label: element.getAttribute('aria-label'),
-  }))).toEqual({ overflow: false, tabIndex: null, role: null, label: null })
+  }))).toEqual({ overflow: false, overflowX: 'clip', tabIndex: null, role: null, label: null })
 }
 
 /**

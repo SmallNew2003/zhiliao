@@ -174,7 +174,7 @@ class StreamingRenderer {
  * `body` variant uses the full document typography. `omitHtml` renders raw
  * HTML as nothing instead of literal text, for documents written for HTML
  * renderers, such as package READMEs. `textInteractionSource` marks the
- * existing root as a source for text selection interactions.
+ * existing root as a source for text selection interactions. `className` styles that root.
  * The provider's `openFile` enables local Markdown links in settled messages,
  * including `#L24` / `#L24-L30` fragments and `:24` / `:24-30` / `:24:5` suffixes
  * (ranges open at their first line, columns are ignored, and invalid locations
@@ -184,9 +184,10 @@ class StreamingRenderer {
  * absolute HTTP(S) images render directly.
  */
 export const MarkdownText = memo(function MarkdownText({
-  text, streaming = false, labels, fileMentions, pathImages, variant = 'body', omitHtml = false, textInteractionSource = false,
+  text, className, streaming = false, labels, fileMentions, pathImages, variant = 'body', omitHtml = false, textInteractionSource = false,
 }: {
   text: string
+  className?: string | undefined
   streaming?: boolean
   labels: MarkdownLabels
   fileMentions?: MarkdownFileMentions | undefined
@@ -208,7 +209,7 @@ export const MarkdownText = memo(function MarkdownText({
     }
     return streamRef.current.render(text)
   }, [text, streaming, labels, fileMentions, pathImages, omitHtml])
-  return <div className={clsx(css.markdown, variant === 'compact' && css.compact)}
+  return <div className={clsx(css.markdown, variant === 'compact' && css.compact, className)}
     data-text-interaction-source={textInteractionSource ? '' : undefined}
     data-markdown-variant={variant === 'compact' ? variant : undefined}>{children}</div>
 })

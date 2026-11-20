@@ -69,7 +69,8 @@ it.each([
   const scaffold = await launchWebScaffold({})
   try {
     await seedSession(scaffold, shellFixture(args, output), 'shell-command-details-browser')
-    const browser = await chromium.launch()
+    // Native keyboard scrolling must settle before the next focus or selection gesture.
+    const browser = await chromium.launch({ args: ['--disable-smooth-scrolling'] })
     try {
       const page = await newEnglishPage(browser)
       const tripwire = watchConsole(page)
@@ -118,7 +119,8 @@ it.each([
             await row.focus()
             await page.keyboard.press('Tab')
             const focusTarget = background ? inputSection : card.getByRole('button', { name: 'Copy', exact: true })
-            expect(await focusTarget.evaluate(element => document.activeElement === element)).toBe(true)
+            expect(await focusTarget.evaluate(element => document.activeElement === element),
+              `${colorScheme} ${width || 'auto'} Tab from shell row`).toBe(true)
             await page.keyboard.press('End')
             await expect.poll(() => inputSection.evaluate(element =>
               element.scrollTop + element.clientHeight >= element.scrollHeight - 1)).toBe(true)

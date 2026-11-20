@@ -31,6 +31,11 @@ describe('SidebarRoot.module.css', () => {
     expect(declarations('.collapsed .panelList')?.get('gap')).toBe('12px')
   })
 
+  it('wraps wide panel entries into three equal tracks and constrains long labels', () => {
+    expect(declarations('.root:not(.collapsed) .panelList')?.get('grid-template-columns')).toBe('repeat(3, minmax(0, 1fr))')
+    expect(declarations('.root:not(.collapsed) .panelTitle')?.get('max-width')).toBe('100%')
+  })
+
   it('shares and cancels the wide shell trailing padding structurally', () => {
     const root = declarations('.root')
     expect(root?.get('--dsh-sidebar-inline-padding')).toBe('8px')
@@ -50,7 +55,7 @@ describe('SidebarRoot.module.css', () => {
 
   it('keeps the reviewed expanded spacing separate from rail and caption controls', () => {
     expect(declarations('.logoRow')?.get('padding')).toBe('8px 0 8px 8px')
-    expect(declarations('.logoRow')?.get('margin-bottom')).toBe('0')
+    expect(declarations('.logoRow')?.get('margin-bottom')).toBe('10px')
     expect(declarations('.newSession')?.get('margin')).toBe('0 calc(var(--dsh-sidebar-paint-inset) + 1px) 10px')
     expect(declarations('.newSessionContent')?.get('justify-content')).toBe('center')
     expect(declarations(":global(html[data-platform='darwin']:not([data-fullscreen])) .root:not(.collapsed) > .topStrip > .toggle")?.get('transform')).toBe('translateX(4px)')

@@ -30,7 +30,7 @@ it('keeps settings and expanded plugin dialogs clear of the Windows caption acro
       const permissionText = settings.getByText('权限', { exact: true }).locator('..')
       expect(await permissionText.evaluate(el => getComputedStyle(el).paddingRight)).toBe('48px')
       const cubes = settings.getByRole('button', { name: /浅色|深色|跟随系统/ })
-      expect(await cubes.first().evaluate(el => getComputedStyle(el).flexBasis)).toBe('180px')
+      expect(await cubes.first().evaluate(el => getComputedStyle(el).flexBasis)).toBe('170px')
       for (const fullscreen of [false, true, false]) {
         await page.evaluate(value => document.documentElement.toggleAttribute('data-fullscreen', value), fullscreen)
         const margin = fullscreen ? 24 : 60
@@ -96,7 +96,7 @@ it('keeps settings and expanded plugin dialogs clear of the Windows caption acro
         await expect.poll(async () => (await settings.boundingBox())?.y).toBe(platform === 'darwin' ? 68 : 0)
         expect((await settingsMask.boundingBox())?.y).toBe(0)
         expect(await permissionText.evaluate(el => getComputedStyle(el).paddingRight)).toBe(platform === 'darwin' ? '48px' : '16px')
-        expect(await cubes.first().evaluate(el => getComputedStyle(el).flexBasis)).toBe(platform === 'darwin' ? '180px' : '0px')
+        expect(await cubes.first().evaluate(el => getComputedStyle(el).flexBasis)).toBe(platform === 'darwin' ? '170px' : '0px')
         await page.keyboard.press('Escape')
         await settings.waitFor({ state: 'hidden' })
       }

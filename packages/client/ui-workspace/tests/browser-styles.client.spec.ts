@@ -58,7 +58,6 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(listArea?.get('margin-left')).toBe('-4px')
     expect(listArea?.get('padding-left')).toBe('4px')
     expect(listArea?.get('margin-right')).toBe('calc(-1 * var(--dsh-session-list-edge-inset))')
-    expect(declarations('.fade')?.get('right')).toBe('var(--dsh-session-list-edge-inset)')
     expect(list?.get('margin-right')).toBe('var(--dsh-session-list-scrollbar-offset)')
     expect(list?.get('margin-left')).toBe('-4px')
     expect(list?.get('padding-left')).toBe('4px')
@@ -104,8 +103,7 @@ describe('WorkspaceBrowser.module.css list', () => {
     }
   })
 
-  it('keeps the compact fade, overflow control, search field, and row heights', () => {
-    expect(declarations('.fade')?.get('height')).toBe('24px')
+  it('keeps the compact overflow control, search field, and row heights', () => {
     expect(declarations('.sessionOverflowButton')?.get('height')).toBe('28px')
     expect(declarations('.searchExpanded')?.get('height')).toBe('32px')
     expect(rowDeclarations('.projectRow')?.get('height')).toBe('34px')
@@ -119,7 +117,8 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(rowDeclarations('.searchResultRow')?.get('min-height')).toBe('48px')
     expect(rowDeclarations('.searchResultTitle')?.get('margin')).toBe('0 var(--dsh-sidebar-label-gap)')
     expect(rowDeclarations('.sessionRow.selected')?.get('background-color'))
-      .toBe('var(--dsw-alias-interactive-bg-hover)')
+      .toBe('var(--dsw-alias-glass-selected)')
+    expect(rowDeclarations('.sessionRow.selected')?.get('background-size')).toBe('2px 13px')
   })
 
   it('shares action spacing and inset backgrounds without moving the title column', () => {

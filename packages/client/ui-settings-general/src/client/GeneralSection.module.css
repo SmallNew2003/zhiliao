@@ -2,6 +2,9 @@
  * strips the trailing separator wherever the column ends. */
 
 .section {
+  --dsw-alias-label-primary: var(--dsw-alias-reading-ink);
+  --dsw-alias-label-tertiary: var(--dsw-alias-reading-muted);
+  --dsw-alias-bg-module-platform: var(--dsw-alias-settings-control-fill);
   display: flex;
   flex-direction: column;
   width: 100%;

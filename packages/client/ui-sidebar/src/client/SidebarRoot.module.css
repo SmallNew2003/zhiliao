@@ -1,5 +1,5 @@
 /* Sidebar column: vertical stack, padding 8/6, sidebar
-   fill and desktop divider painted by the layout column. Collapse is a
+   material painted by the layout column. Collapse is a
    slide + crossfade, not a morph: the content holds its frozen expanded
    layout (inline width set by the component) and fades in place (.fading)
    while the sliding column (AppFrame grid tracks) clips it; the rail layout
@@ -16,8 +16,7 @@
   height: 100%;
   padding: 6px var(--dsh-sidebar-inline-padding);
   box-sizing: border-box;
-  background: var(--dsw-specific-sidebar-fill);
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
   font-size: 14px;
   /* The sidebar is elevated above the conversation surface, so a revealed
      scrollbar uses the l2 pair. .quietBars hides it without changing layout. */
@@ -27,12 +26,6 @@
 
 :global([data-animating]:not([data-dragging])) .root {
   transition: width var(--ds-transition-duration-slow) var(--ds-ease-in-out);
-}
-
-/* macOS desktop: the AppFrame column owns the translucent sidebar tint; an
-   opaque fill here would sit on top of it and block the window vibrancy. */
-:global([data-platform='darwin']) .root {
-  background: transparent;
 }
 
 /* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
@@ -116,7 +109,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--dsw-radius-sm);
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-glass-secondary);
 }
 
 :global([data-windows-titlebar]) .collapsed .toggle .panelIcon {
@@ -215,8 +208,7 @@
   margin-top: -12px;
 }
 
-/* Logo row: 8px vertical and leading padding, with no trailing padding or
-   bottom margin. Expanded keeps the panel toggle at the
+/* Logo row: 8px vertical and leading padding. Expanded keeps the panel toggle at the
    right edge; the rail gives every control the same base left anchor before
    the shared entry translation is applied. macOS hiddenInset titlebar: the row
    is marked `data-window-drag` in markup (SidebarRoot), so ui-web base.css's
@@ -236,7 +228,7 @@
   gap: 8px;
   height: 60px;
   padding: 8px 0 8px 8px;
-  margin-bottom: 0;
+  margin-bottom: 10px;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -329,9 +321,10 @@
 }
 
 .localBuildTitle {
-  font-size: 12px;
-  line-height: 13px;
-  letter-spacing: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: -0.018em;
 }
 
 .iconButton {
@@ -347,7 +340,7 @@
   padding: 0;
   background: transparent;
   cursor: pointer;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-glass-secondary);
 }
 
 @media (hover: hover) {
@@ -396,27 +389,22 @@
 /* Rail icons ride the primary ink (figma rail spec); expanded keeps the
    secondary icon-button ink. */
 .collapsed .iconButton {
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
 }
 
 .buildVersion {
   flex: none;
   display: inline-flex;
   align-items: center;
-  height: 10px;
-  padding: 0 3px;
-  border-radius: 2px;
-  color: var(--dsw-alias-label-primary-inverted);
-  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-secondary);
   font-family: var(--ds-font-family-code);
-  font-size: 6px;
-  font-weight: 500;
-  line-height: 10px;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 13px;
   white-space: nowrap;
 }
 
-/* New Session: 38px bar, 12px radius (figma 133:7634 geometry, squared-off
-   corners); collapsed it renders as the rail's plain icon control. */
+/* The expanded New Session button centers its label independently of the shortcut. */
 .newSession {
   container-type: inline-size;
   position: relative;
@@ -425,14 +413,15 @@
   align-items: center;
   justify-content: center;
   gap: 0;
-  height: 38px;
+  height: 41px;
   padding: 8px 12px;
   margin: 0 calc(var(--dsh-sidebar-paint-inset) + 1px) 10px;
   box-sizing: border-box;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-button-elevated-fill);
-  color: var(--dsw-alias-label-primary);
+  border: 1px solid var(--dsw-alias-glass-edge);
+  border-radius: var(--dsw-radius-toolbar-control);
+  background: var(--dsw-alias-glass-button);
+  box-shadow: var(--dsw-alias-glass-shadow);
+  color: var(--dsw-alias-glass-ink);
   font-size: 14px;
   font-weight: 500;
   line-height: 22px;
@@ -442,30 +431,7 @@
 
 @media (hover: hover) {
   .newSession:hover {
-    background: var(--dsw-alias-button-floating-hover);
-  }
-}
-
-/* macOS: the themed elevated fill reads as a foreign slab on the vibrancy
-   sidebar; a white wash sits in the glass like native macOS sidebar
-   controls. Dark keeps the same white ink at lower alpha. */
-:global([data-platform='darwin']) :where(.root:not([role='dialog'])) .newSession {
-  background: rgb(255 255 255 / 0.55);
-}
-
-@media (hover: hover) {
-  :global([data-platform='darwin']) :where(.root:not([role='dialog'])) .newSession:hover {
-    background: rgb(255 255 255 / 0.3);
-  }
-}
-
-:global([data-platform='darwin']) :global([data-ds-dark-theme]) :where(.root:not([role='dialog'])) .newSession {
-  background: rgb(255 255 255 / 0.15);
-}
-
-@media (hover: hover) {
-  :global([data-platform='darwin']) :global([data-ds-dark-theme]) :where(.root:not([role='dialog'])) .newSession:hover {
-    background: rgb(255 255 255 / 0.2);
+    background: var(--dsw-alias-glass-tile-hover);
   }
 }
 
@@ -478,6 +444,8 @@
   gap: 0;
   border-color: transparent;
   background: transparent;
+  border-radius: var(--dsw-radius-md);
+  box-shadow: none;
 }
 
 @media (hover: hover) {
@@ -553,7 +521,7 @@
   border-radius: var(--dsw-radius-md);
   background: transparent;
   background-clip: padding-box;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
   font: inherit;
   line-height: 22px;
   text-align: left;
@@ -568,7 +536,7 @@
 
 .panelRow.panelActive {
   background-color: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
 }
 
 .panelRow:focus-visible {
@@ -605,6 +573,54 @@
   white-space: nowrap;
 }
 
+@media (min-width: 780px) {
+  .root:not(.collapsed) .panelList {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+    margin: 2px var(--dsh-sidebar-paint-inset) 19px;
+    max-height: 40%;
+    overflow-y: auto;
+  }
+
+  .root:not(.collapsed) .panelRow {
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    height: 59px;
+    padding: 7px 2px;
+    border: 0;
+    border-radius: var(--dsw-radius-toolbar-control);
+    background: var(--dsw-alias-glass-tile);
+    box-shadow: inset 0 0 0 1px var(--dsw-alias-glass-edge);
+    color: var(--dsw-alias-glass-secondary);
+  }
+
+  .root:not(.collapsed) .panelTitle {
+    max-width: 100%;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 15px;
+  }
+
+  .root:not(.collapsed) .panelGlyph {
+    width: 18px;
+    height: 18px;
+  }
+
+  .root:not(.collapsed) .panelRow:is(.panelActive, [aria-expanded='true']) {
+    background: var(--dsw-alias-glass-selected);
+  }
+}
+
+@media (hover: hover) and (min-width: 780px) {
+  .root:not(.collapsed) .panelRow:not(.panelActive, [aria-expanded='true']):hover {
+    background: var(--dsw-alias-glass-tile-hover);
+  }
+}
+
 .collapsed .panelList {
   gap: 12px;
   margin-bottom: 12px;
@@ -618,7 +634,7 @@
   border-inline: 0;
   background-clip: border-box;
   padding: 0;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-glass-ink);
 }
 
 /* Region seat: always mounted so the foot never moves. Its trailing margin

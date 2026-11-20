@@ -1,18 +1,22 @@
 {
   "web-light": {
     "fill": "rgba(0, 0, 0, 0.24)",
-    "blur": "none"
+    "tint": "linear-gradient(rgba(43, 62, 49, 0.12), rgba(43, 62, 49, 0.12)), none",
+    "blur": "blur(2px)"
   },
   "web-dark": {
     "fill": "rgba(0, 0, 0, 0.5)",
-    "blur": "none"
+    "tint": "linear-gradient(rgba(8, 13, 10, 0.25), rgba(8, 13, 10, 0.25)), none",
+    "blur": "blur(2px)"
   },
   "darwin-light": {
     "fill": "rgba(0, 0, 0, 0.24)",
-    "blur": "none"
+    "tint": "linear-gradient(rgba(43, 62, 49, 0.12), rgba(43, 62, 49, 0.12)), none",
+    "blur": "blur(2px)"
   },
   "darwin-dark": {
     "fill": "rgba(0, 0, 0, 0.5)",
-    "blur": "none"
+    "tint": "linear-gradient(rgba(8, 13, 10, 0.25), rgba(8, 13, 10, 0.25)), none",
+    "blur": "blur(2px)"
   }
 }

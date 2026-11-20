@@ -85,6 +85,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         rendered.push(
           <MarkdownText
             key={i}
+            className={css.reply}
             text={block.text}
             streaming={streaming}
             labels={labels}

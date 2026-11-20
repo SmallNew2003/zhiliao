@@ -27,7 +27,7 @@
 
 .title {
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
 }
@@ -46,12 +46,12 @@
   height: 36px;
   padding: 0 14px;
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-bg-module-platform);
   font: inherit;
   font-size: 14px;
   line-height: 22px;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-settings-control-ink);
   cursor: pointer;
 }
 
