@@ -33,7 +33,7 @@ it('shares menu transparency and blur across palettes and follows native menu bo
   await account.waitFor()
 
   const results: Record<string, Awaited<ReturnType<typeof material>>> = {}
-  const masks: Record<string, { fill: string; blur: string }> = {}
+  const masks: Record<string, { fill: string; tint: string; blur: string }> = {}
   for (const platform of ['web', 'darwin']) {
     for (const dark of [false, true]) {
       await page.evaluate(({ platform, dark }) => {
@@ -85,9 +85,14 @@ it('shares menu transparency and blur across palettes and follows native menu bo
       await settings.waitFor()
       const mask = await settings.locator('..').locator(':scope > [aria-hidden="true"]').evaluate((node) => {
         const style = getComputedStyle(node)
-        return { fill: style.backgroundColor, blur: style.backdropFilter }
+        return { fill: style.backgroundColor, tint: style.backgroundImage, blur: style.backdropFilter }
       })
-      expect(mask).toEqual({ fill: dark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.24)', blur: 'none' })
+      const tint = dark ? 'rgba(8, 13, 10, 0.25)' : 'rgba(43, 62, 49, 0.12)'
+      expect(mask).toEqual({
+        fill: dark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.24)',
+        tint: `linear-gradient(${tint}, ${tint}), none`,
+        blur: 'blur(2px)',
+      })
       masks[`${platform}-${dark ? 'dark' : 'light'}`] = mask
       await page.keyboard.press('Escape')
       await settings.waitFor({ state: 'hidden' })

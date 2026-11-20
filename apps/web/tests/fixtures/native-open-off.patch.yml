@@ -1,0 +1,4 @@
+# In-app file destinations remain available on a Host without a native desktop.
+- id: session-controller
+  config:
+    nativeOpen: false

@@ -49,7 +49,11 @@ async function openWorkspace(
 ): Promise<{ page: Page; input: Locator; errors: ReturnType<typeof watchConsole> }> {
   const scaffold = await launchWebScaffold({
     replayFixture: fileURLToPath(new URL('../../../snapshots/web/lifecycle-chrome/session.v3.jsonl', import.meta.url)),
-    paceMs: 5, compareReplaySession: false, ...openInAppEnvironment === undefined ? {} : { openInAppEnvironment },
+    paceMs: 5, compareReplaySession: false,
+    ...openInAppEnvironment === undefined ? {} : {
+      openInAppEnvironment,
+      extraOverlayPath: fileURLToPath(new URL('./fixtures/native-open-off.patch.yml', import.meta.url)),
+    },
   })
   onTestFinished(() => scaffold.close())
   const browser = await chromium.launch()
@@ -179,7 +183,7 @@ it('browses workspace files in tabs that share one pane tree', async () => {
     await column.locator('[data-files-navigator-mode="fill"]:visible').waitFor()
     expect(await navigator.evaluate(node => getComputedStyle(node).backgroundColor)).toBe(cardPaint.background)
     await layout.evaluate((node) => { node.textContent = '[data-sidebar-right-panel] { width: 960px !important; }' })
-    await navigator.getByRole('separator').waitFor()
+    await column.locator('[data-files-navigator-mode="push"]:visible').waitFor()
   } finally {
     await page.evaluate((value) => {
       if (value === null) document.body.removeAttribute('data-ds-dark-theme')
@@ -190,9 +194,9 @@ it('browses workspace files in tabs that share one pane tree', async () => {
   // The reader scrolls the preview and widens the tree.
   await body.evaluate((node) => { node.scrollTop = 900 })
   const edge = navigator.getByRole('separator', { name: 'Resize file tree' })
+  await edge.hover({ position: { x: 4, y: 120 } })
   const grip = await edge.boundingBox()
   if (grip === null) throw new Error('resize edge is not rendered')
-  await page.mouse.move(grip.x + grip.width / 2, grip.y + 120)
   await page.mouse.down()
   await page.mouse.move(grip.x + grip.width / 2 - 40, grip.y + 120, { steps: 4 })
   await page.mouse.up()
@@ -469,7 +473,7 @@ it('browses workspace files in tabs that share one pane tree', async () => {
 })
 
 it('moves a file between the docked column and a floating panel from the file menu, keeping its reading position', async () => {
-  // The file menu's open actions belong to Open In, which ordinary scenarios leave out; remote launch facts suppress native probes.
+  // The menu offers both in-app destinations on a Host without desktop applications.
   const { page, errors } = await openWorkspace('web-e2e-file-browser-destination',
     createLaunchEnvironmentSnapshot([{ source: 'process', values: { SSH_CONNECTION: '10.0.0.2 55000 10.0.0.9 22' } }]))
   const column = page.locator('[data-rightbar-col]')
@@ -481,9 +485,9 @@ it('moves a file between the docked column and a floating panel from the file me
   await expand.click()
   await column.locator('[data-sidebar-right-guide-entry="files"]').click()
   await column.locator('[data-files-page]').waitFor()
-  const surface = await page.locator('[data-dockkit-surface]').first().boundingBox()
-  if (surface === null) throw new Error('surface is not rendered')
-  await drag(page, column.locator('[data-dockkit-tab]', { hasText: 'Files' }), { x: surface.x - 240, y: surface.y + 120 })
+  await docked('Files').dragTo(page.locator('[data-slot="main"]').locator('..'), {
+    sourcePosition: { x: 6, y: 14 }, steps: 12,
+  })
   await expect.poll(() => float.count()).toBe(1)
   await column.locator('[data-sidebar-right-toggle]').click()
   await expand.waitFor()

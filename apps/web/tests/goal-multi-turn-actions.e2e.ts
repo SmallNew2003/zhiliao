@@ -167,7 +167,7 @@ describe('web e2e: Goal keeps one assistant action row per completed turn', () =
         const group = page.locator('[data-process-activity]:visible').first()
         const groupFontSize = await group.evaluate(element => getComputedStyle(element).fontSize)
         expect(groupFontSize).toBe(`${String(fontSize)}px`)
-        expect(await process.evaluate(element => getComputedStyle(element).fontSize)).toBe(groupFontSize)
+        expect(await process.evaluate(element => getComputedStyle(element).fontSize)).toBe(`${String(fontSize - 1)}px`)
         expect(await trigger.getByText('Continuing goal', { exact: true })
           .evaluate(element => getComputedStyle(element).fontSize)).toBe(groupFontSize)
         expect(await process.evaluate(element => element.getBoundingClientRect().top))
