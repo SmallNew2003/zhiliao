@@ -24,7 +24,7 @@
   border: none;
   border-radius: var(--dsw-radius-sm);
   background: transparent;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-reading-muted);
   font-size: calc(var(--dsh-content-font-size-secondary, 13px) - 1px);
   font-variant-numeric: tabular-nums;
   line-height: calc(24px + var(--dsh-content-font-delta, 0px));
@@ -48,13 +48,13 @@
 
 .trigger[aria-expanded='true'] {
   background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-reading-muted);
 }
 
 @media (hover: hover) {
   .trigger:hover {
     background: var(--dsw-alias-interactive-bg-hover);
-    color: var(--dsw-alias-label-tertiary);
+    color: var(--dsw-alias-reading-muted);
   }
 }
 

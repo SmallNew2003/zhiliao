@@ -21,6 +21,11 @@
   --dsw-radius-lg: 16px;
   --dsw-radius-xl: 20px;
   --dsw-radius-panel: 28px;
+  --dsw-radius-message-tail: 6px;
+  --dsw-radius-session-row: 10px;
+  --dsw-radius-toolbar-control: 11px;
+  --dsw-radius-window-pane: 13px;
+  --dsw-radius-composer: 17px;
 }
 
 /* User font lists (--dsh-font-family-text/-code, written on body by the theme

@@ -5,7 +5,8 @@
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  background: var(--dsw-alias-bg-base);
+  isolation: isolate;
+  background: var(--dsw-alias-window-shell);
 }
 
 /* Only discrete collapse/expand and fold changes ease the tracks (the TSX holds
@@ -28,7 +29,6 @@
   --dsh-windows-content-radius: 16px;
   box-sizing: border-box;
   padding-top: var(--dsh-windows-titlebar-height);
-  background: var(--dsw-specific-sidebar-fill);
 }
 
 :global([data-windows-titlebar]) .centerCol {
@@ -42,12 +42,7 @@
   position: absolute;
   inset: 0 0 auto;
   height: var(--dsh-windows-titlebar-height);
-  background: var(--dsw-specific-sidebar-fill);
   -webkit-app-region: drag;
-}
-
-:global([data-windows-titlebar]) .sidebarCol {
-  border-right: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -61,8 +56,18 @@
   grid-row: 1;
   min-width: 0;
   overflow: hidden;
-  background: var(--dsw-specific-sidebar-fill);
-  border-right: 0.5px solid var(--dsw-alias-border-l3);
+  position: relative;
+}
+
+/* Keep backdrop filtering off the ancestor of fixed Windows caption buttons and overlays. */
+.sidebarCol::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--dsw-alias-sidebar-glass);
+  backdrop-filter: blur(16px) saturate(0.8);
 }
 
 .centerCol {
@@ -72,6 +77,29 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+}
+
+@media (min-width: 768px) {
+  .frame:not([data-sidebar-drawer]) .centerCol {
+    margin: 8px 8px 8px 0;
+    border-radius: var(--dsw-radius-window-pane);
+    box-shadow: var(--dsw-alias-pane-shadow);
+  }
+
+  /* The Windows caption meets the content's native 16px leading corner. */
+  :global([data-windows-titlebar]) .frame .centerCol {
+    margin-top: 0;
+    border-top-left-radius: var(--dsh-windows-content-radius);
+    border-top-right-radius: 0;
+  }
+
+  /* The docked right panel meets the center at the resize handle. */
+  .frame:not([data-sidebar-drawer], [data-rightbar-collapsed]) .centerCol {
+    margin-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
 }
 
 .mainPanel {
@@ -82,13 +110,24 @@
   min-height: 0;
 }
 
-/* macOS desktop: the frame goes transparent so window vibrancy reaches the
-   sidebar column, which keeps only a translucent tint; the centre paints the
-   base background itself to stay opaque. The sidebar/centre separator moves
-   to the opaque centre: on the translucent sidebar the alpha border mixes
-   with the wallpaper and reads as a dark seam. */
+/* Native vibrancy shows through the shell while the center stays opaque. */
 :global([data-platform='darwin']) .frame {
   background: transparent;
+}
+
+:global([data-platform='darwin']) .frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: var(--dsw-alias-window-shell);
+  opacity: 0.65;
+}
+
+/* Window controls and the conversation title share the native titlebar baseline. */
+:global(html[data-platform='darwin']) .frame:not([data-sidebar-drawer]) .centerCol {
+  margin-top: 0;
 }
 
 /* The constant step below the window's top strip (traffic lights, sidebar
@@ -120,51 +159,14 @@
   --dsh-frame-chrome-top: 0px;
 }
 
-:global([data-platform='darwin']) .frame:not([data-sidebar-drawer]) .sidebarCol {
-  /* A blue wash over the top of the translucent tint, gone by a third of the
-     column; a faint blue-grey-violet rises through the bottom third; and a
-     faint blue cast is mixed into the tint itself. Every layer stays
-     transparent so vibrancy shows. */
-  background:
-    linear-gradient(
-      to bottom,
-      rgb(122 155 240 / 0.1),
-      rgb(122 155 240 / 0) 35%,
-      rgb(143 137 184 / 0) 68%,
-      rgb(143 137 184 / 0.09)
-    ),
-    color-mix(in srgb, color-mix(in srgb, var(--dsw-specific-sidebar-fill) 97%, rgb(122 155 240)) 40%, transparent);
-  border-right: none;
-}
-
-/* Dark drops the blue cast (the light-mode wash reads purple over dark fills)
-   and thins the fill so more wallpaper shows; the washes stay. */
-:global([data-platform='darwin']) :global([data-ds-dark-theme]) .frame:not([data-sidebar-drawer]) .sidebarCol {
-  background:
-    linear-gradient(
-      to bottom,
-      rgb(122 155 240 / 0.08),
-      rgb(122 155 240 / 0) 35%,
-      rgb(143 137 184 / 0) 68%,
-      rgb(143 137 184 / 0.07)
-    ),
-    color-mix(in srgb, var(--dsw-specific-sidebar-fill) 50%, transparent);
-}
-
-/* macOS Reduce Transparency: the OS flattens the window's vibrancy layer to a
-   solid grey, so the thin tint and washes read washed-out over it. Replace
-   them with a 90%-opaque fill of the same token in both themes (the dark
-   selector repeats so this outranks its thinner fill). */
 @media (prefers-reduced-transparency: reduce) {
-  :global([data-platform='darwin']) .frame:not([data-sidebar-drawer]) .sidebarCol,
-  :global([data-platform='darwin']) :global([data-ds-dark-theme]) .frame:not([data-sidebar-drawer]) .sidebarCol {
-    background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 90%, transparent);
+  :global([data-platform='darwin']) .frame::after {
+    opacity: 1;
   }
-}
 
-:global([data-platform='darwin']) .centerCol {
-  background: var(--dsw-alias-bg-base);
-  border-left: 0.5px solid var(--dsw-alias-border-l3);
+  .sidebarCol::before {
+    backdrop-filter: none;
+  }
 }
 
 /* The right track paints the base ground on the transparent frame: while the
@@ -174,12 +176,6 @@
    and the incoming panel. The occupant's opaque panel covers this at rest. */
 :global([data-platform='darwin']) .rightbarCol {
   background: var(--dsw-alias-bg-base);
-}
-
-/* The darwin closed sidebar has no rail: the centre reaches the window edge,
-   where a separator would draw a seam against nothing. */
-:global([data-platform='darwin']) [data-sidebar-collapsed] .centerCol {
-  border-left: none;
 }
 
 /* Published while the shell.leading seat is mounted (same condition as the
@@ -305,7 +301,7 @@
   inset: 0 auto 0 0;
   z-index: 71;
   box-sizing: border-box;
-  border-right: none;
+  background: var(--dsw-specific-sidebar-fill);
   transform: translateX(0);
   visibility: visible;
   transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out);

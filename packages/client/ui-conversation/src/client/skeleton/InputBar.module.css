@@ -53,14 +53,11 @@
   width: 100%;
   max-width: var(--dsh-composer-card-max-width);
   padding-top: 8px;
-  /* Input stroke: the light neutral (l2, one step above the menus' l1),
-     drawn as the elevation hairline so it costs no layout; the shadow is the
-     soft elevation tier. Fill: the input surface token (elevated in dark). */
   border: 0;
-  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-panel);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-composer);
   background: var(--dsw-specific-input-major);
-  box-shadow: var(--dsw-elevation-soft);
+  box-shadow: var(--dsw-elevation-stroke), var(--dsw-alias-composer-shadow);
   /* The draft text follows the Settings font-size preference (the textarea,
      mirror, and backdrop all inherit from here, so the three layers stay in
      step); the line height keeps the default 10px leading via the shared px
@@ -74,6 +71,10 @@
      (see ui-theme styles/scrollbar.css for the rebinding contract). */
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.card:focus-within:not(.cardWorkspaceTrigger) {
+  --dsw-elevation-stroke: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-composer-action) 72%, var(--dsw-specific-input-major));
 }
 
 @media (pointer: coarse) {
@@ -96,7 +97,7 @@
   inset: 0;
   box-sizing: border-box;
   border: 1px dashed currentColor;
-  border-radius: var(--dsw-radius-panel);
+  border-radius: inherit;
   color: var(--dsw-alias-border-l4);
   transition: color 100ms ease;
   pointer-events: none;
@@ -219,14 +220,11 @@
   visibility: hidden;
 }
 
-/* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly.
-   Insets mirror .input's pads (the other right 4px sits on .scroll). One
-   ellipsized line: a wrapped second line would clip against the docked
-   36px floor. */
+/* A single line fits the docked input floor; insets match the editable text. */
 .placeholder {
   position: absolute;
   inset: 4px 8px auto 14px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-reading-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -383,9 +381,6 @@
   cursor: default;
 }
 
-/* Primary send (figma IconButton 34:10465): 34px circle, #3964FE light /
-   #679EFE dark — the info-fill pair (500→400), NOT button-primary (ink);
-   white glyph; empty text = 0.4 opacity. */
 .primary {
   display: grid;
   place-items: center;
@@ -393,15 +388,12 @@
   width: 34px;
   height: 34px;
   border: none;
-  border-radius: 999px;
-  corner-shape: round;
-  background: var(--dsw-alias-button-info-fill);
-  /* Static white, not the foreground token: the arrow stays white on the blue
-     fill in both themes (design 34:10465). */
-  color: #fff;
+  border-radius: var(--dsw-radius-toolbar-control);
+  background: var(--dsw-alias-composer-action);
+  color: var(--dsw-alias-label-primary-inverted);
   cursor: pointer;
   transition: background-color 100ms ease;
-  /* Opts out of the row's 2px downward shift (.row top pad): the send circle
+  /* Opts out of the row's 2px downward shift (.row top pad): the send button
      keeps its original seat while the smaller chips sit lower. Transform, not
      margin, so flex centering math is untouched. */
   transform: translateY(-2px);
@@ -409,19 +401,18 @@
 
 @media (hover: hover) {
   .primary:hover:not(:disabled) {
-    background: var(--dsw-alias-button-info-hover);
+    background: color-mix(in srgb, var(--dsw-alias-composer-action) 85%, var(--dsw-alias-reading-ink));
   }
 }
 
-.primary:disabled {
-  opacity: 0.4;
+.primary:disabled:not([data-sending]) {
+  background: var(--dsw-alias-composer-disabled);
+  color: var(--dsw-alias-reading-muted);
   cursor: default;
 }
 
-/* Sending: the message waits for the Host to accept it. The circle keeps its
-   full fill rather than the disabled fade, and an arc turns where the arrow was. */
+/* The spinner retains the active button fill while the Host accepts a message. */
 .primary[data-sending]:disabled {
-  opacity: 1;
   cursor: progress;
 }
 

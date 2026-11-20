@@ -419,6 +419,83 @@ body[data-ds-dark-theme] {
   --dsw-specific-tip: var(--dsw-static-neutral-bluish-800);
 }
 
+/* Shared window materials and selection colors for the sidebar, conversation and settings. */
+body {
+  --dsw-glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.76' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath d='M0 0h128v128H0z' filter='url(%23g)' opacity='.065'/%3E%3C/svg%3E");
+  --dsw-alias-window-shell:
+    radial-gradient(ellipse at 1% 0%, #f5f5f4, transparent 40%),
+    radial-gradient(ellipse at 10% 55%, #edeeed, transparent 48%),
+    radial-gradient(ellipse at 98% 94%, #f0f1f0, transparent 53%),
+    linear-gradient(152deg, #f1f2f1 5%, #ebedeb 50%, #e2e5e3);
+  --dsw-alias-sidebar-glass: var(--dsw-glass-grain), linear-gradient(125deg, #ffffff42, #ffffff0a 66%);
+  --dsw-alias-pane-shadow: 0 0 0 1px #62666226, 0 3px 13px #41454116;
+  --dsw-alias-glass-ink: #3b433d;
+  --dsw-alias-glass-secondary: #555d58;
+  --dsw-alias-glass-button: #ffffff83;
+  --dsw-alias-glass-tile: linear-gradient(150deg, #ffffff78, #ffffff32);
+  --dsw-alias-glass-tile-hover: #ffffffb3;
+  --dsw-alias-glass-selected: #f8fcf8e3;
+  --dsw-alias-glass-edge: #ffffffaa;
+  --dsw-alias-glass-shadow: 0 1px 3px #3f494116;
+  --dsw-alias-settings-shell:
+    var(--dsw-glass-grain),
+    radial-gradient(ellipse at 0% 0%, #f6f6f4df, transparent 51%),
+    linear-gradient(145deg, #f4f5f3df, #f0f2f0de 55%, #e7eae8df);
+  --dsw-alias-settings-scrim: rgb(43 62 49 / 12%);
+  --dsw-alias-settings-shadow: 0 18px 55px #30393329, 0 3px 9px #464a4716, inset 0 0 0 1px #ffffff40;
+  --dsw-alias-settings-control-fill: #f3f3f3;
+  --dsw-alias-settings-control-ink: #4d564f;
+  --dsw-alias-leaf-ink: #28674b;
+  --dsw-alias-leaf: #438564;
+  --dsw-alias-leaf-line: #96bba2;
+  --dsw-alias-leaf-wash: #f0f6f1;
+  --dsw-alias-reading-ink: #35363a;
+  --dsw-alias-reading-muted: #6a706b;
+  --dsw-alias-message-surface: #f7f7f6;
+  --dsw-alias-message-border: #e9eae9;
+  --dsw-alias-message-ink: #3f4540;
+  --dsw-alias-composer-shadow: 0 4px 14px #3c453e0d, 0 1px 2px #424b4309;
+  --dsw-alias-composer-action: #5e6b61;
+  --dsw-alias-composer-disabled: #edefed;
+}
+
+body[data-ds-dark-theme] {
+  --dsw-alias-window-shell:
+    radial-gradient(ellipse at 1% 0%, #303632, transparent 40%),
+    radial-gradient(ellipse at 10% 55%, #2b312e, transparent 48%),
+    linear-gradient(152deg, #252a27, #1d2220 55%, #191d1b);
+  --dsw-alias-sidebar-glass: var(--dsw-glass-grain), linear-gradient(125deg, #ffffff0a, transparent 66%);
+  --dsw-alias-pane-shadow: 0 0 0 1px #ffffff14, 0 3px 13px #0004;
+  --dsw-alias-glass-ink: #e3e9e4;
+  --dsw-alias-glass-secondary: #b6c0b8;
+  --dsw-alias-glass-button: #ffffff10;
+  --dsw-alias-glass-tile: linear-gradient(150deg, #ffffff0f, #ffffff06);
+  --dsw-alias-glass-tile-hover: #ffffff1c;
+  --dsw-alias-glass-selected: #414a43;
+  --dsw-alias-glass-edge: #ffffff1c;
+  --dsw-alias-glass-shadow: 0 1px 3px #0003;
+  --dsw-alias-settings-shell:
+    var(--dsw-glass-grain),
+    radial-gradient(ellipse at 0% 0%, #414741df, transparent 51%),
+    linear-gradient(145deg, #323834ed, #2c322feb 55%, #242b27eb);
+  --dsw-alias-settings-scrim: rgb(8 13 10 / 25%);
+  --dsw-alias-settings-shadow: 0 18px 55px #0005, 0 3px 9px #0004;
+  --dsw-alias-settings-control-fill: #313532;
+  --dsw-alias-settings-control-ink: #d1d8d3;
+  --dsw-alias-leaf-ink: #a5d6b7;
+  --dsw-alias-leaf: #79b996;
+  --dsw-alias-leaf-line: #587f65;
+  --dsw-alias-leaf-wash: #28382e;
+  --dsw-alias-reading-ink: #e5e8e5;
+  --dsw-alias-reading-muted: #a4ada7;
+  --dsw-alias-message-surface: #2a302c;
+  --dsw-alias-message-border: #3b433e;
+  --dsw-alias-message-ink: #dce3dd;
+  --dsw-alias-composer-shadow: 0 4px 14px #0003, 0 1px 2px #0002;
+  --dsw-alias-composer-action: #bdcdc0;
+  --dsw-alias-composer-disabled: #363d38;
+}
+
 /* Overlays without MenuSurface's opaque backing cannot blur page content over
  * native vibrancy reliably, so their fill stays nearly opaque on macOS. */
 html[data-platform='darwin'] body {

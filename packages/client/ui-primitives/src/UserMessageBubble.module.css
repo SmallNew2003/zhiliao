@@ -1,11 +1,13 @@
 .bubble {
+  box-sizing: border-box;
   max-width: 100%;
-  background: var(--dsw-specific-bubble);
-  border-radius: var(--dsw-radius-xl);
+  background: var(--dsw-alias-message-surface);
+  border: 1px solid var(--dsw-alias-message-border);
+  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) var(--dsw-radius-message-tail) var(--dsw-radius-lg);
   padding: 10px 16px;
   font-size: var(--dsh-content-font-size, 14px);
   line-height: calc(22px + var(--dsh-content-font-delta, 0px));
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-message-ink);
   white-space: pre-wrap;
   word-break: break-word;
 }

@@ -433,21 +433,23 @@ describe('web e2e: shipped right Sidebar', () => {
       const centerBefore = await width(conversation)
       await shot(page, '02a-collapsed-header-button')
 
-      // Opening squeezes by default: the column takes a track of the panel's
-      // width, the conversation gives up exactly that much room, and the header
-      // button leaves with the panel's arrival.
+      // The docked panel occupies the right track and replaces the window inset. The
+      // conversation gives up the rest of that track and its header button leaves.
       await expand.click()
       await expect.poll(async () => await frame.getAttribute('data-rightbar-collapsed')).toBe(null)
       await expect.poll(async () => await column.locator('[data-sidebar-right-open]').count()).toBe(1)
       const panelWidth = await width(column)
       expect(panelWidth).toBeGreaterThan(0)
-      expect(await width(conversation)).toBe(centerBefore - panelWidth)
+      expect(await width(conversation)).toBe(centerBefore + 8 - panelWidth)
       await expect.poll(async () => await expand.count()).toBe(0)
       // The corner seat collapses with its button, so the utilities' right edge
       // moves out toward the conversation's own.
       const utilitiesAfter = await utilities.boundingBox()
       const conversationAfter = await conversation.boundingBox()
       if (utilitiesAfter === null || conversationAfter === null) throw new Error('header is not rendered')
+      const docked = await column.boundingBox()
+      if (docked === null) throw new Error('right column is not rendered')
+      expect(conversationAfter.x + conversationAfter.width).toBe(docked.x)
       const gapAfter = (conversationAfter.x + conversationAfter.width) - (utilitiesAfter.x + utilitiesAfter.width)
       expect(gapAfter).toBeLessThan(gapBefore)
 

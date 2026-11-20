@@ -2,7 +2,7 @@
 open: main geometry retained; background inert; no resize handle
 close: Session navigation, Plugins navigation, mask and Escape
 retained: sidebar DOM and opener focus
-768px: 56px rail; main width 712px; drawer focus transfers to the rail toggle
+768px: 56px rail; main width 704px after the 8px window inset; drawer focus transfers to the rail toggle
 breakpoint motion: collapsed rail hides immediately and returns compact without crossfades; expanded sidebar and explicit toggles retain their slides
 767px: hidden drawer; main width 767px; no page overflow
 global panels: browser top inset 48px; macOS keeps its existing clearance

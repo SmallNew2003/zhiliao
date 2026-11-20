@@ -36,17 +36,24 @@ it('reserves bottom content height without remounting it on main-panel navigatio
       await page.goto(scaffold.authenticatedUrl)
       await page.locator('[data-shell-bottom]').waitFor({ state: 'attached' })
       const expected: string[] = []
-      const check = async (height: number, caption = 0) => {
+      const check = async (height: number, platform = 'browser') => {
         await expect.poll(async () => (await geometry(page)).bottom.height).toBe(height)
         const result = await geometry(page)
-        const viewportHeight = page.viewportSize()!.height
+        const { width, height: viewportHeight } = page.viewportSize()!
+        const caption = platform === 'windows' ? 40 : 0
+        const column = { top: caption, height: viewportHeight - caption - height, bottom: viewportHeight - height }
+        const bottomInset = width >= 768 ? 8 : 0
+        const topInset = platform === 'browser' ? bottomInset : 0
         expect(result.bottom).toEqual({ top: viewportHeight - height, height, bottom: viewportHeight })
-        expect(result.main).toEqual({ top: caption, height: viewportHeight - caption - height, bottom: viewportHeight - height })
-        expect(result.sidebar).toEqual(page.viewportSize()!.width < 768
-          ? { top: 0, height: viewportHeight, bottom: viewportHeight } : result.main)
-        expect(result.rightbar).toEqual(result.main)
+        expect(result.main).toEqual({
+          top: column.top + topInset,
+          height: column.height - topInset - bottomInset,
+          bottom: column.bottom - bottomInset,
+        })
+        expect(result.sidebar).toEqual(width < 768 ? { top: 0, height: viewportHeight, bottom: viewportHeight } : column)
+        expect(result.rightbar).toEqual(column)
         expect(result.overlay).toEqual({ top: 0, height: viewportHeight, bottom: viewportHeight })
-        for (const handle of result.handles) expect(handle).toEqual(result.main)
+        for (const handle of result.handles) expect(handle).toEqual(column)
         expect(result.pageHeight).toBe(viewportHeight)
         return result
       }
@@ -71,7 +78,7 @@ it('reserves bottom content height without remounting it on main-panel navigatio
           if (value === 'darwin') document.documentElement.setAttribute('data-platform', value)
           document.documentElement.style.setProperty('--dsh-windows-titlebar-height', '40px')
         }, platform)
-        expected.push(`${platform}: ${JSON.stringify(await check(360, platform === 'windows' ? 40 : 0))}`)
+        expected.push(`${platform}: ${JSON.stringify(await check(360, platform))}`)
       }
       await page.setViewportSize({ width: 520, height: 600 })
       await expect.poll(() => page.locator('[data-shell-bottom]').locator('..').getAttribute('data-sidebar-collapsed')).toBe('true')

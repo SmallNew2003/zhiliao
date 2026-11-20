@@ -139,6 +139,35 @@ describe('web e2e: sidebar search alignment and row action targets', () => {
     try { await browser?.close() } finally { await scaffold?.close() }
   })
 
+  it('places the shipped panel entries in one row beside the inset conversation pane', async () => {
+    const navigation = page.getByRole('navigation', { name: 'Global panels' })
+    const tiles = navigation.getByRole('button')
+    await expect.poll(() => tiles.count()).toBe(3)
+    const boxes = await tiles.evaluateAll(elements => elements.map((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect()
+      return { x, y, width, height }
+    }))
+    const [first, second, third] = boxes
+    if (first === undefined || second === undefined || third === undefined) throw new Error('Missing sidebar entry')
+    for (const box of boxes) {
+      expect(box.y).toBe(first.y)
+      expect(box.height).toBe(59)
+      expect(Math.abs(box.width - first.width)).toBeLessThan(1)
+    }
+    expect(second.x - first.x - first.width).toBeCloseTo(5, 1)
+    expect(third.x - second.x - second.width).toBeCloseTo(5, 1)
+    const pane = page.locator('[data-slot="main"]').locator('../..')
+    expect(await pane.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        top: rect.top,
+        right: innerWidth - rect.right,
+        bottom: innerHeight - rect.bottom,
+        radius: getComputedStyle(element).borderRadius,
+      }
+    })).toEqual({ top: 8, right: 8, bottom: 8, radius: '13px' })
+  })
+
   it('aligns the 32px expanded search with both edges of New session', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-sidebar-search-alignment'))
     const searchButton = page.getByRole('button', { name: 'Search sessions', exact: true })

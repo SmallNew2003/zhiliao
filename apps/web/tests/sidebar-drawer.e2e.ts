@@ -67,7 +67,7 @@ it.each(['light', 'dark'] as const)('keeps the macOS drawer opaque and excludes 
       await drawer.waitFor({ state: 'hidden' })
       await page.setViewportSize({ width: 1200, height: 800 })
       const sidebar = page.locator('[data-slot="sidebar"]').locator('..')
-      await expect.poll(() => sidebar.evaluate(el => getComputedStyle(el).backgroundImage)).not.toBe('none')
+      await expect.poll(() => sidebar.evaluate(el => getComputedStyle(el, '::before').backgroundImage)).not.toBe('none')
       const activeDragRows = page.locator('[data-window-drag]:not([inert] [data-window-drag])')
       expect(await activeDragRows.count()).toBeGreaterThan(0)
       expect(await activeDragRows.evaluateAll(rows => rows.every(row => getComputedStyle(row).getPropertyValue('app-region') === 'drag')))
@@ -372,7 +372,7 @@ it('overlays the conversation and closes after navigation without losing its sid
 
       await page.setViewportSize({ width: 768, height: 844 })
       await expect.poll(() => frame.count()).toBe(0)
-      await expect.poll(async () => Math.round((await main.boundingBox())!.width)).toBe(712)
+      await expect.poll(async () => Math.round((await main.boundingBox())!.width)).toBe(704)
       await page.setViewportSize({ width: 767, height: 844 })
       await expect.poll(() => frame.count()).toBe(1)
 
@@ -481,7 +481,7 @@ it('overlays the conversation and closes after navigation without losing its sid
         await expect.poll(() => frame.count()).toBe(0)
         await posture.send('Emulation.setDevicePostureOverride', { posture: { type: 'folded' } })
         await opener.tap()
-        await expect.poll(() => main.boundingBox()).toEqual({ x: 475.5, y: 0, width: 475.5, height: 669 })
+        await expect.poll(() => main.boundingBox()).toEqual({ x: 475.5, y: 8, width: 467.5, height: 653 })
         expect(await page.locator('[data-side="sidebar"]').count()).toBe(0)
         const foldSearch = page.getByPlaceholder('Search session names')
         if (!(await foldSearch.isVisible())) await page.getByRole('button', { name: 'Search sessions', exact: true }).tap()
@@ -491,7 +491,7 @@ it('overlays the conversation and closes after navigation without losing its sid
         await wideFrame.evaluate((el) => { el.style.setProperty('--ds-transition-duration-slow', '100s') })
         await posture.send('Emulation.clearDevicePostureOverride')
         await assertFoldResize(collapseSidebar, 475.5, 280)
-        await expect.poll(() => main.boundingBox()).toEqual({ x: 280, y: 0, width: 671, height: 669 })
+        await expect.poll(() => main.boundingBox()).toEqual({ x: 280, y: 8, width: 663, height: 653 })
         expect(await page.locator('[data-side="sidebar"]').count()).toBe(1)
         expect(await foldSearch.evaluate(el => el === document.activeElement)).toBe(true)
         expect(await foldSearch.inputValue()).toBe('fold search')
@@ -580,7 +580,7 @@ it('overlays the conversation and closes after navigation without losing its sid
         'open: main geometry retained; background inert; no resize handle',
         'close: Session navigation, Plugins navigation, mask and Escape',
         'retained: sidebar DOM and opener focus',
-        '768px: 56px rail; main width 712px; drawer focus transfers to the rail toggle',
+        '768px: 56px rail; main width 704px after the 8px window inset; drawer focus transfers to the rail toggle',
         'breakpoint motion: collapsed rail hides immediately and returns compact without crossfades; expanded sidebar and explicit toggles retain their slides',
         '767px: hidden drawer; main width 767px; no page overflow',
         'global panels: browser top inset 48px; macOS keeps its existing clearance',

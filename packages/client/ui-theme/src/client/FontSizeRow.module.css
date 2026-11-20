@@ -38,7 +38,7 @@
 
 .title {
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 22px;
   color: var(--dsw-alias-label-primary);
 }
@@ -64,7 +64,7 @@
   justify-content: center;
   min-width: 72px;
   height: 36px;
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-bg-module-platform);
 }
 

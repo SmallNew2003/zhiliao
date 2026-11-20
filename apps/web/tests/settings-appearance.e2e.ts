@@ -127,7 +127,7 @@ it('uses 16px text for coarse-pointer font fields and preserves compact fine-poi
 })
 
 it('shares settings card materials and control sizes in both palettes', async () => {
-  const scaffold = await launchWebScaffold({})
+  const scaffold = await launchWebScaffold({ developerTools: true })
   onTestFinished(() => scaffold.close())
   await scaffold.ctx.settings.mutate('ui-settings-account', [
     { op: 'set', path: ['step'], value: 'done' },
@@ -168,8 +168,10 @@ it('shares settings card materials and control sizes in both palettes', async ()
     await dialog.getByRole('button', { name: label, exact: true }).click()
     await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme'))).toBe(palette === 'dark')
     const selector = await appearance(dialog.getByRole('button', { name: '工作区内修改', exact: true }))
-    expect(selector.radius).toBe('12px')
-    expect((await appearance(dialog)).radius).toBe('28px')
+    const selectedTheme = await appearance(dialog.getByRole('button', { name: label, exact: true, pressed: true }))
+    const activeSection = await appearance(dialog.getByRole('navigation').locator('[aria-current="true"]'))
+    const enabledSwitch = await appearance(dialog.getByRole('switch', { name: '显示代码工作视图', checked: true }))
+    expect((await appearance(dialog)).radius).toBe('20px')
 
     await dialog.getByRole('button', { name: '账号与余额', exact: true }).click()
     const section = dialog.getByRole('region', { name: '账号与余额', exact: true })
@@ -207,8 +209,8 @@ it('shares settings card materials and control sizes in both palettes', async ()
     expect(await appearance(field)).toMatchObject({ radius: '12px', height: 32 })
     const save = await appearance(dialog.getByRole('button', { name: '保存', exact: true }))
     expect(save).toMatchObject({ radius: '12px', height: 36 })
-    await compareOrRefreshGolden(join(EXPECTED, `${palette}.expected.md`),
-      JSON.stringify({ card: material, selector, usage, topUp, save }, null, 2), webSnapshotMode())
+    const paletteSnapshot = { card: material, selector, selectedTheme, activeSection, enabledSwitch, usage, topUp, save }
+    await compareOrRefreshGolden(join(EXPECTED, `${palette}.expected.md`), JSON.stringify(paletteSnapshot, null, 2), webSnapshotMode())
     await dialog.getByRole('button', { name: '取消', exact: true }).click()
   }
 })

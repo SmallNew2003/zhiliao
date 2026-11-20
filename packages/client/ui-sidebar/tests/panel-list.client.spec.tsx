@@ -225,6 +225,20 @@ describe('sidebar global panels', () => {
     }
   })
 
+  it('shows the full label on keyboard focus when an expanded entry is truncated', async () => {
+    const { runtime, locale, view } = await bench()
+    await mountPanels(runtime, locale)
+    await mountProbeActions(runtime)
+    for (const name of ['Alpha panel', 'More']) {
+      const button = view.getByRole('button', { name })
+      Object.defineProperty(within(button).getByText(name), 'scrollWidth', { value: 120 })
+      act(() => { button.focus() })
+      expect(view.getByRole('tooltip').textContent).toBe(name)
+      act(() => { button.blur() })
+      expect(view.queryByRole('tooltip')).toBeNull()
+    }
+  })
+
   it('keeps registration order when panel rows have equal order', async () => {
     const { runtime, locale, view } = await bench()
     await mountPanels(runtime, locale, 20)
